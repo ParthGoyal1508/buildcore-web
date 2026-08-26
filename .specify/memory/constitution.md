@@ -1,50 +1,138 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: (template) → 1.0.0
+- Modified principles: n/a (initial ratification)
+- Added sections:
+  - Core Principles: I. Component-Based Architecture, II. No Inline Styling (NON-NEGOTIABLE),
+    III. Centralized Constants & Configuration (NON-NEGOTIABLE), IV. Type Safety & Validation,
+    V. API Access Boundary (NON-NEGOTIABLE)
+  - Technology Stack & Standards
+  - Development Workflow & Quality Gates
+  - Governance
+- Removed sections: none (first concrete draft from template scaffold)
+- Deferred / TODO items:
+  - TODO(TESTING_STANDARD): No test framework is installed yet (no Jest/Vitest/Playwright in
+    package.json). Section "Development Workflow & Quality Gates" records this as a known gap
+    rather than inventing an unused policy; adopt a framework and amend this constitution (MINOR
+    bump) once introduced.
+  - TODO(CODE_REVIEW_PROCESS): No formal reviewer/approval policy was supplied. A baseline
+    "at least one review before merge" rule is recorded below; tighten it (e.g. required
+    reviewers, CODEOWNERS) via amendment if the team adopts something stricter.
+-->
+
+# BuildCore Web Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Component-Based Architecture
+Every UI element MUST be a small, single-purpose React component colocated under `app/` following
+Next.js App Router conventions (route segments own their `page.tsx`/`layout.tsx`; shared/reusable
+pieces live under `app/ui/`, grouped by feature or domain — e.g. `app/ui/dashboard/`). Components
+MUST default to Server Components; a component is marked `"use client"` only when it needs
+interactivity, browser APIs, or React hooks that require the client runtime, and that boundary
+MUST be pushed as far down the tree as possible. Business/data logic (API calls, data shaping)
+MUST live in `app/lib/`, not inline inside component bodies — components render, `lib` computes.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+**Rationale**: App Router's server/client split is a performance and security boundary, not a
+style choice; keeping logic out of components keeps both testable and keeps client bundles small.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. No Inline Styling (NON-NEGOTIABLE)
+Components MUST NOT use the inline `style={}` prop or hardcoded inline CSS. All styling MUST be
+expressed through Tailwind utility classes (per `tailwind.config.ts`) or, for styles Tailwind
+cannot express (e.g. `@font-face`, complex keyframes), through the project's global stylesheet
+(`app/ui/global.css`). Conditional/dynamic class composition MUST use the existing `clsx` utility
+rather than string concatenation or inline style objects. The only narrow exception is a numeric
+value that is genuinely computed at runtime from data (e.g. a chart bar's pixel height) and cannot
+be expressed as a class — such cases MUST be isolated to a single, clearly-named line and MUST NOT
+be used to smuggle in general-purpose styling.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Rationale**: Inline styles bypass Tailwind's design tokens, break dark-mode/theming
+consistency, cannot be purged/optimized, and are invisible to linting — they silently fragment the
+design system.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Centralized Constants & Configuration (NON-NEGOTIABLE)
+Components and modules MUST NOT hardcode literal strings, URLs, magic numbers, or user-facing copy
+directly inline. Such values MUST be sourced from a centralized location:
+- Cross-cutting constants (routes, limits, magic numbers, shared labels) MUST live in a dedicated
+  `app/lib/constants.ts` (or a `constants/` module if the set grows large enough to split by
+  domain).
+- Environment-dependent values (API base URLs, feature flags, secrets) MUST come from environment
+  variables surfaced through `app/lib/config.ts` (or equivalent), never read as a raw
+  `process.env.X` scattered across components, and never hardcoded as a literal URL/string in a
+  component.
+- User-facing copy that is domain content (not a one-off developer-facing label) MUST be sourced
+  from a constants/content module so copy changes do not require hunting through JSX.
+A code review MUST reject a new literal (string, URL, or magic number) introduced directly in a
+component or route handler when a constants/config module is the appropriate home for it.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**Rationale**: Scattered literals are the single biggest cause of drift between environments
+(dev/staging/prod), duplicated/inconsistent copy, and error-prone renames; centralizing them makes
+the codebase greppable and safely refactorable.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Type Safety & Validation
+TypeScript `strict` mode (already enabled in `tsconfig.json`) MUST remain on and MUST NOT be
+weakened with `any`, `@ts-ignore`, or non-null assertions used to silence real type errors. Any
+data crossing a trust boundary — API responses from `buildcore-api`, form input, environment
+variables — MUST be validated at runtime with a `zod` schema before the application trusts its
+shape; the inferred `z.infer` type, not a hand-written duplicate interface, MUST be used downstream.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Rationale**: `strict` TypeScript catches internal mistakes at compile time; `zod` at the
+boundary catches the mistakes TypeScript cannot see — a backend contract change or a malformed
+response.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. API Access Boundary (NON-NEGOTIABLE)
+This application MUST NOT access a database directly and MUST NOT embed raw SQL or an ORM. All
+data access MUST go through `buildcore-api` via the typed fetch wrapper in `app/lib/api/`
+(`client.ts` and per-domain modules such as `auth.ts`). New backend calls MUST be added as a typed
+function in `app/lib/api/`, not as an ad-hoc `fetch()` call inside a component.
+
+**Rationale**: This is an explicit architectural decision recorded in the project README — the
+direct-Postgres demo plumbing from the original course starter was deliberately removed. Keeping a
+single API boundary is what makes the documented token-handling and backend-contract work
+(HLD §9.1) tractable.
+
+## Technology Stack & Standards
+
+- **Framework**: Next.js (App Router) on React 19, TypeScript 5 in `strict` mode.
+- **Styling**: Tailwind CSS via `tailwind.config.ts` and `@tailwindcss/forms`; no CSS-in-JS
+  library is in use, and none should be introduced without a constitution amendment.
+- **Forms & validation**: `react-hook-form` paired with `@hookform/resolvers` and `zod` schemas
+  for all forms; new forms MUST follow this same pattern rather than uncontrolled inputs or manual
+  validation.
+- **Class composition**: `clsx` for conditional Tailwind class strings.
+- **Linting**: `next lint` (ESLint via Next.js' built-in config) MUST pass with no errors before
+  merge.
+- Dependencies referenced in `README.md` as "not here yet" (`shadcn/ui`, `@tanstack/react-query`,
+  `zustand`, `@serwist/next`, `lucide-react`, generated OpenAPI types) are pre-approved additions
+  when the feature that needs them lands; adding a *different* new architectural dependency (a
+  second styling system, a second HTTP client, a second form library) requires a constitution
+  amendment first.
+
+## Development Workflow & Quality Gates
+
+- Every change MUST pass `npm run lint` and a TypeScript build/typecheck (`next build` or
+  equivalent `tsc --noEmit`) before merge.
+- Every change MUST be reviewed by at least one other person before merging to the main branch;
+  a reviewer MUST explicitly check for violations of Principles II, III, and V (inline styles,
+  hardcoded literals, direct data access) since these are the non-negotiable articles most likely
+  to be introduced accidentally.
+- **Known gap**: no automated test framework is installed yet (see Sync Impact Report). Until one
+  is adopted, reviewers substitute manual verification (running the affected page/flow locally)
+  for automated test coverage. Introducing a test framework (e.g. Vitest, Playwright) requires
+  only a MINOR constitution amendment to record the resulting standard, not a MAJOR one.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes ad-hoc conventions for anything it explicitly covers. Amendments
+require:
+1. A documented rationale for the change (what problem it solves or what it corrects).
+2. A version bump per semantic versioning: MAJOR for removing/redefining a principle, MINOR for
+   adding a principle or materially expanding guidance, PATCH for wording/clarification fixes.
+3. Updating the Sync Impact Report at the top of this file.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+All pull requests MUST be checked against this constitution as part of review (see Development
+Workflow & Quality Gates); a reviewer who approves a change that knowingly violates a
+NON-NEGOTIABLE principle MUST record the justification in the PR description, and that
+justification MUST itself prompt a constitution amendment if the exception is expected to recur.
+
+**Version**: 1.0.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-08-26
