@@ -1,0 +1,306 @@
+---
+
+description: "Task list for feature implementation"
+---
+
+# Tasks: My Workspace Frontend (Punch, Leave, Salary, Face Enrolment)
+
+**Input**: Design documents from `/specs/003-my-workspace/`
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md,
+contracts/my-workspace-ui.md, quickstart.md
+
+**Tests**: Not included — no automated test framework is installed in `buildcore-web` yet
+(constitution's documented gap); verification is manual via `quickstart.md`, especially for
+camera/GPS/offline behaviors that are inherently hard to automate without device-API mocking
+infrastructure this repo doesn't have.
+
+**Organization**: Tasks are grouped by user story (from spec.md) to enable independent
+implementation and testing of each story. All paths are in this repo (`buildcore-web`) — the
+backend this feature consumes is a separate, already-fully-specced feature in the sibling
+`buildcore-api` repo (`specs/003-my-workspace-backend`) and is not re-tasked here.
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: Can run in parallel (different files, no dependencies)
+- **[Story]**: Which user story this task belongs to (US1–US7)
+- Every task includes an exact file path
+
+---
+
+## Phase 1: Setup (Shared Infrastructure)
+
+- [ ] T001 Add `@serwist/next` to `package.json` and configure service-worker registration for
+      offline app-shell caching (research.md §5)
+- [ ] T002 [P] Add `/my/*` routes, user-facing copy, and the GPS accuracy threshold to
+      `app/lib/constants.ts`
+- [ ] T003 [P] Create `app/lib/offline-queue.ts`: native IndexedDB wrapper —
+      `enqueue(entry)`, `drainQueue()`, `getQueuedCount()` (research.md §5, data-model.md
+      "OfflineQueueEntry")
+- [ ] T004 [P] Create `zod` schemas for `FaceEnrolmentStatus`, `PunchResult`, `AttendanceDay`,
+      `LeaveBalance`, `LeaveApplication`, `SalarySlip`, `ReEnrolmentState` in
+      `app/lib/api/my-workspace.ts` (schema definitions only, functions per-story)
+
+**Checkpoint**: Service worker, constants, offline-queue module, and response schemas ready.
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete.
+
+- [ ] T005 Create `app/my/layout.tsx`: bottom tab bar shell (Punch/Leave/Salary/Face-Enrol),
+      registers the `window.addEventListener('online', ...)` listener that calls
+      `offline-queue.ts`'s `drainQueue()` (research.md §5)
+- [ ] T005a Extend `middleware.ts` (introduced by feature 001, already extended by feature 002 for
+      `/dashboard/settings/*`) so its route matcher/protected-paths config also covers `/my/*`,
+      redirecting an unauthenticated request to `/login` — spec FR-016, SC-007. This is a new
+      top-level route tree outside `/dashboard/*`, so it is not covered by the existing matcher
+      without this change.
+- [ ] T006 [P] Create `app/ui/my/camera-capture.tsx`: shared live-preview capture component
+      wrapping `getUserMedia` (research.md §3), with a clear error state for denied/unavailable
+      camera (spec FR-015)
+- [ ] T007 [P] Add the cross-shell "Admin Dashboard" link to `app/my/layout.tsx`'s bottom-nav
+      area (visible only for a dual-role token) and a "My Workspace" entry to
+      `app/ui/dashboard/nav-links.tsx` — research.md §2, spec FR-017
+- [ ] T008 [P] Create a `ResponsiveList`-reuse import path from the Settings feature (or confirm
+      `app/ui/settings/responsive-list.tsx` is reusable as-is) for this feature's tabular data —
+      research.md §9
+
+**Checkpoint**: Shell, camera component, cross-navigation, and the reusable list pattern ready —
+user story implementation can now begin in parallel.
+
+---
+
+## Phase 3: User Story 1 - Enrol face biometrics (Priority: P1) 🎯 MVP
+
+**Goal**: An employee can capture 3–5 photos, acknowledge consent, and enrol; consent withdrawal
+reverts status.
+
+**Independent Test**: Enrol with 3 photos + consent, confirm "Enrolled" status; withdraw consent,
+confirm reversion.
+
+### Implementation for User Story 1
+
+- [ ] T009 [P] [US1] Add `getEnrolmentStatus()`, `enrol()`, `withdrawConsent()` to
+      `app/lib/api/my-workspace.ts`
+- [ ] T010 [US1] Create `app/ui/my/face-enrolment-status.tsx`: status badge, photo-capture flow
+      (uses `CameraCapture`, T006), running counter/thumbnail grid, consent method + acknowledgement,
+      Enrol action disabled until ≥3 photos + consent (depends on T006, T009) — native `<label>`/
+      `<button>` elements and full keyboard operability for every non-camera control, per spec
+      FR-020
+- [ ] T011 [US1] Create `app/my/face-enrol/page.tsx` (depends on T010)
+- [ ] T012 [US1] Wire the locked/hidden state for an already-enrolled employee, replaced by the
+      re-enrolment entry point (US7 will extend this) — spec FR-003
+
+**Checkpoint**: User Story 1 fully functional and independently testable.
+
+---
+
+## Phase 4: User Story 2 - Punch in/out with camera and GPS (Priority: P1)
+
+**Goal**: An enrolled employee can punch in/out with live clock, camera capture, and GPS.
+
+**Independent Test**: Punch in (camera+GPS) → IN TIME populates; punch out → OUT TIME/WORKED
+populate.
+
+### Implementation for User Story 2
+
+- [ ] T013 [P] [US2] Add `submitPunch()` to `app/lib/api/my-workspace.ts`
+- [ ] T014 [US2] Create `app/ui/my/punch-clock.tsx`: server-synced live clock (research.md §7), IN/
+      OUT/WORKED info boxes, Punch In/Out button (uses `CameraCapture` T006 +
+      `navigator.geolocation`, client-side accuracy gate per research.md §4/spec FR-007, and a
+      distinct location-permission-denied error state — separate from the accuracy check — per
+      spec FR-015)
+- [ ] T015 [US2] Wire the payroll-locked proactive banner and rejection message on `punch-clock.tsx`
+      — spec FR-006
+- [ ] T016 [US2] Wire the non-blocking exception notice (face-match/geofence exception result from
+      `submitPunch()`'s response) on `punch-clock.tsx` — spec FR-005
+- [ ] T017 [US2] Create `app/my/punch/page.tsx` rendering `PunchClock` (depends on T014)
+- [ ] T018 [US2] Wire the double-tap guard (disable Punch button immediately on tap until the
+      in-flight request resolves) — spec Edge Cases
+
+**Checkpoint**: User Stories 1 AND 2 both independently functional.
+
+---
+
+## Phase 5: User Story 3 - View attendance history (Priority: P2)
+
+**Goal**: Monthly attendance history table with month/year navigation and status badges.
+
+**Independent Test**: Navigate months, confirm correct status badges per day; empty months show
+empty state.
+
+### Implementation for User Story 3
+
+- [ ] T019 [P] [US3] Add `getAttendanceHistory()` to `app/lib/api/my-workspace.ts`
+- [ ] T020 [US3] Create `app/ui/my/attendance-history.tsx`: `ResponsiveList`-based (T008) table
+      with month/year navigation and distinct status badge styling (Present/Absent/Weekly Off/
+      Holiday/On Leave) — spec FR-008
+- [ ] T021 [US3] Register `attendance-history.tsx` on `app/my/punch/page.tsx` (T017)
+
+**Checkpoint**: User Stories 1–3 independently functional.
+
+---
+
+## Phase 6: User Story 4 - Apply for and manage leave (Priority: P2)
+
+**Goal**: View balance, apply for leave with day-count preview, cancel pending, see decisions on
+next view.
+
+**Independent Test**: View balance, apply within it, confirm Pending; cancel it.
+
+### Implementation for User Story 4
+
+- [ ] T022 [P] [US4] Add `getLeaveBalance()`, `getLeaveApplications()`, `applyLeave()`,
+      `cancelLeaveApplication()` to `app/lib/api/my-workspace.ts`
+- [ ] T023 [US4] Create `app/ui/my/leave-balance.tsx`: balance table with financial-year selector
+      — spec FR-010
+- [ ] T024 [US4] Create `app/ui/my/apply-leave-form.tsx`: type/date-range/reason fields, live
+      day-count preview (excludes weekends/holidays, matching backend logic — research.md,
+      contracts/my-workspace-ui.md), inline over-balance blocking for non-LWP types — spec FR-011;
+      native `<label>`/`<button>` elements and full keyboard operability, per spec FR-020
+- [ ] T025 [US4] Create `app/ui/my/leave-applications.tsx`: `ResponsiveList`-based (T008) table
+      with status badges and a Cancel action shown only for Pending — spec FR-010, FR-012
+- [ ] T026 [US4] Create `app/my/leave/page.tsx` rendering all three (depends on T023–T025)
+
+**Checkpoint**: User Stories 1–4 independently functional.
+
+---
+
+## Phase 7: User Story 5 - View and download salary slip (Priority: P2)
+
+**Goal**: Month selector limited to Processed/Paid, slip view, PDF download.
+
+**Independent Test**: Month selector excludes Draft; view and download return matching figures.
+
+### Implementation for User Story 5
+
+- [ ] T027 [P] [US5] Add `getAvailablePeriods()`, `getSalarySlip()`, `downloadSalarySlipPdf()`
+      (research.md §8) to `app/lib/api/my-workspace.ts`
+- [ ] T028 [US5] Create `app/ui/my/salary-slip.tsx`: month selector, slip view (all PRD-specified
+      sections), Download action triggering a browser save via object URL — spec FR-013
+- [ ] T029 [US5] Create `app/my/salary/page.tsx` rendering `SalarySlip` (depends on T028)
+- [ ] T030 [US5] Wire the empty state for an employee with no Processed/Paid months yet — spec
+      Acceptance Scenario 4
+
+**Checkpoint**: User Stories 1–5 independently functional.
+
+---
+
+## Phase 8: User Story 6 - Punch while offline (Priority: P3)
+
+**Goal**: A punch made offline queues locally and auto-syncs on reconnect, preserving capture time.
+
+**Independent Test**: Simulate offline, punch, confirm "Queued" indicator; restore connectivity,
+confirm auto-sync with original capture time.
+
+### Implementation for User Story 6
+
+- [ ] T031 [US6] Wire `punch-clock.tsx` (T014) to detect `navigator.onLine === false` or a network-
+      error `submitPunch()` failure and route the punch into `offline-queue.ts`'s `enqueue()`
+      (T003) instead of failing outright — spec FR-009
+- [ ] T032 [US6] Add a "Queued — will sync when online" indicator to `punch-clock.tsx`, sourced
+      from `offline-queue.ts`'s `getQueuedCount()`
+- [ ] T033 [US6] Wire `app/my/layout.tsx`'s `online` listener (T005) to call `drainQueue()`, which
+      calls `submitPunch()` for each queued entry in capture order and removes it on success
+- [ ] T034 [US6] Wire a per-punch failure notice (e.g. backend rejects a too-old `capturedAt`) when
+      `drainQueue()`'s submission fails, rather than silently dropping or retrying forever — spec
+      Acceptance Scenario 4
+
+**Checkpoint**: User Stories 1–6 independently functional.
+
+---
+
+## Phase 9: User Story 7 - Request and complete biometric re-enrolment (Priority: P3)
+
+**Goal**: Request re-enrolment, see pending/approved/rejected state, complete fresh capture within
+the granted window.
+
+**Independent Test**: Request → (admin approves elsewhere) → "Re-enrol Now" appears → complete →
+old state replaced, action consumed.
+
+### Implementation for User Story 7
+
+- [ ] T035 [P] [US7] Add `getReEnrolmentState()`, `requestReEnrolment()`, `completeReEnrolment()`
+      to `app/lib/api/my-workspace.ts`
+- [ ] T036 [US7] Extend `face-enrolment-status.tsx` (T010) with the re-enrolment states: "Request
+      Re-enrolment" action (reason selection, disabled while pending), "Pending Approval" badge,
+      rejected-with-remarks display, and the one-time "Re-enrol Now" action (reuses `CameraCapture`
+      T006 for fresh capture) — spec FR-014; same native-element/keyboard-operability standard as
+      T010, per spec FR-020
+- [ ] T037 [US7] Wire the unlock-unavailable states (no request, already consumed, expired after 7
+      days) to hide "Re-enrol Now" appropriately — spec Acceptance Scenario 5
+
+**Checkpoint**: All seven user stories independently functional.
+
+---
+
+## Phase 10: Polish & Cross-Cutting Concerns
+
+- [ ] T038 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
+- [ ] T039 [P] Manually verify every camera- and location-dependent action shows a clear error
+      state when permission is denied/unavailable — spec FR-015/SC-002
+- [ ] T040 [P] Manually verify every non-camera interactive control across all screens is
+      keyboard-operable with a visible focus indicator — spec FR-020/SC-008
+- [ ] T041 [P] Manually verify attendance-history and leave-applications tables render as cards at
+      a mobile viewport (reusing Settings' established pattern) — spec FR-018
+- [ ] T042 Run the full `quickstart.md` validation scenarios end-to-end (including offline and
+      re-enrolment) against a local environment and record results
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: No dependencies — can start immediately
+- **Foundational (Phase 2)**: Depends on Setup — BLOCKS all user stories
+- **User Stories (Phase 3–9)**: All depend on Foundational
+  - US1 (Enrolment) has no dependency on other stories; US7 (Re-enrolment) directly extends its
+    component (T010) and must follow it
+  - US2 (Punch) can build in parallel with US1 (using a test-seeded enrolled employee); US6
+    (Offline sync) directly extends its component (T014) and must follow it
+  - US3 (History) registers onto US2's page (T017) — build after US2's shell exists, though its own
+    logic is independent
+  - US4 (Leave) and US5 (Salary) are both fully independent of US2/US3/US6/US7
+- **Polish (Phase 10)**: Depends on all desired user stories being complete
+
+### Parallel Opportunities
+
+- All Setup tasks marked [P] can run in parallel
+- Within Foundational, T006–T008 can run in parallel (T005 is the shell all of them attach to,
+  build first)
+- Once Foundational completes: US1, US4, US5 can proceed fully in parallel; US2 can proceed in
+  parallel too but US6 must wait on it; US3 waits on US2's page shell; US7 waits on US1's component
+
+---
+
+## Parallel Example: User Story 1
+
+```bash
+# Launch independent pieces of User Story 1 together:
+Task: "Add getEnrolmentStatus/enrol/withdrawConsent to app/lib/api/my-workspace.ts"
+Task: "Create app/ui/my/face-enrolment-status.tsx"
+```
+
+---
+
+## Implementation Strategy
+
+### MVP First (User Stories 1 + 2 Only)
+
+1. Complete Phase 1: Setup
+2. Complete Phase 2: Foundational (CRITICAL — blocks all stories)
+3. Complete Phase 3: User Story 1 (Enrolment)
+4. Complete Phase 4: User Story 2 (Punch)
+5. **STOP and VALIDATE**: Run quickstart.md Scenarios 1–2 independently
+6. Deploy/demo if ready — core self-service biometric attendance on a phone
+
+### Incremental Delivery
+
+1. Setup + Foundational → foundation ready (shell, camera component, offline-queue module)
+2. US1 (Enrolment) → US2 (Punch) → test independently → MVP
+3. US3 (History) → US4 (Leave) → US5 (Salary) → each tested independently → full self-service
+   portal
+4. US6 (Offline sync) → US7 (Re-enrolment) → each tested independently → resilience + biometric
+   lifecycle complete
