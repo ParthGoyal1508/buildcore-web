@@ -1,16 +1,14 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0
-- Modified principles: n/a (initial ratification)
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: n/a
 - Added sections:
-  - Core Principles: I. Component-Based Architecture, II. No Inline Styling (NON-NEGOTIABLE),
-    III. Centralized Constants & Configuration (NON-NEGOTIABLE), IV. Type Safety & Validation,
-    V. API Access Boundary (NON-NEGOTIABLE)
-  - Technology Stack & Standards
-  - Development Workflow & Quality Gates
-  - Governance
-- Removed sections: none (first concrete draft from template scaffold)
-- Deferred / TODO items:
+  - Core Principles: VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) — the product ships as
+    a PWA (`@serwist/next`, already pre-approved in Technology Stack) whose primary users
+    (site-level staff) are expected to be on phones/tablets in the field, so this was promoted to
+    a NON-NEGOTIABLE principle rather than left as an unstated assumption.
+- Removed sections: none
+- Deferred / TODO items (carried over, unchanged):
   - TODO(TESTING_STANDARD): No test framework is installed yet (no Jest/Vitest/Playwright in
     package.json). Section "Development Workflow & Quality Gates" records this as a known gap
     rather than inventing an unused policy; adopt a framework and amend this constitution (MINOR
@@ -91,6 +89,22 @@ direct-Postgres demo plumbing from the original course starter was deliberately 
 single API boundary is what makes the documented token-handling and backend-contract work
 (HLD §9.1) tractable.
 
+### VI. Responsive & Mobile-First Design (NON-NEGOTIABLE)
+Every screen and component MUST render correctly across mobile, tablet, and desktop viewports,
+built mobile-first: base Tailwind classes target the smallest viewport, with `sm:`/`md:`/`lg:`/
+`xl:` variants layering on larger-viewport adjustments — never the reverse (a desktop layout with
+mobile treated as an override). Interactive elements MUST have a minimum 44×44px touch target.
+Layouts MUST NOT depend on fixed pixel widths that break below common mobile widths (320–428px),
+and no action MUST be reachable only via a hover-only interaction (hover MAY enhance, never gate).
+This application is the client for BuildCore's PWA (`@serwist/next`, already listed as a
+pre-approved "not here yet" dependency in Technology Stack) — every new screen MUST be checked at a
+mobile viewport before merge, not retrofitted afterward.
+
+**Rationale**: BuildCore ships as a PWA whose primary users on several roles (Site Engineer, Site
+User, and other field-facing roles) are expected to use it on phones/tablets on site, not desktops
+in an office — a desktop-first design would fail its actual primary audience, not merely degrade
+gracefully for a secondary one.
+
 ## Technology Stack & Standards
 
 - **Framework**: Next.js (App Router) on React 19, TypeScript 5 in `strict` mode.
@@ -113,9 +127,12 @@ single API boundary is what makes the documented token-handling and backend-cont
 - Every change MUST pass `npm run lint` and a TypeScript build/typecheck (`next build` or
   equivalent `tsc --noEmit`) before merge.
 - Every change MUST be reviewed by at least one other person before merging to the main branch;
-  a reviewer MUST explicitly check for violations of Principles II, III, and V (inline styles,
-  hardcoded literals, direct data access) since these are the non-negotiable articles most likely
-  to be introduced accidentally.
+  a reviewer MUST explicitly check for violations of Principles II, III, V, and VI (inline styles,
+  hardcoded literals, direct data access, non-responsive/desktop-only layouts) since these are the
+  non-negotiable articles most likely to be introduced accidentally.
+- New/changed screens MUST be manually checked at a mobile viewport (browser dev tools device
+  emulation, minimum) before merge, per Principle VI — until an automated test framework is
+  adopted (see Known gap below), this is a manual review step, not an automated gate.
 - **Known gap**: no automated test framework is installed yet (see Sync Impact Report). Until one
   is adopted, reviewers substitute manual verification (running the affected page/flow locally)
   for automated test coverage. Introducing a test framework (e.g. Vitest, Playwright) requires
@@ -135,4 +152,4 @@ Workflow & Quality Gates); a reviewer who approves a change that knowingly viola
 NON-NEGOTIABLE principle MUST record the justification in the PR description, and that
 justification MUST itself prompt a constitution amendment if the exception is expected to recur.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-08-26
+**Version**: 1.1.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-08-27
