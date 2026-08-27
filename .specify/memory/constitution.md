@@ -1,8 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
+- Version change: 1.1.0 → 1.2.0
 - Modified principles: n/a
 - Added sections:
+  - Technology Stack & Standards: pre-approved `recharts` as this project's charting library, per
+    the user's explicit choice when asked — the Machinery feature's Equipment Utilization Report
+    (a horizontal stacked-bar band distribution) is the first consumer; no chart-like visual
+    existed anywhere in `buildcore-web` before this.
+- Previous amendment (v1.1.0, for reference, unchanged):
   - Core Principles: VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) — the product ships as
     a PWA (`@serwist/next`, already pre-approved in Technology Stack) whose primary users
     (site-level staff) are expected to be on phones/tablets in the field, so this was promoted to
@@ -121,6 +126,10 @@ gracefully for a secondary one.
   when the feature that needs them lands; adding a *different* new architectural dependency (a
   second styling system, a second HTTP client, a second form library) requires a constitution
   amendment first.
+- **Charting**: `recharts` is pre-approved for any screen that needs a data visualization (chart,
+  graph, proportional/stacked bar) beyond what a plain styled element can express. A second,
+  materially different charting mechanism (a canvas-based library, a hosted charting service)
+  still requires its own amendment before introduction.
 
 ## Development Workflow & Quality Gates
 
@@ -152,4 +161,4 @@ Workflow & Quality Gates); a reviewer who approves a change that knowingly viola
 NON-NEGOTIABLE principle MUST record the justification in the PR description, and that
 justification MUST itself prompt a constitution amendment if the exception is expected to recur.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-08-27
+**Version**: 1.2.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-08-27
