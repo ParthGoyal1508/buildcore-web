@@ -38,15 +38,12 @@ stale hints. If the API returns no row (`inStock: 0`), the hint shows "No stock 
 from a previous page load. A lightweight dedicated endpoint avoids re-fetching the full stock
 table.
 
-## 5. Payment modal: live unallocated-balance counter
+## 5. Payment modal: informational outstanding-balance label (corrected, see §9)
 
-**Decision**: The Payment modal renders an allocation table below the main payment fields.
-Each bill row has an Amount input. A `watch` on all allocation inputs drives:
-- `allocated = sum(all allocation inputs)`
-- `unallocated = paymentAmount − allocated`
-- If `unallocated < 0`: show in red, disable Save button (FR-004).
-
-Allocation inputs use `useFieldArray` (same as Partners' Contacts tab).
+**Decision**: The Payment modal has no allocation table and no allocation inputs. On vendor
+selection, the frontend fetches and displays the vendor's total outstanding balance as a
+read-only label. Allocation of the payment amount against individual bills happens entirely
+server-side via FIFO (FR-004) — the client never selects or splits bills.
 
 ## 6. Stock table query invalidation
 
@@ -67,3 +64,24 @@ When the site changes, the item selection resets (FR-005).
 **Decision**: All inventory API calls through `app/lib/api/inventory.ts`. Vendor dropdown in
 Purchase/Payment modals reuses `getVendors()` from `app/lib/api/partners.ts` (no new function
 needed). Site dropdown reuses `getSites()` from `app/lib/api/projects.ts`.
+
+## 9. Corrections from the master-PRD alignment audit
+
+**Manual bill-allocation UI removed (critical)**: The original plan.md Phase 8 and this file's
+original §5 described a client-side allocation UI — `AllocationRow.tsx`, `useFieldArray` over
+per-bill Amount inputs, a `getOutstandingBills()` fetch, and a live allocated/unallocated
+counter gating Save. This directly contradicted spec.md's own FR-004 ("no manual bill
+selection") and the backend's fully-automatic server-side FIFO design (buildcore-api
+`009-inventory-backend`). §5 above and plan.md Phase 8 were rewritten to the corrected design:
+an informational outstanding-balance label only, no allocation inputs, no `useFieldArray`. The
+equivalent contradiction was independently found and fixed in two buildcore-api files for this
+same feature (`quickstart.md` Scenario 5, `plan.md` Phase 7's unit-test description).
+
+**`middleware.ts` route guard added**: The original plan omitted extending `middleware.ts` for
+`/dashboard/inventory/*`, contradicting this app's own constitution (every route prefix must be
+guarded). Added to plan.md Phase 1 and spec.md FR-012.
+
+**`ResponsiveList`/keyboard-operability made explicit**: The original plan's list-component
+bullets (Masters tabs, Stock, Purchases, Issues, Transfers, Payments) did not call out the
+NON-NEGOTIABLE `ResponsiveList` + keyboard-operable requirement. All six were updated, and a
+Phase 9 mobile/keyboard spot-check task was added, matching spec.md FR-013.

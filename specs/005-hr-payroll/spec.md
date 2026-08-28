@@ -285,6 +285,86 @@ confirming its status updates.
 
 ---
 
+### User Story 11 - Employee offboarding and Full & Final settlement (Priority: P3)
+
+An HR admin initiates an employee's exit, reviews the computed Full & Final (F&F) settlement, and
+processes it, confirming the employee's account is deactivated on completion.
+
+**Why this priority**: Mirrors the backend's already-specced Offboarding/F&F capability
+(specs/005-hr-payroll-backend User Story 11); a complete-lifecycle admin screen, not needed to
+demonstrate the P1/P2 core.
+
+**Independent Test**: Can be fully tested by initiating exit for a seeded employee, viewing the
+F&F computation (pending salary, EL encashment, loan recovery, net payable), processing it, and
+confirming the employee's status shows Inactive.
+
+**Acceptance Scenarios**:
+
+1. **Given** an active employee's detail page, **When** the admin chooses "Initiate Exit" and
+   submits Last Working Day, Reason, and optional remarks, **Then** an exit record is created and
+   an F&F summary becomes available for that employee.
+2. **Given** the F&F summary, **When** viewed, **Then** it shows pending salary, EL encashment,
+   loan recovery, and net payable, matching the backend's computation exactly (no client-side
+   recalculation).
+3. **Given** the F&F summary, **When** the admin clicks Process, **Then** it follows the same
+   Draft → Processed → Paid confirmation flow as a standard payroll run (reusing that UI, not a
+   duplicate).
+4. **Given** a processed F&F settlement past the Last Working Day, **When** the employee's record
+   is viewed anywhere in this app, **Then** their Status shows Inactive.
+
+---
+
+### User Story 12 - Reimbursement claims admin review (Priority: P3)
+
+An HR/Site Admin reviews employee-submitted reimbursement claims, approves or rejects them, marks
+approved claims paid, and views the Reimbursement Register.
+
+**Why this priority**: Mirrors the backend's already-specced Reimbursements Admin capability
+(specs/005-hr-payroll-backend User Story 12); depends on My Workspace's employee-facing submission
+flow (specs/003-my-workspace User Story 8) producing claims to review.
+
+**Independent Test**: Can be fully tested by seeding a Submitted claim (via My Workspace), viewing
+it in this screen, approving it, marking it paid directly, and confirming a second claim can be
+rejected with mandatory remarks.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Reimbursements screen, **When** loaded, **Then** it shows a filterable
+   (status/employee) list of claims with category, amount, expense date, and status.
+2. **Given** a Submitted claim, **When** the admin clicks Approve (optional remarks) or Reject
+   (mandatory remarks), **Then** its status updates and, on rejection, the employee is notified.
+3. **Given** an Approved claim, **When** the admin clicks Mark Paid, **Then** they choose Direct
+   (payment mode, date, reference) or Payroll (queues for the next run), and status becomes Paid.
+4. **Given** the Reimbursement Register view, **When** loaded, **Then** it shows summary totals by
+   status (Pending / Approved-unpaid / Paid) alongside the filterable list.
+
+---
+
+### User Story 13 - Bulk attendance import (Priority: P3)
+
+An HR admin uploads a CSV of attendance records, reviews a row-level validation report, and
+commits only the valid rows.
+
+**Why this priority**: Mirrors the backend's already-specced Bulk Attendance Import capability
+(specs/005-hr-payroll-backend User Story 13); a backfill/convenience tool independent of
+day-to-day attendance admin (User Story 3).
+
+**Independent Test**: Can be fully tested by downloading the CSV template, uploading a file mixing
+valid/invalid rows, confirming the validation report lists row-level errors with nothing
+committed, then committing only the valid rows.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Attendance Import action, **When** the admin downloads the template, **Then** it
+   lists the required columns (Employee Code, Date, Punch In, Punch Out).
+2. **Given** an uploaded CSV, **When** validated, **Then** a row-level report lists errors (unknown
+   employee code, malformed date, duplicate row) and nothing is committed yet.
+3. **Given** a validation report, **When** the admin clicks Commit, **Then** only the
+   previously-validated rows are created as standard attendance records, visible immediately in
+   the Daily Attendance view (User Story 3).
+
+---
+
 ### Edge Cases
 
 - What happens when an admin navigates away from the eight-tab Add/Edit Employee form mid-entry?
@@ -361,6 +441,39 @@ confirming its status updates.
   mobile-first and basic-accessibility conventions — built in from the start on every new
   component, not verified only at the end.
 
+**Offboarding & Full and Final Settlement**
+
+- **FR-021**: The system MUST provide an "Initiate Exit" action on the Employee Detail page
+  capturing Last Working Day, Reason, and optional remarks.
+- **FR-022**: The system MUST render the F&F summary (pending salary, EL encashment, loan
+  recovery, net payable) exactly as returned by the backend, with a Process action reusing the
+  existing payroll-run confirmation flow (User Story 5).
+- **FR-023**: The system MUST show Inactive status for any employee with a processed F&F
+  settlement past their Last Working Day, everywhere that employee's status is displayed.
+
+**Reimbursement Claims Admin**
+
+- **FR-024**: The system MUST provide a filterable (status/employee) Reimbursements list with
+  Approve (optional remarks) and Reject (mandatory remarks) actions on Submitted claims.
+- **FR-025**: The system MUST provide a Mark Paid action on Approved claims supporting both Direct
+  (payment mode, date, reference) and Payroll (queue for next run) options.
+- **FR-026**: The system MUST provide a Reimbursement Register view with summary totals by status
+  alongside the filterable list.
+
+**Bulk Attendance Import**
+
+- **FR-027**: The system MUST provide a CSV template download and upload action for attendance
+  import, with a row-level validation report shown before any commit.
+- **FR-028**: The system MUST provide a Commit action that creates only previously-validated rows,
+  visible immediately in the Daily Attendance view (User Story 3).
+- **FR-029**: The system MUST provide a Reimbursement Categories tab (name, receipt-required
+  toggle, optional max amount) on the existing Settings Employee Setup screen
+  (`/dashboard/settings/employee-setup`, feature 002), matching the CRUD pattern of that screen's
+  existing Department/Designation/Document Type/Shift tabs — found missing during a second
+  alignment-audit pass; My Workspace's claim form (specs/003-my-workspace User Story 8) and this
+  feature's own Reimbursements screen (User Story 12) both depend on this data existing, not just
+  being seeded once.
+
 ### Key Entities
 
 - **Employee (view)**: Mirrors the backend's extended Employee record across all eight tabs' fields.
@@ -377,6 +490,10 @@ confirming its status updates.
 - **Daily Worker / Daily Worker Attendance (views)**: Mirror the backend's equivalents.
 - **Re-enrolment Request (view)**: Mirrors the backend's (already-existing, from My Workspace)
   entity in an admin-queue shape.
+- **Exit Record / F&F Summary (view)**: Mirrors the backend's computation exactly — this feature
+  never recalculates F&F figures client-side.
+- **Reimbursement Claim (view, admin shape)**: Mirrors the backend's, extending My Workspace's
+  own claim view with admin-only fields (approval/rejection remarks, payment mode/reference).
 
 ## Success Criteria *(mandatory)*
 
@@ -394,6 +511,12 @@ confirming its status updates.
   screens is reachable and operable using only a keyboard.
 - **SC-006**: Across all testing, every list screen in this feature renders as cards (not a
   horizontally-scrolling table) at a mobile viewport.
+- **SC-007**: Across all testing, an F&F summary's displayed figures match the backend's own
+  computation exactly — zero client-side recalculation drift.
+- **SC-008**: Across all testing, zero rejected or draft reimbursement claims appear in the
+  Reimbursement Register's payable totals.
+- **SC-009**: Across all testing, an attendance-import commit creates only rows that appeared in
+  its own prior validation report — zero unvalidated rows slip through.
 
 ## Assumptions
 

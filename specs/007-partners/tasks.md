@@ -39,8 +39,13 @@ via quickstart.md.
       `missing`=red; and BOCW statuses with distinct keys to avoid colour collision:
       `bocw_pending`=red, `bocw_partial`=orange, `bocw_paid`=green — M-005 remediation
       (BOCW `partial` is orange, not yellow; use `bocw_partial` key in `BOCWTable`)
+- [ ] T005a [P] Extend `middleware.ts` with a `/dashboard/partners/*` route matcher: `PARTNERS`
+      for `/dashboard/partners/{vendors,contractors,bocw}/*`, `SETTINGS` for
+      `/dashboard/partners/vendors/categories` (a Settings-owned master, backend research.md §1)
+      — FR-013, missing entirely from this feature's original task list, found during a
+      master-PRD alignment audit
 
-**Checkpoint**: Nav, layout, API module, currency formatter, and status badge ready.
+**Checkpoint**: Nav, layout, API module, currency formatter, status badge, and route guard ready.
 
 ---
 
@@ -68,8 +73,9 @@ via quickstart.md.
 - [ ] T008 [P] [US1] Create `app/ui/partners/VendorCategoryModal.tsx`: Name + Description
       fields, `react-hook-form` with zod validation
 - [ ] T009 [US1] Create `app/dashboard/partners/vendors/categories/page.tsx`:
-      `CategoriesPage` — table (#, Category Name, Description, Vendors count, Edit/Delete
-      actions), "Add Category" button, inline 409 delete error handling
+      `CategoriesPage` — `ResponsiveList`-based table (#, Category Name, Description, Vendors
+      count, Edit/Delete actions), fully keyboard-operable (FR-014), "Add Category" button,
+      inline 409 delete error handling
 
 **Checkpoint**: Vendor categories CRUD functional.
 
@@ -100,9 +106,10 @@ toggle active (confirm dialog); Work Detail disabled for material type.
 - [ ] T015 [US2] Create `app/ui/partners/VendorModal.tsx`: 4-tab container composing
       T011–T014; single `react-hook-form` instance with `vendorSchema`; preserves all tab
       data across tab switches (FR-011); loads existing data in edit mode
-- [ ] T016 [P] [US2] Create `app/ui/partners/VendorListTable.tsx`: columns (Vendor name+city,
-      Deals In tags, Contact, Type badge, GSTIN, TDS, Active toggle); Active toggle fires
-      confirmation dialog before `toggleVendorActive()` API call (FR-010)
+- [ ] T016 [P] [US2] Create `app/ui/partners/VendorListTable.tsx`: `ResponsiveList`-based,
+      fully keyboard-operable (FR-014), columns (Vendor name+city, Deals In tags, Contact, Type
+      badge, GSTIN, TDS, Active toggle); Active toggle fires confirmation dialog before
+      `toggleVendorActive()` API call (FR-010)
 - [ ] T017 [US2] Create `app/dashboard/partners/vendors/page.tsx`: `VendorsPage` — list with
       search, type filter, active filter, pagination; "Add Vendor" + "Manage Categories"
       (→ `/vendors/categories`) buttons; `VendorModal` integration; wire
@@ -132,8 +139,9 @@ and expiry warnings; Add contractor modal with vendor picker.
 - [ ] T020 [P] [US3] Create `app/ui/partners/ContractorDocumentRow.tsx`: document type label,
       file link, upload date, expiry date; expiry warning badge (orange "Expiring soon" or red
       "Expired") when `expiryWarning: true`
-- [ ] T021 [US3] Create `app/dashboard/partners/contractors/page.tsx`: contractor list table
-      with compliance status `StatusBadge`, "Add Contractor" button, `ContractorModal`
+- [ ] T021 [US3] Create `app/dashboard/partners/contractors/page.tsx`: `ResponsiveList`-based
+      contractor list table, fully keyboard-operable (FR-014), with compliance status
+      `StatusBadge`, "Add Contractor" button, `ContractorModal`
 - [ ] T022 [US3] Create `app/dashboard/partners/contractors/[id]/page.tsx`:
       `ContractorDetailPage` — document checklist section (one `ContractorDocumentRow` per
       `ContractorDocument` + upload control per document type), compliance history link
@@ -160,8 +168,9 @@ label); verify action hidden on verified rows.
       YYYY-MM — research.md §6), PF section (Challan #, Amount, Date), ESIC section
       (Challan #, Amount, Date); sections are independent (either can be submitted alone);
       `complianceSchema` zod validation
-- [ ] T025 [US4] Create `app/ui/partners/ComplianceTable.tsx`: columns (Contractor, Month,
-      PF Challan/Amount/Date, ESIC Challan/Amount/Date, Status badge, Actions); Verify action
+- [ ] T025 [US4] Create `app/ui/partners/ComplianceTable.tsx`: `ResponsiveList`-based, fully
+      keyboard-operable (FR-014), columns (Contractor, Month, PF Challan/Amount/Date, ESIC
+      Challan/Amount/Date, Status badge, Actions); Verify action
       shows confirmation dialog ("Verify? This records your identity."); verified rows show
       "Verified by [name] on [date]" label with Verify action hidden (spec US4 AC4/AC5)
 - [ ] T026 [US4] Create `app/dashboard/partners/contractors/compliance/page.tsx`:
@@ -195,7 +204,9 @@ click non-gray dot (→ compliance page filtered); gray dot not clickable.
       - `position: sticky; left: 0; z-index: 1` on contractor name `<td>`
       - `position: sticky; top: 0; z-index: 2` on month header `<th>` row
       - FY selector `<select>` calling `router.push({ query: { fy: val } })` — FR-008
-      - renders `RagDot` per cell
+      - renders `RagDot` per cell as a real `<button>` (Tab-reachable, `disabled` for gray
+        cells) rather than a `<div onClick>` — keyboard-navigable per FR-014's exemption note
+        (dense grid exempt from `ResponsiveList`'s card layout, but not from keyboard access)
       - research.md §4
 - [ ] T030 [US5] Create `app/dashboard/partners/contractors/rag/page.tsx`: `RagMatrixPage`
       — reads `?fy=` via `useSearchParams`; defaults to current FY (e.g. `2025-26`); renders
@@ -218,9 +229,10 @@ record full balance → Paid (green badge, button disabled).
 - [ ] T031 [P] [US6] Implement `getBOCW`, `recordBOCWPayment` in `app/lib/api/partners.ts`
 - [ ] T032 [P] [US6] Create `app/ui/partners/BOCWPaymentModal.tsx`: Amount Paid, Payment Date,
       Reference Number, Remarks fields; `react-hook-form` with zod validation
-- [ ] T033 [US6] Create `app/ui/partners/BOCWTable.tsx`: columns (Project Name, Contract Value,
-      Cess Rate, Cess Liability, Paid, Balance, Last Payment Date, Status badge, Actions);
-      all monetary columns via `formatCurrency` (FR-009); Record Payment button disabled when
+- [ ] T033 [US6] Create `app/ui/partners/BOCWTable.tsx`: `ResponsiveList`-based, fully
+      keyboard-operable (FR-014), columns (Project Name, Contract Value, Cess Rate, Cess
+      Liability, Paid, Balance, Last Payment Date, Status badge, Actions); all monetary columns
+      via `formatCurrency` (FR-009); Record Payment button disabled when
       `status === 'paid'` (spec US6 AC3); `BOCWPaymentModal` integration
 - [ ] T034 [US6] Create `app/dashboard/partners/bocw/page.tsx`: `BOCWPage` — paginated BOCW
       list; wire `@tanstack/react-query` with `['partners', 'bocw']` key; invalidate on payment
@@ -240,6 +252,9 @@ record full balance → Paid (green badge, button disabled).
 - [ ] T038 [P] Run TypeScript type check (`npx tsc --noEmit`) and fix issues
 - [ ] T039 [P] Verify RAG Matrix renders without horizontal scroll issues on a 1280px viewport
       (minimum expected admin screen width)
+- [ ] T040 [P] Spot-check every `ResponsiveList`-based screen (Categories, Vendors, Contractors,
+      Compliance, BOCW) at a mobile viewport (card layout, no horizontal scroll) and for keyboard
+      operability across all controls, including RAG Matrix's dot buttons — FR-014
 
 ---
 

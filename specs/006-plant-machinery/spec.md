@@ -10,6 +10,16 @@
 Consumes buildcore-api specs/006-plant-machinery-backend/contracts/plant-api.md. Reuses:
 formatCurrency (008), StatusBadge (007/008), multi-tab modal pattern."
 
+**Reconciled 2026-08-28** against a second, independently-specced version of this feature and a
+fresh master-PRD alignment audit: (1) added User Story 7 for the three Settings-owned reference
+-data masters (Equipment Categories, Equipment Doc Types, Hire Rates) that this feature's original
+scope never built a screen for at all, even though the Asset Register (US1), Fuel (US3), and Hire
+Bills (US6) screens all depend on their data; (2) added the `middleware.ts` permission-guard
+extension for `/dashboard/plant/*`, missing entirely from the original task list; (3) added this
+app's own constitution's NON-NEGOTIABLE mobile-first/`ResponsiveList`/keyboard-operability
+requirement to every list screen, matching the pattern already applied to every other feature in
+this app.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Asset Register (Priority: P1)
@@ -130,6 +140,35 @@ the variance and net payable are correct; move through verify → pay workflow.
 
 ---
 
+### User Story 7 - Reference Data Masters (Priority: P1)
+
+An admin manages Equipment Categories (name, meter type, fuel benchmark, fuel-variance threshold),
+Equipment Doc Types (name, alert days), and Hire Rates (per-category, effective-dated) — the
+Settings-owned masters every other screen in this feature depends on.
+
+**Why this priority**: The Asset Register (US1), Fuel (US3), and Hire Bills (US6) screens all
+read this data (category dropdown, doc type dropdown, rate auto-populate); seeded defaults make
+US1–US6 independently testable without this screen being touched first, but the admin screen
+itself is foundational, matching the backend's own User Story 1 priority.
+
+**Independent Test**: Edit a seeded category's fuel benchmark and confirm a new Fuel entry (US3)
+uses it; add a Hire Rate and confirm a new Hire Bill (US6) for that category defaults to it.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Reference Data Masters screen (three tabs: Categories, Doc Types, Hire Rates),
+   **When** loaded, **Then** each tab lists its seeded defaults.
+2. **Given** the Categories tab, **When** an admin edits fuel benchmark or the fuel-variance
+   threshold %, **Then** the change is saved and reflected the next time that category's data is
+   used elsewhere.
+3. **Given** the Doc Types tab, **When** an admin edits Alert Days, **Then** subsequent
+   document-status derivation for that type reflects the change.
+4. **Given** the Hire Rates tab with an existing "Current" rate for a category, **When** an admin
+   adds a new rate with an Effective From date, **Then** the prior rate's Effective To updates
+   automatically and both rows appear in the effective-dated history.
+
+---
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -144,12 +183,26 @@ the variance and net payable are correct; move through verify → pay workflow.
   immediately after maintenance job open/close via react-query invalidation.
 - **FR-006**: All monetary values MUST use `formatCurrency` from `app/lib/utils.ts`.
 - **FR-007**: All API calls MUST go through `app/lib/api/plant.ts`.
+- **FR-008**: The system MUST provide a Reference Data Masters screen (Categories/Doc Types/Hire
+  Rates tabs) at `/dashboard/plant/masters`, each with its own add/edit modal; the Equipment
+  document-upload control MUST populate its type dropdown from the Doc Types master rather than a
+  hardcoded list.
+- **FR-009**: `middleware.ts` MUST guard `/dashboard/plant/*` with the matching permission per
+  area (`MACHINERY`/`LOGBOOK`/`FUEL`/`MAINTENANCE`/`HIRE_BILLS`/`SETTINGS`), mirroring the
+  backend's corrected permission mapping (buildcore-api specs/006-plant-machinery-backend
+  research.md §7) — missing entirely from this feature's original scope.
+- **FR-010**: Every list screen in this feature MUST use the existing `ResponsiveList` component
+  and be fully keyboard-operable, built into each screen's own implementation from the start —
+  this app's constitution's NON-NEGOTIABLE mobile-first requirement, applied here the same way it
+  already is on every other feature.
 
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: Asset Register renders 200 equipment rows with expiry alerts in under 3 seconds.
 - **SC-002**: Logbook and fuel entries show live-computed totals/amounts with no perceptible delay.
 - **SC-003**: Hire bill net payable always displays correctly (grossAmount − tdsAmount).
+- **SC-004**: Every list screen in this feature is fully usable (all actions reachable, no
+  horizontal scroll) on a mobile viewport.
 
 ## Assumptions
 
@@ -158,3 +211,6 @@ the variance and net payable are correct; move through verify → pay workflow.
 - Vendor dropdown in Hire Bills and Fuel modals reuses `getVendors()` from `app/lib/api/partners.ts`.
 - Site dropdown reuses `getSites()` from `app/lib/api/projects.ts`.
 - Employee operator dropdown reuses HR employee list endpoint.
+- Equipment Categories and Doc Types are seeded with defaults via the backend migration, so US1–
+  US6 are independently testable without US7's admin screen being touched first (matching the
+  backend's own Assumptions). Hire Rates are not pre-seeded.

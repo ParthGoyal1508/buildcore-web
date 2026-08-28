@@ -105,11 +105,15 @@ narrowing and empty-state handling.
 
 ### Implementation for User Story 3
 
-- [ ] T010 [P] [US3] Add `getActivityLog()` to `app/lib/api/dashboard.ts`
+- [ ] T010 [P] [US3] Add `getActivityLog()` and `exportActivityLog()` to
+      `app/lib/api/dashboard.ts` — `exportActivityLog` triggers a direct download from
+      `GET /activity-log/export?module=&timeRange=` (spec FR-006a)
 - [ ] T011 [US3] Create `app/ui/dashboard/activity-log-list.tsx`: `ResponsiveList`-based feed,
       module + time-range filters (combining), pagination/infinite-scroll, distinct empty state per
-      filter combination — spec FR-006, FR-007 (depends on T010); native `<select>`/`<button>`
-      elements and full keyboard operability for the filters, per spec FR-019
+      filter combination, an "Export CSV" button calling `exportActivityLog()` with the
+      currently-applied filters — spec FR-006, FR-006a, FR-007 (depends on T010); native
+      `<select>`/`<button>` elements and full keyboard operability for the filters and export
+      button, per spec FR-019
 - [ ] T012 [US3] Create `app/dashboard/activity-log/page.tsx` (depends on T011)
 
 **Checkpoint**: User Stories 1–3 independently functional.

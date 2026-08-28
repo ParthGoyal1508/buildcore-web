@@ -210,6 +210,17 @@ computed at 1% of contract value, record a partial payment, confirm balance and 
 - **FR-011**: Vendor form tab data MUST be preserved across tab switches (single `react-hook-form`
   instance spanning all tabs, consistent with Projects/Settings precedent).
 - **FR-012**: All API calls MUST go through `app/lib/api/partners.ts`.
+- **FR-013**: `middleware.ts` MUST guard `/dashboard/partners/*` with the `PARTNERS` permission
+  (`SETTINGS` for the Vendor Categories sub-route, since it's a Settings-owned master per the
+  backend's corrected placement), mirroring the backend's permission mapping — missing entirely
+  from this feature's original scope, found during a master-PRD alignment audit.
+- **FR-014**: Every list screen in this feature (Vendor list, Contractor list, Compliance table,
+  BOCW table, Vendor Categories table) MUST use the existing `ResponsiveList` component and be
+  fully keyboard-operable, built into each screen's own implementation from the start — this
+  app's constitution's NON-NEGOTIABLE mobile-first requirement, applied here the same way it
+  already is on every other feature. The RAG Matrix (FR-006) is exempt — a dense grid is not
+  amenable to `ResponsiveList`'s card-layout pattern, but its sticky-header/column behavior MUST
+  still be keyboard-navigable (arrow keys or Tab between cells).
 
 ### Key Entities
 
@@ -234,6 +245,8 @@ computed at 1% of contract value, record a partial payment, confirm balance and 
 - **SC-004**: The Vendor form's tab data is never lost on tab switch — any entered field remains
   in its input when the user returns to a previously visited tab.
 - **SC-005**: BOCW payment recording completes (form submit → table refresh) in under 5 seconds.
+- **SC-006**: Every list screen in this feature (other than the RAG Matrix) is fully usable (all
+  actions reachable, no horizontal scroll) on a mobile viewport.
 
 ## Assumptions
 

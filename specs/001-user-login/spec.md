@@ -236,13 +236,19 @@ correct password succeeds again.
   response, or the Activity Log record.
 - **FR-019**: The system MUST serve the login page and process every login-related request only
   over an encrypted (TLS) connection.
+- **FR-020**: When the login page is loaded with an `?activated=1` query parameter, the system
+  MUST show a one-time "Account activated — log in with your new password" banner above the form.
+  `010-account-creation`'s set-password page redirects here with this param on successful
+  activation; this is a one-line addition, not a new flow — added when that feature was specced,
+  closing this feature's own "Account Creation... separate feature" deferral for the one point
+  where the two flows actually meet (the login page itself).
 
 ### Key Entities
 
 - **User Account**: A registered person who can sign in — holds the credentials needed to
   authenticate, an active/deactivated status, a role, and a flag for whether a password change is
-  mandatory before normal access. Owned/managed by the separate Account Creation feature; login
-  only reads and enforces this state.
+  mandatory before normal access. Owned/managed by `010-account-creation` (built via the Invite
+  Flow); login only reads and enforces this state.
 - **Session**: Represents one signed-in period for a user on one device/browser — has a validity
   window that is short by default and extended when "Remember Me" is selected, and can be ended
   early by logout, admin deactivation, or role/status change.

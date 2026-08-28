@@ -64,6 +64,17 @@ distinct visual treatment (spec FR-016).
 Mirrors My Workspace's entity plus `employeeName`/`siteName` (joined server-side for the admin
 queue).
 
+## ExitRecord / FnfSummary (view)
+
+Mirrors the API's shapes exactly (specs/005-hr-payroll-backend/data-model.md) — no client-side
+computation.
+
+## ReimbursementClaim (admin view)
+
+Mirrors My Workspace's own claim shape (specs/003-my-workspace-backend/data-model.md) plus the
+admin-only fields the backend adds (`approvedBy`/`rejectedBy`/`remarks`, `paymentMode`,
+`paymentReference`).
+
 ## Cross-reference to `buildcore-api` and prior `buildcore-web` features
 
 | Concept | Relationship |

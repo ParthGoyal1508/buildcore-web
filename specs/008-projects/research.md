@@ -118,3 +118,38 @@ ad-hoc inline colour classes.
 
 **Rationale**: FR-009 mandates consistent badge colours; a single `StatusBadge` component with a
 `status → colour` map is the only way to enforce this reliably across eight screens.
+
+## 10. Corrections from the master-PRD alignment audit
+
+**`middleware.ts` route guard added**: The original plan omitted extending `middleware.ts` for
+`/dashboard/projects/*`, contradicting this app's own constitution (every route prefix must be
+guarded). Added to plan.md Phase 1 (T006a) and spec.md FR-013.
+
+**`ResponsiveList`/keyboard-operability made explicit**: The original plan's list-component tasks
+(Clients, Sites, Portfolio, BOQ tree, DWR list, Revenue, Work Orders) did not call out the
+NON-NEGOTIABLE `ResponsiveList` + keyboard-operable requirement. All seven were updated, and a
+Phase 11 mobile/keyboard spot-check task (T055a) was added, matching spec.md FR-014.
+
+Both corrections mirror the equivalent gaps found and fixed in this session's other frontend
+features (007-partners, 009-inventory) — this feature had the same two omissions.
+
+## 11. BOQ import and DWR-approval corrections (matching the backend's own fixes)
+
+**BOQ import: two-step validate-then-confirm, not a single blind commit**: The original design had
+`BOQImportButton` call a single `importBOQ` endpoint that committed valid rows immediately on
+upload. This mirrored a contradiction found and fixed in `buildcore-api/specs/
+008-projects-backend` (research.md §12 there): master PRD §7.5.3 requires "errors displayed per
+row before import confirmed" — a review step between validation and commit. Fixed here to match:
+`validateBOQImport()` (upload, returns a report, writes nothing) + a separate `confirmBOQImport()`
+call triggered by a new "Confirm Import" button.
+
+**BOQ `doneQty` updates on DWR approval, not submission**: The original plan/tasks described BOQ
+`doneQty` refreshing when a DWR is submitted. Master PRD §7.5.3 is explicit: "Only Approved DWRs
+count toward project progress % calculation." Fixed to invalidate the BOQ query only on the
+approve mutation (T036), and the Phase 8/DWRListTable checkpoint text updated to describe the
+correct trigger point — matching the equivalent backend fix (008-projects-backend research.md
+§13).
+
+**Rationale**: Both corrections keep the frontend's described behaviour truthful to what the
+(also-corrected) backend actually does; shipping the frontend against the old backend assumptions
+would have produced a UI that silently disagreed with the API's real responses.

@@ -136,3 +136,40 @@ avoids the recurring gap-then-fix pattern earlier features in this session neede
 analyze passes to catch.
 
 **Alternatives considered**: None — settled precedent, applied proactively this time.
+
+## 10. Offboarding/F&F, Reimbursements Admin, Attendance Import — added during the master-PRD
+alignment pass
+
+**Decision**: These three screens (User Stories 11–13) were missing from this feature's original
+spec despite already being fully specced on the backend (specs/005-hr-payroll-backend User
+Stories 11–13) — an oversight caught during a master-PRD alignment audit, not a deliberate scope
+exclusion. All three reuse existing UI infrastructure: the F&F Process action reuses the payroll
+run confirmation flow (research.md — same component as User Story 5's Process/Pay actions);
+Reimbursements Admin is a new `ResponsiveList` screen at `/dashboard/hr/reimbursements`; Attendance
+Import is a new upload+report flow at `/dashboard/hr/attendance/import`, surfaced as an action on
+the existing Attendance screen (User Story 3) rather than a separate top-level nav entry.
+
+**Rationale**: No new architectural pattern is needed for any of the three — they compose existing
+building blocks (payroll-run confirmation UI, `ResponsiveList`, a validation-report-then-commit
+upload flow analogous to BOQ/Employee-master import elsewhere in the master PRD).
+
+**Alternatives considered**: A separate top-level nav entry for Attendance Import — rejected; it's
+a backfill action on an existing screen, not a distinct daily-use destination.
+
+## 11. Reimbursement Categories tab — found missing on a second pass
+
+**Decision**: This feature adds a sixth tab, `reimbursement-category-tab.tsx`, to Settings'
+existing `/dashboard/settings/employee-setup/page.tsx` (feature 002) — the same non-invasive
+"feature adds to an earlier feature's surface" pattern already used for the backend schema
+(specs/005-hr-payroll-backend research.md §15). Functions (`listReimbursementCategories`,
+`createReimbursementCategory`, `updateReimbursementCategory`) go in the existing
+`app/lib/api/settings.ts`, matching every other Employee Setup master's function location — not a
+new file under `app/lib/api/hr-payroll.ts`, since this data isn't HR-specific.
+
+**Rationale**: Matches the backend's own placement decision exactly; keeps every Employee Setup
+master's admin surface in one screen rather than fragmenting it across two feature areas.
+
+**Alternatives considered**: A tab within this feature's own Reimbursements screen (User Story 12)
+— rejected: category management is company configuration, not claim review, and belongs with its
+sibling masters (Departments, Designations, Document Types, Shifts) for the same reason those
+aren't scattered across the modules that merely consume them.

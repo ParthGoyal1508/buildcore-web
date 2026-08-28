@@ -135,9 +135,10 @@ User" control is present and navigates to the Account Creation entry point.
 4. **Given** an existing user row, **When** an admin clicks Delete and confirms, **Then** the row is
    removed from the list.
 5. **Given** the Users screen, **When** viewed by a Super Admin or HO User, **Then** an "Add User"
-   control is visible and navigates to the separate Account Creation flow; **When** any other role
-   attempts to navigate to `/settings/users`, **Then** they see the same access-denied state as any
-   other `/settings/*` screen — there is no read-only tier for this screen.
+   control is visible and navigates to `/dashboard/account-creation/new` (`010-account-creation`);
+   **When** any other role attempts to navigate to `/settings/users`, **Then** they see the same
+   access-denied state as any other `/settings/*` screen — there is no read-only tier for this
+   screen.
 6. **Given** the last remaining active Super Admin account's row, **When** an admin attempts to
    deactivate it, delete it, or reassign its role, **Then** the action is rejected with a message
    explaining this account cannot lose Super Admin access while it's the only one.
@@ -293,8 +294,8 @@ format, with no editable sequence-number field present.
   HO User; any other role navigating to this route MUST see the same access-denied state as any
   other `/settings/*` screen (FR-020) — there is no read-only tier for this screen.
 - **FR-011**: The system MUST provide an "Add User" entry point on the Users screen that navigates
-  to the separate Account Creation flow's route, without this feature implementing that flow
-  itself.
+  to `/dashboard/account-creation/new` (`010-account-creation`), without this feature implementing
+  that flow itself.
 - **FR-012**: The system MUST allow editing an existing user's Role and Status from the Users
   screen and reflect the change in the list immediately upon a successful save.
 - **FR-013**: The system MUST reject (with an explanatory message) any attempt to deactivate,
@@ -343,7 +344,7 @@ format, with no editable sequence-number field present.
 - **Role**: A named permission set; nine defaults are shipped (Super Admin protected/undeletable),
   admins may add/edit/delete others; tracks how many users currently hold it.
 - **User (administration view)**: An existing account this feature lists/edits/deletes; creation is
-  out of this feature's scope (separate Account Creation flow).
+  out of this feature's scope (`010-account-creation`).
 - **Department / Designation**: Simple per-company named reference entries feeding Employee-form
   dropdowns elsewhere.
 - **Document Type**: A per-company reference entry with three independent toggles and a
@@ -388,7 +389,7 @@ format, with no editable sequence-number field present.
   (GSTIN/PAN format, short-code/department/shift uniqueness), and the fixed permission enumeration;
   this frontend spec describes observable UI behavior, not wire formats.
 - Per the clarifications above: the Users screen includes an "Add User" entry point that deep-links
-  to the separate Account Creation feature; Employee Setup is built at its own standalone route now
+  to `010-account-creation` (`/dashboard/account-creation/new`); Employee Setup is built at its own standalone route now
   rather than waiting on a not-yet-built Employees page; and every list in this feature adopts a
   card layout below the mobile breakpoint, per the buildcore-web constitution's newly added
   Responsive & Mobile-First Design principle.

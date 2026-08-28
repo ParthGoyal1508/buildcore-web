@@ -40,7 +40,8 @@ API client wrapper.
 | `getBOQ(projectId)` | GET | `/projects/:id/boq` | BOQTree |
 | `createBOQGroup(projectId, data)` | POST | `/projects/:id/boq/groups` | BOQTree |
 | `createBOQItem(projectId, data)` | POST | `/projects/:id/boq/items` | BOQTree |
-| `importBOQ(projectId, file)` | POST | `/projects/:id/boq/import` | BOQImportButton |
+| `validateBOQImport(projectId, file)` | POST | `/projects/:id/boq/import/validate` | BOQImportButton (step 1 — returns `batchId` + report, writes nothing) |
+| `confirmBOQImport(projectId, batchId)` | POST | `/projects/:id/boq/import/confirm` | BOQImportButton (step 2 — commits the validated batch) |
 | `getBOQAlerts(projectId)` | GET | `/projects/:id/boq/alerts` | BOQAlertTabs |
 
 ## DWR

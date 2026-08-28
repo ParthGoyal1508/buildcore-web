@@ -104,5 +104,5 @@ const paymentSchema = z.object({
 - All server state via `@tanstack/react-query`. Stock query key: `['inventory', 'stock', { siteId, categoryId, search }]`.
 - Stock hint: `['inventory', 'stock-hint', itemId, siteId]` — fetched on item+site change in Issue/Transfer modals.
 - After Purchase/Issue/Transfer modal save: invalidate `['inventory', 'stock', ...]` to refresh.
-- Payment allocation table: `useFieldArray` on `allocations` field; `watch('amount')` + `watch('allocations')` drive live `unallocated` counter.
+- Payment modal: on vendor selection, fetch outstanding bills and sum client-side into a single informational balance label — no allocation table, no `useFieldArray` (FR-004, research.md §9).
 - Issue modal item dropdown: derived from stock query filtered to `inStock > 0` for selected site; resets on site change.

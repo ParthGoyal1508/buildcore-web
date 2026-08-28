@@ -36,6 +36,8 @@
 3. Filter by module = Machinery. **Expected**: empty state, not an error.
 4. Combine a module filter with a time-range filter. **Expected**: both apply together.
 5. Scroll/paginate to the end. **Expected**: more entries load, or a clear "no more" state.
+6. With module = Settings still applied, click "Export CSV". **Expected**: a CSV downloads
+   directly (no processing state) containing only the Settings entries visible in the list.
 
 ## Scenario 4 — Notifications (User Story 4)
 

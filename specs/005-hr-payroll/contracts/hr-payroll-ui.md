@@ -91,6 +91,46 @@ Guard: middleware requires `DAILY_WORKER_REGISTRY`.
 
 Guard: middleware requires `EMPLOYEES`.
 
+## `/dashboard/settings/employee-setup` — Reimbursement Categories tab (User Story 12 dependency)
+
+**Component**: `reimbursement-category-tab.tsx`, added as a sixth tab to feature 002's existing
+`page.tsx` (research.md §11) — no new route.
+
+**Functions** (added to `app/lib/api/settings.ts`, matching every sibling master):
+`listReimbursementCategories(companyId)`, `createReimbursementCategory(companyId, input)`,
+`updateReimbursementCategory(id, input)`.
+
+Guard: middleware requires `EMPLOYEES` (unchanged — the existing employee-setup route guard).
+
+## `/dashboard/hr/employees/:id` — Offboarding & F&F (User Story 11)
+
+**Components**: `exit-modal.tsx`, `fnf-summary.tsx` (on the Employee Detail page).
+
+**Functions**: `initiateExit(employeeId, input)`, `getFnfSummary(employeeId)`,
+`processFnf(employeeId)` — reuses the existing payroll-run confirmation UI (research.md §10).
+
+Guard: middleware requires `EMPLOYEES`.
+
+## `/dashboard/hr/reimbursements` (User Story 12)
+
+**Page**: `page.tsx` + `reimbursements-list.tsx`, `decide-claim-modal.tsx`, `pay-claim-modal.tsx`.
+
+**Functions**: `listReimbursements(filters)`, `approveReimbursement(id, remarks?)`,
+`rejectReimbursement(id, remarks)`, `payReimbursement(id, input)`,
+`getReimbursementRegister(filters)`.
+
+Guard: middleware requires `EMPLOYEES`.
+
+## `/dashboard/hr/attendance/import` (User Story 13)
+
+**Component**: `attendance-import-modal.tsx` (an action on the existing `/dashboard/hr/attendance`
+screen, research.md §10).
+
+**Functions**: `getAttendanceImportTemplate()`, `validateAttendanceImport(file)`,
+`commitAttendanceImport(validatedRows)`.
+
+Guard: middleware requires `ATTENDANCE`.
+
 ## Shared: `app/ui/shared/camera-capture.tsx`, `app/ui/shared/salary-slip.tsx`,
 `app/lib/geolocation.ts` (promoted from My Workspace — research.md §3, §4)
 

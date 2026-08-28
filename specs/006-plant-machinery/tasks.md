@@ -14,12 +14,16 @@ description: "Task list for feature implementation"
 ## Phase 1: Setup
 
 - [ ] T001 [P] Add "Plant & Machinery" nav group to `nav-links.tsx`: Asset Register, Logbook,
-      Fuel, Maintenance, Services, Hire Bills
+      Fuel, Maintenance, Services, Hire Bills, Masters
 - [ ] T002 [P] Create `app/dashboard/plant/layout.tsx` (breadcrumb + sub-nav)
 - [ ] T003 [P] Create `app/lib/api/plant.ts` with all typed API function stubs
 - [ ] T004 [P] Extend `StatusBadge` with plant statuses: `under_maintenance`=orange,
       `inactive`=gray, `due_soon`=orange, `overdue`=red, `pending_verification`=gray,
       `verified`=blue
+- [ ] T004a Extend `middleware.ts` with a `/dashboard/plant/*` route matcher mapping each
+      sub-path to its permission (`MACHINERY`/`LOGBOOK`/`FUEL`/`MAINTENANCE`/`HIRE_BILLS`/
+      `SETTINGS`), mirroring the backend's corrected permission mapping — FR-009, missing
+      entirely from this feature's original task list
 
 ---
 
@@ -30,9 +34,9 @@ description: "Task list for feature implementation"
       Depreciation Rate if owned)
 - [ ] T006 [P] [US1] `app/ui/plant/EquipmentDocumentRow.tsx`: document type, file link, expiry,
       alert badge (Expiring Soon/Expired)
-- [ ] T007 [US1] `app/dashboard/plant/equipment/page.tsx`: `AssetRegisterPage` — table with
-      Code/Name/Category/Ownership/Site/Reading/Status/Utilisation%/Doc Alert; "Add Equipment"
-      button; wire `@tanstack/react-query`
+- [ ] T007 [US1] `app/dashboard/plant/equipment/page.tsx`: `AssetRegisterPage` — `ResponsiveList`
+      -based table with Code/Name/Category/Ownership/Site/Reading/Status/Utilisation%/Doc Alert,
+      fully keyboard-operable (FR-010); "Add Equipment" button; wire `@tanstack/react-query`
 - [ ] T008 [US1] `app/dashboard/plant/equipment/[id]/page.tsx`: Equipment detail with tabs
       (Overview, Documents, Logbook, Fuel, Maintenance, Services, Hire Bills)
 
@@ -43,8 +47,8 @@ description: "Task list for feature implementation"
 - [ ] T009 [P] [US2] `app/ui/plant/LogbookModal.tsx`: Equipment dropdown, Date, Opening Reading,
       Closing Reading, Total Hours (live: closing − opening via `watch` — FR-002), Fuel Consumed,
       Operator dropdown (HR employees), Project dropdown; inline error for closing < opening
-- [ ] T010 [US2] `app/dashboard/plant/logbook/page.tsx`: Logbook list + filters (equipment,
-      project, date range), "Add Entry" button + `LogbookModal`
+- [ ] T010 [US2] `app/dashboard/plant/logbook/page.tsx`: `ResponsiveList`-based Logbook list
+      (FR-010) + filters (equipment, project, date range), "Add Entry" button + `LogbookModal`
 
 ---
 
@@ -52,8 +56,8 @@ description: "Task list for feature implementation"
 
 - [ ] T011 [P] [US3] `app/ui/plant/FuelModal.tsx`: Equipment, Date, Quantity, Rate, Amount
       (live: qty × rate — FR-003), Vendor; `varianceAlert` badge shown if backend returns it
-- [ ] T012 [US3] `app/dashboard/plant/fuel/page.tsx`: Fuel list with Variance % and alert badge;
-      monthly summary view
+- [ ] T012 [US3] `app/dashboard/plant/fuel/page.tsx`: `ResponsiveList`-based Fuel list (FR-010)
+      with Variance % and alert badge; monthly summary view
 
 ---
 
@@ -62,8 +66,9 @@ description: "Task list for feature implementation"
 - [ ] T013 [P] [US4] `app/ui/plant/MaintenanceModal.tsx`: Equipment dropdown, Type (Breakdown/
       Scheduled), Description, Link to Service Schedule (optional); Close Job modal (closing
       reading, date, parts, costs)
-- [ ] T014 [US4] `app/dashboard/plant/maintenance/page.tsx`: Maintenance list + filters;
-      on job open/close invalidate equipment query (status badge updates — FR-005)
+- [ ] T014 [US4] `app/dashboard/plant/maintenance/page.tsx`: `ResponsiveList`-based Maintenance
+      list (FR-010) + filters; on job open/close invalidate equipment query (status badge updates
+      — FR-005)
 
 ---
 
@@ -71,7 +76,8 @@ description: "Task list for feature implementation"
 
 - [ ] T015 [P] [US5] `app/ui/plant/ServiceScheduleModal.tsx`: Equipment, Service Type, Interval,
       Last Done Reading; Next Due = Last Done + Interval shown as preview
-- [ ] T016 [US5] `app/dashboard/plant/services/page.tsx`: Schedule list with status badges
+- [ ] T016 [US5] `app/dashboard/plant/services/page.tsx`: `ResponsiveList`-based Schedule list
+      (FR-010) with status badges
 
 ---
 
@@ -80,13 +86,29 @@ description: "Task list for feature implementation"
 - [ ] T017 [P] [US6] `app/ui/plant/HireBillModal.tsx`: Equipment (hired only), Vendor, Billed
       Hours, Rate, Billing Period; shows computed Gross Amount, Logbook Hours, Variance, TDS,
       Net Payable as read-only preview fields
-- [ ] T018 [US6] `app/dashboard/plant/hire-bills/page.tsx`: Hire Bills list with status badges;
-      Verify (+ confirmation dialog showing variance) and Pay (payment date + reference modal)
+- [ ] T018 [US6] `app/dashboard/plant/hire-bills/page.tsx`: `ResponsiveList`-based Hire Bills list
+      (FR-010) with status badges; Verify (+ confirmation dialog showing variance) and Pay
+      (payment date + reference modal)
 
 ---
 
-## Phase 8: Polish
+## Phase 8: US7 — Reference Data Masters (P1)
+
+- [ ] T018a [P] [US7] `app/ui/plant/EquipmentCategoryModal.tsx`,
+      `EquipmentDocTypeModal.tsx`, `HireRateModal.tsx`: add/edit forms for each master
+- [ ] T018b [US7] `app/dashboard/plant/masters/page.tsx`: three-tab screen (Categories/Doc
+      Types/Hire Rates), each tab a `ResponsiveList`-based table (FR-010); Hire Rates tab shows
+      the effective-dated history per category with `null` `effectiveTo` rendered as "Current"
+- [ ] T018c [US7] Wire `EquipmentModal.tsx` (T005) and `EquipmentDocumentRow.tsx` (T006)'s
+      Category/Doc Type dropdowns to `listEquipmentCategories()`/`listEquipmentDocTypes()`
+      (`app/lib/api/plant.ts`) rather than a hardcoded list — FR-008
+
+---
+
+## Phase 9: Polish
 
 - [ ] T019 [P] Verify all monetary values use `formatCurrency`
 - [ ] T020 [P] Verify status badges across all plant pages
 - [ ] T021 [P] TypeScript type check (`npx tsc --noEmit`)
+- [ ] T021a [P] Spot-check every list screen across all seven user stories at a mobile viewport
+      (`ResponsiveList` card layout, no horizontal scroll) and for keyboard operability — FR-010

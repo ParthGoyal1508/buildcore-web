@@ -115,6 +115,11 @@ and confirming the list narrows correctly.
    selected, **Then** an empty state is shown, not an error.
 4. **Given** the list, **When** scrolled/paginated to its end, **Then** further entries load
    (or a clear "no more entries" state is shown) rather than the list simply stopping silently.
+5. **Given** the current module/time-range filters, **When** the "Export CSV" button is clicked,
+   **Then** the backend's `GET /activity-log/export` is called with the same filters and the
+   resulting CSV downloads directly (synchronous — no processing/polling state, unlike the
+   Reports export in US5) — master PRD §7.2.5. Found missing during the master-PRD alignment
+   audit; the original scope built the feed screen but never its export action.
 
 ---
 
@@ -261,6 +266,9 @@ confirm the async/notification path.
 - **FR-006**: The system MUST provide an Activity Log screen with module and time-range filters
   that combine, rendering entries newest-first in the documented format, with pagination or
   infinite scroll for entries beyond the first page.
+- **FR-006a**: The Activity Log screen MUST provide an "Export CSV" action that calls
+  `GET /activity-log/export` with the currently-applied filters and downloads the result directly
+  (master PRD §7.2.5). Added during the master-PRD alignment audit.
 - **FR-007**: The system MUST show a distinct empty state (not an error) when a selected Activity
   Log filter combination currently matches zero entries.
 - **FR-008**: The system MUST show a bell icon with a badge reflecting the current active-

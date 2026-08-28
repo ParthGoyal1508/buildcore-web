@@ -44,6 +44,9 @@ output grouped by `section`, replacing the removed `app/ui/dashboard/cards.tsx`.
 **Functions**:
 - `getActivityLog(module, timeRange, page): Promise<{ entries: ActivityLogEntry[]; hasMore:
   boolean }>` → `GET /activity-log?module=&timeRange=&page=`
+- `exportActivityLog(module, timeRange): void` → triggers a direct browser download from
+  `GET /activity-log/export?module=&timeRange=` (`text/csv` response, same filters as the current
+  view) — spec FR-006a
 
 ## Notifications (header, no route — User Story 4)
 

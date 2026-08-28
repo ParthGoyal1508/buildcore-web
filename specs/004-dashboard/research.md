@@ -116,4 +116,23 @@ buttons (spec FR-019) — no new pattern invented.
 
 **Rationale**: Consistency with the now twice-established repo convention (Settings, My Workspace).
 
+## 9. Activity Log CSV export — added during the master-PRD alignment audit
+
+**Decision**: The Activity Log's "Export CSV" button (spec FR-006a) uses the same synchronous
+blob-download pattern as §7's small-report-export path — `exportActivityLog()` calls
+`GET /activity-log/export?module=&timeRange=` and downloads the response directly; there is no
+processing/polling state for this export, unlike the Reports feature's large exports.
+
+**Rationale**: The original scope built the Activity Log feed screen (US3) but never an export
+action for it, even though master PRD §7.2.5 lists CSV export as a first-class requirement, not an
+optional add-on — found missing during a full sweep of the Activity Log's PRD section against
+this feature's shipped scope. The Activity Log's own export is always synchronous (unlike Reports)
+because it's a direct filtered dump of already-paginated data, not a computed report requiring
+the async job pipeline §7 describes — matching the backend's own design (`buildcore-api`
+004-dashboard-backend research.md §9, which streams the CSV directly with no job queue).
+
+**Alternatives considered**: Routing the Activity Log export through the same async
+processing/polling path as Reports — rejected: unnecessary complexity for a filtered dump of an
+already-indexed table, and the backend itself doesn't queue this export (research.md §9 there).
+
 **Alternatives considered**: None — this is a settled precedent.

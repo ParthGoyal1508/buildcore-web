@@ -227,6 +227,10 @@ window elapses (quickstart.md Scenario 5).
       document each open item (enumeration-timing, IP-limit thresholds, etc.)
 - [ ] T040 [P] Confirm no plaintext password appears in any log, response body, or Activity Log
       row across both repos (spec FR-018)
+- [ ] T041 [P] [buildcore-web] In `app/login/page.tsx` (or `login-form.tsx`), read an
+      `?activated=1` search param and show a one-time "Account activated — log in with your new
+      password" banner above the form — spec FR-020, added for `010-account-creation`'s
+      set-password page to redirect into
 
 ---
 

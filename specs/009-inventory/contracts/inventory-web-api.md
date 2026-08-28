@@ -52,8 +52,8 @@ All calls through `app/lib/api/inventory.ts`. Vendor/site dropdowns reuse existi
 | Function | Method | Endpoint | Used by |
 |---|---|---|---|
 | `getPayments(params)` | GET | `/inventory/payments?vendorId=&dateFrom=&dateTo=&paymentMode=&page=` | PaymentsPage |
-| `getOutstandingBills(vendorId)` | GET | `/inventory/bills?vendorId=&paymentStatus=unpaid,part_paid` | PaymentModal |
-| `createPayment(data)` | POST | `/inventory/payments` | PaymentModal |
+| `getVendorOutstandingBalance(vendorId)` | GET | `/inventory/bills?vendorId=&paymentStatus=unpaid,part_paid` (summed client-side into a single balance) | PaymentModal (informational label only — FR-004, research.md §9) |
+| `createPayment(data)` | POST | `/inventory/payments` (no allocations field — FIFO is server-side) | PaymentModal |
 | `deletePayment(id)` | DELETE | `/inventory/payments/:id` | PaymentListTable |
 
 ## Error handling conventions
@@ -61,7 +61,6 @@ All calls through `app/lib/api/inventory.ts`. Vendor/site dropdowns reuse existi
 | HTTP Status | UI behaviour |
 |---|---|
 | `422` + `{ availableStock: N }` | Inline "Insufficient stock (available: N)" on Quantity field — no navigation |
-| `400` (over-allocation) | Unallocated balance turns red before submit (client-side guard); if backend returns 400, show toast |
 | `409` (delete blocked) | Inline error message (e.g. "Bill has allocated payments — unallocate before deleting") |
 | `400` (same-site transfer) | Inline "Source and destination cannot be the same" — client-side validation fires first |
 | `403` | Redirect to `/dashboard` with toast |

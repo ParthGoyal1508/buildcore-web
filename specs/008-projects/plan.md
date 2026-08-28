@@ -12,7 +12,15 @@ create/edit), DWR list, BOQ management (within project detail), Revenue/RA Bills
 formula computes Actual Qty live in the browser. The project detail page is a nine-tab full-page
 layout with a sticky tab strip. A `ProjectLockContext` propagates lock state across all tabs so
 action buttons disable without prop drilling. All API calls go through `app/lib/api/projects.ts`.
-See [research.md](research.md) for all nine decisions.
+
+**Corrected during a master-PRD alignment audit** (matching the backend's own corrections in
+`buildcore-api/specs/008-projects-backend`): BOQ import is a two-step validate-then-confirm flow,
+not a single blind commit (`BOQImportButton` now has a review-then-confirm step); DWR approval,
+not submission, is what moves BOQ `doneQty`; a `middleware.ts` permission guard for
+`/dashboard/projects/*` (missing from the original scope) and explicit `ResponsiveList`/keyboard-
+operability requirements on every list screen (this app's own NON-NEGOTIABLE constitution
+principle) have been added. See [research.md](research.md) for all eleven decisions (nine
+original + two corrections).
 
 ## Technical Context
 
@@ -40,10 +48,14 @@ latency + render). DWR Actual Qty live computation is instantaneous as the user 
 number formatting via shared `formatCurrency` utility in `app/lib/utils.ts` (research.md §8);
 project lock state propagated via React context — no scattered `isLocked` prop drilling; P&L
 period in URL query param for shareability (FR-006, research.md §6); status badges via shared
-`StatusBadge` component (FR-009, research.md §9).
+`StatusBadge` component (FR-009, research.md §9); every list screen uses `ResponsiveList` and is
+keyboard-operable (FR-014, research.md §10); BOQ import never commits from the upload call — a
+separate confirm step is required (FR-004, research.md §11); `middleware.ts` guards
+`/dashboard/projects/*` (FR-013, research.md §10).
 
-**Scale/Scope**: ~9 new route files, ~18 new components, ~25 typed API functions, 1 new React
-context (`ProjectLockContext`), 1 shared utility function addition (`formatCurrency`).
+**Scale/Scope**: ~9 new route files, ~19 new components (BOQ import gets a confirm-step UI), ~26
+typed API functions, 1 new React context (`ProjectLockContext`), 1 shared utility function
+addition (`formatCurrency`).
 
 ## Constitution Check (Frontend Principles)
 
@@ -53,8 +65,9 @@ context (`ProjectLockContext`), 1 shared utility function addition (`formatCurre
 | II. No literal strings/URLs inline | All API endpoints in `app/lib/api/projects.ts`; all label strings in component props or a constants file | PASS |
 | III. TypeScript strict + zod at boundaries | All form schemas are zod objects; all API response shapes are typed interfaces in data-model.md | PASS |
 | IV. All API calls through `app/lib/api/` | Single `app/lib/api/projects.ts` (research.md §7) | PASS |
-| V. Mobile-first, keyboard-operable | All new components follow the app's existing responsive and a11y conventions | PASS |
+| V. Mobile-first, keyboard-operable (NON-NEGOTIABLE) | `ResponsiveList` reused for every list screen (Clients, Sites, Portfolio, BOQ tree, DWR list, Revenue/RA Bills, Work Orders); every interactive control keyboard-operable, built in from the start (corrected — spec FR-014) | PASS |
 | VI. PII fields masked by default | No PII in this module; no special masking required | N/A |
+| `middleware.ts` route guard | `/dashboard/projects/*` guarded with `PROJECTS`/`DWR`/`PROJECT_FINANCIALS` per sub-route (corrected — spec FR-013, missing from original scope) | PASS |
 
 ## Project Structure
 
@@ -93,7 +106,9 @@ app/
 │   └── utils.ts                           # MODIFIED: +formatCurrency
 └── ui/
     └── projects/                          # All reusable project UI components
-        └── [18 components per data-model.md]
+        └── [19 components per data-model.md]
+
+middleware.ts                              # MODIFIED — /dashboard/projects/* permission mapping
 ```
 
 ## Implementation Phases
@@ -106,13 +121,17 @@ app/
 - [ ] Create `app/lib/api/projects.ts` with all typed API function signatures (can be stubs)
 - [ ] Create `ProjectLockContext` (React context carrying `isLocked: boolean`)
 - [ ] Create shared `StatusBadge` component (or extend existing) with project/DWR/RA Bill colour maps
+- [ ] Extend `middleware.ts` with a `/dashboard/projects/*` route matcher (`PROJECTS`/`DWR`/
+      `PROJECT_FINANCIALS` per sub-route — spec FR-013)
 
-**Checkpoint**: Nav, layout, API module, lock context, and currency formatter ready.
+**Checkpoint**: Nav, layout, API module, lock context, currency formatter, and route guard ready.
 
 ### Phase 2: Clients and Sites (US1 & US2 — P1)
 
-- [ ] `app/dashboard/projects/clients/page.tsx` + `ClientModal.tsx`
-- [ ] `app/dashboard/projects/sites/page.tsx` + `SiteModal.tsx`
+- [ ] `app/dashboard/projects/clients/page.tsx` + `ClientListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable — FR-014) + `ClientModal.tsx`
+- [ ] `app/dashboard/projects/sites/page.tsx` + `SiteListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable — FR-014) + `SiteModal.tsx`
 - [ ] Lat/Lng client-side validation (FR-012)
 - [ ] GSTIN format validation on ClientModal (FR in spec)
 
@@ -120,8 +139,8 @@ app/
 
 ### Phase 3: Project Portfolio — List and Create/Edit (US3 — P1)
 
-- [ ] `app/dashboard/projects/portfolio/page.tsx` + `ProjectListTable.tsx`
-  (status filter, client filter, search, lock badge)
+- [ ] `app/dashboard/projects/portfolio/page.tsx` + `ProjectListTable.tsx` (`ResponsiveList`-based,
+  keyboard-operable — FR-014; status filter, client filter, search, lock badge)
 - [ ] `ProjectForm.tsx` (shared create/edit form with zod schema)
 - [ ] `app/dashboard/projects/portfolio/new/page.tsx`
 - [ ] `app/dashboard/projects/portfolio/[id]/edit/page.tsx`
@@ -142,29 +161,35 @@ app/
 
 ### Phase 5: BOQ (US5 — P2)
 
-- [ ] `BOQTree.tsx` (collapsible group/item tree with derived columns)
+- [ ] `BOQTree.tsx` (collapsible group/item tree with derived columns, keyboard-operable — FR-014)
 - [ ] Add Group / Add Item inline forms
-- [ ] `BOQImportButton.tsx` (file upload + result display with error report download)
+- [ ] `BOQImportButton.tsx`: two-step flow — file upload calls `validateBOQImport()` and renders
+      the report (valid count, per-row errors, error-report download) without committing; a
+      separate "Confirm Import" button calls `confirmBOQImport(batchId)` (spec FR-004,
+      research.md §11)
 - [ ] `BOQAlertTabs.tsx` (Today Task / Delayed / To Be Delayed)
 
 **Checkpoint**: BOQ management fully functional within project detail.
 
 ### Phase 6: DWR (US6 — P2)
 
-- [ ] `app/dashboard/projects/dwr/page.tsx` + `DWRListTable.tsx`
+- [ ] `app/dashboard/projects/dwr/page.tsx` + `DWRListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable — FR-014)
 - [ ] `DWRModal.tsx` with Task section
 - [ ] `DWRTaskRow.tsx` with live Actual Qty computation (`react-hook-form` `watch`)
 - [ ] Approve action with confirmation dialog
 - [ ] DWR detail view
 
-**Checkpoint**: DWR creation, submission, and approval functional; BOQ doneQty updates visible.
+**Checkpoint**: DWR creation, submission, and approval functional; BOQ doneQty updates visible
+**on approval, not submission** (master PRD §7.5.3 — matches the backend's corrected design).
 
 ### Phase 7: Revenue, RA Bills, Work Orders (US7 — P3)
 
-- [ ] `RevenueTab.tsx` complete (revenue entries + `RevenueModal.tsx`)
+- [ ] `RevenueTab.tsx` complete (revenue entries list — `ResponsiveList`-based, keyboard-operable,
+  FR-014 — + `RevenueModal.tsx`)
 - [ ] `RABillCard.tsx` with Submit/Approve/Reject state actions + confirmation dialogs
 - [ ] `WorkOrderModal.tsx` (6-tab modal: Work Detail, Terms, Requirements, Hire Contract,
-  Material, Labour)
+  Material, Labour) + `WorkOrderListTable.tsx` (`ResponsiveList`-based, keyboard-operable — FR-014)
 
 **Checkpoint**: Revenue and billing workflow functional; RA Bill approval triggers P&L refresh.
 
@@ -175,6 +200,13 @@ app/
 - [ ] `PnlCostBreakdown.tsx` (table with red/green variance, `costOverrunAlert` highlight)
 - [ ] `PnlStatement.tsx` (equation display)
 - [ ] `BudgetForm.tsx` (five-category upsert, integrated into Costing/P&L tab)
-- [ ] `unavailableModules` indicator rendering
+- [ ] `unavailableModules` indicator rendering (expect Materials/Subcontractors only, per
+      buildcore-api's corrected P&L stub scope — Machinery/Fuel/Labour are real)
 
 **Checkpoint**: Full P&L tab functional with period selector, budget entry, and overrun alerts.
+
+### Phase 9: Polish
+
+- [ ] Spot-check every `ResponsiveList`-based screen (Clients, Sites, Portfolio, BOQ tree, DWR
+      list, Revenue/RA Bills, Work Orders) at a mobile viewport and for keyboard operability — FR-014
+- [ ] Manual quickstart.md walkthrough

@@ -8,16 +8,26 @@
 
 Build five route areas under `/dashboard/inventory/*` and a Masters modal on the Stock page —
 Stock dashboard with quick-action buttons, Purchase/Issue/Transfer/Payment modals, and five list
-pages. Key UI behaviours: live `qty × rate` Amount, available-stock hints via dedicated API,
-live unallocated-balance counter in Payment modal with Save guard, and item dropdown filtered
-to `inStock > 0` items for Issues. See [research.md](research.md) for all 8 decisions.
+pages. Key UI behaviours: live `qty × rate` Amount, available-stock hints via dedicated API, an
+informational outstanding-balance label in the Payment modal (allocation itself is fully
+automatic FIFO server-side — no client-side allocation UI), and item dropdown filtered to
+`inStock > 0` items for Issues.
+
+**Corrected during a master-PRD alignment audit**: this plan's original Phase 8 described a
+manual bill-allocation UI (`AllocationRow.tsx`, `useFieldArray`, `getOutstandingBills()`, a live
+allocated/unallocated counter gating Save) that directly contradicted spec.md's own FR-004 and
+the backend's fully-automatic FIFO design — now corrected to match. Also added: a `middleware.ts`
+permission guard for `/dashboard/inventory/*` (missing entirely from the original scope) and
+explicit `ResponsiveList`/keyboard-operability requirements on every list screen (this app's own
+NON-NEGOTIABLE constitution principle). See [research.md](research.md) for all 10 decisions (8
+original + 2 corrections).
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.7, Next.js 16 (App Router), React 19 — unchanged.
 
-**Primary Dependencies**: Existing — `react-hook-form` + `useFieldArray` + zod,
-`@tanstack/react-query`, `formatCurrency` (008), `StatusBadge` (007/008). No new dependency.
+**Primary Dependencies**: Existing — `react-hook-form` + zod, `@tanstack/react-query`,
+`formatCurrency` (008), `StatusBadge` (007/008). No new dependency.
 
 **Storage**: N/A — all data in `buildcore-api`.
 
@@ -28,7 +38,8 @@ hint appears within 500ms of item-site selection.
 
 **Constraints**: All API calls through `app/lib/api/inventory.ts`; vendor/site dropdowns reuse
 existing `partners.ts`/`projects.ts` API modules; `formatCurrency` on all monetary fields;
-`StatusBadge` for payment status; unallocated-balance guard client-side before API call.
+`StatusBadge` for payment status; bill allocation is fully server-side FIFO — no client-side
+allocation logic or guard.
 
 **Scale/Scope**: 5 route files, ~14 components, ~20 typed API functions.
 
@@ -40,7 +51,8 @@ existing `partners.ts`/`projects.ts` API modules; `formatCurrency` on all moneta
 | No literal API strings | All endpoints in `app/lib/api/inventory.ts` | PASS |
 | TypeScript + zod at boundaries | All schemas defined in data-model.md | PASS |
 | API calls through `app/lib/api/` | `inventory.ts`; vendor/site from existing modules | PASS |
-| Mobile-first responsive | Existing breakpoint conventions | PASS |
+| Mobile-first & keyboard-operable (NON-NEGOTIABLE) | `ResponsiveList` reused for all six list screens (Masters tabs, Stock, Purchases, Issues, Transfers, Payments); every interactive control keyboard-operable, built in from the start (corrected — spec FR-013) | PASS |
+| `middleware.ts` route guard | `/dashboard/inventory/*` guarded with `INVENTORY`/`SETTINGS` per sub-route (corrected — spec FR-012, missing from original scope) | PASS |
 
 ## Project Structure
 
@@ -55,6 +67,7 @@ app/dashboard/inventory/
 
 app/lib/api/inventory.ts
 app/ui/inventory/    [14 components per data-model.md]
+middleware.ts         # MODIFIED — /dashboard/inventory/* permission mapping (INVENTORY/SETTINGS)
 ```
 
 ## Implementation Phases
@@ -66,21 +79,24 @@ app/ui/inventory/    [14 components per data-model.md]
 - [ ] Create `app/lib/api/inventory.ts` with all typed API function stubs
 - [ ] Ensure `formatCurrency` + `StatusBadge` (with `unpaid`=red, `part_paid`=yellow, `paid`=green
       payment status entries) exist from 007/008; add if not present
+- [ ] Extend `middleware.ts` with a `/dashboard/inventory/*` route matcher (`INVENTORY`/
+      `SETTINGS` per sub-route — spec FR-012)
 
-**Checkpoint**: Nav, layout, API module, and shared utilities ready.
+**Checkpoint**: Nav, layout, API module, shared utilities, and route guard ready.
 
 ### Phase 2: Phase 2 — TypeScript types and zod schemas
 
 - [ ] Define all interfaces and zod schemas (`purchaseSchema`, `issueSchema`, `paymentSchema`
-      with allocation refine) in `app/lib/api/inventory.ts` — data-model.md
+      — no allocations field, FIFO is server-side) in `app/lib/api/inventory.ts` — data-model.md
 
 **Checkpoint**: All types defined; components can be built with correct prop shapes.
 
 ### Phase 3: US1 — Item Masters (P1) 🎯 MVP
 
 - [ ] `CategoryTab.tsx`: category table + inline add form; delete with 409 handling
-- [ ] `ItemTab.tsx`: item table + add/edit form (Code read-only, Name, Category dropdown,
-      Unit dropdown, Description); delete with 409 handling
+- [ ] `ItemTab.tsx`: `ResponsiveList`-based, keyboard-operable (FR-013) item table + add/edit
+      form (Code read-only, Name, Category dropdown, Unit dropdown [all 8 values], Reorder
+      Level, HSN Code — FR-014, Description); delete with 409 handling
 - [ ] `MastersModal.tsx`: two-tab modal composing CategoryTab + ItemTab
 - [ ] Wire from Stock page "Masters" button (Phase 4)
 
@@ -88,7 +104,8 @@ app/ui/inventory/    [14 components per data-model.md]
 
 ### Phase 4: US2 — Stock Dashboard (P1)
 
-- [ ] `StockTable.tsx`: table with all stock columns, all monetary via `formatCurrency`,
+- [ ] `StockTable.tsx`: `ResponsiveList`-based, keyboard-operable (FR-013), all stock columns,
+      a visible below-reorder-level flag per row (FR-014), all monetary via `formatCurrency`,
       four quick-action buttons (New Purchase, New Issue, New Transfer, Masters — each opens
       respective modal)
 - [ ] `app/dashboard/inventory/stock/page.tsx`: `StockPage` — renders `StockTable`, hosts
@@ -102,8 +119,9 @@ app/ui/inventory/    [14 components per data-model.md]
 - [ ] `PurchaseModal.tsx`: siteId + itemId + vendorId (from `getVendors()` in partners.ts)
       + date + quantity + rate + bill file upload (`<input type="file" accept=".pdf,.jpg,.png">`);
       live Amount = qty × rate via `watch` (FR-002); `purchaseSchema` validation
-- [ ] `PurchaseListTable.tsx`: Date, Project, Item, Vendor, Qty, Rate, Amount, Bill link,
-      PaymentStatus `StatusBadge`, Delete (with 409 guard)
+- [ ] `PurchaseListTable.tsx`: `ResponsiveList`-based, keyboard-operable (FR-013), Date,
+      Project, Item, Vendor, Qty, Rate, Amount, GRN Number (FR-016), Bill link, PaymentStatus
+      `StatusBadge`, Delete (with 409 guard)
 - [ ] `app/dashboard/inventory/purchases/page.tsx`: list + filters (date range, project,
       vendor, payment status), "New Purchase" button opening `PurchaseModal`
 
@@ -114,8 +132,10 @@ app/ui/inventory/    [14 components per data-model.md]
 - [ ] `IssueModal.tsx`: siteId (from `getSites()` in projects.ts), itemId (filtered to
       `inStock > 0` via stock query for selected site — resets on site change FR-005),
       `getStockHint()` call on item+site selection (FR-003), available qty hint below Quantity,
+      Activity/BOQ Item selector sourced from the selected site's project, required (FR-015),
       date + quantity + issuedTo + remarks; `issueSchema` validation
-- [ ] `IssueListTable.tsx` + `app/dashboard/inventory/issues/page.tsx`
+- [ ] `IssueListTable.tsx` (`ResponsiveList`-based, keyboard-operable, FR-013) +
+      `app/dashboard/inventory/issues/page.tsx`
 
 **Checkpoint**: Issue creation with stock hint and over-issue inline error functional.
 
@@ -123,25 +143,32 @@ app/ui/inventory/    [14 components per data-model.md]
 
 - [ ] `TransferModal.tsx`: fromSiteId, toSiteId (from-site = to-site client-side guard FR,
       `getStockHint()` on from-site item selection), itemId, date, qty, remarks
-- [ ] `TransferListTable.tsx` + `app/dashboard/inventory/transfers/page.tsx`
+- [ ] `TransferListTable.tsx` (`ResponsiveList`-based, keyboard-operable, FR-013) +
+      `app/dashboard/inventory/transfers/page.tsx`
 
 **Checkpoint**: Transfer creation with source stock hint functional.
 
-### Phase 8: US6 — Payments & Bill Allocation (P2)
+### Phase 8: US6 — Payments (FIFO auto-allocation) (P2)
 
-- [ ] `AllocationRow.tsx`: bill info (Item, Date, Total, Remaining) + amount input;
-      used in `useFieldArray`
-- [ ] `PaymentModal.tsx`: vendorId dropdown (loads `getOutstandingBills()` on vendor change),
-      amount + date + paymentMode + referenceNumber + allocation `useFieldArray`; live
-      `allocated = sum(inputs)`, `unallocated = amount − allocated` counter (red + Save disabled
-      if < 0 — FR-004); `paymentSchema` with allocation refine
-- [ ] `PaymentListTable.tsx` + `app/dashboard/inventory/payments/page.tsx`
+**Corrected** (research.md §9): no `AllocationRow.tsx`, no `useFieldArray`, no
+`getOutstandingBills()` call, no client-side allocated/unallocated counter — allocation is fully
+automatic server-side FIFO (spec FR-004), matching the backend's design exactly.
 
-**Checkpoint**: Payment recording with live allocation guard fully functional.
+- [ ] `PaymentModal.tsx`: vendorId dropdown (from partners.ts); on vendor change, fetch and
+      display the vendor's total outstanding balance as an informational label only — not an
+      editable allocation list; amount + date + paymentMode + referenceNumber;
+      `paymentSchema` validation (no allocations field)
+- [ ] `PaymentListTable.tsx` (`ResponsiveList`-based, keyboard-operable, FR-013) +
+      `app/dashboard/inventory/payments/page.tsx`: columns include Unallocated Balance; on save
+      invalidate purchases query (payment status badges on PurchasesPage update)
+
+**Checkpoint**: Payment recording with automatic FIFO allocation fully functional.
 
 ### Phase 9: Polish
 
 - [ ] Verify all monetary fields use `formatCurrency` across all 5 pages
 - [ ] Verify all payment status displays use `StatusBadge`
 - [ ] TypeScript type check (`npx tsc --noEmit`)
+- [ ] Spot-check every `ResponsiveList`-based screen (Masters, Stock, Purchases, Issues,
+      Transfers, Payments) at a mobile viewport and for keyboard operability — FR-013
 - [ ] Manual quickstart.md walkthrough

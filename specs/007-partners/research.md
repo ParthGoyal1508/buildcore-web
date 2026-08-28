@@ -84,3 +84,25 @@ If `StatusBadge` doesn't yet exist (if 008 hasn't shipped), create it in this fe
 
 **Decision**: All `buildcore-api` calls go through `app/lib/api/partners.ts` — same convention
 as `app/lib/api/projects.ts` (008). Follows Constitution Principle V for this codebase.
+
+## 9. Middleware guard and ResponsiveList/keyboard-operability — found missing on re-audit
+
+**Decision**: `middleware.ts` gains a `/dashboard/partners/*` route matcher: `PARTNERS` for
+vendors/contractors/bocw sub-routes, `SETTINGS` for `/dashboard/partners/vendors/categories`
+(mirroring the backend's corrected permission mapping, `007-partners-backend` research.md §9).
+Every list screen (Categories, Vendors, Contractors, Compliance, BOCW) uses this app's existing
+`ResponsiveList` component and is fully keyboard-operable, built in per-component from the
+start. The RAG Matrix is the one exception — a dense contractor×month grid isn't amenable to
+`ResponsiveList`'s card-layout pattern — but its dots are real `<button>` elements (Tab-reachable,
+`disabled` rather than merely `pointer-events: none` for gray cells) so keyboard access isn't
+lost even where the card layout is.
+
+**Rationale**: Both were simply missing from this feature's original scope — a gap caught during
+a master-PRD alignment audit, the same class of gap (middleware guard, `ResponsiveList`) that
+`006-plant-machinery`'s web spec needed the identical retrofit for. This app's constitution makes
+both NON-NEGOTIABLE; there's no principled reason for Partners to be the exception.
+
+**Alternatives considered**: Exempting the RAG Matrix from keyboard access entirely (treating it
+as a read-only visualization) — rejected: FR-007 already requires dot clicks to navigate, so the
+interaction exists regardless; making it keyboard-reachable costs nothing beyond using `<button>`
+instead of a styled `<div>`.

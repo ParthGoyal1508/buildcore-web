@@ -299,21 +299,88 @@ it.
 - [ ] T052 [US10] Register `ReEnrolmentQueue` as a tab/section within the Employees area
       (`app/dashboard/hr/employees/page.tsx`, T012)
 
-**Checkpoint**: All ten user stories independently functional.
+**Checkpoint**: All ten original user stories independently functional.
 
 ---
 
-## Phase 13: Polish & Cross-Cutting Concerns
+## Phase 13: User Story 11 - Employee offboarding and Full & Final settlement (Priority: P3)
 
-- [ ] T053 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
-- [ ] T054 [P] Manually verify every list screen across all ten user stories renders as cards at a
-      mobile viewport (spot-check, since `ResponsiveList` reuse was built in per-component) — spec
-      FR-020/SC-006
-- [ ] T055 [P] Manually verify every non-camera interactive control across all screens is
+**Goal**: Initiate exit, view F&F summary, process it, see Inactive status reflected everywhere.
+
+**Independent Test**: Initiate exit for a seeded employee, view the F&F summary, process it,
+confirm Status shows Inactive on the Employee List/Detail.
+
+### Implementation for User Story 11
+
+- [ ] T058 [P] [US11] Add `initiateExit()`, `getFnfSummary()`, `processFnf()` to
+      `app/lib/api/hr-payroll.ts`
+- [ ] T059 [US11] Create `app/ui/hr/exit-modal.tsx` and `app/ui/hr/fnf-summary.tsx`,
+      keyboard-operable, reusing the existing payroll-run confirmation UI for Process (research.md
+      §10) (depends on T058)
+- [ ] T060 [US11] Register both on the Employee Detail page (`app/dashboard/hr/employees/[id]/
+      page.tsx`, T013) (depends on T059)
+
+**Checkpoint**: All eleven user stories independently functional.
+
+---
+
+## Phase 14: User Story 12 - Reimbursement claims admin review (Priority: P3)
+
+**Goal**: Filterable claims list, Approve/Reject/Mark Paid actions, Register view.
+
+**Independent Test**: Seed a Submitted claim, approve it, mark it paid directly, confirm a second
+claim can be rejected with mandatory remarks.
+
+### Implementation for User Story 12
+
+- [ ] T061 [P] [US12] Add `listReimbursements()`, `approveReimbursement()`,
+      `rejectReimbursement()`, `payReimbursement()`, `getReimbursementRegister()` to
+      `app/lib/api/hr-payroll.ts`
+- [ ] T062 [US12] Create `app/ui/hr/reimbursements-list.tsx` (`ResponsiveList`-based, status
+      filter), `decide-claim-modal.tsx`, `pay-claim-modal.tsx`, all keyboard-operable (depends on
+      T061)
+- [ ] T063 [US12] Implement `app/dashboard/hr/reimbursements/page.tsx` (depends on T062)
+- [ ] T063a [US12] Add `listReimbursementCategories()`, `createReimbursementCategory()`,
+      `updateReimbursementCategory()` to `app/lib/api/settings.ts`; create
+      `app/ui/settings/reimbursement-category-tab.tsx` and register it as a sixth tab on
+      `app/dashboard/settings/employee-setup/page.tsx` (feature 002) — FR-029, research.md §11,
+      found missing on a second alignment-audit pass (depends on Foundational only)
+
+**Checkpoint**: All twelve user stories independently functional.
+
+---
+
+## Phase 15: User Story 13 - Bulk attendance import (Priority: P3)
+
+**Goal**: CSV template download, upload + validation report, commit-only-validated-rows.
+
+**Independent Test**: Upload a CSV mixing valid/invalid rows, confirm the report and nothing
+committed, then commit only the valid rows and confirm they appear in Daily Attendance.
+
+### Implementation for User Story 13
+
+- [ ] T064 [P] [US13] Add `getAttendanceImportTemplate()`, `validateAttendanceImport()`,
+      `commitAttendanceImport()` to `app/lib/api/hr-payroll.ts`
+- [ ] T065 [US13] Create `app/ui/hr/attendance-import-modal.tsx` — template download, upload,
+      row-level validation report display, Commit action, keyboard-operable (depends on T064)
+- [ ] T066 [US13] Register the Import action on the existing Attendance screen
+      (`app/dashboard/hr/attendance/page.tsx`, T023) (depends on T065)
+
+**Checkpoint**: All thirteen user stories independently functional.
+
+---
+
+## Phase 16: Polish & Cross-Cutting Concerns
+
+- [ ] T067 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
+- [ ] T068 [P] Manually verify every list screen across all thirteen user stories renders as cards
+      at a mobile viewport (spot-check, since `ResponsiveList` reuse was built in per-component) —
+      spec FR-020/SC-006
+- [ ] T069 [P] Manually verify every non-camera interactive control across all screens is
       keyboard-operable with a visible focus indicator (spot-check) — spec FR-020/SC-005
-- [ ] T056 [P] Manually verify zero PII values are ever visible without an explicit Reveal action
+- [ ] T070 [P] Manually verify zero PII values are ever visible without an explicit Reveal action
       — spec SC-002
-- [ ] T057 Run the full `quickstart.md` validation scenarios end-to-end and record results
+- [ ] T071 Run the full `quickstart.md` validation scenarios end-to-end and record results
 
 ---
 
@@ -324,7 +391,7 @@ it.
 - **Setup (Phase 1)**: No dependencies — can start immediately
 - **Foundational (Phase 2)**: Depends on Setup — BLOCKS all user stories (component/utility
   promotion and route protection both need to land before any story reuses them)
-- **User Stories (Phase 3–12)**: All depend on Foundational
+- **User Stories (Phase 3–15)**: All depend on Foundational
   - US1 (Employees) is the root dependency — US2 (Documents), US8 (Transfer) extend it directly
   - US2 depends on US1's form/detail existing
   - US3 (Attendance admin), US4 (Leave admin) depend only on Foundational + 003's existing data
@@ -337,7 +404,11 @@ it.
   - US6 (Challans) depends on US5's payroll data existing
   - US9 (Daily Workers) depends only on Foundational (T003, T004) — fully independent of US1–US8
   - US10 (Re-enrolment queue) depends only on Foundational + 003's existing data
-- **Polish (Phase 13)**: Depends on all desired user stories being complete
+  - US11 (Offboarding/F&F) depends on US1 (Employee Detail page to attach to) and US5 (reused
+    payroll-run confirmation UI)
+  - US12 (Reimbursements Admin) depends only on Foundational — independent of every other story
+  - US13 (Attendance Import) depends on US3 (registers onto the existing Attendance screen)
+- **Polish (Phase 16)**: Depends on all desired user stories being complete
 
 ### Parallel Opportunities
 

@@ -208,15 +208,33 @@ immediately.
 - **FR-010**: All API calls MUST go through `app/lib/api/inventory.ts`.
 - **FR-011**: The Masters modal MUST be two-tab (Categories, Items) using the established
   multi-tab modal pattern.
+- **FR-012**: `middleware.ts` MUST guard `/dashboard/inventory/*` with the `INVENTORY` permission
+  (`SETTINGS` for the Masters sub-route, since Categories/Items are Settings-owned masters per
+  the backend's corrected placement), mirroring the backend's permission mapping — missing
+  entirely from this feature's original scope, found during a master-PRD alignment audit.
+- **FR-013**: Every list screen in this feature (Stock table, Purchases, Issues, Transfers,
+  Payments, Masters tabs) MUST use the existing `ResponsiveList` component and be fully
+  keyboard-operable, built into each screen's own implementation from the start — this app's
+  constitution's NON-NEGOTIABLE mobile-first requirement, applied here the same way it already is
+  on every other feature.
+- **FR-014**: The Item tab of the Masters modal MUST include Reorder Level and HSN Code fields;
+  the Stock table MUST visibly flag any row where `belowReorderLevel: true` (e.g. a warning
+  badge/row highlight) — both fields were entirely missing from this feature's original scope.
+- **FR-015**: The Issue modal MUST include an Activity/BOQ Item selector (sourced from the
+  selected site's project), required before submission — missing from this feature's original
+  scope; without it, the backend's now-required `activityId`/`boqItemId` field has no UI input.
+- **FR-016**: The Purchase list and detail MUST display the auto-generated GRN number returned by
+  the backend on save.
 
 ### Key Entities
 
 - **ItemCategory**: Name (uppercase), Items count.
-- **Item**: Code, Name, Category, Unit, Description.
+- **Item**: Code, Name, Category, Unit, Reorder Level, HSN Code, Description.
 - **StockRow**: Item, Project/Store, Category, Unit, Received, Issued, Transfer In, Transfer Out,
-  In Stock, Avg Rate (₹), Stock Value (₹).
-- **Purchase**: Date, Site, Item, Vendor, Qty, Rate, Amount, Bill file, Payment Status badge.
-- **Issue**: Date, Site, Item, Issued To, Qty, Remarks.
+  In Stock, Avg Rate (₹), Stock Value (₹), Below Reorder Level flag.
+- **Purchase**: Date, Site, Item, Vendor, Qty, Rate, Amount, Bill file, GRN Number, Payment
+  Status badge.
+- **Issue**: Date, Site, Item, Issued To, Activity/BOQ Item, Qty, Remarks.
 - **StockTransfer**: Date, From Site, To Site, Item, Qty, Remarks.
 - **Payment**: Date, Vendor, Amount, Payment Mode, Reference, Allocated Bills count.
 - **PurchaseBill**: Total Amount, Paid Amount, Payment Status badge (for allocation list).
@@ -235,6 +253,8 @@ immediately.
   3 seconds for a site with 200 items and 12 months of transactions.
 - **SC-005**: Monetary values on all five pages use consistent Indian number formatting (₹ with
   lakhs/crores grouping).
+- **SC-006**: Every list screen in this feature is fully usable (all actions reachable, no
+  horizontal scroll) on a mobile viewport.
 
 ## Assumptions
 

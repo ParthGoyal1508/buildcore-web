@@ -61,7 +61,9 @@
 3. Add two Task Items under the group. **Expected**: BOQ tree shows the group with two indented
    items.
 4. Click "Import BOQ". Upload a 5-row Excel file where row 3 is missing the Unit column.
-   **Expected**: "4 rows imported. 1 error." with a "Download Error Report" link.
+   **Expected**: "4 valid rows. 1 error." with a "Download Error Report" link — nothing written
+   to the BOQ tree yet. Click "Confirm Import". **Expected**: "4 rows imported"; the 4 valid rows
+   now appear in the BOQ tree.
 5. Click the BOQ Alerts card. Select the "Delayed" tab. **Expected**: items past their Finish
    Date with pending qty appear; items on track do not.
 
@@ -76,8 +78,11 @@
 4. Enter measurement values: Nos1=2, Nos2=1, Length=10, Breadth=1, Depth=1, Density=1.
    **Expected**: Actual Qty field shows `20` instantly (live computation).
 5. Submit the DWR. **Expected**: DWR appears in the list with status "Submitted".
-6. Click "Approve". Confirm the dialog. **Expected**: status badge changes to "Approved" (green).
-7. Check the BOQ tree for the project. **Expected**: the selected task item's Done Qty is now 20.
+6. Check the BOQ tree for the project. **Expected**: the selected task item's Done Qty is still
+   unchanged (only Approved DWRs count — master PRD §7.5.3).
+7. Click "Approve". Confirm the dialog. **Expected**: status badge changes to "Approved" (green).
+8. Check the BOQ tree for the project again. **Expected**: the selected task item's Done Qty is
+   **now** 20.
 
 ---
 

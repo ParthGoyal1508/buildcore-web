@@ -49,8 +49,8 @@ Guard: middleware requires `USER_MANAGEMENT`.
   FR-016) is surfaced verbatim as the form's error message (spec FR-013).
 - `deleteUser(id): Promise<void>` → `DELETE /settings/users/:id` — same 409 handling.
 
-The "Add User" control (spec FR-011) is a plain `<Link>` to the separate Account Creation route
-(no function call here — out of this feature's scope).
+The "Add User" control (spec FR-011) is a plain `<Link href="/dashboard/account-creation/new">`
+(`010-account-creation`) — no function call here, out of this feature's scope.
 
 Guard: middleware requires `USER_MANAGEMENT` AND the caller's own role is Super Admin or HO User
 (spec FR-010) — any other authenticated role gets `AccessDenied`, not a read-only render.

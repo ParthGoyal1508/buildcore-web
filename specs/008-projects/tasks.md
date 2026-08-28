@@ -44,8 +44,11 @@ implementation and testing of each story.
       On Hold=orange, Completed=blue), DWR status (Draft=gray, Submitted=orange,
       Approved=green), and RA Bill status (Draft=gray, Submitted=yellow, Approved=green) —
       FR-009, research.md §9
+- [ ] T006a [P] Extend `middleware.ts` with a `/dashboard/projects/*` route matcher (`PROJECTS`/
+      `DWR`/`PROJECT_FINANCIALS` per sub-route — spec FR-013, research.md §10)
 
-**Checkpoint**: Nav, layout, API module, lock context, currency formatter, and status badge ready.
+**Checkpoint**: Nav, layout, API module, lock context, currency formatter, status badge, and
+route guard ready.
 
 ---
 
@@ -75,10 +78,11 @@ data needed.
 - [ ] T009 [P] [US1] Create `app/ui/projects/ClientModal.tsx`: `react-hook-form` form with
       zod validation for Name (required), Contact Person, Phone, Email, Address, GSTIN
       (15-char alphanumeric format validation per FR in spec); handles create and edit modes
-- [ ] T010 [US1] Create `app/dashboard/projects/clients/page.tsx`: `ClientsPage` — table with
-      columns (Client Name, Contact Person, Phone, Email, Projects count, Status, Actions),
-      search + status filter, pagination, "Add Client" button opening `ClientModal`, inline
-      delete with `409` handling ("Client has linked projects")
+- [ ] T010 [US1] Create `app/dashboard/projects/clients/page.tsx`: `ClientsPage` —
+      `ResponsiveList`-based, keyboard-operable table (FR-014) with columns (Client Name,
+      Contact Person, Phone, Email, Projects count, Status, Actions), search + status filter,
+      pagination, "Add Client" button opening `ClientModal`, inline delete with `409` handling
+      ("Client has linked projects")
 - [ ] T011 [US1] Wire `@tanstack/react-query` for client list (`['projects', 'clients', params]`
       query key) and mutations (create/update/delete with `invalidateQueries` on success)
 
@@ -101,9 +105,10 @@ radius — no DWR or BOQ needed.
       (searchable dropdown), Location address, Latitude (`@Min(-90)/@Max(90)` via zod),
       Longitude (`@Min(-180)/@Max(180)`), Geofence Radius (positive integer, helper label
       "Employees outside this radius will be flagged") — spec FR-012
-- [ ] T014 [US2] Create `app/dashboard/projects/sites/page.tsx`: `SitesPage` — table with
-      (Site Name, Project linked, Location, Geofence Radius m, Status, Actions), project filter,
-      "Add Site" button, `SiteModal` integration
+- [ ] T014 [US2] Create `app/dashboard/projects/sites/page.tsx`: `SitesPage` —
+      `ResponsiveList`-based, keyboard-operable table (FR-014) with (Site Name, Project linked,
+      Location, Geofence Radius m, Status, Actions), project filter, "Add Site" button,
+      `SiteModal` integration
 
 **Checkpoint**: Sites CRUD fully functional.
 
@@ -126,9 +131,10 @@ form; lock toggle with confirmation.
       Dates, Assignment), Client searchable dropdown, Project Manager searchable employee
       dropdown (calls HR employee list API), route-change interception for unsaved changes
       ("Discard changes?" dialog) — spec FR-002, research.md §3
-- [ ] T017 [P] [US3] Create `app/ui/projects/ProjectListTable.tsx`: table with (Code, Name,
-      Client, Location, Contract Value via `formatCurrency`, Status badge, Start Date, End Date,
-      lock icon if `isLocked`, Actions: View/Edit/Delete) — FR-010
+- [ ] T017 [P] [US3] Create `app/ui/projects/ProjectListTable.tsx`: `ResponsiveList`-based,
+      keyboard-operable table (FR-014) with (Code, Name, Client, Location, Contract Value via
+      `formatCurrency`, Status badge, Start Date, End Date, lock icon if `isLocked`,
+      Actions: View/Edit/Delete) — FR-010
 - [ ] T018 [US3] Create `app/dashboard/projects/portfolio/page.tsx`: `PortfolioPage` with
       `ProjectListTable`, search/status/client filters, "Add Project" button
 - [ ] T019 [US3] Create `app/dashboard/projects/portfolio/new/page.tsx` and
@@ -176,20 +182,24 @@ lock project → banner appears, action buttons disabled.
 **Goal**: Collapsible BOQ tree, Add Group/Item forms, Excel import with error display, BOQ
 Alert tabs.
 
-**Independent Test**: Add group + 2 items, import 5-row Excel (1 bad row) → see "4 imported,
-1 error" + download link; BOQ Alerts show correct classifications.
+**Independent Test**: Add group + 2 items, upload a 5-row Excel (1 bad row) → see the validation
+report "4 valid, 1 error" + download link with nothing written yet, click Confirm Import → see
+"4 imported"; BOQ Alerts show correct classifications.
 
 ### Implementation for User Story 5
 
-- [ ] T027 [P] [US5] Implement `getBOQ`, `createBOQGroup`, `createBOQItem`, `importBOQ`,
-      `getBOQAlerts` in `app/lib/api/projects.ts`
-- [ ] T028 [P] [US5] Create `app/ui/projects/BOQTree.tsx`: collapsible tree table (group rows
-      expand to show items), columns (BOQ No., Task Name, Unit, Scope Qty, Done Qty, Pending Qty,
-      Per Day Qty, Avg Qty/Day, Days to Complete), inline Add Group/Add Item forms at the
+- [ ] T027 [P] [US5] Implement `getBOQ`, `createBOQGroup`, `createBOQItem`, `validateBOQImport`,
+      `confirmBOQImport`, `getBOQAlerts` in `app/lib/api/projects.ts`
+- [ ] T028 [P] [US5] Create `app/ui/projects/BOQTree.tsx`: collapsible tree table
+      (`ResponsiveList`-based, keyboard-operable — FR-014; group rows expand to show items),
+      columns (BOQ No., Task Name, Unit, Scope Qty, Done Qty, Pending Qty, Per Day Qty,
+      Avg Qty/Day, Days to Complete), inline Add Group/Add Item forms at the
       bottom; disabled when locked (`ProjectLockContext`)
-- [ ] T029 [P] [US5] Create `app/ui/projects/BOQImportButton.tsx`: file input for `.xlsx`,
-      upload via `importBOQ`, on complete show "N rows imported. M errors." with "Download Error
-      Report" anchor link to `errorReportUrl`; progress indicator during upload — FR-004
+- [ ] T029 [P] [US5] Create `app/ui/projects/BOQImportButton.tsx`: two-step flow — file input for
+      `.xlsx` uploads via `validateBOQImport`, on complete shows "N valid rows. M errors." with
+      "Download Error Report" anchor link to `errorReportUrl` and a "Confirm Import" button
+      (disabled until validation completes); clicking it calls `confirmBOQImport(batchId)` and
+      shows "N rows imported"; progress indicator during both calls — FR-004
 - [ ] T030 [US5] Create `app/ui/projects/BOQAlertTabs.tsx`: three-tab card (Today Task,
       Delayed, To Be Delayed) each showing a list of BOQ items with their context (BOQ No.,
       Task Name, Pending Qty, deadline info); auto-refreshes when BOQ query is invalidated
@@ -205,8 +215,9 @@ Alert tabs.
 **Goal**: DWR list with filters; Add DWR modal with BOQ task picker and live Actual Qty
 computation; Approve action with confirmation.
 
-**Independent Test**: Create DWR, enter measurement values, see live Actual Qty, submit, approve
-from list — BOQ Done Qty updates visible on next BOQ load.
+**Independent Test**: Create DWR, enter measurement values, see live Actual Qty, submit — BOQ
+Done Qty unchanged on next BOQ load; approve from list — BOQ Done Qty **now** updates (master PRD
+§7.5.3: only Approved DWRs count toward progress).
 
 ### Implementation for User Story 6
 
@@ -221,15 +232,17 @@ from list — BOQ Done Qty updates visible on next BOQ load.
       Work Date (default today), DPR Number (read-only auto), Supervisor searchable employee
       dropdown, Weather, Contract For (radio), add/remove `DWRTaskRow` entries; disabled when
       locked (`ProjectLockContext`) — spec US6 AC2/AC3
-- [ ] T035 [US6] Create `app/ui/projects/DWRListTable.tsx` and
-      `app/dashboard/projects/dwr/page.tsx`: DWR list with (Date, Project, Supervisor, Workers,
-      Machinery, Progress %, Weather, Status badge, Actions); filters (Project, date range,
-      Status); "Add DWR" button; Approve action with `window.confirm` dialog — spec US6 AC5
+- [ ] T035 [US6] Create `app/ui/projects/DWRListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable — FR-014) and `app/dashboard/projects/dwr/page.tsx`: DWR list with
+      (Date, Project, Supervisor, Workers, Machinery, Progress %, Weather, Status badge, Actions);
+      filters (Project, date range, Status); "Add DWR" button; Approve action with
+      `window.confirm` dialog — spec US6 AC5
 - [ ] T036 [US6] Wire `@tanstack/react-query` DWR queries with project-scoped keys
-      `['project', id, 'dwr']`; on approve mutation, also invalidate BOQ query to reflect
-      updated `doneQty`
+      `['project', id, 'dwr']`; on **approve** mutation only (not submit), also invalidate BOQ
+      query to reflect updated `doneQty` — master PRD §7.5.3
 
-**Checkpoint**: DWR creation, submission, approval, and BOQ doneQty refresh all working.
+**Checkpoint**: DWR creation, submission, and approval all working; BOQ doneQty refreshes on
+approval, not submission.
 
 ---
 
@@ -255,10 +268,12 @@ Revenue Booked updates.
 - [ ] T040 [P] [US7] Create `app/ui/projects/WorkOrderModal.tsx`: 6-tab modal (Work Detail,
       Terms & Conditions, Requirements, Hire Contract, Material, Labour); single
       `react-hook-form` instance preserving data across tab switches — spec FR-011
-- [ ] T041 [US7] Complete `RevenueTab.tsx` (US4 Phase 6 shell): wire revenue list +
-      `RevenueModal`, RA Bills section with `RABillCard` rows, lock-aware action buttons
+- [ ] T041 [US7] Complete `RevenueTab.tsx` (US4 Phase 6 shell): wire revenue list
+      (`ResponsiveList`-based, keyboard-operable — FR-014) + `RevenueModal`, RA Bills section
+      with `RABillCard` rows, lock-aware action buttons
 - [ ] T042 [US7] Complete `BillsExpensesTab.tsx` (US4 Phase 6 shell): wire Work Orders sub-tab
-      with `WorkOrderModal`
+      with a `WorkOrderListTable.tsx` (`ResponsiveList`-based, keyboard-operable — FR-014) and
+      `WorkOrderModal`
 
 **Checkpoint**: Revenue, RA Bill workflow, and Work Orders fully functional.
 
@@ -314,6 +329,9 @@ enter budgets, verify overrun highlight when actual > budget × 1.10.
       `isLocked: true` — FR-005
 - [ ] T054 [P] Run TypeScript type check (`npx tsc --noEmit`) and fix any issues
 - [ ] T055 [P] Manually verify quickstart.md Scenario 8 (locked project end-to-end) in dev
+- [ ] T055a [P] Spot-check every `ResponsiveList`-based screen (Clients, Sites, Portfolio, BOQ
+      tree, DWR list, Revenue, Work Orders) at a mobile viewport and for keyboard operability —
+      FR-014
 
 ---
 

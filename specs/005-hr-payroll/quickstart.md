@@ -79,9 +79,33 @@
 2. Navigate to the queue within Employees. **Expected**: listed with employee/site/reason.
 3. Approve it. **Expected**: status updates.
 
-## Scenario 10 — Cross-cutting checks
+## Scenario 11 — Offboarding & F&F (User Story 11)
 
-1. Sign in as a role lacking each relevant permission; confirm access-denied for each of the seven
+1. From an active employee's Detail page, choose Initiate Exit with a Last Working Day and reason.
+2. View the F&F summary. **Expected**: pending salary/EL encashment/loan recovery/net payable
+   match the backend exactly.
+3. Click Process. **Expected**: reuses the payroll-run confirmation UI; on completion (past Last
+   Working Day), the employee's Status shows Inactive on both List and Detail.
+
+## Scenario 12 — Reimbursements Admin (User Story 12)
+
+1. Seed a Submitted claim (via My Workspace). Navigate to `/dashboard/hr/reimbursements`.
+   **Expected**: claim listed with category/amount/status.
+2. Approve it. **Expected**: status updates to Approved.
+3. Mark it Paid (Direct). **Expected**: payment mode/date/reference recorded; status becomes Paid.
+4. Reject a second claim without remarks. **Expected**: rejected (remarks required); with remarks,
+   succeeds and the claim never appears in the Register's payable totals.
+
+## Scenario 13 — Bulk Attendance Import (User Story 13)
+
+1. From the Attendance screen, choose Import, download the template.
+2. Upload a CSV mixing valid/invalid rows. **Expected**: row-level validation report; nothing
+   committed yet.
+3. Commit. **Expected**: only the previously-validated rows appear in the Daily Attendance view.
+
+## Scenario 14 — Cross-cutting checks
+
+1. Sign in as a role lacking each relevant permission; confirm access-denied for each of the eight
    `/dashboard/hr/*` areas independently.
 2. Tab through every screen's controls using only the keyboard (camera capture excepted).
    **Expected**: visible focus, all reachable.

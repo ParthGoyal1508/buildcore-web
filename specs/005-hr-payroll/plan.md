@@ -47,10 +47,13 @@ inline (Principle III); TypeScript `strict`, `zod` at every API boundary (Princi
 and keyboard-operable, built in per-component from the start (Principle VI, spec FR-020); PII
 fields masked by default everywhere, reveal always an explicit per-field action (spec FR-003).
 
-**Scale/Scope**: The largest frontend feature specced so far — seven route areas, ~30 new typed
-API functions, ~25 new components, one existing page (`app/dashboard/hr` stub → real landing
-page), two components + one utility promoted to shared locations, `nav-links.tsx`'s existing "HR &
-Payroll" entry finally resolving to real content.
+**Scale/Scope**: The largest frontend feature specced so far — eight route areas (adding
+Reimbursements as its own page; Offboarding/F&F and Attendance Import compose into existing
+Employee Detail/Attendance pages rather than adding new top-level routes), ~38 new typed API
+functions, ~31 new components, one existing page (`app/dashboard/hr` stub → real landing page),
+two components + one utility promoted to shared locations, `nav-links.tsx`'s existing "HR &
+Payroll" entry finally resolving to real content. User Stories 11–13 were added during a
+master-PRD alignment pass after this feature's original build — no other route/story changes.
 
 ## Constitution Check
 
@@ -96,12 +99,16 @@ buildcore-web/
 │   │   ├── constants.ts                          # MODIFIED — /dashboard/hr/* routes, copy
 │   │   ├── geolocation.ts                        # NEW — promoted from My Workspace
 │   │   └── api/
-│   │       └── hr-payroll.ts                     # NEW — all typed API functions
+│   │       ├── hr-payroll.ts                     # NEW — all typed API functions
+│   │       └── settings.ts                       # MODIFIED — Reimbursement Categories CRUD
+│   │                                             #   functions (research.md §11)
 │   ├── ui/
 │   │   ├── shared/
 │   │   │   ├── camera-capture.tsx                # MOVED from app/ui/my/
 │   │   │   └── salary-slip.tsx                   # MOVED from app/ui/my/
 │   │   ├── my/                                    # MODIFIED — imports updated to app/ui/shared/
+│   │   ├── settings/
+│   │   │   └── reimbursement-category-tab.tsx     # NEW — 6th tab on 002's employee-setup page
 │   │   └── hr/
 │   │       ├── employee-form.tsx                 # NEW — eight-tab (research.md §2)
 │   │       ├── employee-list.tsx                 # NEW
@@ -123,13 +130,19 @@ buildcore-web/
 │   │       ├── new-loan-modal.tsx                # NEW
 │   │       ├── daily-worker-registry.tsx         # NEW
 │   │       ├── daily-worker-attendance-capture.tsx # NEW
-│   │       └── reenrolment-queue.tsx             # NEW
+│   │       ├── reenrolment-queue.tsx             # NEW
+│   │       ├── exit-modal.tsx                    # NEW — US11
+│   │       ├── fnf-summary.tsx                   # NEW — US11
+│   │       ├── reimbursements-list.tsx           # NEW — US12
+│   │       ├── decide-claim-modal.tsx            # NEW — US12
+│   │       ├── pay-claim-modal.tsx               # NEW — US12
+│   │       └── attendance-import-modal.tsx       # NEW — US13
 │   └── dashboard/
 │       ├── hr/
 │       │   ├── page.tsx                           # NEW — landing (nav-links target resolves)
 │       │   ├── employees/
 │       │   │   ├── page.tsx, [id]/page.tsx, new/page.tsx, [id]/edit/page.tsx
-│       │   ├── attendance/page.tsx
+│       │   ├── attendance/page.tsx                 # MODIFIED — adds Import action (US13)
 │       │   ├── leave/page.tsx
 │       │   ├── payroll/
 │       │   │   ├── page.tsx
@@ -138,9 +151,12 @@ buildcore-web/
 │       │   ├── loans/
 │       │   │   ├── page.tsx
 │       │   │   └── [id]/schedule/page.tsx
-│       │   └── daily-workers/
-│       │       ├── page.tsx
-│       │       └── attendance/page.tsx
+│       │   ├── daily-workers/
+│       │   │   ├── page.tsx
+│       │   │   └── attendance/page.tsx
+│       │   └── reimbursements/page.tsx             # NEW — US12
+│       └── settings/
+│           └── employee-setup/page.tsx              # MODIFIED — adds the 6th tab (research.md §11)
 ├── middleware.ts                                    # MODIFIED — /dashboard/hr/* permission
 │                                                    #   mapping (EMPLOYEES/ATTENDANCE/PAYROLL/
 │                                                    #   CHALLANS/LOANS/DAILY_WORKER_REGISTRY)

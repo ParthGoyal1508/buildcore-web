@@ -33,7 +33,13 @@ quickstart.md
       `unpaid`=red, `part_paid`=yellow, `paid`=green entries exist; add if absent
       (should exist from 007/008)
 
-**Checkpoint**: Nav, layout, API module, and shared utilities ready.
+- [ ] T004a [P] Extend `middleware.ts` with a `/dashboard/inventory/*` route matcher:
+      `INVENTORY` for stock/purchases/issues/transfers/payments, `SETTINGS` for the
+      Masters modal's underlying routes (a Settings-owned master, backend research.md §1)
+      — FR-012, missing entirely from this feature's original task list, found during a
+      master-PRD alignment audit
+
+**Checkpoint**: Nav, layout, API module, shared utilities, and route guard ready.
 
 ---
 
@@ -58,9 +64,11 @@ delete unlinked category (success), delete linked category (inline error).
 - [ ] T006 [P] [US1] Create `app/ui/inventory/CategoryTab.tsx`: table (name, item count,
       Delete icon), inline add-row form (Name input + submit); delete with 409 inline error
       handling ("Category has linked items")
-- [ ] T007 [P] [US1] Create `app/ui/inventory/ItemTab.tsx`: table (Code read-only, Name,
-      Category, Unit, Description, Edit/Delete), Add/Edit form with category dropdown
-      (`getCategories()`), unit dropdown, description; delete with 409 handling
+- [ ] T007 [P] [US1] Create `app/ui/inventory/ItemTab.tsx`: `ResponsiveList`-based table
+      (Code read-only, Name, Category, Unit, Reorder Level, HSN Code, Description, Edit/Delete),
+      keyboard-operable (FR-013), Add/Edit form with category dropdown (`getCategories()`), unit
+      dropdown (all 8 values), Reorder Level and HSN Code fields (FR-014); delete with 409
+      handling
 - [ ] T008 [US1] Create `app/ui/inventory/MastersModal.tsx`: two-tab modal composing
       `CategoryTab` + `ItemTab`; `@tanstack/react-query` with `['inventory','categories']`
       and `['inventory','items']` keys
@@ -80,10 +88,11 @@ refreshes after any modal save.
 
 ### Implementation for User Story 2
 
-- [ ] T009 [P] [US2] Create `app/ui/inventory/StockTable.tsx`: table with Item, Project/Store,
-      Category, Unit, Received, Issued, Transfer In, Transfer Out, In Stock, Avg Rate (₹),
-      Stock Value (₹) columns; all monetary via `formatCurrency`; search + site + category
-      filters; four header buttons (New Purchase, New Issue, New Transfer, Masters)
+- [ ] T009 [P] [US2] Create `app/ui/inventory/StockTable.tsx`: `ResponsiveList`-based,
+      keyboard-operable (FR-013), with Item, Project/Store, Category, Unit, Received, Issued,
+      Transfer In, Transfer Out, In Stock, Avg Rate (₹), Stock Value (₹) columns, a visible
+      below-reorder-level flag per row (FR-014); all monetary via `formatCurrency`; search + site
+      + category filters; four header buttons (New Purchase, New Issue, New Transfer, Masters)
 - [ ] T010 [US2] Create `app/dashboard/inventory/stock/page.tsx`: `StockPage` — renders
       `StockTable` + hosts `PurchaseModal`, `IssueModal`, `TransferModal`, `MastersModal`
       (each opened via their button); wire `@tanstack/react-query` `['inventory','stock',params]`
@@ -110,8 +119,9 @@ allocated → inline error.
       rate, live Amount = qty × rate via `react-hook-form` `watch` (FR-002), bill file upload
       (`<input type="file" accept=".pdf,.jpg,.png">` — FR-009); `purchaseSchema` validation;
       `multipart/form-data` POST
-- [ ] T012 [P] [US3] Create `app/ui/inventory/PurchaseListTable.tsx`: Date, Project, Item,
-      Vendor, Qty, Rate, Amount (formatCurrency), Bill file link, Payment Status `StatusBadge`,
+- [ ] T012 [P] [US3] Create `app/ui/inventory/PurchaseListTable.tsx`: `ResponsiveList`-based,
+      keyboard-operable (FR-013), with Date, Project, Item, Vendor, Qty, Rate, Amount
+      (formatCurrency), GRN Number (FR-016), Bill file link, Payment Status `StatusBadge`,
       Delete (confirmation dialog, 409 inline error "Bill has allocated payments")
 - [ ] T013 [US3] Create `app/dashboard/inventory/purchases/page.tsx`: `PurchasesPage` —
       list + filters (date range, project, vendor, payment status), "New Purchase" button +
@@ -137,12 +147,15 @@ submit → inline "Insufficient stock (available: N)"; enter valid qty → saves
         (research.md §7); resets when siteId changes (FR-005)
       - On itemId + siteId both selected: call `getStockHint(itemId, siteId)` and display
         "Available: N [unit]" hint below Quantity field (FR-003, research.md §4)
+      - Activity/BOQ Item selector, sourced from the selected site's project (FR-015),
+        required before submission
       - quantity, issuedTo, date, remarks; `issueSchema` validation
       - On `422` response: show inline "Insufficient stock (available: N)" error on Quantity
         field without navigating away (spec US4 AC2)
-- [ ] T015 [P] [US4] Create `app/ui/inventory/IssueListTable.tsx` and
-      `app/dashboard/inventory/issues/page.tsx`: list + filters (date range, project, item),
-      "New Issue" button + `IssueModal`; on save invalidate stock query
+- [ ] T015 [P] [US4] Create `app/ui/inventory/IssueListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable, FR-013) and `app/dashboard/inventory/issues/page.tsx`: list + filters
+      (date range, project, item), "New Issue" button + `IssueModal`; on save invalidate stock
+      query
 
 **Checkpoint**: Issue creation with live stock hint and validation functional.
 
@@ -164,21 +177,22 @@ inline error before API call; qty > source stock → 422 inline error.
       - On fromSiteId + itemId: `getStockHint(itemId, fromSiteId)` → "Available at source: N"
       - quantity, date, remarks
       - On `400` (same-site from backend): show "Source and destination cannot be the same"
-- [ ] T017 [P] [US5] Create `app/ui/inventory/TransferListTable.tsx` and
-      `app/dashboard/inventory/transfers/page.tsx`: list + filters (date range, from/to
-      project, item), "New Transfer" button + `TransferModal`; on save invalidate stock query
+- [ ] T017 [P] [US5] Create `app/ui/inventory/TransferListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable, FR-013) and `app/dashboard/inventory/transfers/page.tsx`: list +
+      filters (date range, from/to project, item), "New Transfer" button + `TransferModal`; on
+      save invalidate stock query
 
 **Checkpoint**: Transfer CRUD with source-stock validation functional.
 
 ---
 
-## Phase 8: User Story 6 — Payments & Bill Allocation (Priority: P2)
+## Phase 8: User Story 6 — Payments (FIFO auto-allocation) (Priority: P2)
 
-**Goal**: Payment modal with live unallocated-balance counter (Save disabled if negative),
-`useFieldArray` bill allocation rows; payments list.
+**Goal**: Payment modal showing an informational outstanding-balance label (no manual
+allocation UI — FR-004); payments list.
 
-**Independent Test**: Select vendor → bill list loads; allocate more than payment amount →
-Save disabled (negative balance red); correct allocation → saves; bills update statuses.
+**Independent Test**: Select vendor → outstanding balance label loads; submit payment → saves;
+bills update statuses automatically via server-side FIFO (verify via bill list/statuses).
 
 ### Implementation for User Story 6
 
@@ -188,10 +202,11 @@ Save disabled (negative balance red); correct allocation → saves; bills update
         label "Outstanding: ₹X" (FR-004 — no manual allocation table needed)
       - amount, date, paymentMode dropdown, referenceNumber
       - `paymentSchema` zod validation (no allocations array — FIFO is server-side)
-- [ ] T019 [P] [US6] Create `app/ui/inventory/PaymentListTable.tsx` and
-      `app/dashboard/inventory/payments/page.tsx`: list + filters (date range, vendor, payment
-      mode), "New Payment" button + `PaymentModal`; columns include Unallocated Balance;
-      on save invalidate purchases query (payment status badges on PurchasesPage update)
+- [ ] T019 [P] [US6] Create `app/ui/inventory/PaymentListTable.tsx` (`ResponsiveList`-based,
+      keyboard-operable, FR-013) and `app/dashboard/inventory/payments/page.tsx`: list + filters
+      (date range, vendor, payment mode), "New Payment" button + `PaymentModal`; columns include
+      Unallocated Balance; on save invalidate purchases query (payment status badges on
+      PurchasesPage update)
 - [ ] T020 [P] [US6] Update `app/lib/api/inventory.ts`: add `createPayment(data)` POST
       (no allocations field), remove `getOutstandingBills` call — FIFO allocation is automatic
 
@@ -202,11 +217,14 @@ Save disabled (negative balance red); correct allocation → saves; bills update
 ## Phase 9: Polish & Cross-Cutting
 
 - [ ] T021 [P] Verify all monetary fields use `formatCurrency` across all 5 pages and modals
-- [ ] T022 [P] Verify all payment status displays use `StatusBadge` (Purchases list + Payment
-      modal allocation rows)
+- [ ] T022 [P] Verify all payment status displays use `StatusBadge` (Purchases list + Payments
+      list)
 - [ ] T023 [P] Verify item dropdown in IssueModal and TransferModal resets correctly when site
       changes (manual test per quickstart.md Scenario 3 step 4)
 - [ ] T024 [P] Run TypeScript type check (`npx tsc --noEmit`) and fix issues
+- [ ] T024a [P] Spot-check every `ResponsiveList`-based screen (Masters tabs, Stock, Purchases,
+      Issues, Transfers, Payments) at a mobile viewport (card layout, no horizontal scroll) and
+      for keyboard operability across all controls — FR-013
 
 ---
 
@@ -229,7 +247,7 @@ other. US6 is independent of US4/US5.
 - T006, T007 (US1 tabs) and T009 (stock table) are parallel after Phase 2
 - T011, T012 (purchase modal + table) are parallel
 - T014, T015 (issue modal + list) and T016, T017 (transfer modal + list) are parallel
-- T018, T019 (AllocationRow + PaymentModal) and T020 (PaymentListTable) are parallel
+- T018 (PaymentModal), T019 (PaymentListTable), and T020 (API) are parallel
 - T021–T024 (polish) are all independent
 
 ## Implementation Strategy

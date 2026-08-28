@@ -10,8 +10,13 @@ Build six route areas under `/dashboard/partners/*` — Vendor Categories (sub-p
 with 4-tab modal (single `react-hook-form` with `useFieldArray` contacts), Contractor Vault with
 document expiry warnings, Monthly Compliance recording + verify workflow, RAG Matrix as a sticky
 CSS table with FY URL param, and BOCW Cess table with payment recording. Extends `StatusBadge`
-with compliance statuses. All API calls through `app/lib/api/partners.ts`. See
-[research.md](research.md) for all 8 decisions.
+with compliance statuses. All API calls through `app/lib/api/partners.ts`.
+
+**Corrected during a master-PRD alignment audit**: added a `middleware.ts` permission guard for
+`/dashboard/partners/*` (missing entirely from the original scope) and explicit `ResponsiveList`/
+keyboard-operability requirements on every list screen except the RAG Matrix (this app's own
+NON-NEGOTIABLE constitution principle, previously only implied by a generic "mobile-first" line).
+See [research.md](research.md) for all 9 decisions (8 original + 1 correction).
 
 ## Technical Context
 
@@ -45,7 +50,8 @@ Vendor 4-tab form never loses entered data on tab switch (SC-004).
 | No literal strings/URLs inline | All endpoints in `app/lib/api/partners.ts` | PASS |
 | TypeScript strict + zod | All form schemas are zod; all API types defined in data-model.md | PASS |
 | All API calls through `app/lib/api/` | Single `partners.ts` module | PASS |
-| Mobile-first | Responsive at existing breakpoints; RAG Matrix overflow-x on narrow screens | PASS |
+| Mobile-first & keyboard-operable (NON-NEGOTIABLE) | `ResponsiveList` reused for every list screen except the RAG Matrix (exempt per FR-014 — a dense grid isn't amenable to card layout, but its dots are real `<button>`s, Tab-reachable); every new interactive control keyboard-operable, built in from the start (corrected — spec FR-014) | PASS |
+| `middleware.ts` route guard | `/dashboard/partners/*` guarded with `PARTNERS`/`SETTINGS` per sub-route (corrected — spec FR-013, missing from original scope) | PASS |
 
 ## Project Structure
 
@@ -67,6 +73,8 @@ app/
 │   └── partners.ts
 └── ui/partners/
     └── [15 components per data-model.md]
+middleware.ts                                    # MODIFIED — /dashboard/partners/* permission
+                                                  #   mapping (PARTNERS/SETTINGS)
 ```
 
 ## Implementation Phases
@@ -78,14 +86,16 @@ app/
 - [ ] Create `app/lib/api/partners.ts` with all 22 typed API function stubs
 - [ ] Ensure `formatCurrency` exists in `app/lib/utils.ts` (create if 008 not yet merged)
 - [ ] Extend `StatusBadge` colour map with compliance statuses (research.md §7)
+- [ ] Extend `middleware.ts` with a `/dashboard/partners/*` route matcher (`PARTNERS`/`SETTINGS`
+      per sub-route — spec FR-013, research.md §9)
 
-**Checkpoint**: Nav, layout, API module, and badge extension ready.
+**Checkpoint**: Nav, layout, API module, badge extension, and route guard ready.
 
 ### Phase 2: US1 — Vendor Categories (P1)
 
 - [ ] `VendorCategoryModal.tsx` (Add/Edit)
-- [ ] `app/dashboard/partners/vendors/categories/page.tsx` — table with count, modal, delete
-      with 409 handling
+- [ ] `app/dashboard/partners/vendors/categories/page.tsx` — `ResponsiveList`-based table
+      with count, modal, delete with 409 handling, keyboard-operable (FR-014)
 - [ ] Wire `@tanstack/react-query` category queries
 
 **Checkpoint**: Categories CRUD functional.
@@ -96,7 +106,8 @@ app/
 - [ ] `VendorContactsTab.tsx` with `useFieldArray` add/remove rows (FR-003)
 - [ ] `VendorModal.tsx` — 4-tab single `react-hook-form` instance with `vendorSchema`; Work
       Detail tab conditionally enabled on type = subcontractor/labour_contractor (FR-005)
-- [ ] `VendorListTable.tsx` — active toggle with confirmation dialog (FR-010)
+- [ ] `VendorListTable.tsx` — `ResponsiveList`-based, keyboard-operable (FR-014), active
+      toggle with confirmation dialog (FR-010)
 - [ ] `app/dashboard/partners/vendors/page.tsx` — list, search/type/active filters, Add Vendor
 
 **Checkpoint**: Vendor 4-tab modal and list fully functional.
@@ -105,7 +116,8 @@ app/
 
 - [ ] `ContractorModal.tsx` — vendor picker (filtered to subcontractor/labour_contractor type)
 - [ ] `ContractorDocumentRow.tsx` — document row with `expiryWarning` badge (FR in spec)
-- [ ] `app/dashboard/partners/contractors/page.tsx` — list with complianceStatus badge
+- [ ] `app/dashboard/partners/contractors/page.tsx` — `ResponsiveList`-based list,
+      keyboard-operable (FR-014), with complianceStatus badge
 - [ ] `app/dashboard/partners/contractors/[id]/page.tsx` — detail: documents with upload +
       delete, compliance history link
 
@@ -115,7 +127,8 @@ app/
 
 - [ ] `ComplianceModal.tsx` — contractor dropdown, month picker (`max={currentMonth}`),
       PF + ESIC sections independent, `complianceSchema` validation
-- [ ] `ComplianceTable.tsx` — table with status badges, Edit, Verify action (confirmation dialog
+- [ ] `ComplianceTable.tsx` — `ResponsiveList`-based, keyboard-operable (FR-014), table with
+      status badges, Edit, Verify action (confirmation dialog
       + "Verified by X on Y" label for verified rows — spec US4 AC4/AC5)
 - [ ] `app/dashboard/partners/contractors/compliance/page.tsx` — reads `contractorId` + `month`
       from URL params (for RAG dot navigation), pre-filters table
@@ -137,7 +150,8 @@ app/
 ### Phase 7: US6 — BOCW Cess (P3)
 
 - [ ] `BOCWPaymentModal.tsx` — Amount, Date, Reference, Remarks fields
-- [ ] `BOCWTable.tsx` — project rows with `formatCurrency` on all monetary columns, Status
+- [ ] `BOCWTable.tsx` — `ResponsiveList`-based, keyboard-operable (FR-014), project rows with
+      `formatCurrency` on all monetary columns, Status
       badge, Record Payment button (disabled when status=paid — spec US6 AC3)
 - [ ] `app/dashboard/partners/bocw/page.tsx` — paginated BOCW list, payment modal integration
 

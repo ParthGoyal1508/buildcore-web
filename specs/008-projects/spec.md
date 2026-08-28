@@ -158,9 +158,10 @@ Delayed).
 no measurable context. Depends on Project Portfolio (US3/US4).
 
 **Independent Test**: Can be fully tested by navigating to a project's BOQ section, creating a
-task group, adding three items, then triggering an Excel import of five rows (one bad row) and
-confirming the error is displayed with the row number and column name — without needing DWR or
-P&L to exist.
+task group, adding three items, uploading a five-row Excel file (one bad row) and confirming the
+validation report shows the error with row number and column name and nothing is written yet,
+then clicking Confirm Import and confirming the four valid rows now appear in the BOQ tree —
+without needing DWR or P&L to exist.
 
 **Acceptance Scenarios**:
 
@@ -169,9 +170,12 @@ P&L to exist.
    Pending Qty, Per Day Qty, Avg Qty Per Day, Days to Complete.
 2. **Given** the Add Task Group form, **When** submitted, **Then** the new group appears
    immediately in the BOQ tree.
-3. **Given** the Import BOQ button, **When** an Excel file is uploaded, **Then** valid rows appear
-   in the BOQ tree and a downloadable error report is offered for any rejected rows, showing the
-   row number, column name, and error reason.
+3. **Given** the Import BOQ button, **When** an Excel file is uploaded, **Then** the backend
+   validates it and returns a report (valid row count + any rejected rows with row number, column
+   name, error reason, and a downloadable error report) without writing anything yet; **When** the
+   admin reviews the report and clicks Confirm Import, **Then** the valid rows are committed and
+   appear in the BOQ tree (matches the backend's two-step validate/confirm import, buildcore-api
+   008-projects-backend research.md §12).
 4. **Given** the BOQ Alert section, **When** viewed, **Then** it shows three tabs: Today Task
    (items with today as target date), Delayed (items past their Finish Date with pending qty),
    To Be Delayed (items at risk based on current Avg Qty Per Day vs required Per Day Qty).
@@ -303,8 +307,11 @@ Cumulative, and confirming cost overrun categories (Actual > Budget by >10%) are
 - **FR-003**: The DWR measurement formula (Nos × Nos × Length × Breadth × Depth × Density) MUST
   compute Actual Qty live client-side as the user types, displayed as a read-only result field
   before submission.
-- **FR-004**: BOQ Excel import MUST show upload progress and, on completion, display both the
-  count of successfully imported rows and a "Download Error Report" link if any rows failed.
+- **FR-004**: BOQ Excel import MUST be a two-step validate-then-confirm flow, not a single blind
+  commit: on upload, show upload progress and, on completion, display the validation report (valid
+  row count, any per-row errors, and a "Download Error Report" link if any rows failed) without
+  anything being written yet; a separate "Confirm Import" action then commits the valid rows
+  (matches the backend's `/boq/import/validate` + `/boq/import/confirm` endpoints).
 - **FR-005**: Locked project pages MUST display a persistent banner ("This project is locked —
   data entry is disabled") and disable all Add/Edit/Delete action buttons — the UI must not rely
   solely on backend `423` responses to communicate lock state.
@@ -323,6 +330,15 @@ Cumulative, and confirming cost overrun categories (Actual > Budget by >10%) are
   (005).
 - **FR-012**: The site form's Latitude/Longitude fields MUST be validated client-side with clear
   error messages before submission.
+- **FR-013**: `middleware.ts` MUST be extended with a route guard for `/dashboard/projects/*`,
+  mapping sub-routes to `PROJECTS`/`DWR`/`PROJECT_FINANCIALS` permissions — this app's own
+  constitution requires every new route prefix to be guarded (found missing during the master-PRD
+  alignment audit; not present in the original scope).
+- **FR-014**: Every list screen in this feature (Clients, Sites, Portfolio, BOQ tree, DWR list,
+  Revenue/RA Bills, Work Orders) MUST use the existing `ResponsiveList` component and be fully
+  keyboard-operable, per this app's NON-NEGOTIABLE mobile-first/keyboard-operable constitution
+  principle — not just assumed via the general Assumptions note, but a first-class requirement
+  every list task must build in from the start.
 
 ### Key Entities
 
@@ -353,6 +369,8 @@ Cumulative, and confirming cost overrun categories (Actual > Budget by >10%) are
   the user types individual measurement values.
 - **SC-006**: Locked projects are visually distinguishable from unlocked projects in the Portfolio
   list without requiring the user to open the edit modal.
+- **SC-007**: Every list screen in this feature is usable at a mobile viewport (card layout, no
+  horizontal scroll) and every interactive control is reachable and operable by keyboard alone.
 
 ## Assumptions
 
