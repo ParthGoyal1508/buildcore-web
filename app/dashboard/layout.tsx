@@ -1,4 +1,5 @@
 import SideNav from '@/app/ui/dashboard/sidenav';
+import SessionGuard from '@/app/ui/dashboard/session-guard';
 
 export default function DashboardLayout({
   children,
@@ -7,6 +8,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex h-screen flex-col md:flex-row md:overflow-hidden">
+      <SessionGuard />
       <div className="w-full flex-none md:w-64">
         <SideNav />
       </div>

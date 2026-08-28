@@ -9,8 +9,11 @@ contract this feature needs — it revises `buildcore-api`'s current bare-starte
 
 **Request body**:
 ```json
-{ "email": "string", "password": "string", "rememberMe": "boolean" }
+{ "identifier": "string", "password": "string", "rememberMe": "boolean" }
 ```
+`identifier` is either the account's email or its username (backend's 2026-08-28 clarification) —
+the frontend sends whatever the user typed in the single identifier field (FR-001) without trying
+to distinguish which kind it is.
 
 **Response — 200 OK** (credentials valid, account active, not locked):
 ```json
@@ -22,7 +25,7 @@ contract this feature needs — it revises `buildcore-api`'s current bare-starte
 - `mustChangePassword: true` tells the frontend to route to the password-change step instead of
   the Dashboard (FR-007) — that step itself is out of scope for this feature.
 
-**Response — 401 Unauthorized** (unregistered email, wrong password, OR deactivated account —
+**Response — 401 Unauthorized** (unregistered identifier, wrong password, OR deactivated account —
 all three indistinguishable, per FR-004):
 ```json
 { "message": "Invalid email or password" }
@@ -35,7 +38,7 @@ all three indistinguishable, per FR-004):
 Returned even if the submitted password was correct — a locked account rejects every attempt
 (FR-014).
 
-**Response — 400 Bad Request** (missing/malformed `email` or `password`): standard validation
+**Response — 400 Bad Request** (missing/malformed `identifier` or `password`): standard validation
 error; the frontend's own inline field validation (FR-002) should make this response rare in
 practice but the backend still enforces it as the authoritative boundary (constitution Principle
 IV — client-side validation is UX only).

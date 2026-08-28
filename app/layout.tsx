@@ -17,7 +17,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} antialiased`}>{children}</body>
+      {/* suppressHydrationWarning: some browser extensions (e.g. ColorZilla)
+          inject attributes like cz-shortcut-listen onto <body> before React
+          hydrates — a false-positive mismatch, not a real one. Scoped to
+          this one element only; doesn't suppress genuine hydration bugs
+          anywhere else in the tree. */}
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }
