@@ -234,6 +234,37 @@ confirming a one-time "Re-enrol Now" action appears and completing fresh capture
 
 ---
 
+### User Story 8 - Reimbursement Requests (Priority: P3)
+
+An employee submits expense claims (travel, fuel, food, medical, other) with receipt uploads;
+views claim history with status; can edit/delete draft claims and withdraw pending-review claims.
+
+**Why this priority**: PRD §7.9.5; depends on My Workspace shell and the Settings Reimbursement
+Categories master. Added in master PRD v2.2.
+
+**Independent Test**: Can be fully tested by creating a draft claim, uploading a receipt,
+submitting it (status → Submitted), viewing it in history, and withdrawing it (status → Draft
+for revision) — without HR admin approving anything.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Reimbursements section of My Workspace, **When** "New Claim" is tapped,
+   **Then** a form opens with: Category dropdown (from Reimbursement Categories master), Amount,
+   Expense Date, Description, Receipt upload (camera or file picker); per-category max amount
+   hint shown if configured.
+2. **Given** a claim form, **When** submitted, **Then** status changes to `Submitted` and it
+   appears in history; the category's configured per-claim limit (if any) is validated before
+   submission.
+3. **Given** a `Draft` claim, **When** the employee edits or deletes it, **Then** the change
+   is allowed; once `Submitted`, editing is disabled.
+4. **Given** a `Submitted` claim still under review, **When** the employee taps "Withdraw",
+   **Then** status reverts to `Draft` for revision.
+5. **Given** the claim history list, **When** viewed, **Then** each claim shows Category,
+   Amount, Expense Date, Status badge (Draft=gray, Submitted=orange, Approved=green,
+   Rejected=red, Paid=blue), and once paid: payment mode (Payroll/Direct) and date.
+
+---
+
 ### Edge Cases
 
 - What happens if an employee navigates directly to any `/my/*` route without a valid session? They

@@ -57,12 +57,13 @@
 
 ---
 
-## Scenario 6 — Payments & Bill Allocation (US6)
+## Scenario 6 — Payments FIFO Auto-allocation (US6)
 
 1. Navigate to `/dashboard/inventory/payments`. Click "New Payment".
-2. Select vendor. **Expected**: allocation list shows outstanding bills below payment fields.
-3. Enter Amount=₹7,000. Allocate ₹5,000 to bill 1, ₹3,000 to bill 2.
-   **Expected**: Unallocated = −₹1,000 (red); Save button disabled.
-4. Reduce bill 2 allocation to ₹2,000. **Expected**: Unallocated = ₹0; Save enabled.
-5. Save. **Expected**: payment appears in list; go to Purchases — bill 1 shows "Paid" (green),
-   bill 2 shows "Part Paid" (yellow).
+2. Select vendor. **Expected**: outstanding balance label shows total unpaid amount for that
+   vendor (e.g. "Outstanding: ₹8,000").
+3. Enter Amount=₹7,000. Submit.
+4. **Expected**: payment appears in list with `allocatedBillCount: 2` (oldest bill fully paid,
+   second bill part-paid with ₹2,000 applied), `Unallocated Balance: ₹0`.
+5. Go to Purchases page — oldest bill shows "Paid" (green), second shows "Part Paid" (yellow).
+6. Delete the payment. **Expected**: both bills revert to prior status.

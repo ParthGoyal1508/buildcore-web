@@ -19,8 +19,7 @@ app/ui/inventory/
 ├── PurchaseModal.tsx                   # New/Edit Purchase modal
 ├── IssueModal.tsx                      # New Issue modal with stock hint
 ├── TransferModal.tsx                   # New Transfer modal with stock hint
-├── PaymentModal.tsx                    # New Payment modal with allocation table
-├── AllocationRow.tsx                   # Single bill allocation row (useFieldArray)
+├── PaymentModal.tsx                    # New Payment modal (FIFO — enter amount, no manual allocation)
 ├── PurchaseListTable.tsx               # Purchase list with payment status badge
 ├── IssueListTable.tsx
 ├── TransferListTable.tsx
@@ -62,7 +61,7 @@ interface Transfer { id: string; date: string; fromSiteName: string; toSiteName:
 // Payments
 interface Payment { id: string; date: string; vendorName: string; amount: number;
   paymentMode: string; referenceNumber: string; allocatedAmount: number;
-  allocatedBillCount: number; }
+  unallocatedBalance: number; allocatedBillCount: number; }
 interface PurchaseBill { id: string; purchaseId: string; vendorId: string;
   totalAmount: number; paidAmount: number; remainingAmount: number;
   paymentStatus: PaymentStatus; itemName: string; date: string; }
@@ -96,12 +95,8 @@ const paymentSchema = z.object({
   date: z.string(),
   paymentMode: z.enum(['upi','bank_transfer','cash','cheque']),
   referenceNumber: z.string().min(1),
-  allocations: z.array(z.object({
-    billId: z.string().uuid(),
-    allocatedAmount: z.number().min(0),
-  })),
-}).refine(data => data.allocations.reduce((s, a) => s + a.allocatedAmount, 0) <= data.amount,
-  { message: 'Allocated amount exceeds payment amount' });
+  // No allocations array — FIFO allocation is automatic server-side
+});
 ```
 
 ## State Management Notes

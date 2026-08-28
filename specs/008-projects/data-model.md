@@ -109,12 +109,13 @@ interface RABill { id: string; billNumber: string; amount: number; billingDate: 
   status: RABillStatus; rejectionRemark?: string; }
 
 // P&L
-type PnlCategory = 'labour' | 'materials' | 'machinery_fuel' | 'subcontractors' | 'overheads';
+type PnlCategory = 'labour' | 'materials' | 'machinery' | 'fuel' | 'subcontractors' | 'overheads';
 type PnlPeriod = 'monthly' | 'quarterly' | 'yearly' | 'cumulative';
 interface PnlCostRow { category: PnlCategory; budget: number; actual: number;
   variance: number; variancePct: number; costOverrunAlert: boolean; }
 interface ProjectPnl { contractValue: number; revenueBooked: number;
-  costBreakdown: PnlCostRow[]; grossProfit: number; marginPct: number;
+  costBreakdown: PnlCostRow[];  // 6 rows: labour, materials, machinery, fuel, subcontractors, overheads
+  grossProfit: number; marginPct: number;
   period: PnlPeriod; unavailableModules: string[]; }
 ```
 

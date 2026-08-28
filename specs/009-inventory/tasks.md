@@ -182,24 +182,20 @@ Save disabled (negative balance red); correct allocation → saves; bills update
 
 ### Implementation for User Story 6
 
-- [ ] T018 [P] [US6] Create `app/ui/inventory/AllocationRow.tsx`: single bill row in the
-      allocation table — shows Item, Date, Total (formatCurrency), Remaining, Amount input
-      (`react-hook-form` controlled); used in `useFieldArray` in `PaymentModal`
-- [ ] T019 [P] [US6] Create `app/ui/inventory/PaymentModal.tsx`:
+- [ ] T018 [P] [US6] Create `app/ui/inventory/PaymentModal.tsx`:
       - vendorId dropdown (from partners.ts `getVendors({active:true})`)
+      - On vendorId change: fetch outstanding balance summary and display as informational
+        label "Outstanding: ₹X" (FR-004 — no manual allocation table needed)
       - amount, date, paymentMode dropdown, referenceNumber
-      - On vendorId change: call `getOutstandingBills(vendorId)`, populate `useFieldArray`
-        of `AllocationRow`s (each row's amount input defaults to 0)
-      - Live counter: `allocated = watch('allocations').reduce(...)`, `unallocated =
-        watch('amount') − allocated`; show "Unallocated: ₹X"; if `unallocated < 0` → red
-        text + Save button disabled (FR-004)
-      - `paymentSchema` zod validation with allocation `refine`
-- [ ] T020 [P] [US6] Create `app/ui/inventory/PaymentListTable.tsx` and
+      - `paymentSchema` zod validation (no allocations array — FIFO is server-side)
+- [ ] T019 [P] [US6] Create `app/ui/inventory/PaymentListTable.tsx` and
       `app/dashboard/inventory/payments/page.tsx`: list + filters (date range, vendor, payment
-      mode), "New Payment" button + `PaymentModal`; on save invalidate purchases query
-      (payment status badges on PurchasesPage update)
+      mode), "New Payment" button + `PaymentModal`; columns include Unallocated Balance;
+      on save invalidate purchases query (payment status badges on PurchasesPage update)
+- [ ] T020 [P] [US6] Update `app/lib/api/inventory.ts`: add `createPayment(data)` POST
+      (no allocations field), remove `getOutstandingBills` call — FIFO allocation is automatic
 
-**Checkpoint**: Payment recording with live allocation guard fully functional.
+**Checkpoint**: Payment recording with FIFO auto-allocation fully functional.
 
 ---
 

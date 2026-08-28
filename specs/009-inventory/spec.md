@@ -139,33 +139,37 @@ both stores' balances update.
 2. **Given** From Site = To Site, **When** submitted, **Then** an inline "Source and destination
    cannot be the same" error is shown (client-side validation before API call).
 3. **Given** the Transfer list, **When** loaded, **Then** it shows Date, From Project, To
-   Project, Item, Qty, Unit, Remarks; filterable by date range, from/to project, item.
+   Project, Item, Qty, Unit, Status badge (Pending=gray, In Transit=orange, Received=green),
+   Remarks; filterable by date range, from/to project, item, status.
+4. **Given** a transfer, **When** the admin clicks "Mark In Transit" or "Mark Received",
+   **Then** a confirmation dialog appears before the status PATCH call.
 
 ---
 
-### User Story 6 - Record Payments & Allocate Bills (Priority: P2)
+### User Story 6 - Record Payments (FIFO Auto-allocation) (Priority: P2)
 
-An admin records a vendor payment and allocates it across unpaid/part-paid purchase bills;
-bill payment statuses update immediately; unallocated balance is shown.
+An admin records a vendor payment; the system automatically applies it against the vendor's
+unpaid/part-paid purchase bills in FIFO order (oldest bill first). Bill payment statuses update
+immediately.
 
 **Why this priority**: Completes the purchase-to-payment audit trail. Depends on purchases (US3).
 
-**Independent Test**: With bills ₹5,000 + ₹3,000 for a vendor, record payment ₹7,000; allocate
-₹5,000 to bill 1 (→ Paid badge) and ₹2,000 to bill 2 (→ Part Paid badge); confirm unallocated
-balance = ₹0; confirm Payment list shows `allocatedBillCount: 2`.
+**Independent Test**: With bills for a vendor (oldest ₹5,000 + newer ₹3,000), record payment
+₹7,000 — oldest bill shows Paid badge, newer shows Part Paid badge; Payment list shows
+`allocatedBillCount: 2` and `unallocatedBalance: ₹0`.
 
 **Acceptance Scenarios**:
 
-1. **Given** the New Payment modal, **When** a Vendor is selected, **Then** all unpaid/part-paid
-   bills for that vendor are shown as an allocation list below the payment fields.
-2. **Given** the allocation list, **When** amounts are entered per bill, **Then** a running
-   "Allocated total" and "Unallocated balance" are shown live below the list.
-3. **Given** the total allocated amount exceeds the payment amount, **When** displayed, **Then**
-   the "Unallocated balance" shows in red and the Save button is disabled (client-side guard
-   before backend `400`).
-4. **Given** a saved payment, **When** viewed in the Payment list, **Then** it shows Date,
-   Vendor, Amount, Payment Mode, Reference, Allocated Bills count.
-5. **Given** a bill that reaches fully paid status, **When** displayed in the Purchase list,
+1. **Given** the New Payment modal, **When** a Vendor is selected, **Then** a summary of
+   the vendor's outstanding balance (total unpaid amount) is shown as an informational label
+   below the Vendor field — the admin enters a payment amount, the system handles allocation
+   automatically.
+2. **Given** the payment amount is submitted, **When** it is less than total outstanding,
+   **Then** the oldest bills are paid first (FIFO); any remainder shows as `Unallocated`
+   on the payment row.
+3. **Given** a saved payment, **When** viewed in the Payment list, **Then** it shows Date,
+   Vendor, Amount, Payment Mode, Reference, Allocated Bills count, Unallocated Balance.
+4. **Given** a bill that reaches fully paid status, **When** displayed in the Purchase list,
    **Then** its Payment Status badge changes to "Paid" (green).
 
 ---
@@ -189,8 +193,8 @@ balance = ₹0; confirm Payment list shows `allocatedBillCount: 2`.
   the server re-validates on submit.
 - **FR-003**: Available stock hints in Issue and Transfer modals MUST be read from the stock API
   at item-selection time (not static; refreshed when site/item changes).
-- **FR-004**: Bill allocation inputs MUST show a live "Unallocated balance" counter; Save MUST
-  be disabled when total allocated > payment amount (client-side guard, FR-006 backend enforces).
+- **FR-004**: The New Payment modal MUST show the vendor's total outstanding balance as an
+  informational label; the admin enters only the payment amount (no manual bill selection).
 - **FR-005**: The Item dropdown in Issue modal MUST show only items with `inStock > 0` for the
   selected site; when the site changes, the item selection resets.
 - **FR-006**: Stock table balances MUST refresh after any Purchase/Issue/Transfer modal save
