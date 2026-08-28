@@ -16,24 +16,38 @@
 - Q: Should this Login feature include per-company configurable lockout settings (threshold/duration), or ship with the PRD's fixed default (5 attempts, 15-minute lock) and leave configurability for a later admin-settings feature? → A: Fixed default only — per-company configurability is out of scope for this feature.
 - Q: What should the exact "Remember Me" session duration be, so success criteria and tests can target a concrete value? → A: 30 days.
 
+### Session 2026-08-28
+
+- Q: Should the login field accept only an email, or also a username? → A: Both — the field
+  accepts either a registered email or a registered username (backend: `001-user-login-backend`'s
+  2026-08-28 clarification). Username is admin-assigned at account creation, never self-chosen, so
+  this feature only needs to accept it as an alternate identifier — no new account-management UI is
+  added here.
+- Q: Does this screen need any UI for an admin resetting another user's password? → A: No — that's
+  backend-only scope on `001-user-login-backend` (a new admin-only API endpoint). This feature
+  stays scoped to the login form itself; the admin-facing UI for it belongs to a future user-
+  management screen, not this one.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Sign in with valid credentials (Priority: P1)
 
-A registered, active user visits the login page, enters their email and password, and is signed
-in and taken to their dashboard.
+A registered, active user visits the login page, enters their email-or-username and password, and
+is signed in and taken to their dashboard.
 
 **Why this priority**: This is the core purpose of the feature — without it, no user can access
 the system at all. Nothing else in this feature has value without this working first.
 
 **Independent Test**: Can be fully tested by entering a known-valid email/password combination for
 an active account and confirming the user lands on the Dashboard with a "Welcome back, {name}!"
-confirmation.
+confirmation; repeat with that same account's username in place of its email to confirm both
+identifiers work.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user with an active account and a correct email/password, **When** they submit the
-   login form, **Then** they are redirected to the Dashboard and shown "Welcome back, {name}!".
+1. **Given** a user with an active account and a correct email-or-username/password, **When** they
+   submit the login form, **Then** they are redirected to the Dashboard and shown "Welcome back,
+   {name}!".
 2. **Given** a user typing their password, **When** they toggle the show/hide password control,
    **Then** the password field's content becomes readable/hidden accordingly without clearing what
    they typed.
@@ -184,21 +198,24 @@ correct password succeeds again.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST provide a login page with Email and Password fields, a control to
-  reveal/hide the entered password, a "Remember Me" checkbox, a "Sign In" action, and a link to
-  the forgot-password flow.
-- **FR-002**: The system MUST validate that Email and Password are both provided before attempting
-  to sign in, showing an inline error next to any empty required field without submitting the
-  attempt.
-- **FR-003**: The system MUST treat email matching as case-insensitive and trim leading/trailing
-  whitespace before evaluating a login attempt.
-- **FR-004**: The system MUST reject a login attempt whenever the email is not registered, the
+- **FR-001**: The system MUST provide a login page with a single "Email or Username" identifier
+  field and a Password field, a control to reveal/hide the entered password, a "Remember Me"
+  checkbox, a "Sign In" action, and a link to the forgot-password flow.
+- **FR-002**: The system MUST validate that the identifier and Password are both provided before
+  attempting to sign in, showing an inline error next to any empty required field without
+  submitting the attempt.
+- **FR-003**: The system MUST treat the identifier (whether an email or a username) as
+  case-insensitive and trim leading/trailing whitespace before evaluating a login attempt. Unlike
+  before this clarification, the field MUST NOT be validated as email-shaped (no `type="email"` /
+  email-format check) — a valid username won't pass that check.
+- **FR-004**: The system MUST reject a login attempt whenever the identifier is not registered, the
   password does not match the registered account, or the account is deactivated, and in every one
   of these cases MUST show the identical generic message "Invalid email or password" — never
-  revealing which of these reasons applied, and never revealing whether the email is registered at
-  all.
-- **FR-005**: The system MUST accept a login attempt only when the email is registered, the
-  password matches, and the account is active (not deactivated and not currently locked out).
+  revealing which of these reasons applied, and never revealing whether the identifier is
+  registered at all.
+- **FR-005**: The system MUST accept a login attempt only when the identifier (email or username)
+  is registered, the password matches, and the account is active (not deactivated and not
+  currently locked out).
 - **FR-006**: On a successful login, the system MUST redirect the user to the Dashboard and show a
   confirmation message "Welcome back, {name}!" using the account holder's name.
 - **FR-007**: On a successful login where the account is flagged as requiring a mandatory password

@@ -1,7 +1,4 @@
-// Base URL for buildcore-api. Set NEXT_PUBLIC_API_URL in .env.local —
-// see .env.local.example.
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+import { API_URL } from '@/app/lib/config';
 
 export class ApiError extends Error {
   constructor(
@@ -18,6 +15,10 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
+    // Sends/receives the httpOnly refresh-token cookie, which is set on a
+    // different origin than this app in both local dev and production
+    // (research.md §2; requires the backend's CORS credentials: true).
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...init?.headers,
@@ -29,5 +30,6 @@ export async function apiFetch<T>(
     throw new ApiError(body.message || res.statusText, res.status);
   }
 
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : (undefined as T);
 }

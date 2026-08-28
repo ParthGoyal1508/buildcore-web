@@ -1,38 +1,75 @@
-import { apiFetch } from './client';
+import { z } from 'zod';
+import { apiFetch, ApiError } from './client';
+import {
+  setAccessToken,
+  clearSession,
+  setSessionHint,
+  clearSessionHint,
+} from '@/app/lib/session';
+import { MESSAGES, formatLockoutMessage } from '@/app/lib/constants';
 
-export interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
-}
+const loginResponseSchema = z.object({
+  accessToken: z.string(),
+  name: z.string(),
+  mustChangePassword: z.boolean(),
+});
 
-const ACCESS_TOKEN_KEY = 'buildcore_access_token';
+const refreshResponseSchema = z.object({
+  accessToken: z.string(),
+});
 
-// NOTE: localStorage is a placeholder for this boilerplate. docs/HLD.md §9.1
-// specifies an in-memory access token + an HTTP-only refresh-token cookie
-// set by the API — that requires the backend to set cookies on login, which
-// isn't wired yet (see buildcore-api's README). Swap this out when it is.
-export function storeAccessToken(token: string) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(ACCESS_TOKEN_KEY, token);
+export type LoginResult = z.infer<typeof loginResponseSchema>;
+
+/**
+ * Maps every failure to this app's own copy regardless of the backend's
+ * exact wording (contracts/auth-api.md already returns a generic message for
+ * 401, but the frontend shouldn't rely on that staying true — spec FR-004).
+ */
+export async function login(
+  identifier: string,
+  password: string,
+  rememberMe: boolean,
+): Promise<LoginResult> {
+  try {
+    const raw = await apiFetch<unknown>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, password, rememberMe }),
+    });
+    const result = loginResponseSchema.parse(raw);
+    setAccessToken(result.accessToken);
+    setSessionHint(rememberMe);
+    return result;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.status === 401) {
+        throw new ApiError(MESSAGES.invalidCredentials, err.status);
+      }
+      if (err.status === 423) {
+        throw new ApiError(formatLockoutMessage(err.message), err.status);
+      }
+      if (err.status === 429) {
+        // Without this the raw "ThrottlerException: Too Many Requests" from
+        // the backend reaches the user (contracts/auth-api.md's rate-limit
+        // section specifies this copy instead).
+        throw new ApiError(MESSAGES.rateLimited, err.status);
+      }
+    }
+    throw err;
   }
 }
 
-export function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+export async function refreshToken(): Promise<string> {
+  const raw = await apiFetch<unknown>('/auth/refresh-token', { method: 'POST' });
+  const result = refreshResponseSchema.parse(raw);
+  setAccessToken(result.accessToken);
+  return result.accessToken;
 }
 
-export function clearTokens() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
+export async function logout(): Promise<void> {
+  try {
+    await apiFetch('/auth/logout', { method: 'POST' });
+  } finally {
+    clearSession();
+    clearSessionHint();
   }
-}
-
-export async function login(email: string, password: string): Promise<TokenPair> {
-  const tokens = await apiFetch<TokenPair>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-  storeAccessToken(tokens.accessToken);
-  return tokens;
 }

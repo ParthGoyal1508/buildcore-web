@@ -2,10 +2,12 @@ import { Suspense } from 'react';
 import { lusitana } from '@/app/ui/fonts';
 import CardWrapper from '@/app/ui/dashboard/cards';
 import { CardsSkeleton } from '@/app/ui/skeletons';
+import WelcomeBanner from '@/app/ui/dashboard/welcome-banner';
 
 export default function DashboardPage() {
   return (
     <main>
+      <WelcomeBanner />
       <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
         Dashboard
       </h1>
