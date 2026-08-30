@@ -5,12 +5,13 @@
     "build": "next build",
     "dev": "next dev --turbopack -p 3001",
     "start": "next start -p 3001",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.9.1",
     "@tailwindcss/forms": "^0.5.10",
+    "@tanstack/react-query": "^5.102.8",
     "autoprefixer": "10.4.20",
     "clsx": "^2.1.1",
     "next": "16.3.2",
@@ -23,8 +24,11 @@
     "zod": "^3.25.17"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
     "@types/node": "22.10.7",
     "@types/react": "19.0.7",
-    "@types/react-dom": "19.0.3"
+    "@types/react-dom": "19.0.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3"
   }
 }

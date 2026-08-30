@@ -92,6 +92,12 @@ export async function authFetch<T>(path: string, init?: RequestInit): Promise<T>
       // between the two.
       clearSessionHint();
       if (typeof window !== 'undefined') {
+        // Deliberately a full document navigation, not router.push(): the session
+        // has just been invalidated, and a client-side transition would keep the
+        // React tree — and every react-query cache entry holding the previous
+        // user's data — alive across the "logout". Reloading guarantees the next
+        // user starts from a clean process.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = '/login';
       }
       throw refreshErr;
