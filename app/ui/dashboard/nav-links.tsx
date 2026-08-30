@@ -8,7 +8,9 @@ import {
   UserGroupIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
+import { ROUTES } from '@/app/lib/constants';
 
 // Mirrors the module list in docs/prd/00-master-prd.md §4 Scope & §7 Module
 // Specifications — one entry per ERP module.
@@ -20,6 +22,9 @@ const links = [
   { name: 'Inventory', href: '/dashboard/inventory', icon: ArchiveBoxIcon },
   { name: 'Partners', href: '/dashboard/partners', icon: UserGroupIcon },
   { name: 'Reports', href: '/dashboard/reports', icon: ChartBarIcon },
+  // Leaves this shell entirely, for a user who is both an admin and an employee
+  // (research.md §2, spec FR-017). The `/my` tree has its own bottom-tab layout.
+  { name: 'My Workspace', href: ROUTES.myPunch, icon: ClockIcon },
   { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
 ];
 

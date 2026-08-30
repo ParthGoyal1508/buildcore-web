@@ -10,7 +10,30 @@ export const ROUTES = {
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
+
+  // --- My Workspace (feature 003) ---
+  // A separate top-level tree, not nested under /dashboard: its users are field
+  // employees on phones, and it gets a bottom-tab shell rather than the sidenav.
+  myPunch: '/my/punch',
+  myLeave: '/my/leave',
+  mySalary: '/my/salary',
+  myFaceEnrol: '/my/face-enrol',
 } as const;
+
+/**
+ * Maximum acceptable GPS uncertainty, in metres, before a punch may be submitted
+ * (spec FR-007, research.md §4).
+ *
+ * Checked in the browser *before* the network request, not just server-side. A
+ * reading accurate to half a kilometre tells you nothing about whether the worker
+ * is inside a 200-metre site geofence, so submitting it would only produce an
+ * exception for an admin to resolve by hand — the employee is better served by
+ * being asked to wait a moment for a better fix.
+ */
+export const MAX_GPS_ACCURACY_METERS = 100;
+
+/** Photos required to enrol, mirroring the backend's configured bounds. */
+export const ENROLMENT_PHOTO_RANGE = { min: 3, max: 5 } as const;
 
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
@@ -34,6 +57,42 @@ export const MESSAGES = {
   confirmDelete: (what: string, name: string) =>
     `Delete the ${what} "${name}"? This cannot be undone.`,
   protectedRole: 'The Super Admin role is protected and cannot be edited or deleted.',
+
+  // --- My Workspace (feature 003) ---
+  cameraDenied:
+    'Camera access is blocked. Allow it in your browser settings, then try again.',
+  cameraUnavailable:
+    'No camera is available on this device, so a photo cannot be captured here.',
+  locationDenied:
+    'Location access is blocked. Allow it in your browser settings — a punch cannot be recorded without it.',
+  locationUnavailable:
+    'Your location could not be determined. Move somewhere with a clearer view of the sky and try again.',
+  locationInaccurate: (accuracy: number) =>
+    `Your location is only accurate to about ${Math.round(accuracy)}m, which is not precise enough to confirm you are on site. Wait a moment and try again.`,
+  punchQueued:
+    'Queued — this punch will sync automatically when you are back online.',
+  punchQueuedCount: (count: number) =>
+    `${count} punch${count === 1 ? '' : 'es'} queued — will sync when you are back online.`,
+  punchSyncFailed: (reason: string) => `A queued punch could not be synced: ${reason}`,
+  punchExceptionFlagged:
+    'Punch recorded, but it needs review — your face or location did not match. Your supervisor has been notified; you do not need to punch again.',
+  payrollLocked:
+    'This period is closed for payroll. Punches and leave changes dated inside it can no longer be recorded.',
+  notEnrolled: 'Enrol your face before punching in.',
+  enrolmentConsent:
+    'I consent to my facial data being captured and stored for attendance verification.',
+  noSalaryPeriods:
+    'No payslips yet. One appears here once your first month of payroll has been processed.',
+  leaveDayCountApprox:
+    'Approximate — the final day count excludes your site’s holidays and is confirmed when you submit.',
+  reEnrolmentPending:
+    'Your re-enrolment request is waiting for approval. You will be able to re-capture once it is approved.',
+  reEnrolmentRejected: (remarks: string | null) =>
+    remarks
+      ? `Your re-enrolment request was declined: ${remarks}`
+      : 'Your re-enrolment request was declined.',
+  reEnrolmentExpired:
+    'Your approval window has closed without being used. Request re-enrolment again to continue.',
 } as const;
 
 /**

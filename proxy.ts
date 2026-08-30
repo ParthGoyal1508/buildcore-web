@@ -32,5 +32,9 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  // `/my/:path*` is a separate top-level tree from `/dashboard/*` (the My Workspace
+  // shell, feature 003), so it needs its own matcher entry — the existing pattern
+  // does not cover it, and without this the shell would render to a signed-out
+  // visitor before any request failed (spec FR-016, SC-007).
+  matcher: ['/dashboard/:path*', '/my/:path*', '/login'],
 };

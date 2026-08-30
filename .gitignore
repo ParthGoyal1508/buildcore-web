@@ -35,3 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*
+
+# Serwist — the service worker is a build artefact (serwist.config.js)
+public/sw*
