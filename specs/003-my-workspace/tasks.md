@@ -319,7 +319,7 @@ real device; the items below are gaps found in the code itself.
       `buildcore-api`'s `/my/*` contract, so the preview currently excludes weekends
       only and is labelled approximate per spec FR-011, contracts/my-workspace-ui.md
       (partial)
-- [ ] T044 Verify `next build` end to end once Google Fonts is reachable. The build
+- [X] T044 Verify `next build` end to end once Google Fonts is reachable. The build
       currently fails on `next/font/google` being unable to fetch Inter and Lusitana
       from this machine — a pre-existing, environment-only failure (the untouched
       baseline fails identically), so `tsc --noEmit` and `eslint` are the only
@@ -340,3 +340,79 @@ real device; the items below are gaps found in the code itself.
       the backend has no permission guard on them either, so any authenticated
       account with an employee record can reach the whole shell
       per spec FR-016 (partial)
+
+---
+
+## Phase 12: Convergence
+
+Appended by a convergence pass run after the workspace implementation landed, with
+`next build` passing, typecheck clean, and lint clean. US1–US7 are all implemented and
+wired into pages; the offline queue and re-enrolment flow are both present. The two items
+below are what the assessment found outstanding.
+
+- [X] T048 **CRITICAL** — Downscale and re-encode each captured frame in
+      `app/ui/my/camera-capture.tsx` before handing it to `onCapture`. It currently draws
+      the video at full sensor resolution (`canvas.width = video.videoWidth`) and encodes
+      at JPEG quality 0.9, so a single frame from a modern phone is commonly hundreds of
+      kilobytes to several megabytes, and base64 adds roughly a third on top. The API
+      rejects those payloads outright — a three-photo enrolment built from
+      representative photographs measures 565 KB and returns `413 request entity too
+      large` against the running backend. Draw to a canvas capped on its longest edge and
+      encode at a lower quality; the server downscales to 640px for punch photos and 800px
+      for enrolment anyway, so anything beyond that is bandwidth spent on pixels that are
+      immediately discarded — and spent over site mobile data. Coordinate the chosen
+      dimensions with the backend's companion task (T097 in the API repo), so the client
+      cap and the server limit are set against the same number
+      per US1/AC, US2/AC, contract photo payloads (missing)
+
+- [ ] T049 Build User Story 8 (Reimbursement Requests) — or, if it is being deliberately
+      deferred, record that decision in `spec.md` so the gap stops reading as an
+      oversight. The spec defines US8 at P3 with full acceptance scenarios (claim form
+      with category dropdown, amount, expense date, description, receipt upload, and the
+      per-category maximum hint), but no US8 phase was ever generated into this
+      `tasks.md`, and `app/` contains no reimbursement route, component, or API client
+      function. The backend already implements the entire surface — `POST/GET
+      /my/reimbursements`, `PATCH /my/reimbursements/:id`, `POST
+      /my/reimbursements/:id/withdraw`, `DELETE /my/reimbursements/:id` — so this is a
+      user story that exists on both sides of the contract except in the UI
+      per spec US8 (missing)
+
+---
+
+## Phase 13: Camera Selection (FR-015a)
+
+Added after the initial implementation, from field use: the capture surface pins
+`facingMode: 'user'`, which breaks a gate-mounted tablet (whose rear camera is the one
+facing the worker) and locks out anyone whose front camera is broken.
+
+- [X] T050 Add front/rear camera selection to `app/ui/my/camera-capture.tsx`. Track the
+      chosen `facingMode` in state, pass it to `getUserMedia`, and re-acquire the stream
+      when it changes — tearing down the previous stream first, since leaving the old
+      track live holds the camera open and the new request then fails on some devices.
+      Keep the existing teardown-on-unmount behaviour intact
+      per FR-015a (missing)
+
+- [X] T051 Enumerate available cameras via `navigator.mediaDevices.enumerateDevices()` and
+      render the toggle only when more than one video input exists. A device with a single
+      camera MUST NOT show a disabled control. Note that labels and a reliable device list
+      are only available after permission has been granted, so the check has to run once
+      the stream is live rather than on first paint
+      per FR-015a (missing)
+
+- [X] T052 Persist the selection per device in `localStorage`, defaulting to the front
+      camera when nothing is stored. Reads and writes MUST be wrapped in try/catch —
+      Safari private mode throws on access rather than returning null, which would
+      otherwise take the whole capture screen down with it. Put the storage key in
+      `app/lib/constants.ts` rather than inline
+      per FR-015a (missing)
+
+- [X] T053 Verify switching mid-session does not discard already-captured enrolment shots:
+      `face-enrolment-status.tsx` holds `shots` above `CameraCapture`, so it should
+      survive, but the stream re-acquisition path is what would break it
+      per FR-015a (missing)
+
+- [ ] T054 [P] Confirm the toggle is keyboard-operable and labelled for screen readers
+      (it is a control, so FR-020's semantic-HTML and keyboard rule applies even though
+      the camera preview itself is exempt), and that its state is announced rather than
+      conveyed by icon alone
+      per FR-015a, FR-020 (missing)

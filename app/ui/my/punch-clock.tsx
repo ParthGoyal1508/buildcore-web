@@ -9,7 +9,11 @@ import {
   type PunchResult,
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
-import { MAX_GPS_ACCURACY_METERS, MESSAGES } from '@/app/lib/constants';
+import {
+  DEV_FALLBACK_POSITION,
+  MAX_GPS_ACCURACY_METERS,
+  MESSAGES,
+} from '@/app/lib/constants';
 import { enqueue } from '@/app/lib/offline-queue';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
@@ -21,6 +25,19 @@ const HTTP_LOCKED = 423;
 const two = (n: number) => String(n).padStart(2, '0');
 const clockText = (date: Date) =>
   `${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}`;
+const dateText = (date: Date) =>
+  date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+/**
+ * Rendered until the clock starts on the client.
+ *
+ * Same character count as `clockText`, which with `tabular-nums` means the real
+ * time replaces it without shifting the layout.
+ */
+const CLOCK_PLACEHOLDER = '--:--:--';
 const timeOnly = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
@@ -33,33 +50,92 @@ const timeOnly = (iso: string | null) =>
  * Sending it anyway would produce an exception for an admin to resolve by hand, when
  * what the worker actually needs is to be told to wait a few seconds.
  */
-function getPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error(MESSAGES.locationUnavailable));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (position.coords.accuracy > MAX_GPS_ACCURACY_METERS) {
-          reject(new Error(MESSAGES.locationInaccurate(position.coords.accuracy)));
-          return;
-        }
-        resolve(position);
-      },
-      (error) =>
-        // A refusal and a failed fix need different advice: one is fixed in browser
-        // settings, the other by moving somewhere with a clearer sky.
-        reject(
-          new Error(
-            error.code === error.PERMISSION_DENIED
-              ? MESSAGES.locationDenied
-              : MESSAGES.locationUnavailable,
-          ),
-        ),
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+/** One `getCurrentPosition` call, promisified so the two attempts below can await. */
+function requestPosition(
+  options: PositionOptions,
+): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(resolve, reject, options),
+  );
+}
+
+async function getPosition(): Promise<GeolocationPosition> {
+  if (!navigator.geolocation) {
+    throw new Error(MESSAGES.locationUnavailable);
+  }
+  // Checked explicitly because the browser reports an insecure origin as an
+  // ordinary position failure, which would otherwise be reported to the user as
+  // bad sky visibility — advice that can never fix it.
+  if (!window.isSecureContext) {
+    throw new Error(MESSAGES.locationInsecureConnection);
+  }
+
+  try {
+    // Ask for the best fix available first: on a phone on site, this is the GPS
+    // reading the geofence check actually needs.
+    return checkAccuracy(
+      await requestPosition({
+        enableHighAccuracy: true,
+        timeout: 15_000,
+        // A fix from the last half-minute still describes where someone is
+        // standing, and accepting one lets a device that already knows its position
+        // answer instantly rather than powering up the GPS. `0` forces a fresh
+        // acquisition on every punch — the slowest path to the same answer.
+        maximumAge: 30_000,
+      }),
     );
-  });
+  } catch (error) {
+    const code = (error as GeolocationPositionError)?.code;
+    // A refusal is final — retrying cannot change it, and the fix is in browser
+    // settings rather than anything the app can do.
+    if (code === 1 /* PERMISSION_DENIED */) {
+      throw new Error(MESSAGES.locationDenied);
+    }
+    // Anything the accuracy gate itself rejected is already a usable message.
+    if (code === undefined) {
+      throw error;
+    }
+
+    // High accuracy failed. Retry coarsely rather than giving up: a device with no
+    // GPS hardware (a laptop, most desktops) cannot satisfy the first request at
+    // all, but positions fine from Wi-Fi — and a coarse fix that the accuracy gate
+    // below still has to pass beats refusing to let anyone punch in.
+    try {
+      return checkAccuracy(
+        await requestPosition({
+          enableHighAccuracy: false,
+          // Shorter than the precise attempt on purpose: coarse positioning
+          // resolves from Wi-Fi or the network almost immediately when it can
+          // resolve at all, so a long timeout here only adds dead waiting on a
+          // device that was never going to answer.
+          timeout: 8_000,
+          // A recent cached fix is fine here; this branch is already the fallback.
+          maximumAge: 60_000,
+        }),
+      );
+    } catch (fallbackError) {
+      const fallbackCode = (fallbackError as GeolocationPositionError)?.code;
+      if (fallbackCode === 1) {
+        throw new Error(MESSAGES.locationDenied);
+      }
+      if (fallbackCode === undefined) {
+        throw fallbackError;
+      }
+      throw new Error(
+        fallbackCode === 3 /* TIMEOUT */
+          ? MESSAGES.locationTimedOut
+          : MESSAGES.locationUnavailable,
+      );
+    }
+  }
+}
+
+/** Rejects a fix too vague to place someone inside or outside a site geofence. */
+function checkAccuracy(position: GeolocationPosition): GeolocationPosition {
+  if (position.coords.accuracy > MAX_GPS_ACCURACY_METERS) {
+    throw new Error(MESSAGES.locationInaccurate(position.coords.accuracy));
+  }
+  return position;
 }
 
 export default function PunchClock() {
@@ -71,6 +147,14 @@ export default function PunchClock() {
   const [notice, setNotice] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [queuedNotice, setQueuedNotice] = useState(false);
+  // Which step of the capture -> locate -> submit sequence is running. Locating can
+  // take many seconds (and on a device that cannot get a fix, the better part of
+  // half a minute before it gives up), during which the screen previously showed
+  // nothing at all — indistinguishable from a button that had not registered the tap.
+  const [phase, setPhase] = useState<'locating' | 'submitting' | null>(null);
+  // A ref, not state: onSuccess needs to know whether the stand-in position was
+  // used, and re-rendering mid-submit to carry that flag would be pointless work.
+  const usedFallbackRef = useRef(false);
 
   // --- Server-synced clock (research.md §7). ---
   //
@@ -80,10 +164,33 @@ export default function PunchClock() {
   // that. The `capturedAt` actually submitted is a fresh device timestamp, which
   // the backend validates on its own terms regardless.
   const offsetRef = useRef(0);
-  const [displayTime, setDisplayTime] = useState(() => clockText(new Date()));
+  // Null until mounted, never seeded from `new Date()` during render. The server
+  // renders this component too, and a clock initialised at render time produces
+  // markup stamped with the server's time and locale that can never match what the
+  // browser produces a moment later — React reports that as a hydration failure and
+  // throws the whole tree away. The date below is held for the same reason: it is
+  // formatted with the runtime's own locale and timezone, so server and client
+  // disagree even when they agree on the day.
+  const [displayTime, setDisplayTime] = useState<string | null>(null);
+  const [displayDate, setDisplayDate] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+
+    const paint = () => {
+      if (!active) return;
+      const corrected = new Date(Date.now() + offsetRef.current);
+      setDisplayTime(clockText(corrected));
+      // Cheap, and keeps the date right for anyone on shift across midnight.
+      setDisplayDate(dateText(corrected));
+    };
+    // Scheduled rather than called straight from the effect body: writing state
+    // synchronously there triggers an immediate second render pass, which is what
+    // `react-hooks/set-state-in-effect` exists to prevent. A zero-delay timer paints
+    // on the next task instead — imperceptible, and it means the clock does not sit
+    // on its placeholder for a full second waiting for the first interval tick.
+    const firstPaint = setTimeout(paint, 0);
+
     fetch('/', { method: 'HEAD' })
       .then((res) => {
         const serverDate = res.headers.get('date');
@@ -96,11 +203,10 @@ export default function PunchClock() {
         // is what would have been shown anyway.
       });
 
-    const tick = setInterval(() => {
-      if (active) setDisplayTime(clockText(new Date(Date.now() + offsetRef.current)));
-    }, 1000);
+    const tick = setInterval(paint, 1000);
     return () => {
       active = false;
+      clearTimeout(firstPaint);
       clearInterval(tick);
     };
   }, []);
@@ -127,14 +233,32 @@ export default function PunchClock() {
   const punch = useMutation({
     mutationFn: async ({ type, photo }: { type: 'in' | 'out'; photo: Blob }) => {
       const capturedAt = new Date().toISOString();
-      const position = await getPosition();
-      const input = {
-        type,
-        photo,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        capturedAt,
-      };
+
+      setPhase('locating');
+      let coords: { latitude: number; longitude: number };
+      let usedFallback = false;
+      try {
+        const position = await getPosition();
+        coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+      } catch (locationError) {
+        // In production a punch without a real location is worthless — the whole
+        // point is proving someone was on site — so the failure surfaces and the
+        // punch stops here. In development it would instead make the screen
+        // untestable on any machine whose OS will not hand out a position, so a
+        // stand-in is used and announced.
+        if (process.env.NODE_ENV === 'production') {
+          throw locationError;
+        }
+        coords = DEV_FALLBACK_POSITION;
+        usedFallback = true;
+      }
+      usedFallbackRef.current = usedFallback;
+
+      const input = { type, photo, capturedAt, ...coords };
+      setPhase('submitting');
 
       // Offline (US6, T031): queue rather than fail. The punch already happened —
       // the worker is standing at the gate — and the only thing missing is a
@@ -172,10 +296,15 @@ export default function PunchClock() {
       ) {
         setNotice(MESSAGES.punchExceptionFlagged);
       } else {
-        setNotice(null);
+        // Keep the stand-in-location warning visible on an otherwise clean punch —
+        // it is the one thing about this record that is not real.
+        setNotice(
+          usedFallbackRef.current ? MESSAGES.locationDevFallback : null,
+        );
       }
       queryClient.invalidateQueries({ queryKey: ['my', 'attendance'] });
     },
+    onSettled: () => setPhase(null),
     onError: (err: unknown) => {
       setPendingType(null);
       if (err instanceof ApiError && err.status === HTTP_LOCKED) {
@@ -209,14 +338,11 @@ export default function PunchClock() {
           className="text-4xl font-semibold tabular-nums text-gray-900"
           aria-live="off"
         >
-          {displayTime}
+          {displayTime ?? CLOCK_PLACEHOLDER}
         </p>
         <p className="mt-1 text-sm text-gray-500">
-          {new Date().toLocaleDateString(undefined, {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })}
+          {/* Non-breaking space holds the line's height before the date resolves. */}
+          {displayDate ?? '\u00A0'}
         </p>
       </div>
 
@@ -256,6 +382,26 @@ export default function PunchClock() {
           }
         >
           {notice}
+        </p>
+      )}
+
+      {/* Locating can run for many seconds before it succeeds or gives up, and the
+          capture button is disabled throughout. Without this the screen is
+          indistinguishable from one that never registered the tap — which is
+          exactly how it read. */}
+      {phase && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+        >
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700"
+          />
+          {phase === 'locating'
+            ? MESSAGES.punchLocating
+            : MESSAGES.punchSubmitting}
         </p>
       )}
 

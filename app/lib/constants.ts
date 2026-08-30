@@ -29,11 +29,67 @@ export const ROUTES = {
  * is inside a 200-metre site geofence, so submitting it would only produce an
  * exception for an admin to resolve by hand — the employee is better served by
  * being asked to wait a moment for a better fix.
+ *
+ * Overridable via `NEXT_PUBLIC_MAX_GPS_ACCURACY_METERS` because the right value is
+ * device- and site-dependent, not universal: a phone on site reports a GPS fix
+ * accurate to a few metres, while a laptop positioning from Wi-Fi is routinely
+ * coarser than this default — which makes the gate impossible to satisfy on the
+ * very machine most local testing happens on. Raise it for desktop testing; leave
+ * it at the default for a deployment whose sites have tight geofences.
  */
-export const MAX_GPS_ACCURACY_METERS = 100;
+export const MAX_GPS_ACCURACY_METERS = Number(
+  process.env.NEXT_PUBLIC_MAX_GPS_ACCURACY_METERS ?? 100,
+);
+
+/**
+ * Stand-in coordinates used when the browser cannot locate the device — development
+ * only, and never in a production build.
+ *
+ * Desktop browsers frequently cannot produce a fix at all: a laptop has no GPS, and
+ * if the operating system's location services are switched off for the browser,
+ * both the precise and the coarse request simply time out. That leaves the punch
+ * screen untestable on the very machine it is developed on, for a reason unrelated
+ * to anything the feature does.
+ *
+ * Defaults deliberately match `seedWorkspaceFixtures`' demo site, so a fallback
+ * punch lands inside the geofence and exercises the in-range path rather than the
+ * exception path. Point both at your own coordinates to test somewhere real.
+ */
+export const DEV_FALLBACK_POSITION = {
+  latitude: Number(process.env.NEXT_PUBLIC_DEV_FALLBACK_LATITUDE ?? 19.076),
+  longitude: Number(process.env.NEXT_PUBLIC_DEV_FALLBACK_LONGITUDE ?? 72.8777),
+} as const;
+
+/**
+ * Which camera the capture screen uses, remembered per device (FR-015a).
+ *
+ * `user` is the front camera and the default: a worker holding their own phone is
+ * the common case. `environment` is the rear one, which a tablet mounted at a site
+ * gate needs, since there the rear camera is the one pointing at the worker.
+ */
+export type CameraFacing = 'user' | 'environment';
+export const CAMERA_FACING_STORAGE_KEY = 'buildcore.my.cameraFacing';
+export const DEFAULT_CAMERA_FACING: CameraFacing = 'user';
 
 /** Photos required to enrol, mirroring the backend's configured bounds. */
 export const ENROLMENT_PHOTO_RANGE = { min: 3, max: 5 } as const;
+
+/**
+ * Capture ceiling applied before a photo is uploaded.
+ *
+ * A phone camera frame at full sensor resolution is hundreds of kilobytes to
+ * several megabytes, and base64 adds roughly a third on top. Uploading that is
+ * wasted twice over: it is spent on site mobile data, and the server immediately
+ * downscales to 640px (punch) or 800px (enrolment) anyway, so the extra pixels are
+ * discarded on arrival.
+ *
+ * 1280px on the longest edge keeps comfortably more detail than the server's own
+ * target — so its resize still has room to work from — while bringing a frame down
+ * to roughly 150-250 KB. The API's body limit is sized against this number; if you
+ * raise it, raise `MAX_REQUEST_BODY_SIZE` on the backend to match.
+ */
+export const CAPTURE_MAX_DIMENSION = 1280;
+export const CAPTURE_JPEG_QUALITY = 0.85;
 
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
@@ -66,7 +122,26 @@ export const MESSAGES = {
   locationDenied:
     'Location access is blocked. Allow it in your browser settings — a punch cannot be recorded without it.',
   locationUnavailable:
-    'Your location could not be determined. Move somewhere with a clearer view of the sky and try again.',
+    'Your location could not be determined. If you are indoors, move near a window or outside and try again.',
+  locationTimedOut:
+    'Locating you took too long. Check that location is switched on for this device, then try again.',
+  /**
+   * Browsers expose geolocation only on a secure origin — HTTPS, or localhost.
+   * Reached most often when testing from a phone against a dev server over the
+   * local network by IP, where every other feature works and only this one fails,
+   * with nothing on screen to say why.
+   */
+  punchLocating: 'Finding your location…',
+  punchSubmitting: 'Recording your punch…',
+  /**
+   * Shown whenever the dev fallback position is used, never silently substituted:
+   * a punch carrying a made-up location must be obviously distinguishable from a
+   * real one while testing.
+   */
+  locationDevFallback:
+    'Using the development fallback location — your device could not be located.',
+  locationInsecureConnection:
+    'Location is unavailable over an insecure connection. Open this site over HTTPS (or on localhost) to punch in.',
   locationInaccurate: (accuracy: number) =>
     `Your location is only accurate to about ${Math.round(accuracy)}m, which is not precise enough to confirm you are on site. Wait a moment and try again.`,
   punchQueued:

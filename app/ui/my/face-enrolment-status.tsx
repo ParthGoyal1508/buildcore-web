@@ -144,7 +144,14 @@ export default function FaceEnrolmentStatusPanel() {
     <div className="space-y-4">
       {isCapturing ? (
         <CameraCapture
-          captureLabel={`Capture photo ${shots.length + 1}`}
+          // At the cap the button is disabled, so labelling it with the next
+          // photo number advertises an action that can never happen — say why it
+          // is unavailable instead.
+          captureLabel={
+            shots.length >= ENROLMENT_PHOTO_RANGE.max
+              ? `Maximum ${ENROLMENT_PHOTO_RANGE.max} photos captured`
+              : `Capture photo ${shots.length + 1}`
+          }
           disabled={shots.length >= ENROLMENT_PHOTO_RANGE.max}
           onCancel={() => setIsCapturing(false)}
           onCapture={(blob) =>
