@@ -104,8 +104,6 @@ export const MESSAGES = {
   saveFailed: 'Could not save your changes. Please review the form and try again.',
   loadFailed: 'Could not load this list. Please try again.',
   never: 'Never',
-  addUserUnavailable:
-    'Adding accounts arrives with the Account Creation module — not available yet.',
   confirmDeleteRole: (name: string, users: number) =>
     users > 0
       ? `Delete the "${name}" role? ${users} user${users === 1 ? '' : 's'} will lose the access it grants until reassigned.`

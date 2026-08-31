@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
@@ -179,14 +180,16 @@ export default function UserList() {
   return (
     <>
       <div className="mb-4 flex justify-end">
-        {/* Account creation belongs to feature 010, which has no route yet. Shown
-            disabled rather than linked, so the control is where it will be without
-            dead-linking today. */}
-        <Button type="button" disabled title={MESSAGES.addUserUnavailable}>
+        {/* Feature 010's invite flow now exists, so this links rather than sitting
+            disabled. A link, not a button with an onClick — it is navigation, so it
+            should behave like one for middle-click, keyboard and screen readers. */}
+        <Link
+          href="/dashboard/account-creation/new"
+          className="flex h-10 items-center rounded-lg bg-blue-500 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        >
           Add user
-        </Button>
+        </Link>
       </div>
-      <p className="mb-4 text-xs text-gray-500">{MESSAGES.addUserUnavailable}</p>
 
       <ResponsiveList
         columns={columns}
