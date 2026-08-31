@@ -18,6 +18,7 @@ export const ROUTES = {
   myLeave: '/my/leave',
   mySalary: '/my/salary',
   myFaceEnrol: '/my/face-enrol',
+  myReimbursements: '/my/reimbursements',
 } as const;
 
 /**
@@ -113,6 +114,12 @@ export const MESSAGES = {
   protectedRole: 'The Super Admin role is protected and cannot be edited or deleted.',
 
   // --- My Workspace (feature 003) ---
+  claimReceiptRequired: (category: string, threshold: number) =>
+    `${category} claims above ${threshold} need a receipt attached.`,
+  confirmDeleteClaim:
+    'Delete this draft claim? It has not been submitted, so nothing is kept.',
+  confirmWithdrawClaim:
+    'Withdraw this claim from review? It stays on your record as withdrawn.',
   cameraDenied:
     'Camera access is blocked. Allow it in your browser settings, then try again.',
   cameraUnavailable:
@@ -129,6 +136,17 @@ export const MESSAGES = {
    * local network by IP, where every other feature works and only this one fails,
    * with nothing on screen to say why.
    */
+  /** An open shift started today. The In/Out boxes show the day's first in and
+   * last out, so a punch-in made after the last punch-out does not appear in them
+   * at all — this is the only thing on screen that accounts for the button. */
+  punchOpenSince: (capturedAt: string) =>
+    `You are currently punched in, since ${new Date(capturedAt).toLocaleTimeString(
+      undefined,
+      { hour: '2-digit', minute: '2-digit' },
+    )}. Punch out to close this shift.`,
+  /** Shown in place of the punch control once the day's pair is recorded. */
+  punchDayComplete:
+    'You have punched in and out for today. Attendance for today is complete.',
   punchLocating: 'Finding your location…',
   punchSubmitting: 'Recording your punch…',
   /**

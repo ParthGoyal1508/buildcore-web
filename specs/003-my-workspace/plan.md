@@ -176,3 +176,62 @@ only action and becomes a status-only screen. This was raised explicitly and acc
 is that consent, once given, is not employee-revocable from this UI in any state. An employee with
 a stuck pending request goes through HR, and the API-level withdrawal route stays available for
 that purpose.
+
+---
+
+## Amendment 2026-09-01 — User Story 8, punch state, attendance bounds, service-worker caching
+
+**Scope**: additions and corrections to an already-shipped feature, recorded in place. No new
+artifacts; `research.md` and `data-model.md` are unaffected.
+
+### 1. User Story 8 was built (FR-021)
+
+US8 was fully specified and its backend fully implemented, but no US8 phase had ever been generated
+into `tasks.md` and `app/` contained no reimbursement route, component or client function. Built as
+three files plus a tab: a claim form handling both file and edit, a history list, and a page.
+
+Two backend gaps had to close first, because the UI could not be wired without them — both are
+recorded in the backend plan's matching amendment: nothing exposed the category list (so the
+dropdown had nothing to populate from), and `receiptRef` was a storage reference the backend never
+produced for receipts (so every claim above a threshold was unfileable).
+
+Two spec corrections came out of building it, both recorded in `spec.md` under US8: Withdraw
+produces a terminal `Withdrawn` status rather than returning a claim to Draft, and the promised
+"per-category max amount" does not exist in the data model.
+
+### 2. Punch state comes from the server (FR-019b, FR-019c)
+
+The screen inferred its in/out state from today's attendance row, but the backend's "one open
+punch-in at a time" rule is not scoped to a day. A punch-in left open overnight therefore showed
+"Punch In", offered it, and was refused — naming a punch on a screen the employee could not see.
+
+It now reads the state from the backend, and writes it from the punch response rather than waiting
+on a refetch: the punch just made *is* the authoritative answer, and depending on a round trip left
+the button one tap behind reality, so a successful punch-out still showed "Punch Out" and the
+second tap was refused.
+
+### 3. Attendance cannot navigate into the future (FR-008)
+
+Guarded in the handler as well as by disabling the control — the disabled attribute is the
+affordance, the guard is what makes a future month unreachable however `step()` is called.
+
+### 4. The service worker no longer caches API responses (FR-019a)
+
+Serwist's `defaultCache` ends with a catch-all cross-origin `NetworkFirst` rule, and `buildcore-api`
+is a different origin — so every `/my/*` GET was being cached for up to an hour. Beyond the
+staleness that surfaced above, that cache is scoped to the origin rather than the session and
+survives sign-out: on a shared site phone, one employee's attendance, payslip or claim responses
+could be served to the next person who signs in. For data the backend spec places in the regulated
+tier (FR-026), that is not a trade worth making for offline convenience.
+
+A `NetworkOnly` rule for cross-origin requests is prepended ahead of `defaultCache`; rules match in
+order, so it wins. App-shell precaching — the reason the worker exists — is untouched.
+
+**Constitution check (re-evaluated)**: no new violations. Principle V holds — every new API call
+goes through `app/lib/api/my-workspace.ts`. Principle VI holds: the Claims tab keeps six tabs
+within a phone's width by labelling itself "Claims", and the claim history uses `ResponsiveList`,
+so it renders as cards at mobile widths like every other table here. Principles I–IV unaffected.
+
+**Known gap**: this app keeps its own `financialYearOf` and uses browser-local time for "today",
+while the backend now reckons every calendar day in a configured zone (`APP_TIMEZONE`). The two
+agree for the current userbase, but nothing keeps them in sync.

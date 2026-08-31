@@ -368,7 +368,7 @@ below are what the assessment found outstanding.
       cap and the server limit are set against the same number
       per US1/AC, US2/AC, contract photo payloads (missing)
 
-- [ ] T049 Build User Story 8 (Reimbursement Requests) — or, if it is being deliberately
+- [X] T049 (done — see Phase 13, T103–T106) Build User Story 8 (Reimbursement Requests) — or, if it is being deliberately
       deferred, record that decision in `spec.md` so the gap stops reading as an
       oversight. The spec defines US8 at P3 with full acceptance scenarios (claim form
       with category dropdown, amount, expense date, description, receipt upload, and the
@@ -462,3 +462,112 @@ but uncalled wrapper (deliberate — see plan.md's amendment section).
       — PARTIAL (2026-08-31): `npx tsc --noEmit` and `eslint` on the component are both clean, and
       all three enrolment branches were read to confirm no withdrawal control remains. The manual
       browser walkthrough of Scenario 1 steps 3/4/4a has NOT been run
+
+---
+
+## Phase 13: Amendment 2026-09-01 — User Story 8, punch state, attendance bounds, SW caching
+
+Appended after Phase 12. Every task below is already implemented; they are recorded so `tasks.md`
+still describes the code that exists. T049 (build US8 or record its deferral) is closed by
+T103–T106.
+
+### User Story 8 — Reimbursements
+
+- [X] T103 [US8] Add reimbursement schemas and client functions to
+      `app/lib/api/my-workspace.ts`; `amount` is coerced from the string Prisma serialises
+      `DECIMAL` as
+      per FR-021, contracts/my-workspace-ui.md
+
+- [X] T104 [US8] Create `app/ui/my/reimbursement-form.tsx` — one component for file and edit,
+      since the two differ only in endpoint and starting values, and splitting them would
+      duplicate the receipt-threshold logic that is the only real behaviour in it. The receipt
+      requirement updates live as the amount changes and blocks submit client-side as well as
+      server-side; "Save as draft" skips the rule, since a draft is not in review yet
+      per FR-021, US8 AC1, AC2
+
+- [X] T105 [US8] Create `app/ui/my/reimbursement-claims.tsx` — history via `ResponsiveList`, six
+      status badges, payment mode once paid. Row actions follow US8 AC3 exactly: draft →
+      Edit/Submit/Delete, submitted → Withdraw, decided → none. No disabled controls on a decided
+      claim, which would imply it might reopen. Submit is a status-only `PATCH`, which the backend
+      re-checks against the claim's final values so a draft saved under the threshold cannot be
+      submitted over it
+      per FR-021, US8 AC3, AC4, AC5
+
+- [X] T106 [US8] Create `app/my/reimbursements/page.tsx` and add the "Claims" tab to
+      `app/my/layout.tsx`
+      per FR-021
+
+### Punch state and attendance bounds
+
+- [X] T107 [US2] Take the Punch screen's in/out state from `getOpenPunch()` instead of today's
+      attendance row, write it from the punch response rather than waiting on a refetch, and
+      re-read it on error so a disagreement self-corrects. A punch-in left open overnight blocks
+      the next one, so the previous same-day inference offered a punch-in the server refused
+      per FR-019b
+
+- [X] T108 [US2] Surface an open punch-in carried over from an earlier day, naming the day it was
+      made — an empty "In time" beside a "Punch Out" button otherwise reads as a bug
+      per FR-019c
+
+- [X] T109 [US3] Clamp attendance month navigation at the current month: disable the forward
+      control and reject a forward step in the handler, so the guard holds however `step()` is
+      called
+      per FR-008
+
+### Service worker
+
+- [X] T110 Stop the service worker caching `buildcore-api` responses: prepend a `NetworkOnly`
+      rule for cross-origin requests ahead of Serwist's `defaultCache`, whose final rule cached
+      every API GET for an hour. Beyond staleness, that cache is scoped to the origin rather than
+      the session and survives sign-out, so on a shared site phone one employee's attendance,
+      payslip or claim responses could be served to the next person who signs in
+      per FR-019a, FR-026 (backend spec)
+
+### Consent controls (recorded from the 2026-08-31 amendment)
+
+- [ ] T111 [US1] Walk quickstart.md Scenario 1 steps 3, 4 and 4a in a browser to confirm no
+      consent-method dropdown and no withdrawal control render in any enrolment state. Typecheck,
+      lint and a read of all three branches confirm it statically; the manual pass has not been run
+      per FR-002a, FR-002b — carries forward the unfinished half of T102
+
+---
+
+## Phase 14: Amendment 2026-09-01 (b) — one punch per day on the Punch screen (FR-019c, FR-019d)
+
+**Goal**: The Punch screen offers exactly the one action still available today, or none once the
+day's punch-in and punch-out are both recorded.
+
+**Independent Test**: With no punch today, the screen offers Punch In. After punching in, it offers
+Punch Out and says when the shift started. After punching out, it shows the day's in time, out time
+and worked hours with no control at all.
+
+**Depends on** the backend's Phase 15 (`GET /my/punch/open` reshaped to today's state).
+
+- [X] T112 [US2] Reshape the open-punch client call to today's state —
+      `{ punchedInAt, punchedOutAt, isComplete }` — in `app/lib/api/my-workspace.ts`, renaming it
+      to match what it now answers
+      per FR-019b, contracts/my-workspace-ui.md
+
+- [X] T113 [US2] Drive the Punch action from that state in `app/ui/my/punch-clock.tsx`: Punch In
+      when the day has no punch-in, Punch Out while the shift is open, and no control once
+      `isComplete`
+      per FR-019c
+
+- [X] T114 [US2] Render the completed-day summary — in time, out time, worked hours — in place of
+      the action once the day is complete. Not a disabled button: backend FR-008 allows one pair a
+      day, so a control offered after that can only ever be refused, and a disabled one still
+      advertises a capability that does not exist
+      per FR-019c
+
+- [X] T115 [US2] Keep the open-shift notice while a shift is running, and drop the "from an earlier
+      day" variant — a stale punch-in is no longer reported by the endpoint and is no longer
+      actionable
+      per FR-019d, backend FR-008a
+
+- [X] T116 [US2] Handle the backend's 409 alongside the existing 423 branch, surfacing the server's
+      message rather than the generic save-failed copy
+      per FR-019b, backend FR-008
+
+- [X] T117 [US6] Confirm a queued offline punch refused on sync (409) still surfaces once through
+      the existing `punchSyncFailed` path, rather than being dropped silently
+      per FR-009, backend FR-008

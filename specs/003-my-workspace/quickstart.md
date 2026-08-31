@@ -26,6 +26,24 @@
 5. Deny camera permission (browser setting) and retry Capture on a fresh not-enrolled test account.
    **Expected**: clear "camera required" error, no crash.
 
+## Scenario 1b — Reimbursement claim (User Story 8)
+
+1. Navigate to `/my/reimbursements` via the Claims tab. **Expected**: an empty history and a
+   "New claim" button. If the company has no categories configured, a notice says so instead —
+   run `COMPANY_SHORT_CODE=<code> npx ts-node prisma/seed-reimbursement-categories.ts` in
+   `buildcore-api` to seed them.
+2. Tap "New claim", pick Travel, enter an amount **above** its receipt threshold, fill the date
+   and description, and attempt to submit without a receipt. **Expected**: Submit stays disabled
+   and the form states the rule.
+3. Attach a receipt photo and submit. **Expected**: the claim appears as "Pending review" with
+   "Receipt attached".
+4. File a second claim **below** the threshold with no receipt, using "Save as draft".
+   **Expected**: it appears as "Draft" with Edit, Submit and Delete actions.
+5. Tap Submit on the draft. **Expected**: it becomes "Pending review" and the row's actions
+   collapse to Withdraw alone.
+6. Tap Withdraw and confirm. **Expected**: the status becomes "Withdrawn" and no actions remain —
+   it is not returned to Draft.
+
 ## Scenario 2 — Punch in/out (User Story 2)
 
 1. As the enrolled employee, navigate to `/my/punch`. **Expected**: live clock, empty IN/OUT/
@@ -40,6 +58,22 @@
 6. Mark the current period payroll-locked in the backend test data; reload `/my/punch`.
    **Expected**: proactive "period locked" banner shown; attempting a punch anyway shows a clear
    rejection, no punch recorded.
+
+### Scenario 2 additions (2026-09-01)
+
+- After punching in, reopen `/my/punch`. **Expected**: the button reads "Punch Out" and an amber
+  notice says when the shift started (FR-019d).
+- After punching out, reload. **Expected**: no punch control at all — the In/Out/OT boxes plus a
+  note that today's attendance is complete (FR-019c). A second punch of either kind is impossible
+  from the UI, and the API refuses it with 409.
+- With a punch-in left open on an *earlier* day, punching in today still works: that punch is not
+  reported and does not block (backend FR-008a).
+- Punch out. **Expected**: the button flips to "Punch In" immediately, without a reload, and a
+  second tap is impossible rather than refused (FR-019b).
+- Punch in shortly after local midnight, then check the attendance table for **today**.
+  **Expected**: the punch appears on today's row, not yesterday's (backend FR-018a).
+- Step the attendance month forward to the current month. **Expected**: the forward control is
+  disabled; there is no way to reach a future month (FR-008).
 
 ## Scenario 3 — Attendance history (User Story 3)
 
