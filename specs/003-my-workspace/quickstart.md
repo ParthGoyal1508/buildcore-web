@@ -16,10 +16,13 @@
    enrolled yet," 0/5 counter, disabled Enrol.
 2. Tap Capture 3 times. **Expected**: live camera preview each time, thumbnail grid grows, counter
    updates; Enrol remains disabled until consent is also checked.
-3. Select a consent method, check acknowledgement, tap Enrol. **Expected**: "Face enrolled
-   successfully," status becomes "Enrolled on {today}."
+3. Check the consent acknowledgement, tap Enrol. **Expected**: "Face enrolled successfully,"
+   status becomes "Enrolled on {today}." No consent-method dropdown is shown at any point
+   (FR-002a) — the checkbox is the whole consent step.
 4. Reload the page. **Expected**: capture/Enrol controls are now locked/hidden; a "Request
-   Re-enrolment" action is shown instead.
+   Re-enrolment" action is shown instead, and **no "Withdraw consent" control appears** (FR-002b).
+4a. Request re-enrolment, then reload. **Expected**: the pending-approval notice is shown with no
+   "Withdraw consent" control beside it (FR-002b covers this state too).
 5. Deny camera permission (browser setting) and retry Capture on a fresh not-enrolled test account.
    **Expected**: clear "camera required" error, no crash.
 

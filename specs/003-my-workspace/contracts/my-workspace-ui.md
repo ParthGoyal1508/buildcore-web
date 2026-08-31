@@ -13,8 +13,11 @@ authority).
 **Functions**:
 - `getEnrolmentStatus(): Promise<FaceEnrolmentStatus>` → `GET /my/face-enrol`
 - `enrol(input: { photos: Blob[]; consentMethod; consentAcknowledged: true }): Promise<...>` →
-  `POST /my/face-enrol`
-- `withdrawConsent(): Promise<void>` → `DELETE /my/face-enrol/consent`
+  `POST /my/face-enrol` — the request shape is unchanged, but the screen no longer collects a
+  method and always passes `digital` (FR-002a)
+- `withdrawConsent(): Promise<void>` → `DELETE /my/face-enrol/consent` — retained in the client as
+  a typed wrapper, but no longer called by any screen (FR-002b). Kept deliberately so a future
+  admin/support surface can re-use it without re-deriving the call.
 - `getReEnrolmentState(): Promise<ReEnrolmentState>` → derived from `GET /my/face-enrol`'s status
   field plus any pending-request detail the backend contract includes
 - `requestReEnrolment(reason: string): Promise<void>` →

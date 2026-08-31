@@ -42,20 +42,36 @@ const timeOnly = (iso: string | null) =>
 
 export default function AttendanceHistory() {
   const today = new Date();
-  const [month, setMonth] = useState(today.getMonth() + 1);
-  const [year, setYear] = useState(today.getFullYear());
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
+  const [month, setMonth] = useState(currentMonth);
+  const [year, setYear] = useState(currentYear);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['my', 'attendance', month, year],
     queryFn: () => getAttendanceHistory(month, year),
   });
 
+  // The current month is the newest one there can be attendance for, so stepping
+  // past it only ever produces an empty table.
+  const isCurrentMonth = month === currentMonth && year === currentYear;
+
   function step(delta: number) {
     // Arithmetic on a Date rather than manual month/year wrapping — December → 
     // January is exactly the boundary hand-rolled code gets wrong.
     const shifted = new Date(Date.UTC(year, month - 1 + delta, 1));
-    setMonth(shifted.getUTCMonth() + 1);
-    setYear(shifted.getUTCFullYear());
+    const shiftedMonth = shifted.getUTCMonth() + 1;
+    const shiftedYear = shifted.getUTCFullYear();
+    // Guarded here as well as on the button: `disabled` is the affordance, this is
+    // what actually makes a future month unreachable.
+    if (
+      shiftedYear > currentYear ||
+      (shiftedYear === currentYear && shiftedMonth > currentMonth)
+    ) {
+      return;
+    }
+    setMonth(shiftedMonth);
+    setYear(shiftedYear);
   }
 
   const columns: Column<AttendanceDay>[] = [
@@ -113,7 +129,12 @@ export default function AttendanceHistory() {
           <SecondaryButton
             type="button"
             onClick={() => step(1)}
-            aria-label="Next month"
+            disabled={isCurrentMonth}
+            aria-label={
+              isCurrentMonth
+                ? 'Next month unavailable — this is the current month'
+                : 'Next month'
+            }
           >
             ›
           </SecondaryButton>

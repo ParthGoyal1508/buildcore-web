@@ -135,3 +135,44 @@ caching.
 ## Complexity Tracking
 
 *No entries — no constitution violations requiring justification (see Constitution Check above).*
+
+---
+
+## Amendment 2026-08-31 — Consent controls on Face Enrolment (FR-002a, FR-002b)
+
+**Scope**: UI-only delta to an already-shipped feature. No new artifacts were generated — this
+amendment updates `plan.md`, `spec.md`, `contracts/my-workspace-ui.md`, and `quickstart.md` in
+place. `research.md` and `data-model.md` are unaffected: no new decision was researched and no
+entity changed shape.
+
+**What changes**
+
+1. **Consent-method dropdown removed** (FR-002a). The `SelectField` offering `signed_paper` /
+   `digital` / `verbal` is gone from `app/ui/my/face-enrolment-status.tsx`; the component now
+   passes a literal `digital` to `enrol()`. The screen collects consent one way — the
+   acknowledgement checkbox — so the method was a choice with only one truthful answer.
+2. **Self-service "Withdraw consent" removed** (FR-002b). The withdrawal button and its helper
+   text are removed from *both* places they appear: the `enrolled && !unlockActive` branch and the
+   `re_enrolment_requested` branch. The `withdraw` mutation and its `onError`/`isPending` wiring go
+   with them.
+
+**What deliberately does not change**
+
+- `DELETE /my/face-enrol/consent` and backend FR-004/FR-017 are untouched. Withdrawal remains
+  reachable at the API level, so the underlying data-protection right keeps a route; it is simply
+  no longer a one-tap action beside the employee's enrolment status.
+- `withdrawConsent()` stays exported from `app/lib/api/my-workspace.ts` as a typed but uncalled
+  wrapper, so a future admin/support surface can reuse it (user's explicit choice).
+- `enrol()`'s request shape keeps `consentMethod`; only the caller stops varying it.
+
+**Constitution Check (re-evaluated for this delta)**: no new violations. Principle V (API Access
+Boundary) still holds — the retained wrapper keeps all `buildcore-api` calls inside
+`app/lib/api/my-workspace.ts`. Principle III is unaffected: the removed `<option>` labels were the
+last literal copy in this component's consent block, and no new literal is introduced. Principles
+I, II, IV, VI are untouched — this is a net deletion of JSX and state.
+
+**Accepted consequence** (user decision, 2026-08-31): the `re_enrolment_requested` branch loses its
+only action and becomes a status-only screen. This was raised explicitly and accepted — the intent
+is that consent, once given, is not employee-revocable from this UI in any state. An employee with
+a stuck pending request goes through HR, and the API-level withdrawal route stays available for
+that purpose.

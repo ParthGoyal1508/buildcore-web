@@ -38,3 +38,5 @@ next-env.d.ts
 
 # Serwist — the service worker is a build artefact (serwist.config.js)
 public/sw*
+
+certificates
