@@ -1,0 +1,434 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { ApiError } from '@/app/lib/api/client';
+import {
+  getAttendanceHistory,
+  submitPunch,
+  type PunchResult,
+} from '@/app/lib/api/my-workspace';
+import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
+import {
+  DEV_FALLBACK_POSITION,
+  MAX_GPS_ACCURACY_METERS,
+  MESSAGES,
+} from '@/app/lib/constants';
+import { enqueue } from '@/app/lib/offline-queue';
+import { Button } from '@/app/ui/button';
+import { FormError } from '@/app/ui/settings/form-fields';
+import CameraCapture from '@/app/ui/my/camera-capture';
+
+/** HTTP 423 — the backend's status for a write into a closed payroll period. */
+const HTTP_LOCKED = 423;
+
+const two = (n: number) => String(n).padStart(2, '0');
+const clockText = (date: Date) =>
+  `${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}`;
+const dateText = (date: Date) =>
+  date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+/**
+ * Rendered until the clock starts on the client.
+ *
+ * Same character count as `clockText`, which with `tabular-nums` means the real
+ * time replaces it without shifting the layout.
+ */
+const CLOCK_PLACEHOLDER = '--:--:--';
+const timeOnly = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+/**
+ * Reads the current position, rejecting a fix too vague to be worth sending
+ * (research.md §4, spec FR-007).
+ *
+ * The accuracy gate is here rather than only server-side because a reading accurate
+ * to half a kilometre cannot distinguish inside from outside a 200-metre geofence.
+ * Sending it anyway would produce an exception for an admin to resolve by hand, when
+ * what the worker actually needs is to be told to wait a few seconds.
+ */
+/** One `getCurrentPosition` call, promisified so the two attempts below can await. */
+function requestPosition(
+  options: PositionOptions,
+): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(resolve, reject, options),
+  );
+}
+
+async function getPosition(): Promise<GeolocationPosition> {
+  if (!navigator.geolocation) {
+    throw new Error(MESSAGES.locationUnavailable);
+  }
+  // Checked explicitly because the browser reports an insecure origin as an
+  // ordinary position failure, which would otherwise be reported to the user as
+  // bad sky visibility — advice that can never fix it.
+  if (!window.isSecureContext) {
+    throw new Error(MESSAGES.locationInsecureConnection);
+  }
+
+  try {
+    // Ask for the best fix available first: on a phone on site, this is the GPS
+    // reading the geofence check actually needs.
+    return checkAccuracy(
+      await requestPosition({
+        enableHighAccuracy: true,
+        timeout: 15_000,
+        // A fix from the last half-minute still describes where someone is
+        // standing, and accepting one lets a device that already knows its position
+        // answer instantly rather than powering up the GPS. `0` forces a fresh
+        // acquisition on every punch — the slowest path to the same answer.
+        maximumAge: 30_000,
+      }),
+    );
+  } catch (error) {
+    const code = (error as GeolocationPositionError)?.code;
+    // A refusal is final — retrying cannot change it, and the fix is in browser
+    // settings rather than anything the app can do.
+    if (code === 1 /* PERMISSION_DENIED */) {
+      throw new Error(MESSAGES.locationDenied);
+    }
+    // Anything the accuracy gate itself rejected is already a usable message.
+    if (code === undefined) {
+      throw error;
+    }
+
+    // High accuracy failed. Retry coarsely rather than giving up: a device with no
+    // GPS hardware (a laptop, most desktops) cannot satisfy the first request at
+    // all, but positions fine from Wi-Fi — and a coarse fix that the accuracy gate
+    // below still has to pass beats refusing to let anyone punch in.
+    try {
+      return checkAccuracy(
+        await requestPosition({
+          enableHighAccuracy: false,
+          // Shorter than the precise attempt on purpose: coarse positioning
+          // resolves from Wi-Fi or the network almost immediately when it can
+          // resolve at all, so a long timeout here only adds dead waiting on a
+          // device that was never going to answer.
+          timeout: 8_000,
+          // A recent cached fix is fine here; this branch is already the fallback.
+          maximumAge: 60_000,
+        }),
+      );
+    } catch (fallbackError) {
+      const fallbackCode = (fallbackError as GeolocationPositionError)?.code;
+      if (fallbackCode === 1) {
+        throw new Error(MESSAGES.locationDenied);
+      }
+      if (fallbackCode === undefined) {
+        throw fallbackError;
+      }
+      throw new Error(
+        fallbackCode === 3 /* TIMEOUT */
+          ? MESSAGES.locationTimedOut
+          : MESSAGES.locationUnavailable,
+      );
+    }
+  }
+}
+
+/** Rejects a fix too vague to place someone inside or outside a site geofence. */
+function checkAccuracy(position: GeolocationPosition): GeolocationPosition {
+  if (position.coords.accuracy > MAX_GPS_ACCURACY_METERS) {
+    throw new Error(MESSAGES.locationInaccurate(position.coords.accuracy));
+  }
+  return position;
+}
+
+export default function PunchClock() {
+  const queryClient = useQueryClient();
+  const now = new Date();
+
+  const [pendingType, setPendingType] = useState<'in' | 'out' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [queuedNotice, setQueuedNotice] = useState(false);
+  // Which step of the capture -> locate -> submit sequence is running. Locating can
+  // take many seconds (and on a device that cannot get a fix, the better part of
+  // half a minute before it gives up), during which the screen previously showed
+  // nothing at all — indistinguishable from a button that had not registered the tap.
+  const [phase, setPhase] = useState<'locating' | 'submitting' | null>(null);
+  // A ref, not state: onSuccess needs to know whether the stand-in position was
+  // used, and re-rendering mid-submit to carry that flag would be pointless work.
+  const usedFallbackRef = useRef(false);
+
+  // --- Server-synced clock (research.md §7). ---
+  //
+  // One offset, computed once, then ticked locally. Polling every second to display
+  // a clock would be a network request per second for a cosmetic value; a grossly
+  // wrong device clock is the only thing worth correcting, and one reading catches
+  // that. The `capturedAt` actually submitted is a fresh device timestamp, which
+  // the backend validates on its own terms regardless.
+  const offsetRef = useRef(0);
+  // Null until mounted, never seeded from `new Date()` during render. The server
+  // renders this component too, and a clock initialised at render time produces
+  // markup stamped with the server's time and locale that can never match what the
+  // browser produces a moment later — React reports that as a hydration failure and
+  // throws the whole tree away. The date below is held for the same reason: it is
+  // formatted with the runtime's own locale and timezone, so server and client
+  // disagree even when they agree on the day.
+  const [displayTime, setDisplayTime] = useState<string | null>(null);
+  const [displayDate, setDisplayDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const paint = () => {
+      if (!active) return;
+      const corrected = new Date(Date.now() + offsetRef.current);
+      setDisplayTime(clockText(corrected));
+      // Cheap, and keeps the date right for anyone on shift across midnight.
+      setDisplayDate(dateText(corrected));
+    };
+    // Scheduled rather than called straight from the effect body: writing state
+    // synchronously there triggers an immediate second render pass, which is what
+    // `react-hooks/set-state-in-effect` exists to prevent. A zero-delay timer paints
+    // on the next task instead — imperceptible, and it means the clock does not sit
+    // on its placeholder for a full second waiting for the first interval tick.
+    const firstPaint = setTimeout(paint, 0);
+
+    fetch('/', { method: 'HEAD' })
+      .then((res) => {
+        const serverDate = res.headers.get('date');
+        if (serverDate && active) {
+          offsetRef.current = new Date(serverDate).getTime() - Date.now();
+        }
+      })
+      .catch(() => {
+        // Offline, or the HEAD was blocked. The local clock is the fallback, which
+        // is what would have been shown anyway.
+      });
+
+    const tick = setInterval(paint, 1000);
+    return () => {
+      active = false;
+      clearTimeout(firstPaint);
+      clearInterval(tick);
+    };
+  }, []);
+
+  const { data: enrolment } = useQuery({
+    queryKey: ['my', 'face-enrol'],
+    queryFn: getEnrolmentStatus,
+  });
+
+  const { data: today } = useQuery({
+    queryKey: ['my', 'attendance', now.getMonth() + 1, now.getFullYear()],
+    queryFn: () => getAttendanceHistory(now.getMonth() + 1, now.getFullYear()),
+  });
+
+  const todayKey = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+  )
+    .toISOString()
+    .slice(0, 10);
+  const todayRow = today?.find((day) => day.date === todayKey);
+  const hasOpenPunchIn = Boolean(todayRow?.inTime && !todayRow?.outTime);
+  const nextType: 'in' | 'out' = hasOpenPunchIn ? 'out' : 'in';
+
+  const punch = useMutation({
+    mutationFn: async ({ type, photo }: { type: 'in' | 'out'; photo: Blob }) => {
+      const capturedAt = new Date().toISOString();
+
+      setPhase('locating');
+      let coords: { latitude: number; longitude: number };
+      let usedFallback = false;
+      try {
+        const position = await getPosition();
+        coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+      } catch (locationError) {
+        // In production a punch without a real location is worthless — the whole
+        // point is proving someone was on site — so the failure surfaces and the
+        // punch stops here. In development it would instead make the screen
+        // untestable on any machine whose OS will not hand out a position, so a
+        // stand-in is used and announced.
+        if (process.env.NODE_ENV === 'production') {
+          throw locationError;
+        }
+        coords = DEV_FALLBACK_POSITION;
+        usedFallback = true;
+      }
+      usedFallbackRef.current = usedFallback;
+
+      const input = { type, photo, capturedAt, ...coords };
+      setPhase('submitting');
+
+      // Offline (US6, T031): queue rather than fail. The punch already happened —
+      // the worker is standing at the gate — and the only thing missing is a
+      // network, so refusing it would lose a real attendance event.
+      if (!navigator.onLine) {
+        await enqueue(input);
+        return 'queued' as const;
+      }
+
+      try {
+        return await submitPunch(input);
+      } catch (err) {
+        // A network-level failure is indistinguishable from being offline as far as
+        // the punch is concerned. An ApiError means the server answered and had a
+        // reason, which the worker needs to see rather than have silently queued.
+        if (err instanceof ApiError) throw err;
+        await enqueue(input);
+        return 'queued' as const;
+      }
+    },
+    onSuccess: (result) => {
+      setPendingType(null);
+      if (result === 'queued') {
+        setQueuedNotice(true);
+        setNotice(MESSAGES.punchQueued);
+        return;
+      }
+      const punchResult = result as PunchResult;
+      // A flagged punch is still a recorded punch (FR-007/FR-005). The notice is
+      // informational, not an error, because there is nothing for the worker to
+      // redo — punching again would only create a second exception.
+      if (
+        punchResult.faceMatchResult === 'exception' ||
+        punchResult.geofenceResult === 'exception'
+      ) {
+        setNotice(MESSAGES.punchExceptionFlagged);
+      } else {
+        // Keep the stand-in-location warning visible on an otherwise clean punch —
+        // it is the one thing about this record that is not real.
+        setNotice(
+          usedFallbackRef.current ? MESSAGES.locationDevFallback : null,
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ['my', 'attendance'] });
+    },
+    onSettled: () => setPhase(null),
+    onError: (err: unknown) => {
+      setPendingType(null);
+      if (err instanceof ApiError && err.status === HTTP_LOCKED) {
+        setIsLocked(true);
+        setError(MESSAGES.payrollLocked);
+        return;
+      }
+      setError(err instanceof Error ? err.message : MESSAGES.saveFailed);
+    },
+  });
+
+  function startPunch(type: 'in' | 'out') {
+    setError(null);
+    setNotice(null);
+    setQueuedNotice(false);
+    setPendingType(type);
+  }
+
+  if (enrolment && enrolment.status === 'not_enrolled') {
+    return (
+      <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
+        {MESSAGES.notEnrolled}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-lg bg-white p-6 text-center shadow-sm">
+        <p
+          className="text-4xl font-semibold tabular-nums text-gray-900"
+          aria-live="off"
+        >
+          {displayTime ?? CLOCK_PLACEHOLDER}
+        </p>
+        <p className="mt-1 text-sm text-gray-500">
+          {/* Non-breaking space holds the line's height before the date resolves. */}
+          {displayDate ?? '\u00A0'}
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-3">
+        {[
+          ['In time', timeOnly(todayRow?.inTime ?? null)],
+          ['Out time', timeOnly(todayRow?.outTime ?? null)],
+          ['OT hours', todayRow?.otHours != null ? `${todayRow.otHours}` : '—'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-lg bg-white p-3 text-center shadow-sm">
+            <dt className="text-xs uppercase tracking-wide text-gray-500">
+              {label}
+            </dt>
+            <dd className="mt-1 text-lg font-medium text-gray-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* Proactive, not just reactive (T015): telling the worker the period is
+          closed before they capture a photo beats letting them go through the
+          whole flow to be refused at the end. */}
+      {isLocked && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {MESSAGES.payrollLocked}
+        </p>
+      )}
+
+      <FormError message={error} />
+
+      {notice && (
+        <p
+          role="status"
+          className={
+            queuedNotice
+              ? 'rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800'
+              : 'rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800'
+          }
+        >
+          {notice}
+        </p>
+      )}
+
+      {/* Locating can run for many seconds before it succeeds or gives up, and the
+          capture button is disabled throughout. Without this the screen is
+          indistinguishable from one that never registered the tap — which is
+          exactly how it read. */}
+      {phase && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+        >
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700"
+          />
+          {phase === 'locating'
+            ? MESSAGES.punchLocating
+            : MESSAGES.punchSubmitting}
+        </p>
+      )}
+
+      {pendingType ? (
+        <CameraCapture
+          captureLabel={`Confirm punch ${pendingType}`}
+          disabled={punch.isPending}
+          onCancel={() => setPendingType(null)}
+          onCapture={(photo) => punch.mutate({ type: pendingType, photo })}
+        />
+      ) : (
+        <Button
+          type="button"
+          onClick={() => startPunch(nextType)}
+          // The double-tap guard (T018). `isPending` covers the whole capture →
+          // geolocate → submit sequence, which on a slow connection is several
+          // seconds of a button that would otherwise look tappable again.
+          disabled={punch.isPending}
+          className="h-14 w-full justify-center text-base"
+        >
+          {punch.isPending
+            ? 'Recording…'
+            : nextType === 'in'
+              ? 'Punch In'
+              : 'Punch Out'}
+        </Button>
+      )}
+    </div>
+  );
+}

@@ -336,6 +336,17 @@ for revision) — without HR admin approving anything.
 - **FR-015**: The system MUST show a clear, non-crashing error state for any camera- or
   location-dependent action when the corresponding device capability is unavailable or access is
   denied.
+- **FR-015a**: The system MUST let the user switch between the front- and rear-facing camera during
+  any photo capture (both face enrolment and punch), MUST remember the choice per device across
+  sessions, and MUST default to the front camera when no choice has been stored. On a device that
+  exposes only one camera the control MUST be hidden rather than shown disabled — a toggle that
+  cannot toggle is worse than no toggle. Switching MUST NOT discard photos already captured in an
+  in-progress enrolment session.
+  *Rationale*: the capture surface currently pins `facingMode: 'user'`. That is the right default
+  for a worker holding their own phone, but it is unusable in two situations the field actually
+  produces: a shared tablet mounted at a site gate, where the rear camera is the one pointing at the
+  worker, and any device whose front camera is broken — where a locked front camera means that
+  person cannot record attendance at all.
 - **FR-016**: The system MUST redirect an unauthenticated request to any `/my/*` route to `/login`,
   consistent with this app's existing route-protection behavior.
 - **FR-017**: The system MUST provide a way for a user whose role has both My Workspace and admin/
