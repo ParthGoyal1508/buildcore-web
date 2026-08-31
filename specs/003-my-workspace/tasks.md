@@ -73,11 +73,14 @@ user story implementation can now begin in parallel.
 
 ## Phase 3: User Story 1 - Enrol face biometrics (Priority: P1) 🎯 MVP
 
-**Goal**: An employee can capture 3–5 photos, acknowledge consent, and enrol; consent withdrawal
-reverts status.
+**Goal**: An employee can capture 3–5 photos, acknowledge consent, and enrol.
 
-**Independent Test**: Enrol with 3 photos + consent, confirm "Enrolled" status; withdraw consent,
-confirm reversion.
+> **Amended 2026-08-31 (FR-002b)**: consent withdrawal is no longer part of this story's UI. The
+> original goal and independent test also covered "consent withdrawal reverts status"; that control
+> is removed from the screen (see Phase 12 below). The backend route is unchanged.
+
+**Independent Test**: Enrol with 3 photos + consent, confirm "Enrolled" status; reload and confirm
+the capture/Enrol controls are locked and no withdrawal control is offered.
 
 ### Implementation for User Story 1
 
@@ -416,3 +419,46 @@ facing the worker) and locks out anyone whose front camera is broken.
       the camera preview itself is exempt), and that its state is announced rather than
       conveyed by icon alone
       per FR-015a, FR-020 (missing)
+
+---
+
+## Phase 12: Amendment 2026-08-31 — Consent controls on Face Enrolment (FR-002a, FR-002b)
+
+**Goal**: Face Enrolment collects consent through the acknowledgement checkbox alone, and offers no
+self-service consent-withdrawal action in any enrolment state.
+
+**Independent Test**: As a not-enrolled employee, confirm the enrolment form shows a checkbox and
+no consent-method dropdown; as an enrolled employee, and again with a re-enrolment request pending,
+confirm no "Withdraw consent" control appears anywhere on the screen.
+
+**Context**: UI-only delta to an already-shipped story. `DELETE /my/face-enrol/consent` and backend
+FR-004/FR-017 are unchanged, and `withdrawConsent()` stays exported from the API client as a typed
+but uncalled wrapper (deliberate — see plan.md's amendment section).
+
+### Implementation
+
+- [X] T098 [US1] Remove the consent-method `SelectField` (and its `consentMethod` state) from
+      `app/ui/my/face-enrolment-status.tsx`, passing a literal `'digital'` to `enrol()` instead,
+      and drop the now-unused `SelectField` import
+      per FR-002a
+
+- [X] T099 [US1] Remove the "Withdraw consent" `SecondaryButton` and its explanatory paragraph from
+      the `isEnrolled && !unlockActive` branch of `app/ui/my/face-enrolment-status.tsx`
+      per FR-002b
+
+- [X] T100 [US7] Remove the "Withdraw consent" `SecondaryButton` from the
+      `re_enrolment_requested` branch of `app/ui/my/face-enrolment-status.tsx`, leaving the
+      pending-approval notice as a status-only section — accepted consequence, plan.md
+      per FR-002b
+
+- [X] T101 [US1] Delete the now-unreferenced `withdraw` mutation (and any `SecondaryButton` import
+      left unused) from `app/ui/my/face-enrolment-status.tsx`, keeping `withdrawConsent()` itself
+      exported from `app/lib/api/my-workspace.ts`
+      per FR-002b
+
+- [ ] T102 Verify with `npx tsc --noEmit` and by walking quickstart.md Scenario 1 steps 3, 4, and
+      4a that no consent-method dropdown and no withdrawal control render in any enrolment state
+      per FR-002a, FR-002b
+      — PARTIAL (2026-08-31): `npx tsc --noEmit` and `eslint` on the component are both clean, and
+      all three enrolment branches were read to confirm no withdrawal control remains. The manual
+      browser walkthrough of Scenario 1 steps 3/4/4a has NOT been run

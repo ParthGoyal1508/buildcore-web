@@ -9,7 +9,6 @@ import {
   enrol,
   getEnrolmentStatus,
   requestReEnrolment,
-  withdrawConsent,
   type FaceEnrolmentStatus,
 } from '@/app/lib/api/my-workspace';
 import {
@@ -21,7 +20,6 @@ import {
   CheckboxField,
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import CameraCapture from '@/app/ui/my/camera-capture';
@@ -56,8 +54,6 @@ export default function FaceEnrolmentStatusPanel() {
 
   const [shots, setShots] = useState<Shot[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [consentMethod, setConsentMethod] =
-    useState<'signed_paper' | 'digital' | 'verbal'>('digital');
   const [consentAcknowledged, setConsentAcknowledged] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [reason, setReason] = useState('');
@@ -86,7 +82,9 @@ export default function FaceEnrolmentStatusPanel() {
 
   const submitEnrolment = useMutation({
     mutationFn: () =>
-      enrol({ photos: shots.map((s) => s.blob), consentMethod }),
+      // Consent is always given digitally here — the checkbox below is the record
+      // of it, so there is no method left to choose.
+      enrol({ photos: shots.map((s) => s.blob), consentMethod: 'digital' }),
     onSuccess: afterChange,
     onError: (error) => setFormError(asMessage(error)),
   });
@@ -105,12 +103,6 @@ export default function FaceEnrolmentStatusPanel() {
       setIsRequesting(false);
       setFormError(null);
     },
-    onError: (error) => setFormError(asMessage(error)),
-  });
-
-  const withdraw = useMutation({
-    mutationFn: withdrawConsent,
-    onSuccess: afterChange,
     onError: (error) => setFormError(asMessage(error)),
   });
 
@@ -229,21 +221,6 @@ export default function FaceEnrolmentStatusPanel() {
         <section className="space-y-4">
           {captureSession}
 
-          <SelectField
-            id="consent-method"
-            label="How was consent given?"
-            value={consentMethod}
-            onChange={(event) =>
-              setConsentMethod(
-                event.target.value as 'signed_paper' | 'digital' | 'verbal',
-              )
-            }
-          >
-            <option value="digital">Digitally, here</option>
-            <option value="signed_paper">On a signed paper form</option>
-            <option value="verbal">Verbally, recorded by HR</option>
-          </SelectField>
-
           <CheckboxField
             id="consent-ack"
             label={MESSAGES.enrolmentConsent}
@@ -312,38 +289,15 @@ export default function FaceEnrolmentStatusPanel() {
               Request re-enrolment
             </Button>
           )}
-
-          <div className="border-t border-gray-200 pt-4">
-            <SecondaryButton
-              type="button"
-              onClick={() => withdraw.mutate()}
-              disabled={withdraw.isPending}
-              className="text-red-600"
-            >
-              {withdraw.isPending ? 'Withdrawing…' : 'Withdraw consent'}
-            </SecondaryButton>
-            <p className="mt-1 text-xs text-gray-500">
-              Deletes your stored photos and face template. You will not be able
-              to punch until you enrol again.
-            </p>
-          </div>
         </section>
       )}
 
       {/* --- Awaiting a decision (T037): no action to offer, so none is shown. --- */}
       {data.status === 're_enrolment_requested' && !unlockActive && (
-        <section className="space-y-3">
+        <section>
           <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
             {MESSAGES.reEnrolmentPending}
           </p>
-          <SecondaryButton
-            type="button"
-            onClick={() => withdraw.mutate()}
-            disabled={withdraw.isPending}
-            className="text-red-600"
-          >
-            Withdraw consent
-          </SecondaryButton>
         </section>
       )}
 

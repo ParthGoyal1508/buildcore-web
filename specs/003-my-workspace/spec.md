@@ -28,6 +28,19 @@ repo's own spec (specs/003-my-workspace-backend/contracts/my-workspace-api.md)."
   is built; the status update is simply visible the next time the employee opens the relevant
   screen.
 
+### Session 2026-08-31
+
+- Q: Should Face Enrolment ask the employee how consent was given (signed paper / digital /
+  verbal)? → A: No — the screen collects consent one way only, by ticking the acknowledgement
+  checkbox, so the method is always "digital" and asking is a choice with only one truthful
+  answer. The backend contract still accepts `consentMethod` unchanged; this UI simply always
+  sends `digital`.
+- Q: Should the employee be able to withdraw biometric consent from Face Enrolment? → A: No — the
+  self-service "Withdraw consent" control is removed from the screen. The backend route
+  (`DELETE /my/face-enrol/consent`, backend FR-004/FR-017) is deliberately retained as the
+  API-level withdrawal path, so the underlying data-protection right still has a route; it is
+  simply no longer a one-tap action sitting next to the employee's enrolment status.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Enrol face biometrics (Priority: P1)
@@ -50,12 +63,13 @@ badge changes to "Enrolled on {date}."
    preview is shown; each capture adds a thumbnail and increments the counter, up to 5.
 3. **Given** fewer than 3 captured photos, **When** the employee attempts to submit, **Then** the
    Enrol action remains disabled — no submission is possible.
-4. **Given** 3–5 captured photos and a checked consent acknowledgement (with a selected consent
-   method), **When** Enrol is tapped, **Then** the photos are uploaded, a "Face enrolled
-   successfully" confirmation appears, and the status badge updates to "Enrolled on {date}."
+4. **Given** 3–5 captured photos and a checked consent acknowledgement, **When** Enrol is tapped,
+   **Then** the photos are uploaded, a "Face enrolled successfully" confirmation appears, and the
+   status badge updates to "Enrolled on {date}." Consent is recorded as digital — the screen asks
+   for no consent method, because ticking the box here is itself the digital consent.
 5. **Given** an already-enrolled employee, **When** they view Face Enrolment, **Then** the photo
    capture and Enrol controls are locked/hidden, replaced by a "Request Re-enrolment" action
-   (User Story 7).
+   (User Story 7), and no consent-withdrawal control is offered anywhere on the screen.
 6. **Given** camera access is denied or unavailable, **When** Capture is attempted, **Then** a clear
    error state explains the camera is required and how to grant permission, rather than a silent
    failure.
@@ -294,6 +308,13 @@ for revision) — without HR admin approving anything.
 - **FR-002**: The system MUST provide a Face Enrolment screen showing current status ("Not enrolled
   yet" or "Enrolled on {date}"), a live-camera photo capture flow (max 5, thumbnail grid, running
   counter), and an Enrol action disabled until ≥3 photos are captured and consent is acknowledged.
+- **FR-002a**: The Face Enrolment screen MUST collect consent through the acknowledgement checkbox
+  alone and MUST NOT ask the employee to choose a consent method; it MUST always send `digital` as
+  the method to the unchanged backend endpoint.
+- **FR-002b**: The Face Enrolment screen MUST NOT offer a self-service consent-withdrawal action in
+  any enrolment state (enrolled, re-enrolment requested, or unlock granted). The backend withdrawal
+  route remains available at the API level and is out of scope for this UI; the typed
+  `withdrawConsent()` client wrapper is retained but left uncalled.
 - **FR-003**: The system MUST lock/hide the photo-capture and Enrol controls for an already-enrolled
   employee, replacing them with the re-enrolment request entry point.
 - **FR-004**: The system MUST provide a My Punch screen with a live clock, IN TIME/OUT TIME/WORKED
@@ -364,7 +385,8 @@ for revision) — without HR admin approving anything.
 ### Key Entities
 
 - **Face Enrolment (view)**: Status, enrolment date, captured-photo thumbnails (session-local until
-  submitted), consent method/acknowledgement — mirrors the backend's Face Enrolment entity.
+  submitted), consent acknowledgement (method always digital, per FR-002a) — mirrors the backend's
+  Face Enrolment entity.
 - **Punch (view)**: Type (in/out), captured time, face-match/geofence result, offline-queued flag —
   mirrors the backend's Punch Record.
 - **Attendance Day (view)**: One calendar day's computed status plus in/out/OT figures, for the
