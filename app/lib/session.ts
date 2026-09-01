@@ -1,4 +1,9 @@
 import { apiFetch, ApiError } from './api/client';
+import { ROUTES } from './constants';
+
+/** The backend's code for "this account must change its password first"
+ * (010 FR-017a). Matched on the code, never the message. */
+export const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
 
 // In-memory only — never localStorage/sessionStorage (research.md §2). Lost on
 // hard refresh; re-obtained via the httpOnly refresh cookie.
@@ -77,6 +82,19 @@ export async function authFetch<T>(path: string, init?: RequestInit): Promise<T>
   try {
     return await apiFetch<T>(path, withAuthHeader(accessToken));
   } catch (err) {
+    // The account owes a forced password change (010 FR-017a). Routed here rather
+    // than handled per-caller: every screen can hit this, and the only useful
+    // response from any of them is the same one. Branching on the code, never the
+    // message, so the backend's wording stays free to change.
+    if (
+      err instanceof ApiError &&
+      err.status === 403 &&
+      err.code === PASSWORD_CHANGE_REQUIRED &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== ROUTES.changePassword
+    ) {
+      window.location.href = ROUTES.changePassword;
+    }
     if (!(err instanceof ApiError) || err.status !== 401) {
       throw err;
     }

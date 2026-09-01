@@ -7,6 +7,7 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   createUser,
   createUserSchema,
+  passwordRules,
   getUnlinkedEmployees,
 } from '@/app/lib/api/account-creation';
 import { listActiveCompanies, listRoles } from '@/app/lib/api/settings';
@@ -40,6 +41,9 @@ export default function CreateUserForm() {
   const [nameSource, setNameSource] = useState<NameSource>('employee');
   const [employeeId, setEmployeeId] = useState('');
   const [displayName, setDisplayName] = useState('');
+  // Empty means "send an invite" — the two modes differ by whether this is filled
+  // in, not by a separate control (backend FR-015).
+  const [password, setPassword] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -132,6 +136,7 @@ export default function CreateUserForm() {
           : undefined,
       displayName:
         effectiveNameSource === 'displayName' ? displayName || undefined : undefined,
+      password: password || undefined,
       roleIsCrossCompany,
     });
     if (!parsed.success) {
@@ -271,11 +276,48 @@ export default function CreateUserForm() {
         )}
       </fieldset>
 
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-gray-700">
+          How they get in
+        </legend>
+        <TextField
+          id="password"
+          label="Set a password (optional)"
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          error={fieldErrors.password}
+          hint="Leave blank to email an invite and let them choose their own. Fill it in to create the account immediately — no email is sent, you pass the password on yourself, and they must change it when they first sign in."
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {password.length > 0 && (
+          <ul className="space-y-1 text-xs">
+            {passwordRules.map((rule) => {
+              const met = rule.test(password);
+              return (
+                <li
+                  key={rule.label}
+                  className={met ? 'text-green-700' : 'text-gray-500'}
+                >
+                  {met ? '✓' : '•'} {rule.label}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </fieldset>
+
       <FormError message={formError} />
 
       <div className="flex gap-2">
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Sending invite…' : 'Send invite'}
+          {mutation.isPending
+            ? password
+              ? 'Creating account…'
+              : 'Sending invite…'
+            : password
+              ? 'Create account'
+              : 'Send invite'}
         </Button>
         <SecondaryButton
           type="button"

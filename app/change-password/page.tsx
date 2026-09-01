@@ -1,26 +1,29 @@
 import type { Metadata } from 'next';
 import AuthNotice from '@/app/ui/auth-notice';
+import ChangePasswordForm from '@/app/ui/change-password-form';
 
 export const metadata: Metadata = { title: 'Change Password' };
 
 /**
- * Placeholder for the mandatory password-change step (spec FR-007). Reached
- * when a login succeeds with `mustChangePassword: true` — which today means an
- * administrator issued a temporary password for this account. The change form
- * itself is a separate feature; this page exists so that user lands on an
- * explanation rather than a 404.
+ * The mandatory password-change step (001 FR-007, 010 FR-017c).
+ *
+ * Reached when a login returns `mustChangePassword: true` — an administrator either
+ * reset this account's password or created the account with one. Either way the
+ * value in force was chosen by someone else, and for a directly-created account the
+ * server refuses every non-exempt request until it is replaced.
+ *
+ * This was a placeholder until 010's 2026-09-01 amendment: it explained the
+ * situation and offered no way out of it, which was survivable only because nothing
+ * enforced the flag.
  */
 export default function ChangePasswordPage() {
   return (
     <AuthNotice title="Password change required" backLabel="Back to login">
       <p>
-        Your administrator has set a temporary password for your account. You
-        need to choose a new one before you can continue.
+        Your administrator set the password you just used. Choose your own before
+        continuing — until you do, the rest of the app is unavailable.
       </p>
-      <p>
-        This screen isn&apos;t built yet — until it is, contact your
-        administrator to complete the change.
-      </p>
+      <ChangePasswordForm />
     </AuthNotice>
   );
 }

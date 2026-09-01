@@ -75,3 +75,45 @@ test-seeded without US1's form existing yet.
 
 **MVP (Phase 1–3)**: Both user stories together are the minimum shippable unit — US1 alone
 produces accounts nobody can activate; US2 alone has nothing to validate against.
+
+---
+
+## Phase 6: Amendment 2026-09-01 — password on create, and a real change-password screen
+
+**Goal**: An admin can set a password when creating an account, and a user forced to change theirs
+has a screen that actually does it.
+
+**Independent Test**: Create an account with a password from the admin form; sign in as it; land on
+the change-password screen; change the password; continue into the app on the same session.
+
+**Depends on** the backend's Phase 8 (optional `password` on create, and the
+`PASSWORD_CHANGE_REQUIRED` refusal).
+
+- [X] T047 [US4] Add an optional password field to the create-user form in
+      `app/ui/account-creation/create-user-form.tsx`, with the same complexity rule stated in the
+      UI, and make clear that supplying one skips the invite email entirely
+      per backend FR-015, FR-016
+
+- [X] T048 [US4] Send `password` through `app/lib/api/account-creation.ts` only when supplied, so
+      an empty field keeps today's invite behaviour rather than sending an empty string
+      per backend FR-015
+
+- [X] T049 Replace the placeholder at `app/change-password/page.tsx` with a working form posting to
+      `POST /users/change-password`. Today it is an explanatory dead end, so an account forced to
+      change its password has nowhere to go — which is why the backend's refusal cannot ship
+      without this
+      per backend FR-017c
+
+- [X] T050 Route the user onward after a successful change rather than leaving them on the form,
+      and rely on the backend clearing the flag rather than re-logging them in
+      per backend FR-017b
+
+- [X] T051 Handle a `403` carrying `PASSWORD_CHANGE_REQUIRED` anywhere in the app by routing to the
+      change-password screen, branching on the code and never on the message text
+      per backend FR-017a
+
+- [ ] T052 (PARTIAL) Confirm the four exempt calls still work from that screen — profile read, change,
+      refresh, logout — so the page can render the signed-in user and the user can leave without
+      completing the change — `GET /users/me` and the change-password call verified
+      live against a running API; refresh and logout not exercised from this screen
+      per backend FR-017a

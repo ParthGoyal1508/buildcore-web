@@ -53,6 +53,12 @@ export const createUserSchema = z
     companyId: z.string().optional(),
     employeeId: z.string().optional(),
     displayName: z.string().optional(),
+    /**
+     * Optional. Supplying one creates the account directly instead of emailing an
+     * invite (backend FR-015): it opens immediately and the user must change this
+     * password at first login.
+     */
+    password: z.string().optional(),
     /** Not sent to the API — drives the two conditional rules below. */
     roleIsCrossCompany: z.boolean(),
   })
@@ -65,6 +71,16 @@ export const createUserSchema = z
     {
       path: ['companyId'],
       message: 'A cross-company role is not scoped to one company.',
+    },
+  )
+  .refine(
+    // Only when one is actually supplied — an empty field means "send an invite",
+    // not "an invalid password".
+    (v) => !v.password || passwordRules.every((r) => r.test(v.password as string)),
+    {
+      path: ['password'],
+      message:
+        'Password must be at least 8 characters and include an uppercase letter and a number.',
     },
   )
   .refine(
@@ -123,6 +139,7 @@ export async function createUser(
     displayName,
     employeeId,
     companyId,
+    password,
     ...rest
   } = input;
   const raw = await authFetch<unknown>('/account-creation/users', {
@@ -132,6 +149,9 @@ export async function createUser(
       ...(companyId ? { companyId } : {}),
       ...(employeeId ? { employeeId } : {}),
       ...(displayName?.trim() ? { displayName: displayName.trim() } : {}),
+      // Omitted entirely when blank: an empty string would be a password the
+      // backend then rejects, rather than the invite flow the admin asked for.
+      ...(password ? { password } : {}),
     }),
   });
   return createdUserSchema.parse(raw);
