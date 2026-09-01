@@ -15,6 +15,14 @@ buildcore-api specs/005-hr-payroll-backend/contracts/hr-payroll-api.md. Reuses t
 established patterns: ResponsiveList (Settings), the generic widget/filter renderers (Dashboard),
 and the CameraCapture component (My Workspace) for Daily Worker photo capture."
 
+## Clarifications
+
+### Session 2026-09-01 (ratification — frontend gap-closure clarify pass)
+
+- Q: How much backend validation should the client duplicate? → A: Only deterministic rules — tax
+  slab contiguity and section-ceiling capping are evaluated client-side because the client holds all
+  the inputs; payroll-run conflicts are not.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Maintain full employee records (Priority: P1)
@@ -544,3 +552,194 @@ committed, then committing only the valid rows.
   whatever file the backend produces, with no format-specific UI logic of its own.
 - No automated test framework exists yet in this repo; verification is manual, per this app's
   established known gap.
+
+---
+
+## Amendment 2026-09-01 — TDS, Salary Advances, Registers, Late-Coming; Recruitment and Labour Handover
+
+**Reason**: A gap audit against the module/submodule matrix found several uncovered screens across
+rows 15 to 23, plus two areas that belong to newly created frontend features.
+
+Added by this amendment:
+
+- **TDS screens** (rows 18, 20) — tax slab configuration, employee investment declarations, and the
+  quarterly/Form-16 reports. Nothing here computes or displays income-tax deduction today.
+- **Salary Advances** (rows 10, 19, 20) — an advance is not a loan; it carries no EMI schedule and is
+  recovered in one month, so the existing Loans screens cannot represent it.
+- **Salary Register and Deduction Report** (row 18) — the two consolidated views payroll is actually
+  reviewed and signed off from.
+- **Late Coming report** (row 16) — 002 configures shift in-time, out-time, and grace, but nothing
+  displays lateness against it.
+
+Handed to other features (no screens added here):
+
+- **Recruitment, onboarding, letters, and the resignation report** (rows 22, 23) are specified by the
+  new frontend feature **011-recruitment**. This feature's exit/F&F screens gain links to 011's
+  resignation record and letter generation.
+- **Daily worker and labour attendance** (rows 11, 12, 15, 18) are superseded by the new frontend
+  feature **013-labour**, matching the backend supersession ratified 2026-09-01.
+
+Everything above is otherwise unchanged.
+
+### User Story 14 - TDS configuration, declarations and reports (Priority: P1)
+
+An admin maintains tax slabs, employees' investment declarations are recorded and verified, and TDS
+appears on payroll with quarterly and Form-16 reporting.
+
+**Why this priority**: Without it every payroll screen shows a materially wrong net pay for any
+employee above the exemption threshold.
+
+**Independent Test**: Configure slabs for a financial year, record a declaration, run payroll, and
+confirm a TDS deduction line appears on the salary slip.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Tax Slabs screen, **When** a slab set is added, **Then** it collects Financial Year,
+   Regime (Old/New), and ordered slab rows with lower bound, upper bound, and rate.
+2. **Given** slab rows with a gap or overlap, **When** Save is attempted, **Then** the offending
+   boundary is highlighted inline and Save stays disabled — pre-empting the backend rejection.
+3. **Given** the employee Tax Declaration screen, **When** a declaration line is added, **Then** it
+   collects Section, Declared Amount, and an optional proof upload.
+4. **Given** a declared amount above its section ceiling, **When** entered, **Then** the capped
+   deductible amount is shown live beside it, so the user sees the effective figure before saving.
+5. **Given** a declaration, **When** Verify is used with proof attached, **Then** its status changes to
+   Verified; helper text states unverified declarations count only until the configured cut-off month.
+6. **Given** an employee without a PAN, **When** payroll is processed, **Then** they appear in the run's
+   exception list with a clear "higher no-PAN rate applied" explanation.
+7. **Given** a processed run, **When** the Quarterly TDS report is opened, **Then** per-employee
+   deducted amounts, PAN, and taxable income are listed with missing-PAN rows flagged.
+8. **Given** the Form 16 data view, **When** an employee and financial year are chosen, **Then** gross
+   salary, exemptions, deductions by section, taxable income, and tax deducted are shown.
+9. **Given** any TDS report, **When** exported, **Then** the established export handling applies.
+
+---
+
+### User Story 15 - Salary Advances (Priority: P2)
+
+An employee's advance against salary is requested, approved, disbursed, and recovered in full from the
+next payroll.
+
+**Why this priority**: The matrix names Advance separately from Loan at three places, and the existing
+Loans screens cannot represent a single-month recovery.
+
+**Independent Test**: Approve a ₹10,000 advance, run the next payroll, and confirm a matching
+deduction line appears and the advance closes.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/hr/salary-advances`, **When** loaded, **Then** advances list employee, amount,
+   recovery month, outstanding balance, and status — visually distinct from the Loans screen so the
+   two are not confused.
+2. **Given** the New Advance modal, **When** submitted, **Then** it collects Employee, Amount, Reason,
+   and Recovery Month.
+3. **Given** an amount above the configured percentage of monthly net, **When** entered, **Then** an
+   inline "exceeds limit — needs approval" warning appears.
+4. **Given** an employee with an open advance, **When** a second is attempted, **Then** the `409` is
+   surfaced inline with a link to the existing advance.
+5. **Given** a payroll run where recovery was capped, **When** the deduction is viewed, **Then** helper
+   text explains the remainder carries forward and the advance stays open.
+6. **Given** an employee with an outstanding advance, **When** their F&F is computed, **Then** the
+   advance appears as a recovery line in the settlement.
+
+---
+
+### User Story 16 - Salary Register and Deduction Report (Priority: P2)
+
+Payroll is reviewed and signed off from a salary register listing every employee's full breakup, and a
+deduction report summarising each head.
+
+**Why this priority**: These are the views payroll is actually approved from. Read-only over an
+existing run, so low risk.
+
+**Independent Test**: Process a run for three employees and confirm the register's column totals equal
+the run totals and the deduction report's heads equal the register's columns.
+
+**Acceptance Scenarios**:
+
+1. **Given** a processed run, **When** the Salary Register is opened, **Then** every employee is listed
+   with code, name, designation, department, days paid, LOP days, each earning component, gross, each
+   deduction component, total deductions, and net pay, with column totals.
+2. **Given** a run that is not processed, **When** the register is requested, **Then** an explanatory
+   state is shown rather than an empty or erroring table.
+3. **Given** a register whose totals diverge from the run, **When** rendered, **Then** an explicit
+   reconciliation warning is shown — never a silently different number.
+4. **Given** a project filter, **When** applied, **Then** only line items carrying that project are
+   included — the matrix's project-wise manpower cost view.
+5. **Given** the Deduction Report, **When** opened, **Then** each head (PF employee/employer, ESIC
+   employee/employer, PT, TDS, loan EMI, salary advance, LWP, other) is listed with employee count and
+   total, split into statutory and non-statutory.
+6. **Given** the deduction report, **When** compared with the challan screens, **Then** the statutory
+   head totals match; any divergence is surfaced rather than hidden.
+7. **Given** either register, **When** exported, **Then** the established export handling applies, and
+   the wide table scrolls within its own container on mobile.
+
+---
+
+### User Story 17 - Late-Coming Report (Priority: P3)
+
+Attendance is shown against each employee's shift, so late arrivals, early departures, and short hours
+are visible, with repeat lateness surfaced.
+
+**Why this priority**: 002 already configures shifts with a grace period; nothing consumes it.
+
+**Independent Test**: With a 09:00 shift and 15-minute grace, a 09:20 punch-in shows 5 late minutes.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/hr/reports/late-coming`, **When** a period and optional department or site are
+   chosen, **Then** each employee shows late days, total late minutes, early departure days, and
+   short-hours days, sorted by late days descending.
+2. **Given** an employee exceeding the configured monthly threshold, **When** listed, **Then** a
+   repeat-late-comer marker is shown.
+3. **Given** an employee with no assigned shift, **When** listed, **Then** an explicit "no shift
+   assigned" marker is shown rather than zero — unconfigured data is never displayed as punctuality.
+4. **Given** a day with no punch times, **When** rendered, **Then** it carries its own explicit marker.
+5. **Given** approved leave or a holiday, **When** the report is computed, **Then** those days are
+   excluded entirely.
+6. **Given** the report, **When** viewed, **Then** helper text states lateness does not deduct pay, so
+   its purpose as an informational surface is unambiguous.
+
+### Additional Edge Cases
+
+- Slabs are edited after runs were processed under them → processed runs stay frozen; the UI shows the
+  edit affects future runs only.
+- An employee switches regime mid-year → the switch control is available only at the configured point,
+  disabled with an explanation otherwise.
+- Both an advance and a loan EMI fall due where net cannot cover both → the deduction lines show the
+  applied order and the carried-forward remainder.
+
+### Additional Functional Requirements
+
+- **FR-030**: All new screens MUST live under `/dashboard/hr/*` or `/dashboard/payroll/*` and reuse the
+  existing `PAYROLL`, `ATTENDANCE`, and `REPORTS` permission guards — no new permission is introduced.
+- **FR-031**: The tax slab editor MUST validate contiguity and non-overlap client-side, highlighting
+  the offending boundary and disabling Save — pre-empting the backend rejection.
+- **FR-032**: A declared investment above its section ceiling MUST display the capped deductible amount
+  live beside the entered value.
+- **FR-033**: The Salary Advances screen MUST be visually and navigationally distinct from the Loans
+  screen so the two are not conflated.
+- **FR-034**: A capped advance or loan recovery MUST display helper text explaining the carry-forward,
+  never silently showing a smaller deduction.
+- **FR-035**: The Salary Register MUST be available only for processed or paid runs, showing an
+  explanatory state otherwise, and MUST surface any total divergence from the run as an explicit
+  reconciliation warning.
+- **FR-036**: The Deduction Report's statutory totals MUST be presented so they can be compared against
+  the challan screens, with divergence surfaced rather than hidden.
+- **FR-037**: The late-coming report MUST render explicit "no shift assigned" and "no punch times"
+  markers rather than zero values, and MUST state that lateness does not deduct pay.
+- **FR-038**: The exit/F&F screens MUST link to 011's resignation record and MUST trigger relieving
+  letter generation through 011's letter service rather than implementing letter generation here.
+- **FR-039**: This feature MUST NOT render any daily-worker or labour attendance screen; those live in
+  013-labour (supersession ratified 2026-09-01).
+- **FR-040**: The employee record MUST expose a mount point for 012's "Assets in custody" panel so the
+  exit flow shows what must be recovered before settlement.
+- **FR-041**: All new API calls MUST go through the existing typed HR/payroll API modules with `zod`
+  validation at the boundary (Principles IV, V); wide register tables MUST scroll within their own
+  container at mobile widths (Principle VI).
+
+### Additional Success Criteria
+
+- **SC-A01**: The salary register, deduction report, and challan screens reconcile exactly for the same
+  processed run, and any divergence is visible rather than silent.
+- **SC-A02**: No employee without a configured shift is ever displayed as punctual.
+- **SC-A03**: A slab set with a gap or overlap cannot be submitted from the UI.

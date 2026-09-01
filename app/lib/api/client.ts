@@ -4,6 +4,14 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    /**
+     * The backend's machine-readable error code, when it sends one.
+     *
+     * Carried separately from `message` so callers branch on a stable identifier
+     * rather than on prose — wording is allowed to change without breaking a
+     * client. Used today by `PASSWORD_CHANGE_REQUIRED` (010 FR-017a).
+     */
+    public code?: string,
   ) {
     super(message);
   }
@@ -27,7 +35,7 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message || res.statusText, res.status);
+    throw new ApiError(body.message || res.statusText, res.status, body.code);
   }
 
   const text = await res.text();

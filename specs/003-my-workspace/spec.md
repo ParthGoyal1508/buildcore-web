@@ -262,20 +262,33 @@ for revision) — without HR admin approving anything.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Reimbursements section of My Workspace, **When** "New Claim" is tapped,
-   **Then** a form opens with: Category dropdown (from Reimbursement Categories master), Amount,
-   Expense Date, Description, Receipt upload (camera or file picker); per-category max amount
-   hint shown if configured.
-2. **Given** a claim form, **When** submitted, **Then** status changes to `Submitted` and it
-   appears in history; the category's configured per-claim limit (if any) is validated before
-   submission.
-3. **Given** a `Draft` claim, **When** the employee edits or deletes it, **Then** the change
-   is allowed; once `Submitted`, editing is disabled.
+1. **Given** the Reimbursements screen, **When** "New claim" is tapped, **Then** a form opens
+   with: Category dropdown (fetched from the backend's category list, each showing the amount
+   above which a receipt becomes mandatory), Amount, Expense Date, Description, and Receipt
+   upload (camera or file picker).
+2. **Given** a claim above its category's receipt threshold with no receipt attached, **When**
+   submission is attempted, **Then** it is blocked in the form with the rule stated, and the
+   backend refuses it independently — the employee is never allowed to complete a claim that was
+   never fileable.
+3. **Given** a `Draft` claim, **When** the employee edits, submits, or deletes it from the
+   history list, **Then** the change is allowed; once submitted, editing and deleting are no
+   longer offered.
 4. **Given** a `Submitted` claim still under review, **When** the employee taps "Withdraw",
-   **Then** status reverts to `Draft` for revision.
+   **Then** its status becomes `Withdrawn` and it stays on the record as such.
 5. **Given** the claim history list, **When** viewed, **Then** each claim shows Category,
-   Amount, Expense Date, Status badge (Draft=gray, Submitted=orange, Approved=green,
-   Rejected=red, Paid=blue), and once paid: payment mode (Payroll/Direct) and date.
+   Amount, Expense Date, Status badge (Draft=gray, Pending review=amber, Approved=green,
+   Rejected=red, Paid=blue, Withdrawn=gray), whether a receipt is attached, and once paid, the
+   payment mode (via payroll / paid directly).
+
+**Corrections recorded 2026-09-01, from building this story:**
+
+- Scenario 4 previously said Withdraw "reverts to `Draft` for revision". It does not: the backend
+  models `withdrawn` as its own terminal status, deliberately distinct from `rejected` so that
+  "I changed my mind" and "this was refused" stay distinguishable. The scenario above now matches.
+- Scenarios 1 and 2 previously promised a "per-category max amount". No such field exists on the
+  Reimbursement Category master — only `receiptRequiredAbove` — so nothing can display or enforce
+  it. Adding it is a schema change, deliberately not made here; the scenarios now describe the
+  receipt threshold, which is the rule that does exist.
 
 ---
 
@@ -330,7 +343,9 @@ for revision) — without HR admin approving anything.
   GPS accuracy is below the required threshold or location access is denied, with a clear message.
 - **FR-008**: The system MUST provide a monthly attendance history table (Date, Day, In Time, Out
   Time, OT Hours, Status) with month/year navigation, showing distinct status badge styling for
-  Present, Absent, Weekly Off, Holiday, and On Leave.
+  Present, Absent, Weekly Off, Holiday, and On Leave. Navigation MUST NOT reach a month later than
+  the current one — there can be no attendance for a month that has not happened, so offering it
+  only produces an empty table. Backward navigation is unrestricted.
 - **FR-009**: The system MUST queue a punch made while offline on-device (including its captured
   photo and GPS coordinates) with a visible "queued, will sync" indicator, and MUST automatically
   submit queued punches in their original capture order once connectivity returns, without
@@ -377,6 +392,25 @@ for revision) — without HR admin approving anything.
   feature is mobile-first by design (its own dedicated shell), not a retrofit.
 - **FR-019**: All requests to `buildcore-api`'s My Workspace endpoints MUST go through the typed
   `app/lib/api/` fetch wrapper, per the constitution's API Access Boundary principle.
+- **FR-019a**: The service worker MUST NOT cache any `buildcore-api` response. Its cache is scoped
+  to the origin rather than the session and survives sign-out, so on a shared site phone one
+  employee's attendance, payslip or claim data could be served to whoever signs in next — and a
+  screen could act on an answer the server had already moved past. App-shell precaching, which is
+  what the worker exists for, is unaffected.
+- **FR-019b**: The Punch screen MUST take its punch state from the backend's today-state endpoint
+  rather than inferring it from the attendance row, and MUST update that state from the response of
+  a punch it just made rather than waiting on a refetch. Inferring it locally offers actions the
+  server refuses, and waiting on a refetch leaves the button one tap behind reality after a
+  successful punch.
+- **FR-019c**: Once the day's punch-in and punch-out are both recorded, the Punch screen MUST show
+  the day's in time, out time and worked hours in place of any punch action — no button, disabled
+  or otherwise. Backend FR-008 allows one pair per day, so a control offered after that point can
+  only ever be refused, and a disabled control still advertises a capability that does not exist.
+- **FR-019d**: While a shift is open, the Punch screen MUST show when it was started. The In/Out
+  boxes report the day's recorded times, so without this the only thing explaining a "Punch Out"
+  button is the button itself.
+- **FR-021**: The system MUST provide a Reimbursements screen listing the employee's own claims and
+  offering a claim form, reachable from the `/my/*` tab bar (User Story 8).
 - **FR-020**: Every non-camera control in this feature (tab bar, buttons, form fields, month/year
   navigation) MUST be operable via keyboard alone and use semantic HTML elements, consistent with
   the basic-accessibility standard (no formal WCAG conformance target) already established for this

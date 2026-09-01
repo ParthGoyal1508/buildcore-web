@@ -141,3 +141,42 @@ feature depends on but does not modify or re-plan.
 ## Complexity Tracking
 
 *No entries — no constitution violations requiring justification (see Constitution Check above).*
+
+---
+
+## Amendment 2026-09-01 — Company Documents Screen
+
+Covers spec FR-025 to FR-034. Adds one screen under `/dashboard/settings/*`; **no new permission**
+(reuses `COMPANY_SETTINGS`).
+
+**Constitution re-check**: Principle III — status labels and colour maps from constants.
+Principle IV/V — new calls added to the existing typed `app/lib/api/settings.ts` with `zod` at the
+boundary. Principle VI — `ResponsiveList`, 44×44px targets, no horizontal page scroll at 320px.
+PASS.
+
+### Phase A1: Types and API
+
+- [ ] Extend `app/lib/api/settings.ts` with company-document-type and company-document functions and
+      their `zod` schemas
+- [ ] Add company-document status labels and colour maps to constants
+
+### Phase A2: US8 — Company Documents screen (P3)
+
+- [ ] `CompanyDocumentTypesTab.tsx`: CRUD; `requiresExpiry` without `alertDays` blocked with a
+      field-level error; 409 on delete surfaced as a toast
+- [ ] `CompanyDocumentsTab.tsx` (`ResponsiveList`): current versions with status badge rendered
+      **from the API's computed status, never recomputed client-side from dates** (spec FR-027)
+- [ ] `UploadCompanyDocumentForm.tsx`: **shows and enforces only the fields the selected type marks
+      required** (spec FR-026); expiry-before-issue cross-field validation; typed `accept` and
+      upload progress
+- [ ] Expandable row listing every prior version, each downloadable (spec FR-028)
+- [ ] "Expiring soon" filter, expired first
+- [ ] Company selector rendered **only** for cross-company-access holders (spec FR-031)
+- [ ] Copy stating that expiry blocks no business operation (spec FR-029)
+- [ ] Reminders rendered from the global Reminders centre, not evaluated here (spec FR-030) —
+      **blocked by the 004 amendment**
+- [ ] Delete with reason promoting the prior version to current in the same list update
+
+### Phase A3: Polish
+
+- [ ] Verify skeleton / empty / error-with-retry states; mobile spot-check; `npx tsc --noEmit`

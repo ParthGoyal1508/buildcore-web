@@ -31,6 +31,9 @@ authority).
 `app/ui/my/attendance-history.tsx`.
 
 **Functions**:
+- `getTodayPunchState(): Promise<{ punchedInAt, punchedOutAt, isComplete }>` →
+  `GET /my/punch/open` — what the employee has already punched today. `isComplete` means the
+  day's pair is recorded and no control is offered (FR-019b, FR-019c)
 - `submitPunch(input: { type; photo: Blob; latitude; longitude; capturedAt }):
   Promise<PunchResult>` → `POST /my/punch` — on a network failure or `navigator.onLine === false`,
   the caller (not this function) routes the same input into
@@ -69,11 +72,43 @@ The offline queue module (`app/lib/offline-queue.ts`) exposes `enqueue(entry)`, 
   triggers a browser save via an object URL, not routed through the JSON `apiFetch` wrapper since
   the response isn't JSON)
 
+## `/my/reimbursements` (User Story 8)
+
+**Page**: `app/my/reimbursements/page.tsx` + `app/ui/my/reimbursement-claims.tsx` (history and row
+actions) + `app/ui/my/reimbursement-form.tsx` (file and edit, one component for both).
+
+**Functions**:
+- `getReimbursementCategories(): Promise<ReimbursementCategory[]>` →
+  `GET /my/reimbursements/categories`
+- `getReimbursementClaims(): Promise<ReimbursementClaim[]>` → `GET /my/reimbursements`
+- `createReimbursementClaim(input: ClaimInput): Promise<ReimbursementClaim>` →
+  `POST /my/reimbursements`
+- `updateReimbursementClaim(id, input): Promise<ReimbursementClaim>` →
+  `PATCH /my/reimbursements/:id` — also how a draft is submitted, via `{ status: 'submitted' }`
+- `withdrawReimbursementClaim(id): Promise<ReimbursementClaim>` →
+  `POST /my/reimbursements/:id/withdraw`
+- `deleteReimbursementClaim(id): Promise<void>` → `DELETE /my/reimbursements/:id`
+
+`ClaimInput.receipt` is base64 image data sent inside the create/edit request, not a separate
+upload — a two-step upload would orphan the blob of every claim the employee abandons. The claim
+`amount` is coerced from the string Prisma serialises `DECIMAL` as, so components format a number
+rather than each deciding how to parse it.
+
 ## Shared: `app/my/layout.tsx`
 
-Bottom tab bar (Punch/Leave/Salary/Face-Enrol), the cross-shell "Admin Dashboard" link for
-dual-role users (research.md §2), and registration of the `online` event listener that drains the
-offline punch queue (research.md §5).
+Bottom tab bar (Punch/Leave/Salary/**Claims**/Face-Enrol), the cross-shell "Admin Dashboard" link
+for dual-role users (research.md §2), and registration of the `online` event listener that drains
+the offline punch queue (research.md §5).
+
+The Claims tab is labelled "Claims" rather than "Reimbursements": six tabs share the width of a
+phone, and the full word would either wrap or force a smaller label than its neighbours.
+
+## Shared: `app/sw.ts`
+
+Precaches the `/my/*` app shell. Prepends a `NetworkOnly` rule for all cross-origin requests ahead
+of Serwist's `defaultCache`, whose final rule would otherwise cache every `buildcore-api` GET for
+an hour (FR-019a). Rules are matched in order, so the earlier rule wins. Fonts are unaffected:
+`next/font/google` self-hosts them at build time, making them same-origin requests.
 
 ## Shared: `app/ui/dashboard/nav-links.tsx` (MODIFIED)
 

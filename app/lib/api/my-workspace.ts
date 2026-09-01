@@ -125,6 +125,41 @@ export const salarySlipSchema = z.object({
 });
 export type SalarySlip = z.infer<typeof salarySlipSchema>;
 
+export const reimbursementCategorySchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  /** Null means a receipt is never required — distinct from `0`, which requires
+   * one on every claim. */
+  receiptRequiredAbove: z.number().nullable(),
+});
+export type ReimbursementCategory = z.infer<typeof reimbursementCategorySchema>;
+
+export const REIMBURSEMENT_STATUSES = [
+  'draft',
+  'submitted',
+  'approved',
+  'rejected',
+  'paid',
+  'withdrawn',
+] as const;
+export type ReimbursementStatus = (typeof REIMBURSEMENT_STATUSES)[number];
+
+export const reimbursementClaimSchema = z.object({
+  id: z.string(),
+  categoryId: z.string(),
+  // Prisma serialises DECIMAL as a string; coerce so components can format a
+  // number rather than each deciding how to parse it.
+  amount: z.coerce.number(),
+  expenseDate: z.string(),
+  description: z.string(),
+  receiptRef: z.string().nullable(),
+  status: z.enum(REIMBURSEMENT_STATUSES),
+  paymentMode: z.enum(['payroll', 'direct']).nullable().optional(),
+  createdAt: z.string(),
+});
+export type ReimbursementClaim = z.infer<typeof reimbursementClaimSchema>;
+
 // -------------------------------------------------------------- Face enrol
 
 /**
@@ -220,6 +255,26 @@ export async function submitPunch(input: PunchInput): Promise<PunchResult> {
   );
 }
 
+export const todayPunchStateSchema = z.object({
+  punchedInAt: z.string().nullable(),
+  punchedOutAt: z.string().nullable(),
+  /** Both punches recorded — nothing further is accepted today (backend FR-008). */
+  isComplete: z.boolean(),
+});
+export type TodayPunchState = z.infer<typeof todayPunchStateSchema>;
+
+/**
+ * What the employee has already punched today, and whether the day is finished.
+ *
+ * Read from the server rather than inferred from the attendance row: the backend
+ * allows one punch-in and one punch-out per day, and a screen guessing at that
+ * offers actions the server then refuses. A punch-in left open on an earlier day is
+ * deliberately not reported — it cannot be closed and does not constrain today.
+ */
+export async function getTodayPunchState(): Promise<TodayPunchState> {
+  return todayPunchStateSchema.parse(await authFetch('/my/punch/open'));
+}
+
 export async function getAttendanceHistory(
   month: number,
   year: number,
@@ -298,4 +353,70 @@ export async function downloadSalarySlipPdf(period: string): Promise<Blob> {
     throw new Error('Could not download the payslip. Please try again.');
   }
   return res.blob();
+}
+
+// ---------------------------------------------------------- Reimbursements
+
+export async function getReimbursementCategories(): Promise<
+  ReimbursementCategory[]
+> {
+  return z
+    .array(reimbursementCategorySchema)
+    .parse(await authFetch('/my/reimbursements/categories'));
+}
+
+export async function getReimbursementClaims(): Promise<ReimbursementClaim[]> {
+  return z
+    .array(reimbursementClaimSchema)
+    .parse(await authFetch('/my/reimbursements'));
+}
+
+export interface ClaimInput {
+  categoryId: string;
+  amount: number;
+  /** `YYYY-MM-DD`. */
+  expenseDate: string;
+  description: string;
+  /** Base64 image data. Stored server-side in this same request, which is why no
+   * separate upload call exists — a two-step upload would orphan the blob of every
+   * claim the employee then abandons. */
+  receipt?: string;
+  status?: 'draft' | 'submitted';
+}
+
+export async function createReimbursementClaim(
+  input: ClaimInput,
+): Promise<ReimbursementClaim> {
+  return reimbursementClaimSchema.parse(
+    await authFetch('/my/reimbursements', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function updateReimbursementClaim(
+  id: string,
+  input: Partial<ClaimInput>,
+): Promise<ReimbursementClaim> {
+  return reimbursementClaimSchema.parse(
+    await authFetch(`/my/reimbursements/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+/** Retracts a claim still in review. Distinct from deleting a draft: a withdrawn
+ * claim stays on the record, a deleted draft never existed. */
+export async function withdrawReimbursementClaim(
+  id: string,
+): Promise<ReimbursementClaim> {
+  return reimbursementClaimSchema.parse(
+    await authFetch(`/my/reimbursements/${id}/withdraw`, { method: 'POST' }),
+  );
+}
+
+export async function deleteReimbursementClaim(id: string): Promise<void> {
+  await authFetch(`/my/reimbursements/${id}`, { method: 'DELETE' });
 }

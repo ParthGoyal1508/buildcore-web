@@ -265,3 +265,112 @@ immediately.
 - The Masters modal is accessible only from the Stock page, not as a separate nav item.
 - No separate "Purchase Order" workflow is in scope — purchases represent direct receipt of
   materials, not pre-orders.
+
+---
+
+## Amendment 2026-09-01 — Material Indent Screens
+
+**Reason**: A gap audit against the module/submodule matrix found rows 26 ("Material request") and 37
+("Material Management: Transfers, Issues, **New Request**, Purchases") name a request surface this
+spec does not have. As written, a site has no screen to ask for material — the UI jumps straight from
+purchase to issue, so there is no demand trail and no approval queue. This amendment adds the indent
+screens in front of the existing purchase and issue flows. Everything above is unchanged.
+
+### User Story 7 - Raise and track material indents (Priority: P1)
+
+A site engineer raises an indent for material with a required-by date and the work activity it is
+for, then tracks it through approval and fulfilment.
+
+**Why this priority**: Without it the matrix's "New Request" surface does not exist. It sits in front
+of the existing flows and changes neither.
+
+**Independent Test**: Raise an indent for 50 bags of cement, confirm it appears in the pending list
+with its outstanding quantity — without approving or fulfilling it.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/inventory/indents`, **When** loaded, **Then** indents are listed with Indent
+   Number, Site, Project, Required By, line count, requester, age in days, and a status badge
+   (Pending=amber, Approved=blue, Partially Fulfilled=indigo, Fulfilled=green, Procurement
+   Pending=purple, Rejected/Cancelled=red).
+2. **Given** the New Indent modal, **When** opened, **Then** it collects Site, Project, Required By
+   Date, Justification, and a repeatable line editor with Item, Quantity, and optional Activity/BOQ
+   Item — reusing the Activity/BOQ selector already built for the Issue modal (FR-015).
+3. **Given** an inactive item selected on a line, **When** Save is attempted, **Then** a field-level
+   error appears before any request is sent.
+4. **Given** an indent with zero lines, **When** Save is attempted, **Then** it stays disabled.
+5. **Given** the indent detail, **When** opened, **Then** each line shows Requested, Approved,
+   Fulfilled, and Outstanding quantities.
+6. **Given** an indent past its required-by date with outstanding quantity, **When** listed, **Then**
+   it carries an overdue marker with the day count.
+7. **Given** an indent with any fulfilment, **When** Cancel is attempted, **Then** the `409` is
+   surfaced as a toast; an unfulfilled indent requires a reason to cancel.
+
+---
+
+### User Story 8 - Approve and fulfil indents (Priority: P2)
+
+A project manager approves indents, optionally reducing quantities with a reason, and the store
+fulfils them from stock or marks them as needing procurement.
+
+**Why this priority**: Approval and fulfilment complete the demand trail. Depends on US7.
+
+**Independent Test**: Approve an indent reducing one line from 50 to 40 with a reason, then create an
+issue against it and confirm the outstanding drops to zero.
+
+**Acceptance Scenarios**:
+
+1. **Given** a caller without the approve permission, **When** viewing a pending indent, **Then** the
+   Approve action is not rendered.
+2. **Given** the Approve modal, **When** a line quantity is reduced, **Then** a reason for that line
+   becomes required and both Requested and Approved quantities remain visible afterwards.
+3. **Given** the Reject action, **When** attempted with an empty reason, **Then** it stays disabled.
+4. **Given** an approved indent, **When** "Create Issue" is used from it, **Then** the Issue modal
+   opens pre-filled from the indent line and records the linkage on save.
+5. **Given** an issue quantity exceeding the line's outstanding, **When** entered, **Then** the
+   outstanding is shown as a live hint and Save is disabled — matching how FR-003 surfaces stock
+   hints.
+6. **Given** an approved line with no stock available, **When** "Mark procurement needed" is clicked,
+   **Then** the line status changes and it appears in the procurement-needed view.
+7. **Given** `/dashboard/inventory/procurement-needed`, **When** loaded, **Then** indent-driven demand
+   and reorder-level shortfall are shown as **separate, labelled sections** so the two are never read
+   as one combined quantity.
+8. **Given** a purchase created from that view, **When** saved, **Then** the linkage back to the
+   indent line is recorded and reflected on the indent detail.
+
+### Additional Edge Cases
+
+- Two sites indent the same scarce item → approval does not reserve stock, and the UI says so in
+  helper text; the existing issue-time validation remains the only enforcement point.
+- An indent's work activity is cancelled in Projects → the indent remains and must be cancelled
+  explicitly; no automatic cascade is implied in the UI.
+- An indent is approved while the requester has the detail open → the screen refreshes to the
+  approved state rather than allowing an edit that would fail.
+
+### Additional Functional Requirements
+
+- **FR-017**: All indent routes MUST be under `/dashboard/inventory/indents/*` and guarded by the
+  existing `INVENTORY` permission; approval actions MUST additionally require `INVENTORY_APPROVE` and
+  MUST NOT be rendered without it.
+- **FR-018**: The indent line editor MUST reuse the Activity/BOQ Item selector already built for the
+  Issue modal (FR-015), not a second implementation.
+- **FR-019**: The indent detail MUST show Requested, Approved, Fulfilled, and Outstanding quantities
+  per line so a quantity reduction at approval stays visible afterwards.
+- **FR-020**: An issue created against an indent line MUST show the line's outstanding quantity as a
+  live hint and disable Save when exceeded, matching FR-003's stock-hint pattern.
+- **FR-021**: The UI MUST state in helper text that approving an indent does not reserve stock, so a
+  user is not surprised by a later issue-time failure.
+- **FR-022**: The procurement-needed view MUST present indent demand and reorder-level shortfall as
+  separate labelled sections, never summed into one figure.
+- **FR-023**: All indent API calls MUST go through the existing typed `app/lib/api/inventory.ts`
+  module (Principle V), with `zod` validation at the boundary (Principle IV).
+- **FR-024**: Every indent screen MUST use `ResponsiveList`, meet the 44×44px touch target, and render
+  without horizontal page scroll at 320px (Principle VI).
+- **FR-025**: Indent statuses, labels, and colour mappings MUST come from a constants module
+  (Principle III) and use the shared `StatusBadge`.
+
+### Additional Success Criteria
+
+- **SC-A01**: Every issue and purchase raised from a site's demand is traceable to its indent line in
+  the UI, and outstanding always equals approved minus fulfilled on screen.
+- **SC-A02**: The procurement-needed view never displays a single combined demand figure.

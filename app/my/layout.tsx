@@ -9,6 +9,7 @@ import {
   CalendarDaysIcon,
   BanknotesIcon,
   FaceSmileIcon,
+  ReceiptPercentIcon,
   Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import { SerwistProvider } from '@serwist/next/react';
@@ -20,6 +21,9 @@ const TABS = [
   { name: 'Punch', href: ROUTES.myPunch, icon: ClockIcon },
   { name: 'Leave', href: ROUTES.myLeave, icon: CalendarDaysIcon },
   { name: 'Salary', href: ROUTES.mySalary, icon: BanknotesIcon },
+  // "Claims", not "Reimbursements": six tabs share the width of a phone, and the
+  // full word would either wrap or force the label smaller than the others.
+  { name: 'Claims', href: ROUTES.myReimbursements, icon: ReceiptPercentIcon },
   { name: 'Face', href: ROUTES.myFaceEnrol, icon: FaceSmileIcon },
 ];
 

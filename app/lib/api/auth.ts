@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { apiFetch, ApiError } from './client';
+import { authFetch } from '@/app/lib/session';
 import {
   setAccessToken,
   clearSession,
@@ -72,4 +73,22 @@ export async function logout(): Promise<void> {
     clearSession();
     clearSessionHint();
   }
+}
+
+/**
+ * Changes the signed-in user's own password.
+ *
+ * Also the way out of the forced-change state: the backend clears
+ * `mustChangePassword` in the same write, and the refusal it drives stops
+ * immediately — the current session keeps working, with no re-login
+ * (`010` FR-017a, FR-017b).
+ */
+export async function changePassword(input: {
+  oldPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  await authFetch('/users/me/password', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 }

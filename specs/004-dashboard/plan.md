@@ -132,3 +132,50 @@ group. The one removed file (`cards.tsx`) is the placeholder this feature exists
 ## Complexity Tracking
 
 *No entries — no constitution violations requiring justification (see Constitution Check above).*
+
+---
+
+## Amendment 2026-09-01 — Department Dashboard and Reminders Centre
+
+Covers spec FR-020 to FR-030. Adds two route areas; **no new permission** (reuses `DASHBOARD`).
+
+**Build-order note**: the Reminders centre is a dependency for the 002, 006, and 012 amendments,
+which all render from it rather than evaluating reminders themselves. Schedule it early.
+
+**Constitution re-check**: Principle I — the Department Dashboard reuses the existing shared widget
+components with no second rendering path. Principle III — severity labels and colour maps from
+constants. Principle IV/V — new calls on the existing typed dashboard module with `zod`.
+Principle VI — usable at mobile widths. PASS.
+
+### Phase A1: Types and API
+
+- [ ] Extend the dashboard API module with department-widget and reminders functions and `zod`
+      schemas
+- [ ] Add reminder severity labels and colour maps to constants
+
+### Phase A2: US8 — Department Dashboard (P2)
+
+- [ ] `DepartmentSelector.tsx` populated from the API, showing **only the caller's permitted
+      departments** (spec FR-023)
+- [ ] `app/dashboard/department/page.tsx` rendering through the **existing shared widget
+      components** — no second rendering path or response shape (spec FR-020)
+- [ ] Selected department encoded in the URL so the view is shareable and survives reload
+      (spec FR-022)
+- [ ] Empty department renders zero values, not an error (spec FR-021)
+- [ ] Unbuilt-module widgets fall through to the existing "Coming soon" treatment (FR-002)
+
+### Phase A3: US9 — Reminders Centre (P2) — unblocks 002, 006, 012
+
+- [ ] `RemindersList.tsx`: source module, type, subject, due date, signed days remaining, severity
+      via `StatusBadge`; **overdue first, then soonest due** (spec FR-025)
+- [ ] Module / type / severity filters without a full-page reload
+- [ ] An unavailable module source reported as such **without failing the screen** (spec FR-026)
+- [ ] `SnoozeModal.tsx` collecting until-date and reason (spec FR-029)
+- [ ] Header count **visually distinguishable from the existing notifications badge** (spec FR-027)
+- [ ] Row click navigates to the underlying record in its owning module (spec FR-028)
+- [ ] Distinct empty state, not an error
+
+### Phase A4: Polish
+
+- [ ] Mobile spot-check both screens; `npx tsc --noEmit`
+- [ ] Confirm no cross-department KPI leakage (SC-A01)

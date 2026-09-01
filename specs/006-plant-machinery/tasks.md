@@ -112,3 +112,49 @@ description: "Task list for feature implementation"
 - [ ] T021 [P] TypeScript type check (`npx tsc --noEmit`)
 - [ ] T021a [P] Spot-check every list screen across all seven user stories at a mobile viewport
       (`ResponsiveList` card layout, no horizontal scroll) and for keyboard operability — FR-010
+
+---
+
+## Amendment 2026-09-01 — Spare Parts and Service Bills Screens
+
+Covers spec FR-011 to FR-020 and plan Phase A8. Task IDs prefixed `TA`. **No new permission**
+(reuses `MAINTENANCE`).
+
+**Note**: a `plan.md` was created for this feature during the same pass — it was the only frontend
+feature without one. See [plan.md](plan.md).
+
+- [ ] TA001 Extend `app/lib/api/plant.ts` with spare-part, part-movement, and service-bill functions
+      plus their `zod` schemas (spec FR-018)
+- [ ] TA002 [P] Add spare-part and service-bill statuses, payment statuses, and colour maps to
+      constants
+- [ ] TA003 Extend the `middleware.ts` plant mapping to cover `/dashboard/plant/spare-parts`
+      with `MAINTENANCE` (spec FR-011)
+- [ ] TA004 [US8] `spare-part-table.tsx` (`ResponsiveList`): stock, avg rate, stock value, reorder
+      level, with a **low-stock marker on the row** visible without opening the detail
+- [ ] TA005 [US8] `spare-part-form.tsx`: duplicate part-number 409 inline; optional compatible
+      categories and linked inventory item
+- [ ] TA006 [US8] `receive-part-modal.tsx` with **live Amount = Qty × Rate as a read-only computed
+      field** (spec FR-012), matching FR-003's established pattern
+- [ ] TA007 [US8] Below-reorder filter; delete 409 as a toast for a part with consumption history
+- [ ] TA008 [US8] Linked-part reconciliation view showing **both balances side by side** so
+      divergence is visible (spec FR-017)
+- [ ] TA009 [US9] `job-parts-tab.tsx`: consumed parts with quantity, rate at consumption, and value
+- [ ] TA010 [US9] Add Part with a **live available-stock hint disabling Save when exceeded**
+      (spec FR-014)
+- [ ] TA011 [US9] Incompatible-part **non-blocking warning** — never prevents the action
+      (spec FR-015)
+- [ ] TA012 [US9] Add Part **disabled on a closed job with an explanatory tooltip** rather than
+      failing on submit (spec FR-016); Reverse requires a reason
+- [ ] TA013 [US9] `service-bill-form.tsx`: **TDS Amount and Net Payable as live read-only computed
+      fields, never editable inputs** (spec FR-013); duplicate bill-number 409 inline
+- [ ] TA014 [US9] Pay **disabled while the bill is unverified with a tooltip** (spec FR-016);
+      verified bills render read-only
+- [ ] TA015 [US9] `service-bill-table.tsx` with payment status badges via `StatusBadge`
+      (spec FR-020)
+- [ ] TA016 [US9] Equipment maintenance-cost panel — parts / internal labour / service bills / total
+- [ ] TA017 Replace any local equipment document-expiry or service-due reminder rendering with the
+      global Reminders centre — **blocked by 004 TA006**
+- [ ] TA018 [P] Verify `formatCurrency` (spec FR-006) throughout and that **no computed financial
+      field is an editable input** (SC-A02)
+- [ ] TA019 [P] `ResponsiveList` and 320px spot-check on both new screens (spec FR-019);
+      `npx tsc --noEmit`

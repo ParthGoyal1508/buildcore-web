@@ -450,3 +450,73 @@ Task: "Create app/ui/hr/holidays-panel.tsx"
 2. US1 → US2 → US3 → US4 → US7 → US5 → test each independently → core MVP
 3. US6 (Challans) → US8 (Transfer) → each tested independently → full P1/P2 scope
 4. US9 (Daily Workers) → US10 (Re-enrolment queue) → each tested independently → feature complete
+
+---
+
+## Amendment 2026-09-01 — TDS, Advances, Registers, Late-Coming; Recruitment and Labour Handover
+
+Covers spec FR-030 to FR-041 and plan Phases A1–A7. Task IDs prefixed `TA`. **No new permission**
+(reuses `PAYROLL`, `ATTENDANCE`, `REPORTS`).
+
+### Handover (do first — removes scope)
+
+- [ ] TA001 **Remove any daily-worker or labour attendance screen from this feature's scope** — they
+      live in 013-labour (spec FR-039, supersession ratified 2026-09-01)
+- [ ] TA002 Add the mount point in the employee screen for 012's "Assets in custody" panel
+      (spec FR-040) — **coordinate with 012 T030**
+- [ ] TA003 Add exit/F&F links to 011's resignation record and letter generation (spec FR-038) —
+      **blocked by 011 T029/T043/T044**
+
+### Types and API
+
+- [ ] TA004 Extend the HR/payroll API modules with tax-slab, declaration, advance, register, and
+      shift-compliance functions plus `zod` schemas
+- [ ] TA005 [P] Add tax sections, deduction heads, and colour maps to constants
+
+### US14 — TDS (P1)
+
+- [ ] TA006 [US14] `tax-slab-editor.tsx`: ordered slab rows with **client-side contiguity and
+      non-overlap validation highlighting the offending boundary and disabling Save** (spec FR-031)
+- [ ] TA007 [US14] `tax-declaration-form.tsx`: **capped deductible amount shown live beside the
+      entered value** (spec FR-032); proof upload with typed `accept`
+- [ ] TA008 [US14] Verify action with cut-off-month helper text
+- [ ] TA009 [US14] Missing-PAN employees surfaced in the run exception list with a clear
+      "higher no-PAN rate applied" explanation
+- [ ] TA010 [US14] Quarterly TDS report with missing-PAN rows flagged; Form 16 data view
+- [ ] TA011 [US14] Export via the established handling
+
+### US15 — Salary Advances (P2)
+
+- [ ] TA012 [US15] `salary-advance-table.tsx` and form, **visually and navigationally distinct from
+      the Loans screen** so the two are never conflated (spec FR-033)
+- [ ] TA013 [US15] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
+- [ ] TA014 [US15] **Capped-recovery helper text explaining the carry-forward** (spec FR-034)
+- [ ] TA015 [US15] Advance recovery line shown in the F&F settlement
+
+### US16 — Registers (P2)
+
+- [ ] TA016 [US16] `salary-register.tsx`: full earnings/deductions breakup with column totals;
+      project filter for the manpower-cost view
+- [ ] TA017 [US16] **Available only for processed or paid runs, with an explanatory state
+      otherwise** (spec FR-035)
+- [ ] TA018 [US16] **Explicit reconciliation warning when totals diverge from the run** — never a
+      silently different number (spec FR-035)
+- [ ] TA019 [US16] `deduction-report.tsx`: heads split statutory / non-statutory, presented for
+      comparison against the challan screens (spec FR-036)
+- [ ] TA020 [US16] Wide register tables scroll **within their own container** at mobile widths
+      (spec FR-041)
+- [ ] TA021 [US16] Export via the established handling
+
+### US17 — Late-Coming (P3)
+
+- [ ] TA022 [US17] `late-coming-report.tsx`: late days, late minutes, early departures, short hours,
+      sorted by late days descending; repeat-late-comer marker
+- [ ] TA023 [US17] **Explicit "no shift assigned" and "no punch times" markers rather than zero** —
+      unconfigured data must never display as punctuality (spec FR-037)
+- [ ] TA024 [US17] Copy stating lateness does not deduct pay (spec FR-037)
+
+### Polish
+
+- [ ] TA025 [P] Confirm the salary register, deduction report, and challan screens reconcile on
+      screen for the same processed run (SC-A01)
+- [ ] TA026 [P] 320px spot-check; `npx tsc --noEmit`

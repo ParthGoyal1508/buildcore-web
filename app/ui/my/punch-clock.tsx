@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   getAttendanceHistory,
+  getTodayPunchState,
   submitPunch,
   type PunchResult,
+  type TodayPunchState,
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
 import {
@@ -227,8 +229,21 @@ export default function PunchClock() {
     .toISOString()
     .slice(0, 10);
   const todayRow = today?.find((day) => day.date === todayKey);
-  const hasOpenPunchIn = Boolean(todayRow?.inTime && !todayRow?.outTime);
+
+  // Asked of the server rather than inferred from the attendance row. The backend
+  // allows one punch-in and one punch-out a day (FR-008), and a screen guessing at
+  // that offers actions the server then refuses.
+  const { data: punchState } = useQuery({
+    queryKey: ['my', 'punch-open'],
+    queryFn: getTodayPunchState,
+  });
+  const hasOpenPunchIn =
+    punchState?.punchedInAt != null && punchState.punchedOutAt == null;
   const nextType: 'in' | 'out' = hasOpenPunchIn ? 'out' : 'in';
+  // No control at all once the day is done — not a disabled one. One pair is the
+  // whole allowance, so anything offered past this point can only be refused, and
+  // a disabled button still advertises a capability that does not exist.
+  const dayIsComplete = punchState?.isComplete === true;
 
   const punch = useMutation({
     mutationFn: async ({ type, photo }: { type: 'in' | 'out'; photo: Blob }) => {
@@ -303,15 +318,41 @@ export default function PunchClock() {
         );
       }
       queryClient.invalidateQueries({ queryKey: ['my', 'attendance'] });
+      // Written from the response rather than waiting on a refetch. The punch we
+      // just made *is* the authoritative answer to "is there an open punch-in",
+      // and depending on a round trip here left the button one tap behind reality:
+      // a successful punch-out still showed "Punch Out", and the second tap was
+      // refused with "You have no open punch-in to punch out from".
+      queryClient.setQueryData(
+        ['my', 'punch-open'],
+        (previous: TodayPunchState | undefined) => ({
+          punchedInAt:
+            punchResult.type === 'in'
+              ? punchResult.capturedAt
+              : previous?.punchedInAt ?? null,
+          punchedOutAt:
+            punchResult.type === 'out'
+              ? punchResult.capturedAt
+              : previous?.punchedOutAt ?? null,
+          isComplete: punchResult.type === 'out',
+        }),
+      );
     },
     onSettled: () => setPhase(null),
     onError: (err: unknown) => {
       setPendingType(null);
+      // Whatever the server refused, our idea of the open punch-in may be what was
+      // wrong — re-read it so the button corrects itself instead of offering the
+      // same rejected action again.
+      queryClient.invalidateQueries({ queryKey: ['my', 'punch-open'] });
       if (err instanceof ApiError && err.status === HTTP_LOCKED) {
         setIsLocked(true);
         setError(MESSAGES.payrollLocked);
         return;
       }
+      // 409 is the day's own state refusing the punch (backend FR-008) — already
+      // punched in, already punched out, nothing to punch out from. The server's
+      // message says which, and is more useful than any generic copy here.
       setError(err instanceof Error ? err.message : MESSAGES.saveFailed);
     },
   });
@@ -361,6 +402,24 @@ export default function PunchClock() {
         ))}
       </dl>
 
+      {hasOpenPunchIn && punchState?.punchedInAt && (
+        <p
+          role="status"
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          {MESSAGES.punchOpenSince(punchState.punchedInAt)}
+        </p>
+      )}
+
+      {dayIsComplete && (
+        <p
+          role="status"
+          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
+        >
+          {MESSAGES.punchDayComplete}
+        </p>
+      )}
+
       {/* Proactive, not just reactive (T015): telling the worker the period is
           closed before they capture a photo beats letting them go through the
           whole flow to be refused at the end. */}
@@ -405,7 +464,10 @@ export default function PunchClock() {
         </p>
       )}
 
-      {pendingType ? (
+      {/* Nothing to offer once the day's pair is recorded (FR-019c) — the boxes
+          above already show what happened, and the only control that could appear
+          here is one the server would refuse. */}
+      {dayIsComplete ? null : pendingType ? (
         <CameraCapture
           captureLabel={`Confirm punch ${pendingType}`}
           disabled={punch.isPending}

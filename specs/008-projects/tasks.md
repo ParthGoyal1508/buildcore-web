@@ -371,3 +371,47 @@ renders (even if most show empty states).
 
 **Increment 3 (Phase 9–11, US7–US8 + polish)**: Revenue/billing, P&L dashboard, and final
 cross-cutting consistency checks.
+
+---
+
+## Amendment 2026-09-01 — Project Planning and Target-vs-Actual Screens
+
+Covers spec FR-015 to FR-024 and plan Phases A1–A5. Task IDs prefixed `TA`. **No new permission**
+(reuses `PROJECTS`, `REPORTS`).
+
+- [ ] TA001 Extend the projects API module with phase, activity, dependency, baseline, and target
+      functions plus `zod` schemas
+- [ ] TA002 [P] Add schedule/target status labels and colour maps to constants
+- [ ] TA003 Extend the existing project-lock treatment to **every** schedule and target control,
+      rendering them read-only rather than failing on save (spec FR-016)
+- [ ] TA004 [US9] `schedule-outline.tsx`: phases and activities with planned dates, weightage,
+      percent complete, and milestone markers
+- [ ] TA005 [US9] `activity-form.tsx` with finish-before-start cross-field validation
+- [ ] TA006 [US9] **Running weightage total displayed prominently; Baseline disabled with the actual
+      sum named while it is not 100** (spec FR-017)
+- [ ] TA007 [US9] `dependency-control.tsx`: cycle 400 surfaced **with the cycle path named**
+      (spec FR-018)
+- [ ] TA008 [US9] A planned-date dependency violation renders as a **non-blocking marker that still
+      allows saving** (spec FR-018)
+- [ ] TA009 [US9] Baseline vs current dates side by side with variance; **baseline values never
+      editable** (spec FR-019)
+- [ ] TA010 [US9] Activity delete 409 offering a Cancel action instead
+- [ ] TA011 [US10] `target-set-form.tsx` with overlap 409 naming the existing set
+- [ ] TA012 [US10] `target-vs-actual-report.tsx`: target, actual, achievement, variance, and a
+      weightage-weighted rollup stating its basis
+- [ ] TA013 [US10] **A period with no target shows "not set" and computes no achievement
+      percentage** — never displayed as zero (spec FR-020)
+- [ ] TA014 [US10] `monthly-report.tsx`: cumulative progress, quantity, target, man-days, equipment
+      hours, material consumed — **man-days blocked by 013 T055**
+- [ ] TA015 [US10] `progress-trend-chart.tsx`: planned vs actual cumulative per period; legible on
+      mobile and scrolling in its own container; **computed bar dimensions isolated to a single
+      named line** (spec FR-023)
+- [ ] TA016 [US11] `schedule-variance-view.tsx`: per-activity status, slippage in days, critical-path
+      marking
+- [ ] TA017 [US11] **Percent-complete source marked** (quantity-derived vs manual) so the two are
+      never conflated (spec FR-021)
+- [ ] TA018 [US11] **Explanatory state when no baseline exists**, rather than comparing against
+      blanks (spec FR-022)
+- [ ] TA019 [US10] Export via the established handling
+- [ ] TA020 [P] Confirm target actuals reconcile with approved DWR measurements (SC-A01); 320px
+      spot-check every chart; `npx tsc --noEmit`

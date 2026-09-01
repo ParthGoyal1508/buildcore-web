@@ -20,6 +20,14 @@ app's own constitution's NON-NEGOTIABLE mobile-first/`ResponsiveList`/keyboard-o
 requirement to every list screen, matching the pattern already applied to every other feature in
 this app.
 
+## Clarifications
+
+### Session 2026-09-01 (ratification — frontend gap-closure clarify pass)
+
+- Q: This feature has no plan.md, unlike the other eight. Create one? → A: Yes — create a full
+  plan.md covering both the original scope and the 2026-09-01 spare-parts/service-bills amendment,
+  bringing it to parity with the rest of the corpus.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Asset Register (Priority: P1)
@@ -214,3 +222,115 @@ uses it; add a Hire Rate and confirm a new Hire Bill (US6) for that category def
 - Equipment Categories and Doc Types are seeded with defaults via the backend migration, so US1–
   US6 are independently testable without US7's admin screen being touched first (matching the
   backend's own Assumptions). Hire Rates are not pre-seeded.
+
+---
+
+## Amendment 2026-09-01 — Spare Parts and Service Bills Screens
+
+**Reason**: A gap audit against the module/submodule matrix found row 32 ("Maintenance: Scheduled
+Service, Service Request, **Spare Parts Inventory**, **Service Bills**") names two screens this spec
+does not have. A maintenance job currently records that work happened but not what it consumed or
+what it cost. Everything above is unchanged.
+
+### User Story 8 - Spare Parts Stock (Priority: P2)
+
+A workshop storekeeper maintains the spare parts catalogue, receives parts into stock, and sees parts
+below their reorder level.
+
+**Why this priority**: Required before consumption can be recorded against a job. Depends on the
+existing masters.
+
+**Independent Test**: Register a hydraulic filter with a reorder level of 5, receive 10 into stock,
+and confirm the balance shows 10 with no reorder flag — without any maintenance job.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/plant/spare-parts`, **When** loaded, **Then** parts are listed with Part
+   Number, Name, Unit, In Stock, Avg Rate, Stock Value, and Reorder Level, with a below-reorder
+   filter; monetary values use `formatCurrency`.
+2. **Given** a part at or below its reorder level, **When** listed, **Then** the row carries a
+   distinct low-stock marker visible without opening the detail.
+3. **Given** the New Part modal, **When** submitted, **Then** it collects Part Number, Name, Unit,
+   Reorder Level, optional Compatible Categories, and an optional linked Inventory Item.
+4. **Given** a duplicate part number, **When** submitted, **Then** the `409` is surfaced inline on
+   that field.
+5. **Given** the Receive Stock modal, **When** Quantity and Rate are entered, **Then** Amount
+   (Qty × Rate) is displayed live as a read-only computed field, matching FR-003's pattern.
+6. **Given** a part with a declared inventory-item link, **When** the detail is viewed, **Then** both
+   balances are shown side by side so divergence is visible.
+7. **Given** a part with consumption history, **When** Delete is attempted, **Then** the `409` is
+   surfaced as a toast.
+
+---
+
+### User Story 9 - Consume parts and record service bills on a maintenance job (Priority: P2)
+
+A mechanic records the parts consumed on a job, and third-party workshop invoices are recorded
+against it and tracked to payment.
+
+**Why this priority**: This is what makes parts stock meaningful and surfaces true maintenance cost.
+Depends on US8 and the existing Maintenance story.
+
+**Independent Test**: Consume 2 filters on an open job and confirm stock drops by 2 and the job's
+parts cost updates; record a service bill with TDS and confirm net payable is displayed.
+
+**Acceptance Scenarios**:
+
+1. **Given** an open maintenance job, **When** the Parts tab is opened, **Then** consumed parts are
+   listed with quantity, rate at consumption, and value, plus an Add Part action.
+2. **Given** the Add Part form, **When** a quantity exceeds available stock, **Then** the available
+   quantity is shown as a live hint and Save is disabled.
+3. **Given** a part incompatible with the equipment's category, **When** selected, **Then** a
+   non-blocking warning appears explaining it will be flagged — the action is never prevented.
+4. **Given** a closed job, **When** Add Part is attempted, **Then** the action is disabled with an
+   explanatory tooltip.
+5. **Given** a consumed part and the maintenance permission, **When** Reverse is used, **Then** a
+   reason is required and the job's parts cost visibly decreases.
+6. **Given** the Service Bills tab, **When** a bill is added, **Then** it collects Vendor, Bill Number,
+   Bill Date, Gross Amount, Tax, and TDS %, displaying computed TDS and Net Payable live as read-only
+   fields — never accepting them as input.
+7. **Given** a duplicate bill number for the same vendor, **When** submitted, **Then** the `409` is
+   surfaced inline.
+8. **Given** an unverified service bill, **When** Pay is attempted, **Then** the action is disabled
+   with a tooltip explaining verification is required first.
+9. **Given** a verified bill, **When** viewed, **Then** its figures are read-only and a Payment Status
+   badge is shown (Paid=green, Partially Paid=amber, Unpaid=red).
+10. **Given** the equipment detail, **When** the maintenance cost panel is viewed, **Then** lifetime
+    parts cost, internal labour cost, service bill cost, and total are shown.
+
+### Additional Edge Cases
+
+- A part's average rate changes after a consumption → the consumption keeps the rate at consumption
+  time and the UI labels it as such, so history never appears to restate.
+- A service bill arrives for a disposed machine → it is still recordable against the historical job,
+  with the machine shown as disposed.
+- A repair vendor is deactivated in Partners → the bill row resolves the vendor name with an inactive
+  marker.
+
+### Additional Functional Requirements
+
+- **FR-011**: Spare parts and service bill routes MUST be under `/dashboard/plant/*` and guarded by
+  the existing `MAINTENANCE` permission — no new permission is introduced.
+- **FR-012**: The Receive Stock and Add Part forms MUST compute Amount (`Qty × Rate`) live
+  client-side as a read-only field, matching FR-003's existing pattern.
+- **FR-013**: Service bill TDS Amount and Net Payable MUST be displayed as live read-only computed
+  fields and MUST NOT be editable inputs, mirroring the server-side computation rule.
+- **FR-014**: Part consumption MUST show available stock as a live hint and disable Save when exceeded.
+- **FR-015**: Selecting a part incompatible with the equipment's category MUST show a non-blocking
+  warning, never prevent the action.
+- **FR-016**: Actions the backend rejects by state (adding parts to a closed job, paying an unverified
+  bill) MUST render as disabled with an explanatory tooltip rather than failing on submit.
+- **FR-017**: A part declaring an inventory-item link MUST show both balances side by side so
+  divergence is visible rather than hidden.
+- **FR-018**: All new API calls MUST go through the existing typed `app/lib/api/plant.ts` module
+  (FR-007), with `zod` validation at the boundary.
+- **FR-019**: All new list screens MUST use `ResponsiveList` (FR-010), meet 44×44px touch targets, and
+  render without horizontal page scroll at 320px.
+- **FR-020**: All monetary values MUST use `formatCurrency` (FR-006), and payment statuses MUST use
+  `StatusBadge` with the documented colour mapping.
+
+### Additional Success Criteria
+
+- **SC-A01**: A maintenance job's displayed total cost always equals its parts cost plus its service
+  bill net payable on screen.
+- **SC-A02**: No computed financial field (Amount, TDS, Net Payable) is ever an editable input.
