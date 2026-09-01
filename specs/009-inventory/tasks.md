@@ -258,3 +258,39 @@ issues. Delivers a complete daily workflow for stock tracking.
 **Increment 2 (Phase 7, US5)**: Transfers.
 
 **Increment 3 (Phase 8–9, US6 + polish)**: Payments, allocation UI, consistency checks.
+
+---
+
+## Amendment 2026-09-01 — Material Indent Screens
+
+Covers spec FR-017 to FR-025 and plan Phases A1–A4. Task IDs prefixed `TA`. Adds one permission
+(`INVENTORY_APPROVE`) to the middleware mapping.
+
+**Key invariant**: the UI must never imply that approving an indent reserves stock (spec FR-021).
+The existing issue-time validation remains the only enforcement point.
+
+- [ ] TA001 Extend `app/lib/api/inventory.ts` with indent functions plus `zod` schemas
+      (spec FR-023)
+- [ ] TA002 [P] Add indent status labels and colour maps to constants (spec FR-025)
+- [ ] TA003 Extend the `middleware.ts` inventory mapping so approval sub-routes require
+      `INVENTORY_APPROVE` (spec FR-017)
+- [ ] TA004 [US7] `indent-form.tsx`: header plus a repeatable line editor **reusing the Activity/BOQ
+      Item selector already built for the Issue modal** (spec FR-018) — not a second implementation
+- [ ] TA005 [US7] Inactive-item field-level guard; Save disabled with zero lines
+- [ ] TA006 [US7] `indent-table.tsx` (`ResponsiveList`) with status badges and an overdue marker
+- [ ] TA007 [US7] `indent-detail.tsx` showing **Requested, Approved, Fulfilled, and Outstanding per
+      line** (spec FR-019)
+- [ ] TA008 [US7] Cancel 409 when any fulfilment exists; a reason required otherwise
+- [ ] TA009 [US8] `approve-indent-modal.tsx`: per-line quantity reduction **requiring a reason**,
+      with both Requested and Approved remaining visible afterwards
+- [ ] TA010 [US8] Approve/Reject actions **not rendered** without `INVENTORY_APPROVE`; Reject
+      requires a reason
+- [ ] TA011 [US8] "Create Issue" prefilled from an indent line; **outstanding shown as a live hint
+      with Save disabled when exceeded** (spec FR-020), matching FR-003's stock-hint pattern
+- [ ] TA012 [US8] **Helper text stating approval does not reserve stock** (spec FR-021)
+- [ ] TA013 [US8] `procurement-needed-view.tsx`: **indent demand and reorder shortfall as separate
+      labelled sections, never summed into one figure** (spec FR-022)
+- [ ] TA014 [US8] A purchase created from that view records the indent linkage, reflected on the
+      indent detail
+- [ ] TA015 [P] Confirm outstanding always equals approved minus fulfilled on screen (SC-A01);
+      `ResponsiveList` and 320px spot-check (spec FR-024); `npx tsc --noEmit`

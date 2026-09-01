@@ -14,6 +14,14 @@ the backend contract specified in buildcore-api specs/008-projects-backend/contr
 Reuses this app's established patterns: ResponsiveList (Settings), the generic widget/filter
 renderers (Dashboard), and the tabbed detail layout (HR & Payroll Employee Detail)."
 
+## Clarifications
+
+### Session 2026-09-01 (ratification — frontend gap-closure clarify pass)
+
+- Q: How much backend validation should the client duplicate? → A: Only deterministic rules —
+  baseline weightage summing to 100 is checked client-side; dependency cycle detection is surfaced
+  from the server response.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Manage Clients (Priority: P1)
@@ -391,3 +399,146 @@ Cumulative, and confirming cost overrun categories (Actual > Budget by >10%) are
   determines this).
 - Mobile responsiveness follows the existing app's breakpoint conventions; no native mobile
   features (camera, GPS capture) are required for this feature's screens.
+
+---
+
+## Amendment 2026-09-01 — Project Planning and Target-vs-Actual Screens
+
+**Reason**: A gap audit against the module/submodule matrix found two uncovered items. Row 25
+("Projects Portfolio: ... **Project Planning** ...") names a planning surface this spec lacks — a
+project has dates and a BOQ but no phases, activities, milestones, or baseline, so nothing shows
+whether it is running late. Row 26 ("Daily Progress Report: ... **Monthly Report Chart and Target
+report**") names a comparison that cannot be drawn because nothing records what was *planned* for a
+period. Everything above is unchanged.
+
+### User Story 9 - Project schedule: phases, activities and baseline (Priority: P2)
+
+A planning engineer builds a project schedule of phases and activities with dependencies and
+milestones, then baselines it.
+
+**Why this priority**: The plan is the reference every comparison needs. Depends on the project and
+BOQ.
+
+**Independent Test**: Build a two-phase schedule with four activities and one milestone, baseline it,
+and confirm the computed project finish matches the latest activity finish.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/projects/[id]/schedule`, **When** loaded, **Then** phases and their activities
+   are shown as an ordered outline with planned start, planned finish, weightage, percent complete, and
+   a milestone marker.
+2. **Given** the Add Activity form, **When** submitted, **Then** it collects Name, Planned Start,
+   Planned Finish, optional BOQ Item, optional Planned Quantity, Weightage %, and Responsible person;
+   a finish before start shows a field-level error.
+3. **Given** activity weightages not summing to 100, **When** the schedule is viewed, **Then** the
+   running total is displayed prominently with the shortfall or excess named.
+4. **Given** the Baseline action, **When** weightages do not sum to 100, **Then** it is disabled with a
+   tooltip naming the actual sum.
+5. **Given** the Add Dependency control, **When** a dependency would create a cycle, **Then** the `400`
+   is surfaced naming the cycle path.
+6. **Given** an activity starting before a finish-to-start predecessor ends, **When** saved, **Then** a
+   non-blocking dependency-violation marker appears — the plan still saves.
+7. **Given** a baselined schedule, **When** planned dates are later edited, **Then** both baseline and
+   current dates are shown side by side with the variance.
+8. **Given** a locked project, **When** any schedule edit is attempted, **Then** controls are read-only
+   with the existing lock explanation.
+9. **Given** an activity with recorded actuals, **When** Delete is attempted, **Then** the `409` is
+   surfaced and a Cancel action is offered instead.
+
+---
+
+### User Story 10 - Targets and target-vs-actual reporting (Priority: P2)
+
+A project manager sets periodic quantity targets and sees them against actuals from approved DWRs, with
+the monthly chart the matrix names.
+
+**Why this priority**: The direct answer to the matrix's target report. Depends on US9 and the existing
+DWR flow.
+
+**Independent Test**: Set a monthly target of 500 cum, record DWRs totalling 400, and confirm 80%
+achievement with a 100 cum shortfall.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Targets screen, **When** a set is added, **Then** it collects Period Type
+   (Weekly/Monthly), Period From/To, and lines targeting an activity or BOQ item with a quantity.
+2. **Given** an overlapping target set, **When** submitted, **Then** the `409` names the existing set.
+3. **Given** the Target vs Actual report, **When** a period is chosen, **Then** each line shows target,
+   actual, achievement percentage, and variance, with a weightage-weighted project rollup.
+4. **Given** a period with no target set, **When** viewed, **Then** actuals are shown with the target
+   marked "not set" — never as zero, and no achievement percentage is computed.
+5. **Given** the Monthly Report, **When** a month is chosen, **Then** opening and closing cumulative
+   progress, quantity achieved, target, achievement percentage, man-days, equipment hours, and material
+   consumed are shown.
+6. **Given** the Progress Trend chart, **When** a range is chosen, **Then** planned and actual
+   cumulative progress are plotted per period — the matrix's "Monthly Report Chart".
+7. **Given** any chart, **When** rendered on mobile, **Then** it stays legible and scrolls within its
+   own container without the page scrolling horizontally.
+8. **Given** any of these reports, **When** exported, **Then** the established export handling applies.
+
+---
+
+### User Story 11 - Schedule variance and delay analysis (Priority: P3)
+
+A manager sees which activities are behind, by how many days, and which are critical.
+
+**Why this priority**: Derivative of US9 and US10.
+
+**Independent Test**: With one activity trailing its baseline, confirm it is flagged behind schedule
+with the correct slippage.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Schedule Variance view, **When** loaded, **Then** each activity shows baseline dates,
+   current planned dates, actual start/finish, percent complete, and a status
+   (Not Started / On Track / Behind Schedule / Completed).
+2. **Given** an activity trailing its time-elapsed percentage beyond tolerance, **When** rendered,
+   **Then** it is flagged behind schedule with slippage in days.
+3. **Given** the project, **When** the view loads, **Then** overall planned progress, actual progress,
+   and schedule variance percentage are shown.
+4. **Given** activities on the longest dependency chain, **When** rendered, **Then** they are marked
+   critical and a delay on one is shown as affecting the project finish.
+5. **Given** a project with no baseline, **When** the view is requested, **Then** an explanatory state
+   is shown rather than a comparison against blank values.
+6. **Given** an activity whose percent complete came from a manual value rather than quantity, **When**
+   rendered, **Then** the source is marked so the two are not conflated.
+
+### Additional Edge Cases
+
+- A BOQ quantity is revised after targets referencing it were set → both original and revised are shown
+  so the revision is visible.
+- The project is locked mid-period → schedule and target edits go read-only while reports stay readable.
+- Weightages are edited after baselining → both baseline and current sums are shown so the comparison
+  basis is explicit.
+
+### Additional Functional Requirements
+
+- **FR-015**: All schedule and target screens MUST live under `/dashboard/projects/[id]/*` and reuse the
+  existing `PROJECTS` and `REPORTS` permission guards — no new permission is introduced.
+- **FR-016**: The existing project-lock treatment MUST extend to every schedule and target control,
+  rendering them read-only rather than failing on save.
+- **FR-017**: The schedule MUST display a running weightage total, and the Baseline action MUST be
+  disabled with the actual sum named while it is not 100 — pre-empting the backend rejection.
+- **FR-018**: A dependency cycle MUST be surfaced with the cycle path named; a dependency violation in
+  planned dates MUST render as a non-blocking marker that still allows saving.
+- **FR-019**: A baselined schedule MUST show baseline and current dates side by side with the variance;
+  baseline values MUST never be presented as editable.
+- **FR-020**: A period with no target set MUST show the target as "not set" and compute no achievement
+  percentage — never display it as zero.
+- **FR-021**: Percent complete MUST indicate whether it derived from recorded quantity or a manual
+  value, so the two are never conflated.
+- **FR-022**: The variance view MUST show an explanatory state when no baseline exists, rather than
+  comparing against blank values.
+- **FR-023**: Charts MUST remain legible on mobile and scroll within their own container; any
+  runtime-computed bar dimension MUST be isolated to a single named line, the one permitted numeric
+  exception to Principle II.
+- **FR-024**: All new API calls MUST go through the existing typed projects API module with `zod`
+  validation at the boundary (Principles IV, V), and all labels and status colour mappings MUST come
+  from a constants module (Principle III).
+
+### Additional Success Criteria
+
+- **SC-A01**: Target-vs-actual figures on screen always reconcile with the approved DWR measurements
+  for the period.
+- **SC-A02**: A baselined schedule's baseline values are never editable from the UI.
+- **SC-A03**: No dependency cycle can be created from the UI.

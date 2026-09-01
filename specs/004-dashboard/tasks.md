@@ -285,3 +285,38 @@ Task: "Create app/ui/dashboard/activity-log-list.tsx"
 3. US3 (Activity Log) → US4 (Notifications) → US5 (Site Dashboard) → US6 (Group Dashboard) → each
    tested independently
 4. US7 (Reports) → tested independently → feature complete
+
+---
+
+## Amendment 2026-09-01 — Department Dashboard and Reminders Centre
+
+Covers spec FR-020 to FR-030 and plan Phases A1–A4. Task IDs prefixed `TA`. **No new permission**
+(reuses `DASHBOARD`).
+
+**Build-order note**: TA006–TA011 (the Reminders centre) unblock the 002, 006, and 012 amendments,
+which all render from it rather than evaluating reminders themselves. Schedule them early.
+
+- [ ] TA001 Extend the dashboard API module with department-widget and reminders functions plus
+      `zod` schemas
+- [ ] TA002 [P] Add reminder severity labels and colour maps to constants
+- [ ] TA003 [US8] `department-selector.tsx` populated from the API, showing **only the caller's
+      permitted departments** (spec FR-023)
+- [ ] TA004 [US8] `app/dashboard/department/page.tsx` rendering through the **existing shared widget
+      components** — no second rendering path or response shape (spec FR-020)
+- [ ] TA005 [US8] Selected department encoded in the URL so the view is shareable and survives
+      reload (spec FR-022); empty department renders zero values, not an error (spec FR-021);
+      unbuilt-module widgets fall through to the existing "Coming soon" treatment
+- [ ] TA006 [US9] `reminders-list.tsx`: source module, type, subject, due date, signed days
+      remaining, and severity via `StatusBadge`; **overdue first, then soonest due** (spec FR-025)
+- [ ] TA007 [US9] Module / type / severity filters without a full-page reload
+- [ ] TA008 [US9] An unavailable module source **reported as such without failing the screen**
+      (spec FR-026)
+- [ ] TA009 [US9] `snooze-modal.tsx` collecting an until-date and a reason (spec FR-029)
+- [ ] TA010 [US9] Header reminder count **visually distinguishable from the existing notifications
+      badge** (spec FR-027)
+- [ ] TA011 [US9] Row click navigates to the underlying record in its owning module (spec FR-028);
+      distinct empty state, not an error
+- [ ] TA012 [P] Confirm no cross-department KPI leakage (SC-A01)
+- [ ] TA013 [P] 320px spot-check both screens; `npx tsc --noEmit`
+
+**Unblocks**: 002 TA011, 006 TA017, 012 T044.

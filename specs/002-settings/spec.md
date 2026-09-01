@@ -403,3 +403,88 @@ format, with no editable sequence-number field present.
 - No automated test framework exists yet in this repo (per its own constitution's known gap);
   verification of this feature's screens is manual (including the mobile-viewport check FR-021/
   SC-005 require) until one is adopted.
+
+---
+
+## Amendment 2026-09-01 — Company Documents Screen
+
+**Reason**: A gap audit against the module/submodule matrix found row 42 ("Settings: **Companies
+Documents**") names a screen this spec does not have. This feature manages Document *Types* and
+005 stores documents against *employees*, but there is nowhere to keep the company's own statutory
+documents — GST and PF/ESIC registration certificates, incorporation, labour licences, insurance —
+whose expiry stops the company operating. Everything above is unchanged.
+
+### User Story 8 - Company document types and repository (Priority: P3)
+
+A Super Admin configures the kinds of document the company holds and maintains those documents with
+versioning and expiry visibility.
+
+**Why this priority**: Reference data plus a repository screen; no other screen depends on it.
+
+**Independent Test**: Create a "GST Registration Certificate" type with a 60-day alert window, upload
+a certificate expiring in 30 days, confirm it appears in the expiring list, then upload a renewal and
+confirm v2 is current with v1 still downloadable.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Company Documents screen under Settings, **When** loaded, **Then** two tabs are shown
+   — Documents and Document Types — following the established multi-tab pattern.
+2. **Given** the Document Types tab, **When** a type is added, **Then** it collects Name, Statutory
+   flag, Requires Number, Requires Issuing Authority, Requires Expiry, and Alert Days; Requires Expiry
+   without Alert Days shows a field-level error.
+3. **Given** a type with uploaded documents, **When** Delete is attempted, **Then** the `409` is
+   surfaced as a toast.
+4. **Given** the Upload Document form, **When** a type is selected, **Then** only the fields that type
+   marks required are shown and enforced before submit.
+5. **Given** an expiry date earlier than the issue date, **When** submitted, **Then** a field-level
+   error appears before any request is sent.
+6. **Given** the Documents tab, **When** loaded, **Then** current versions are listed with Type,
+   Document Number, Issuing Authority, Issue Date, Expiry Date, Days to Expiry, and a status badge
+   (Valid=green, Expiring Soon=amber, Expired=red).
+7. **Given** a document with prior versions, **When** its row is expanded, **Then** every version is
+   listed with its issue date and remains downloadable.
+8. **Given** an "Expiring soon" filter, **When** applied, **Then** documents within their alert window
+   or already expired are shown, expired first.
+9. **Given** a Super Admin with cross-company access, **When** the screen is opened, **Then** a company
+   selector is shown; a single-company admin sees their own company without a selector.
+10. **Given** a document, **When** Download is clicked, **Then** the file downloads through the typed
+    API client.
+11. **Given** a current document, **When** Delete is confirmed with a reason, **Then** the prior
+    version visibly becomes current in the same list update.
+
+### Additional Edge Cases
+
+- A statutory document expires with no renewal → it stays at the top of the expiring list
+  indefinitely; the UI raises visibility but blocks nothing, and says so.
+- The same type exists per state (multiple GST registrations) → multiple documents of one type with
+  distinct numbers coexist, and versioning applies per number rather than per type.
+- A document is backfilled with a past expiry → accepted and immediately shown as expired.
+
+### Additional Functional Requirements
+
+- **FR-025**: The Company Documents screen MUST live under `/dashboard/settings/*` and be guarded by
+  the existing `COMPANY_SETTINGS` permission — no new permission is introduced.
+- **FR-026**: The upload form MUST show and enforce only the fields the selected document type marks
+  required, so a user is never asked for a value the type does not need.
+- **FR-027**: Document status (Valid / Expiring Soon / Expired) MUST be rendered from the API's
+  computed status via `StatusBadge`, never recomputed client-side from dates.
+- **FR-028**: Prior versions MUST remain visible and downloadable from an expandable row; a renewal
+  MUST NOT visually replace history.
+- **FR-029**: The screen MUST state that document expiry blocks no business operation, so its purpose
+  as a visibility surface is unambiguous.
+- **FR-030**: Company document expiry reminders MUST be rendered from the global Reminders centre
+  built by the 004 amendment, not evaluated independently on this screen.
+- **FR-031**: A company selector MUST appear only for callers holding cross-company access.
+- **FR-032**: All new API calls MUST go through the existing typed `app/lib/api/settings.ts` module
+  with `zod` validation at the boundary (Principles IV, V).
+- **FR-033**: Uploads MUST restrict accepted types via the `accept` attribute and show progress; the
+  screen MUST use `ResponsiveList`, meet 44×44px touch targets, and render without horizontal page
+  scroll at 320px (Principle VI).
+- **FR-034**: Labels, status names, and colour mappings MUST come from a constants module
+  (Principle III).
+
+### Additional Success Criteria
+
+- **SC-A01**: Every company document has a retrievable current version and full version history on
+  screen, with no version ever visually lost on renewal.
+- **SC-A02**: Every document within its alert window or past expiry is discoverable from one filter.

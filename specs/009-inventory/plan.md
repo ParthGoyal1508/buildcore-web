@@ -172,3 +172,53 @@ automatic server-side FIFO (spec FR-004), matching the backend's design exactly.
 - [ ] Spot-check every `ResponsiveList`-based screen (Masters, Stock, Purchases, Issues,
       Transfers, Payments) at a mobile viewport and for keyboard operability — FR-013
 - [ ] Manual quickstart.md walkthrough
+
+---
+
+## Amendment 2026-09-01 — Material Indent Screens
+
+Covers spec FR-017 to FR-025. Adds two route areas under `/dashboard/inventory/*`; adds one
+permission (`INVENTORY_APPROVE`) to the middleware mapping.
+
+**Key invariant**: approving an indent must not appear to reserve stock. The UI states this in
+helper text (spec FR-021), and the existing issue-time validation remains the only enforcement
+point — so this amendment cannot introduce a path that implies a reservation the backend does not
+make.
+
+**Constitution re-check**: Principle III — indent statuses and colour maps from constants.
+Principle IV/V — new calls on the existing typed `app/lib/api/inventory.ts` with `zod`.
+Principle VI — `ResponsiveList`, 44×44px targets, no horizontal page scroll at 320px. PASS.
+
+### Phase A1: Types and API
+
+- [ ] Extend `app/lib/api/inventory.ts` with indent functions and `zod` schemas
+- [ ] Add indent status labels and colour maps to constants
+- [ ] Extend the `middleware.ts` inventory mapping so approval sub-routes require
+      `INVENTORY_APPROVE` (spec FR-017)
+
+### Phase A2: US7 — Raise and track indents (P1)
+
+- [ ] `IndentForm.tsx`: header plus a repeatable line editor **reusing the Activity/BOQ Item
+      selector already built for the Issue modal** (spec FR-018) — not a second implementation
+- [ ] Inactive-item field-level guard; Save disabled with zero lines
+- [ ] `IndentTable.tsx` (`ResponsiveList`) with status badges and an overdue marker
+- [ ] `IndentDetail.tsx` showing **Requested, Approved, Fulfilled, and Outstanding per line**
+      (spec FR-019)
+- [ ] Cancel 409 on any fulfilment; reason required otherwise
+
+### Phase A3: US8 — Approve and fulfil (P2)
+
+- [ ] `ApproveIndentModal.tsx`: per-line quantity reduction **requiring a reason**, with both
+      Requested and Approved remaining visible afterwards
+- [ ] Approve/Reject actions **not rendered** without `INVENTORY_APPROVE`
+- [ ] "Create Issue" prefilled from an indent line; **outstanding shown as a live hint with Save
+      disabled when exceeded** (spec FR-020), matching FR-003's stock-hint pattern
+- [ ] Helper text stating approval does not reserve stock (spec FR-021)
+- [ ] `ProcurementNeededView.tsx`: **indent demand and reorder shortfall as separate labelled
+      sections, never summed** (spec FR-022)
+- [ ] Purchase created from that view records the indent linkage
+
+### Phase A4: Polish
+
+- [ ] Mobile spot-check; `npx tsc --noEmit`
+- [ ] Confirm outstanding always equals approved minus fulfilled on screen (SC-A01)

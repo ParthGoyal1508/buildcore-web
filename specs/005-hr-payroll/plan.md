@@ -171,3 +171,72 @@ existing feature's routes or contracts change.
 ## Complexity Tracking
 
 *No entries — no constitution violations requiring justification (see Constitution Check above).*
+
+---
+
+## Amendment 2026-09-01 — TDS, Advances, Registers, Late-Coming; Recruitment and Labour Handover
+
+Covers spec FR-030 to FR-041. Adds four screen areas; **no new permission** (reuses `PAYROLL`,
+`ATTENDANCE`, `REPORTS`).
+
+**Two handovers, both ratified 2026-09-01:**
+
+- Recruitment, onboarding, letters, and the resignation report move to **011-recruitment**. This
+  feature's exit/F&F screens gain links out rather than building those screens (spec FR-038).
+- Daily-worker and labour attendance screens move to **013-labour** (spec FR-039). This feature must
+  not build them.
+
+**Constitution re-check**: Principle III — tax sections, deduction heads, and colour maps from
+constants. Principle IV/V — new calls on the existing typed HR/payroll modules with `zod`.
+Principle VI — wide register tables scroll within their own container. PASS.
+
+### Phase A1: Handover (do first — removes scope)
+
+- [ ] Remove any daily-worker/labour attendance screen from this feature's scope (spec FR-039)
+- [ ] Add the mount point in the employee screen for 012's "Assets in custody" panel (spec FR-040) —
+      **coordinate with 012's Phase 5**
+- [ ] Add exit/F&F links to 011's resignation record and letter generation (spec FR-038) —
+      **blocked by 011's Phase 7**
+
+### Phase A2: Types and API
+
+- [ ] Extend the HR/payroll API modules with tax-slab, declaration, advance, register, and
+      shift-compliance functions and `zod` schemas
+
+### Phase A3: US14 — TDS (P1)
+
+- [ ] `TaxSlabEditor.tsx`: ordered slab rows with **client-side contiguity and non-overlap
+      validation highlighting the offending boundary and disabling Save** (spec FR-031) — a
+      deterministic rule per the 2026-09-01 ratification
+- [ ] `TaxDeclarationForm.tsx`: **capped deductible amount shown live beside the entered value**
+      (spec FR-032); proof upload; verify action with cut-off-month helper text
+- [ ] Missing-PAN employees surfaced in the run exception list with the higher-rate explanation
+- [ ] Quarterly TDS report and Form 16 data views; export via the established handling
+
+### Phase A4: US15 — Salary Advances (P2)
+
+- [ ] `SalaryAdvanceTable.tsx` + form, **visually and navigationally distinct from the Loans
+      screen** so the two are not conflated (spec FR-033)
+- [ ] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
+- [ ] Capped-recovery helper text explaining the carry-forward (spec FR-034)
+
+### Phase A5: US16 — Registers (P2)
+
+- [ ] `SalaryRegister.tsx`: full earnings/deductions breakup with column totals; project filter for
+      the manpower-cost view; **available only for processed or paid runs with an explanatory state
+      otherwise** (spec FR-035)
+- [ ] Explicit reconciliation warning when totals diverge from the run (spec FR-035)
+- [ ] `DeductionReport.tsx`: heads split statutory / non-statutory, presented for comparison against
+      the challan screens (spec FR-036)
+- [ ] Wide tables scroll within their own container at mobile widths
+
+### Phase A6: US17 — Late-Coming (P3)
+
+- [ ] `LateComingReport.tsx`: late days, late minutes, early departures, short hours, repeat marker
+- [ ] **Explicit "no shift assigned" and "no punch times" markers rather than zero** (spec FR-037)
+- [ ] Copy stating lateness does not deduct pay (spec FR-037)
+
+### Phase A7: Polish
+
+- [ ] Mobile spot-check; `npx tsc --noEmit`
+- [ ] Confirm register / deduction report / challan reconciliation on screen (SC-A01)

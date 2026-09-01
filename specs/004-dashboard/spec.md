@@ -368,3 +368,111 @@ confirm the async/notification path.
 - No automated test framework exists yet in this repo; verification (including the "add a
   simulated widget and confirm no code change is needed" check in SC-002) is manual, per this
   app's established known gap.
+
+---
+
+## Amendment 2026-09-01 — Department Dashboard and Reminders Centre
+
+**Reason**: A gap audit against the module/submodule matrix found two uncovered items in row 3
+("Dashboards: Company Dashboard, Project Dashboard, **Department Dashboard**, **Reminders** and
+Notification"). This spec has Company (US2), Site (US5), and Group (US6) dashboards but no Department
+dashboard, and its Notifications screen (US4) *displays* what modules push — there is no surface for
+*due-date* reminders, which the matrix names again at rows 30 and 36 for machinery and assets.
+Everything above is unchanged.
+
+### User Story 8 - Department Dashboard (Priority: P2)
+
+A department head selects their department and sees KPIs scoped to it, using the same widget
+framework the other dashboards already use.
+
+**Why this priority**: The third dashboard scope the matrix names and the only one absent. Depends on
+the widget framework (US1).
+
+**Independent Test**: With employees in two departments, open the Department Dashboard for one and
+confirm every KPI counts only that department, with no leakage from the other.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/department`, **When** loaded, **Then** a department selector is shown
+   populated from the API, and the widget grid renders through the same shared widget components
+   FR-001 establishes — no new rendering path.
+2. **Given** a selected department, **When** widgets load, **Then** Headcount, Present Today, Absent,
+   On Leave, Pending Leave Approvals, Open Positions, and Department Cost are shown.
+3. **Given** a department with no employees, **When** selected, **Then** zero values are rendered, not
+   an error or an empty screen.
+4. **Given** a widget whose module is not yet built, **When** rendered, **Then** it shows the existing
+   "Coming soon" unavailable treatment (FR-002).
+5. **Given** a caller whose role restricts them to one department, **When** the screen loads, **Then**
+   the selector shows only their department.
+6. **Given** the selected department, **When** the page reloads, **Then** the selection persists via
+   the URL so the view is shareable.
+
+---
+
+### User Story 9 - Reminders Centre (Priority: P2)
+
+A user sees every due-date reminder across modules — document expiry, service due, inspections,
+overdue returns — in one filterable list, and can snooze an item.
+
+**Why this priority**: The matrix names Reminders three times, and features 002, 006, and 012 all
+depend on this surface existing rather than each building their own.
+
+**Independent Test**: With an expiring document and an overdue asset return, open the Reminders centre
+and confirm both appear with correct severity and days remaining, sorted overdue first.
+
+**Acceptance Scenarios**:
+
+1. **Given** `/dashboard/reminders`, **When** loaded, **Then** reminders are listed with source module,
+   type, subject, due date, days remaining (negative when overdue), and a severity indicator
+   (Info=slate, Warning=amber, Overdue=red).
+2. **Given** the list, **When** rendered, **Then** overdue items sort first, then soonest due.
+3. **Given** filters (module, type, severity), **When** applied, **Then** the list narrows without a
+   full-page reload.
+4. **Given** a reminder from a module not yet built, **When** the list loads, **Then** that source is
+   reported as unavailable rather than failing the whole screen — matching FR-002's treatment.
+5. **Given** a reminder, **When** Snooze is used, **Then** a snooze-until date and reason are
+   collected and the item leaves the list until that date.
+6. **Given** the header bell, **When** reminders are due, **Then** a severity-aware count is shown
+   alongside the existing notification badge (FR-008), visually distinguishable from it.
+7. **Given** a reminder row, **When** clicked, **Then** it navigates to the underlying record in its
+   owning module.
+8. **Given** no reminders, **When** the screen loads, **Then** a distinct empty state is shown, not an
+   error.
+
+### Additional Edge Cases
+
+- Two modules raise reminders on the same record for different reasons → both are listed; the UI never
+  collapses distinct concerns into one row.
+- A reminder's underlying record is resolved in another tab → it disappears on the next load rather
+  than erroring when clicked.
+- A snoozed reminder escalates past its snooze date → it reappears at the higher severity.
+
+### Additional Functional Requirements
+
+- **FR-020**: The Department Dashboard MUST render through the same shared widget components FR-001
+  establishes and MUST NOT introduce a second rendering path or response shape.
+- **FR-021**: Every Department Dashboard KPI MUST reflect only the selected department, and an empty
+  department MUST render zero values rather than an error.
+- **FR-022**: The selected department MUST be encoded in the URL so the view is shareable and survives
+  reload.
+- **FR-023**: The department selector MUST show only the caller's permitted departments.
+- **FR-024**: The Reminders centre MUST be the single client surface for due-date reminders; features
+  002, 006, and 012 MUST render from it rather than evaluating reminders independently.
+- **FR-025**: Reminders MUST display source module, type, subject, due date, signed days remaining,
+  and severity, sorted overdue first then soonest due, using `StatusBadge` for severity.
+- **FR-026**: A reminder source whose module is unavailable MUST be reported as such without failing
+  the screen, matching FR-002's unavailable treatment.
+- **FR-027**: The reminders count MUST be visually distinguishable from the existing notifications
+  badge (FR-008) so the two surfaces are not confused.
+- **FR-028**: A reminder row MUST navigate to the underlying record in its owning module.
+- **FR-029**: Snooze MUST collect an until-date and a reason before submitting.
+- **FR-030**: All new API calls MUST go through the existing typed dashboard API module with `zod`
+  validation at the boundary (Principles IV, V), and every new screen MUST remain usable at mobile
+  widths without horizontal page scrolling (Principle VI).
+
+### Additional Success Criteria
+
+- **SC-A01**: Every Department Dashboard KPI recomputed manually over that department matches the
+  widget exactly, with no cross-department leakage.
+- **SC-A02**: Every reminder raised by any module appears in the Reminders centre, and modules'
+  own reminder views match it exactly for the same dataset.

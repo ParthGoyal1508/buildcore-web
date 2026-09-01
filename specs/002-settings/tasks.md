@@ -406,3 +406,31 @@ Both appended tasks are complete.
   instead of deferring to the default.
 - **T044** added a per-row Deactivate/Activate action to the company list, invalidating both the
   admin list and the active-only list a company selector reads.
+
+---
+
+## Amendment 2026-09-01 — Company Documents Screen
+
+Covers spec FR-025 to FR-034 and plan Phases A1–A3. Task IDs prefixed `TA`. **No new permission**
+(reuses `COMPANY_SETTINGS`).
+
+- [ ] TA001 Extend `app/lib/api/settings.ts` with company-document-type and company-document
+      functions plus their `zod` schemas
+- [ ] TA002 [P] Add company-document status labels and colour maps to the constants module
+- [ ] TA003 [US8] `company-document-types-tab.tsx`: CRUD; `requiresExpiry` without `alertDays`
+      blocked with a field-level error; delete 409 as a toast
+- [ ] TA004 [US8] `upload-company-document-form.tsx`: **shows and enforces only the fields the
+      selected type marks required** (spec FR-026); expiry-before-issue cross-field validation
+- [ ] TA005 [US8] Typed `accept` attribute and upload progress (spec FR-033)
+- [ ] TA006 [US8] `company-documents-tab.tsx` (`ResponsiveList`): current versions with the status
+      badge rendered **from the API's computed status, never recomputed client-side from dates**
+      (spec FR-027)
+- [ ] TA007 [US8] Expandable row listing every prior version, each downloadable through the typed
+      client (spec FR-028)
+- [ ] TA008 [US8] "Expiring soon" filter with expired items first
+- [ ] TA009 [US8] Company selector rendered **only** for cross-company-access holders (spec FR-031)
+- [ ] TA010 [US8] Copy stating expiry blocks no business operation (spec FR-029)
+- [ ] TA011 [US8] Reminders rendered from the global Reminders centre, **not evaluated here**
+      (spec FR-030) — **blocked by 004 TA006**
+- [ ] TA012 [US8] Delete with reason promoting the prior version to current in the same list update
+- [ ] TA013 [P] Skeleton / empty / error states; 320px spot-check; `npx tsc --noEmit`

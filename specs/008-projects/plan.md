@@ -210,3 +210,62 @@ middleware.ts                              # MODIFIED — /dashboard/projects/* 
 - [ ] Spot-check every `ResponsiveList`-based screen (Clients, Sites, Portfolio, BOQ tree, DWR
       list, Revenue/RA Bills, Work Orders) at a mobile viewport and for keyboard operability — FR-014
 - [ ] Manual quickstart.md walkthrough
+
+---
+
+## Amendment 2026-09-01 — Project Planning and Target-vs-Actual Screens
+
+Covers spec FR-015 to FR-024. Adds three screen areas under `/dashboard/projects/[id]/*`;
+**no new permission** (reuses `PROJECTS`, `REPORTS`).
+
+**Constitution re-check**: Principle II — the progress-trend chart's runtime-computed bar dimensions
+are the single permitted numeric exception, isolated to one named line (spec FR-023). Principle III —
+status labels and colour maps from constants. Principle IV/V — new calls on the existing typed
+projects module with `zod`. Principle VI — charts legible on mobile and scrolling in their own
+container. PASS.
+
+### Phase A1: Types and API
+
+- [ ] Extend the projects API module with phase, activity, dependency, baseline, and target
+      functions and `zod` schemas
+
+### Phase A2: US9 — Schedule and Baseline (P2)
+
+- [ ] `ScheduleOutline.tsx`: phases and activities with planned dates, weightage, percent complete,
+      milestone markers
+- [ ] `ActivityForm.tsx` with finish-before-start cross-field validation
+- [ ] **Running weightage total displayed prominently; Baseline disabled with the actual sum named
+      while it is not 100** (spec FR-017) — a deterministic client-side rule per the ratification
+- [ ] `DependencyControl.tsx`: cycle 400 surfaced **with the cycle path named**; a planned-date
+      dependency violation renders as a **non-blocking marker that still allows saving**
+      (spec FR-018)
+- [ ] Baseline vs current dates shown side by side with variance; **baseline values never editable**
+      (spec FR-019)
+- [ ] The existing project-lock treatment extended to every schedule and target control
+      (spec FR-016)
+- [ ] Activity delete 409 offering Cancel instead
+
+### Phase A3: US10 — Targets and Reporting (P2)
+
+- [ ] `TargetSetForm.tsx` with overlap 409 naming the existing set
+- [ ] `TargetVsActualReport.tsx`: target, actual, achievement, variance, weightage-weighted rollup;
+      **a period with no target shows "not set" and computes no achievement percentage**
+      (spec FR-020)
+- [ ] `MonthlyReport.tsx`: cumulative progress, quantity, target, man-days, equipment hours,
+      material consumed — **man-days blocked by 013's reports**
+- [ ] `ProgressTrendChart.tsx`: planned vs actual cumulative per period; legible on mobile, scrolls
+      in its own container (spec FR-023)
+- [ ] Export via the established handling
+
+### Phase A4: US11 — Schedule Variance (P3)
+
+- [ ] `ScheduleVarianceView.tsx`: per-activity status, slippage in days, critical-path marking
+- [ ] **Percent-complete source marked** (quantity-derived vs manual) so the two are never conflated
+      (spec FR-021)
+- [ ] **Explanatory state when no baseline exists** rather than comparing against blanks
+      (spec FR-022)
+
+### Phase A5: Polish
+
+- [ ] Mobile spot-check every chart; `npx tsc --noEmit`
+- [ ] Confirm target actuals reconcile with approved DWR measurements (SC-A01)
