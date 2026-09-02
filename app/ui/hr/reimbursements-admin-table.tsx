@@ -12,7 +12,9 @@ import {
 } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES, MESSAGES, hrLabel } from '@/app/lib/constants';
 import { dateLabel, money } from '@/app/lib/format';
+import { getReimbursementCategories } from '@/app/lib/api/my-workspace';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import { FormError, RowAction, SelectField } from '@/app/ui/settings/form-fields';
 
 const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
@@ -28,6 +30,14 @@ const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
  */
 export default function ReimbursementsAdminTable() {
   const queryClient = useQueryClient();
+  const employees = useEmployeeNames();
+  // The claim carries only `categoryId`; the category master supplies the name.
+  const { data: categories } = useQuery({
+    queryKey: ['reimbursementCategories'],
+    queryFn: getReimbursementCategories,
+  });
+  const categoryName = (id: string | null | undefined) =>
+    (id && categories?.find((c) => c.id === id)?.name) || '—';
   const [status, setStatus] = useState<string>('submitted');
   const [error, setError] = useState<string | null>(null);
 
@@ -63,15 +73,19 @@ export default function ReimbursementsAdminTable() {
       key: 'employee',
       header: 'Employee',
       sticky: true,
-      render: (row) => row.employeeName ?? row.employeeCode ?? row.employeeId,
+      render: (row) => employees.label(row.employeeId),
     },
     {
       key: 'category',
       header: 'Category',
-      render: (row) => row.category ?? '—',
+      render: (row) => categoryName(row.categoryId),
     },
     { key: 'amount', header: 'Amount', numeric: true, render: (row) => money(row.amount) },
-    { key: 'date', header: 'Claim date', render: (row) => dateLabel(row.claimDate) },
+    {
+      key: 'date',
+      header: 'Expense date',
+      render: (row) => dateLabel(row.expenseDate),
+    },
     {
       key: 'receipt',
       header: 'Receipt',
@@ -87,7 +101,11 @@ export default function ReimbursementsAdminTable() {
       header: 'Status',
       render: (row) => <StatusBadge status={row.status} />,
     },
-    { key: 'remarks', header: 'Remarks', render: (row) => row.remarks ?? '—' },
+    {
+      key: 'remarks',
+      header: 'Remarks',
+      render: (row) => row.adminRemarks ?? '—',
+    },
   ];
 
   return (

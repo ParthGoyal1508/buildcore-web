@@ -6,6 +6,7 @@ import { getAttendanceExceptions } from '@/app/lib/api/hr-payroll';
 import { MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import Modal from '@/app/ui/settings/modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
@@ -19,6 +20,7 @@ type ExceptionRow = Awaited<ReturnType<typeof getAttendanceExceptions>>[number];
  * needs attention; the Mark/Edit flow is where an admin acts on it.
  */
 export default function ExceptionsModal({ onClose }: { onClose: () => void }) {
+  const employees = useEmployeeNames();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'attendanceExceptions'],
     queryFn: getAttendanceExceptions,
@@ -29,21 +31,12 @@ export default function ExceptionsModal({ onClose }: { onClose: () => void }) {
       key: 'employee',
       header: 'Employee',
       sticky: true,
-      render: (row) => row.name ?? row.employeeCode ?? row.employeeId,
+      render: (row) => row.employeeCode ?? employees.label(row.employeeId),
     },
     {
       key: 'time',
-      header: 'Punch time',
-      render: (row) => dateTimeLabel(row.punchAt ?? row.punchTime ?? null),
-    },
-    {
-      key: 'distance',
-      header: 'Distance from site',
-      numeric: true,
-      render: (row) =>
-        row.distanceMeters === null || row.distanceMeters === undefined
-          ? '—'
-          : `${Math.round(row.distanceMeters)} m`,
+      header: 'Captured at',
+      render: (row) => dateTimeLabel(row.capturedAt),
     },
     {
       key: 'face',
@@ -72,7 +65,7 @@ export default function ExceptionsModal({ onClose }: { onClose: () => void }) {
         caption="Attendance exceptions"
         columns={columns}
         rows={data ?? []}
-        rowKey={(row) => row.id}
+        rowKey={(row) => row.punchId}
         isLoading={isLoading}
         error={isError ? MESSAGES.loadFailed : null}
         emptyMessage="No unresolved exceptions."
