@@ -542,3 +542,28 @@ with the correct slippage.
   for the period.
 - **SC-A02**: A baselined schedule's baseline values are never editable from the UI.
 - **SC-A03**: No dependency cycle can be created from the UI.
+
+## Amendment 2026-09-02 — Desktop-First Responsiveness (constitution v2.0.0)
+
+Constitution Principle VI was redefined from blanket mobile-first to **desktop-first with a closed
+list of mobile-critical surfaces** (punch in/out, attendance including supervisor muster, leave,
+and sign-in). Projects is a **desktop surface**: the BOQ tree, RA bills, work orders and portfolio views are project-management work done at a desk. (Note the plan's Constitution Check mislabels this row 'V.'; it is Principle VI.)
+
+**What changes for this feature:**
+
+- Screens are designed at **desktop width first**. Base Tailwind classes target the desktop layout;
+  smaller-viewport variants exist to keep the screen unbroken, not to produce a phone-optimised one.
+- Every screen MUST still remain **usable and unbroken down to 768px** (tablet): nothing clipped, no
+  control unreachable, and the page body MUST NOT scroll horizontally. Wide content — tables,
+  boards, wide forms — scrolls inside its own `overflow-x: auto` container.
+- The `ResponsiveList` card-layout fallback is now **OPTIONAL**, not mandatory. Use it where the data
+  genuinely reads better as cards; for a dense back-office grid, a horizontally-scrolling table in
+  its own container is an acceptable and often better answer. Any earlier requirement in this spec
+  that mandates `ResponsiveList` on *every* list is relaxed to this standard.
+- **Keyboard operability is unchanged and still applies everywhere** — every interactive control on
+  every screen MUST be reachable and operable by keyboard. Nothing in this amendment relaxes that.
+- 44×44px touch targets and the "no hover-gated action" rule are no longer mandatory on this
+  feature's screens, but remain good practice; hover MUST still not be the *only* way to discover a
+  control's existence.
+
+**Review gate:** these screens are verified at desktop, then re-checked at 768px for breakage only.

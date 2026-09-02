@@ -50,7 +50,7 @@ Vendor 4-tab form never loses entered data on tab switch (SC-004).
 | No literal strings/URLs inline | All endpoints in `app/lib/api/partners.ts` | PASS |
 | TypeScript strict + zod | All form schemas are zod; all API types defined in data-model.md | PASS |
 | All API calls through `app/lib/api/` | Single `partners.ts` module | PASS |
-| Mobile-first & keyboard-operable (NON-NEGOTIABLE) | `ResponsiveList` reused for every list screen except the RAG Matrix (exempt per FR-014 — a dense grid isn't amenable to card layout, but its dots are real `<button>`s, Tab-reachable); every new interactive control keyboard-operable, built in from the start (corrected — spec FR-014) | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): partner management is back-office. This retires the RAG Matrix's card-layout exemption — a dense grid no longer needs one. Wide tables and the matrix scroll in their own container, unbroken at 768px; the matrix dots remain real `<button>`s and every control stays keyboard-operable (spec FR-014). | PASS |
 | `middleware.ts` route guard | `/dashboard/partners/*` guarded with `PARTNERS`/`SETTINGS` per sub-route (corrected — spec FR-013, missing from original scope) | PASS |
 
 ## Project Structure

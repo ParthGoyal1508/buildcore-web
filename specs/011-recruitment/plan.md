@@ -49,7 +49,7 @@ dropdowns reuse the existing `settings.ts` module; no candidate-facing or public
 | III. Centralized constants | Routes, stage names, status labels, and badge colour maps in a constants module — no inline literals (spec FR-017). | PASS |
 | IV. Type safety + zod | Every response validated at the boundary; `z.infer` used downstream (spec FR-005). | PASS |
 | V. API access boundary | All calls via `app/lib/api/recruitment.ts`; no raw `fetch()` in any component (spec FR-004). | PASS |
-| VI. Mobile-first (NON-NEGOTIABLE) | `ResponsiveList` on every list; board falls back to the table below the mobile breakpoint (spec FR-008); 44×44px targets; no hover-gated action; wide tables and the funnel scroll in their own container. | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): requisitions, pipeline, interviews and offers are HR desk work. The pipeline board is designed at desktop width and scrolls in its own container below it, falling back to the table at narrow widths (spec FR-008); `ResponsiveList` optional (see Amendment 2026-09-02); unbroken at 768px; every control keyboard-operable. | PASS |
 | `middleware.ts` route guard | `/dashboard/recruitment/*` guarded with `RECRUITMENT`; report routes additionally `REPORTS` (spec FR-002). | PASS |
 
 ## Project Structure

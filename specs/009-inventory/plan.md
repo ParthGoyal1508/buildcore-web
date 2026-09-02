@@ -51,7 +51,7 @@ allocation logic or guard.
 | No literal API strings | All endpoints in `app/lib/api/inventory.ts` | PASS |
 | TypeScript + zod at boundaries | All schemas defined in data-model.md | PASS |
 | API calls through `app/lib/api/` | `inventory.ts`; vendor/site from existing modules | PASS |
-| Mobile-first & keyboard-operable (NON-NEGOTIABLE) | `ResponsiveList` reused for all six list screens (Masters tabs, Stock, Purchases, Issues, Transfers, Payments); every interactive control keyboard-operable, built in from the start (corrected — spec FR-013) | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): store and procurement work is desk-operated. All six list screens (Masters tabs, Stock, Purchases, Issues, Transfers, Payments) designed at desktop width with wide tables scrolling in their own container, unbroken at 768px; `ResponsiveList` optional (see Amendment 2026-09-02); every interactive control keyboard-operable (spec FR-013). | PASS |
 | `middleware.ts` route guard | `/dashboard/inventory/*` guarded with `INVENTORY`/`SETTINGS` per sub-route (corrected — spec FR-012, missing from original scope) | PASS |
 
 ## Project Structure

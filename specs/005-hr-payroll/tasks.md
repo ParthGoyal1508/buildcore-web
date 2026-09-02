@@ -13,7 +13,8 @@ contracts/hr-payroll-ui.md, quickstart.md
 (constitution's documented gap); verification is manual via `quickstart.md`.
 
 **Organization**: Tasks are grouped by user story (from spec.md). Every component-building task
-bakes in mobile-first/`ResponsiveList` and keyboard-operability/semantic-HTML requirements and
+bakes in desktop-first responsiveness (unbroken at 768px, wide tables scrolling in their own
+container; `ResponsiveList` optional per constitution v2.0.0) and keyboard-operability/semantic-HTML requirements and
 route-guard permissions from the start, per this session's established practice (rather than a
 Polish-phase retrofit). All paths are in this repo (`buildcore-web`) — the backend is a separate,
 already-fully-specced feature in `buildcore-api` (`specs/005-hr-payroll-backend`).

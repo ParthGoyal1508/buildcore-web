@@ -69,7 +69,7 @@ registration, two small nav-link additions (cross-shell navigation, research.md 
 | III. Centralized Constants & Configuration (NON-NEGOTIABLE) | New routes, copy, GPS accuracy threshold, and offline-queue-age display text all in `app/lib/constants.ts`. | PASS |
 | IV. Type Safety & Validation | Every `app/lib/api/my-workspace.ts` function `zod`-validates its response (data-model.md); PDF/blob responses are the sole exception (not JSON, handled per research.md §8). | PASS |
 | V. API Access Boundary (NON-NEGOTIABLE) | All calls through `app/lib/api/my-workspace.ts`; no ad-hoc `fetch()` in components. | PASS |
-| VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) | This feature's own dedicated shell (research.md §1) is mobile-first by construction, not a retrofit; tabular data (attendance history, leave applications) reuses the Settings feature's `ResponsiveList` pattern; every non-camera control keyboard-operable (spec FR-020). | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | **Mobile-first exception (constitution v2.0.0).** This feature is the mobile-critical shell — punch, attendance viewing and leave live here, and the constitution keeps the whole shell mobile-first. Dedicated shell (research.md §1) mobile-first by construction, not a retrofit; tabular data (attendance history, leave applications) reuses the Settings `ResponsiveList` pattern; every non-camera control keyboard-operable (spec FR-020); verified at 320px. | PASS |
 
 No violations require a Complexity Tracking entry — `@serwist/next` is a pre-approved dependency
 being exercised for the first time.

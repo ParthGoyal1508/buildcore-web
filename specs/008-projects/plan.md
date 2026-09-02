@@ -65,7 +65,7 @@ addition (`formatCurrency`).
 | II. No literal strings/URLs inline | All API endpoints in `app/lib/api/projects.ts`; all label strings in component props or a constants file | PASS |
 | III. TypeScript strict + zod at boundaries | All form schemas are zod objects; all API response shapes are typed interfaces in data-model.md | PASS |
 | IV. All API calls through `app/lib/api/` | Single `app/lib/api/projects.ts` (research.md §7) | PASS |
-| V. Mobile-first, keyboard-operable (NON-NEGOTIABLE) | `ResponsiveList` reused for every list screen (Clients, Sites, Portfolio, BOQ tree, DWR list, Revenue/RA Bills, Work Orders); every interactive control keyboard-operable, built in from the start (corrected — spec FR-014) | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): the BOQ tree, RA bills, work orders and portfolio are desk-operated. Designed at desktop width, wide tables and the BOQ tree scroll in their own container, unbroken at 768px; `ResponsiveList` optional (see Amendment 2026-09-02); every interactive control keyboard-operable (spec FR-014). | PASS |
 | VI. PII fields masked by default | No PII in this module; no special masking required | N/A |
 | `middleware.ts` route guard | `/dashboard/projects/*` guarded with `PROJECTS`/`DWR`/`PROJECT_FINANCIALS` per sub-route (corrected — spec FR-013, missing from original scope) | PASS |
 

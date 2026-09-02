@@ -474,3 +474,10 @@ for revision) — without HR admin approving anything.
 - No automated test framework exists yet in this repo; verification of this feature (including
   camera/GPS/offline behavior, which are especially hard to unit-test) is manual, per this
   constitution's existing known gap.
+
+## Amendment 2026-09-02 — Desktop-First Responsiveness (constitution v2.0.0)
+
+Constitution Principle VI was redefined from blanket mobile-first to **desktop-first with a closed
+list of mobile-critical surfaces**. My Workspace is **the** mobile feature. Punch in/out, attendance viewing and leave — three of the four listed surfaces — live here, and the constitution additionally rules that this feature's shell stays mobile-first *in its entirety*, including the screens in it that are not themselves on the list (salary-slip view/download, reimbursement requests), because splitting one shell across two design targets would cost more than it saves.
+
+**What changes for this feature:** nothing is relaxed and nothing is retrofitted. Every screen in this feature remains mobile-first, one-handed at 320px, with 44×44px touch targets, no hover-gated action, and no layout break between 320px and 428px — verified at 320px before merge. This is now the documented exception rather than an instance of a blanket rule, which means a future change to Principle VI's default cannot silently erode it.
