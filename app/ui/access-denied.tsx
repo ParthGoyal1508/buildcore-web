@@ -7,7 +7,13 @@ import { MESSAGES } from '@/app/lib/constants';
  * doesn't hold. A UX courtesy only — the backend rejects the same request with a
  * 403 regardless of what this component does.
  */
-export default function AccessDenied({ detail }: { detail?: string }) {
+export default function AccessDenied({
+  title,
+  detail,
+}: {
+  title?: string;
+  detail?: string;
+}) {
   return (
     <div
       role="alert"
@@ -15,7 +21,7 @@ export default function AccessDenied({ detail }: { detail?: string }) {
     >
       <LockClosedIcon className="w-10 text-gray-400" aria-hidden="true" />
       <h1 className={`${lusitana.className} text-xl`}>
-        {MESSAGES.accessDeniedTitle}
+        {title ?? MESSAGES.accessDeniedTitle}
       </h1>
       <p className="text-sm text-gray-600">{detail ?? MESSAGES.accessDeniedBody}</p>
     </div>

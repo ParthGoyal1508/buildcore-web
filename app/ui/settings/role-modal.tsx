@@ -4,7 +4,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import { Role, createRole, updateRole } from '@/app/lib/api/settings';
-import { MESSAGES, PERMISSIONS, permissionLabel } from '@/app/lib/constants';
+import {
+  MESSAGES,
+  NAV_GOVERNING_PERMISSIONS,
+  NAV_MODULE_BY_PERMISSION,
+  PERMISSIONS,
+  permissionLabel,
+} from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -21,7 +27,23 @@ import {
  * a free-text field (spec FR-007). The PRD's own mock had a comma-separated text
  * input here; that would let an admin type a value the API rejects, so it is
  * deliberately not reproduced.
+ *
+ * The list is split in two (014 FR-013). Thirteen of the twenty-two permissions decide
+ * what appears in the sidebar; the other nine gate content *within* a module and change
+ * nothing about the menu. Presented as one undifferentiated list, an admin clears one of
+ * those nine, expects a module to disappear, and is silently misled — this screen is
+ * where they configure navigation, so it has to say which checkbox does that.
  */
+// Partitioned once at module scope, not per render. Both halves are derived from
+// `PERMISSIONS` and `NAV_GOVERNING_PERMISSIONS`, so a permission added to the enum or a
+// module added to `NAV_MODULES` lands in the right group with no edit here.
+const NAV_PERMISSIONS = PERMISSIONS.filter((permission) =>
+  NAV_GOVERNING_PERMISSIONS.has(permission),
+);
+const NON_NAV_PERMISSIONS = PERMISSIONS.filter(
+  (permission) => !NAV_GOVERNING_PERMISSIONS.has(permission),
+);
+
 export default function RoleModal({
   role,
   onClose,
@@ -104,11 +126,42 @@ export default function RoleModal({
         />
 
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-gray-700">
-            Permissions
+          <legend className="text-sm font-medium text-gray-700">
+            Sidebar modules
           </legend>
+          <p className="mb-2 mt-1 text-xs text-gray-500">
+            {MESSAGES.navPermissionsHint}
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {PERMISSIONS.map((permission) => (
+            {NAV_PERMISSIONS.map((permission) => {
+              const moduleName = NAV_MODULE_BY_PERMISSION.get(permission);
+              return (
+                <CheckboxField
+                  key={permission}
+                  id={`permission-${permission}`}
+                  label={permissionLabel(permission)}
+                  description={
+                    moduleName
+                      ? MESSAGES.permissionControlsModule(moduleName)
+                      : undefined
+                  }
+                  checked={selected.includes(permission)}
+                  onChange={() => toggle(permission)}
+                />
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-sm font-medium text-gray-700">
+            Within a module
+          </legend>
+          <p className="mb-2 mt-1 text-xs text-gray-500">
+            {MESSAGES.nonNavPermissionsHint}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {NON_NAV_PERMISSIONS.map((permission) => (
               <CheckboxField
                 key={permission}
                 id={`permission-${permission}`}
