@@ -24,22 +24,22 @@ via quickstart.md.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Add "Partners" nav group to `app/ui/dashboard/nav-links.tsx` with sub-items:
+- [x] T001 [P] Add "Partners" nav group to `app/ui/dashboard/nav-links.tsx` with sub-items:
       Vendors (`/dashboard/partners/vendors`), Contractors (`/dashboard/partners/contractors`),
       Compliance (`/dashboard/partners/contractors/compliance`), RAG Matrix
       (`/dashboard/partners/contractors/rag`), BOCW Cess (`/dashboard/partners/bocw`)
-- [ ] T002 [P] Create `app/dashboard/partners/layout.tsx` with breadcrumb and sub-nav shell
-- [ ] T003 [P] Create `app/lib/api/partners.ts` with all 22 typed API function signatures
+- [x] T002 [P] Create `app/dashboard/partners/layout.tsx` with breadcrumb and sub-nav shell
+- [x] T003 [P] Create `app/lib/api/partners.ts` with all 22 typed API function signatures
       (stubs) — data-model.md TypeScript types, contracts/partners-web-api.md
-- [ ] T004 [P] Ensure `formatCurrency` exists in `app/lib/utils.ts`; create if not present
+- [x] T004 [P] Ensure `formatCurrency` exists in `app/lib/utils.ts`; create if not present
       (should exist from Projects 008, but create here if 008 not yet merged)
-- [ ] T005 [P] Extend `StatusBadge` colour map (or create `app/ui/projects/StatusBadge.tsx`
+- [x] T005 [P] Extend `StatusBadge` colour map (or create `app/ui/projects/StatusBadge.tsx`
       if not yet present) with compliance statuses: `compliant`=green, `non_compliant`=red,
       `partially_compliant`=yellow, `verified`=green, `submitted`=blue, `partial`=yellow,
       `missing`=red; and BOCW statuses with distinct keys to avoid colour collision:
       `bocw_pending`=red, `bocw_partial`=orange, `bocw_paid`=green — M-005 remediation
       (BOCW `partial` is orange, not yellow; use `bocw_partial` key in `BOCWTable`)
-- [ ] T005a [P] Extend `middleware.ts` with a `/dashboard/partners/*` route matcher: `PARTNERS`
+- [x] T005a [P] Extend `middleware.ts` with a `/dashboard/partners/*` route matcher: `PARTNERS`
       for `/dashboard/partners/{vendors,contractors,bocw}/*`, `SETTINGS` for
       `/dashboard/partners/vendors/categories` (a Settings-owned master, backend research.md §1)
       — FR-013, missing entirely from this feature's original task list, found during a
@@ -51,7 +51,7 @@ via quickstart.md.
 
 ## Phase 2: Foundational — TypeScript types and zod schemas
 
-- [ ] T006 Define all TypeScript interfaces in `app/lib/api/partners.ts` from data-model.md:
+- [x] T006 Define all TypeScript interfaces in `app/lib/api/partners.ts` from data-model.md:
       `VendorCategory`, `VendorListItem`, `VendorDetail`, `VendorContact`, `ContractorListItem`,
       `ContractorDocument`, `ContractorDetail`, `MonthlyCompliance`, `RagRow`, `RagMatrix`,
       `BOCWRow`. Add `vendorSchema` and `complianceSchema` zod schemas.
@@ -68,11 +68,11 @@ via quickstart.md.
 
 ### Implementation for User Story 1
 
-- [ ] T007 [P] [US1] Implement `getVendorCategories`, `createVendorCategory`,
+- [x] T007 [P] [US1] Implement `getVendorCategories`, `createVendorCategory`,
       `updateVendorCategory`, `deleteVendorCategory` in `app/lib/api/partners.ts`
-- [ ] T008 [P] [US1] Create `app/ui/partners/VendorCategoryModal.tsx`: Name + Description
+- [x] T008 [P] [US1] Create `app/ui/partners/VendorCategoryModal.tsx`: Name + Description
       fields, `react-hook-form` with zod validation
-- [ ] T009 [US1] Create `app/dashboard/partners/vendors/categories/page.tsx`:
+- [x] T009 [US1] Create `app/dashboard/partners/vendors/categories/page.tsx`:
       `CategoriesPage` — `ResponsiveList`-based table (#, Category Name, Description, Vendors
       count, Edit/Delete actions), fully keyboard-operable (FR-014), "Add Category" button,
       inline 409 delete error handling
@@ -91,26 +91,26 @@ toggle active (confirm dialog); Work Detail disabled for material type.
 
 ### Implementation for User Story 2
 
-- [ ] T010 [P] [US2] Implement `getVendors`, `createVendor`, `getVendor`, `updateVendor`,
+- [x] T010 [P] [US2] Implement `getVendors`, `createVendor`, `getVendor`, `updateVendor`,
       `toggleVendorActive` in `app/lib/api/partners.ts`
-- [ ] T011 [P] [US2] Create `app/ui/partners/VendorDetailsTab.tsx`: Name, Type dropdown,
+- [x] T011 [P] [US2] Create `app/ui/partners/VendorDetailsTab.tsx`: Name, Type dropdown,
       Deals In multi-select (tags from `getVendorCategories()`), GSTIN, PAN, TDS Section,
       TDS Rate, Active toggle
-- [ ] T012 [P] [US2] Create `app/ui/partners/VendorAddressTab.tsx`: Address, City, State,
+- [x] T012 [P] [US2] Create `app/ui/partners/VendorAddressTab.tsx`: Address, City, State,
       PIN Code fields
-- [ ] T013 [P] [US2] Create `app/ui/partners/VendorContactsTab.tsx`: `useFieldArray` dynamic
+- [x] T013 [P] [US2] Create `app/ui/partners/VendorContactsTab.tsx`: `useFieldArray` dynamic
       rows (Name, Phone, Email per row), "+ Add Contact" button, Delete icon per row — FR-003
-- [ ] T014 [P] [US2] Create `app/ui/partners/VendorWorkDetailTab.tsx`: hire/contract/machine/
+- [x] T014 [P] [US2] Create `app/ui/partners/VendorWorkDetailTab.tsx`: hire/contract/machine/
       charges fields; rendered but inputs disabled when `type` is not
       subcontractor/labour_contractor (FR-005); tooltip "Available for Subcontractor types only"
-- [ ] T015 [US2] Create `app/ui/partners/VendorModal.tsx`: 4-tab container composing
+- [x] T015 [US2] Create `app/ui/partners/VendorModal.tsx`: 4-tab container composing
       T011–T014; single `react-hook-form` instance with `vendorSchema`; preserves all tab
       data across tab switches (FR-011); loads existing data in edit mode
-- [ ] T016 [P] [US2] Create `app/ui/partners/VendorListTable.tsx`: `ResponsiveList`-based,
+- [x] T016 [P] [US2] Create `app/ui/partners/VendorListTable.tsx`: `ResponsiveList`-based,
       fully keyboard-operable (FR-014), columns (Vendor name+city, Deals In tags, Contact, Type
       badge, GSTIN, TDS, Active toggle); Active toggle fires confirmation dialog before
       `toggleVendorActive()` API call (FR-010)
-- [ ] T017 [US2] Create `app/dashboard/partners/vendors/page.tsx`: `VendorsPage` — list with
+- [x] T017 [US2] Create `app/dashboard/partners/vendors/page.tsx`: `VendorsPage` — list with
       search, type filter, active filter, pagination; "Add Vendor" + "Manage Categories"
       (→ `/vendors/categories`) buttons; `VendorModal` integration; wire
       `@tanstack/react-query` with `['partners', 'vendors', params]` key
@@ -129,20 +129,20 @@ and expiry warnings; Add contractor modal with vendor picker.
 
 ### Implementation for User Story 3
 
-- [ ] T018 [P] [US3] Implement `getContractors`, `createContractor`, `getContractor`,
+- [x] T018 [P] [US3] Implement `getContractors`, `createContractor`, `getContractor`,
       `updateContractor`, `uploadContractorDocument`, `deleteContractorDocument` in
       `app/lib/api/partners.ts`
-- [ ] T019 [P] [US3] Create `app/ui/partners/ContractorModal.tsx`: Vendor picker (searchable
+- [x] T019 [P] [US3] Create `app/ui/partners/ContractorModal.tsx`: Vendor picker (searchable
       dropdown filtered to subcontractor/labour_contractor type via `getVendors({ type: ... })`),
       registration number fields (Licence Number, PF Registration, ESIC Registration, BOCW
       Registration, Insurance Policy Number)
-- [ ] T020 [P] [US3] Create `app/ui/partners/ContractorDocumentRow.tsx`: document type label,
+- [x] T020 [P] [US3] Create `app/ui/partners/ContractorDocumentRow.tsx`: document type label,
       file link, upload date, expiry date; expiry warning badge (orange "Expiring soon" or red
       "Expired") when `expiryWarning: true`
-- [ ] T021 [US3] Create `app/dashboard/partners/contractors/page.tsx`: `ResponsiveList`-based
+- [x] T021 [US3] Create `app/dashboard/partners/contractors/page.tsx`: `ResponsiveList`-based
       contractor list table, fully keyboard-operable (FR-014), with compliance status
       `StatusBadge`, "Add Contractor" button, `ContractorModal`
-- [ ] T022 [US3] Create `app/dashboard/partners/contractors/[id]/page.tsx`:
+- [x] T022 [US3] Create `app/dashboard/partners/contractors/[id]/page.tsx`:
       `ContractorDetailPage` — document checklist section (one `ContractorDocumentRow` per
       `ContractorDocument` + upload control per document type), compliance history link
       (→ compliance page filtered to this contractor)
@@ -161,19 +161,19 @@ label); verify action hidden on verified rows.
 
 ### Implementation for User Story 4
 
-- [ ] T023 [P] [US4] Implement `getCompliance`, `createCompliance`, `updateCompliance`,
+- [x] T023 [P] [US4] Implement `getCompliance`, `createCompliance`, `updateCompliance`,
       `verifyCompliance` in `app/lib/api/partners.ts`
-- [ ] T024 [P] [US4] Create `app/ui/partners/ComplianceModal.tsx`: Contractor dropdown
+- [x] T024 [P] [US4] Create `app/ui/partners/ComplianceModal.tsx`: Contractor dropdown
       (active contractors only), Month picker (`<input type="month">` with `max` = current
       YYYY-MM — research.md §6), PF section (Challan #, Amount, Date), ESIC section
       (Challan #, Amount, Date); sections are independent (either can be submitted alone);
       `complianceSchema` zod validation
-- [ ] T025 [US4] Create `app/ui/partners/ComplianceTable.tsx`: `ResponsiveList`-based, fully
+- [x] T025 [US4] Create `app/ui/partners/ComplianceTable.tsx`: `ResponsiveList`-based, fully
       keyboard-operable (FR-014), columns (Contractor, Month, PF Challan/Amount/Date, ESIC
       Challan/Amount/Date, Status badge, Actions); Verify action
       shows confirmation dialog ("Verify? This records your identity."); verified rows show
       "Verified by [name] on [date]" label with Verify action hidden (spec US4 AC4/AC5)
-- [ ] T026 [US4] Create `app/dashboard/partners/contractors/compliance/page.tsx`:
+- [x] T026 [US4] Create `app/dashboard/partners/contractors/compliance/page.tsx`:
       `CompliancePage` — reads `?contractorId=` and `?month=` URL params (for RAG dot
       navigation — research.md §5) and pre-filters table; "Record Compliance" button +
       `ComplianceModal`; wire `@tanstack/react-query` with
@@ -194,12 +194,12 @@ click non-gray dot (→ compliance page filtered); gray dot not clickable.
 
 ### Implementation for User Story 5
 
-- [ ] T027 [P] [US5] Implement `getRagMatrix(fy)` in `app/lib/api/partners.ts`
-- [ ] T028 [P] [US5] Create `app/ui/partners/RagDot.tsx`: coloured circle component;
+- [x] T027 [P] [US5] Implement `getRagMatrix(fy)` in `app/lib/api/partners.ts`
+- [x] T028 [P] [US5] Create `app/ui/partners/RagDot.tsx`: coloured circle component;
       `verified`=green, `submitted`/`partial`=yellow, `missing`=red, `gray`=gray;
       `pointer-events: none` + `cursor: default` for gray; `onClick` prop for non-gray dots
       (navigates via `useRouter.push`) — FR-007
-- [ ] T029 [US5] Create `app/ui/partners/RagMatrix.tsx`: HTML `<table>` with:
+- [x] T029 [US5] Create `app/ui/partners/RagMatrix.tsx`: HTML `<table>` with:
       - overflow-x scroll container
       - `position: sticky; left: 0; z-index: 1` on contractor name `<td>`
       - `position: sticky; top: 0; z-index: 2` on month header `<th>` row
@@ -208,7 +208,7 @@ click non-gray dot (→ compliance page filtered); gray dot not clickable.
         cells) rather than a `<div onClick>` — keyboard-navigable per FR-014's exemption note
         (dense grid exempt from `ResponsiveList`'s card layout, but not from keyboard access)
       - research.md §4
-- [ ] T030 [US5] Create `app/dashboard/partners/contractors/rag/page.tsx`: `RagMatrixPage`
+- [x] T030 [US5] Create `app/dashboard/partners/contractors/rag/page.tsx`: `RagMatrixPage`
       — reads `?fy=` via `useSearchParams`; defaults to current FY (e.g. `2025-26`); renders
       `RagMatrix`; wire `@tanstack/react-query` with `['partners', 'rag', fy]` key
 
@@ -226,15 +226,15 @@ record full balance → Paid (green badge, button disabled).
 
 ### Implementation for User Story 6
 
-- [ ] T031 [P] [US6] Implement `getBOCW`, `recordBOCWPayment` in `app/lib/api/partners.ts`
-- [ ] T032 [P] [US6] Create `app/ui/partners/BOCWPaymentModal.tsx`: Amount Paid, Payment Date,
+- [x] T031 [P] [US6] Implement `getBOCW`, `recordBOCWPayment` in `app/lib/api/partners.ts`
+- [x] T032 [P] [US6] Create `app/ui/partners/BOCWPaymentModal.tsx`: Amount Paid, Payment Date,
       Reference Number, Remarks fields; `react-hook-form` with zod validation
-- [ ] T033 [US6] Create `app/ui/partners/BOCWTable.tsx`: `ResponsiveList`-based, fully
+- [x] T033 [US6] Create `app/ui/partners/BOCWTable.tsx`: `ResponsiveList`-based, fully
       keyboard-operable (FR-014), columns (Project Name, Contract Value, Cess Rate, Cess
       Liability, Paid, Balance, Last Payment Date, Status badge, Actions); all monetary columns
       via `formatCurrency` (FR-009); Record Payment button disabled when
       `status === 'paid'` (spec US6 AC3); `BOCWPaymentModal` integration
-- [ ] T034 [US6] Create `app/dashboard/partners/bocw/page.tsx`: `BOCWPage` — paginated BOCW
+- [x] T034 [US6] Create `app/dashboard/partners/bocw/page.tsx`: `BOCWPage` — paginated BOCW
       list; wire `@tanstack/react-query` with `['partners', 'bocw']` key; invalidate on payment
 
 **Checkpoint**: All 6 user stories implemented.
@@ -243,13 +243,13 @@ record full balance → Paid (green badge, button disabled).
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T035 [P] Verify all monetary displays use `formatCurrency` — BOCW table, compliance
+- [x] T035 [P] Verify all monetary displays use `formatCurrency` — BOCW table, compliance
       amounts in `ComplianceModal` and `ComplianceTable`
-- [ ] T036 [P] Verify all status displays use `StatusBadge` — contractor list, compliance
+- [x] T036 [P] Verify all status displays use `StatusBadge` — contractor list, compliance
       table, BOCW table (no inline colour class strings)
-- [ ] T037 [P] Verify `VendorModal` tab data is never lost on tab switch — manual test per
+- [x] T037 [P] Verify `VendorModal` tab data is never lost on tab switch — manual test per
       quickstart.md Scenario 2 step 3
-- [ ] T038 [P] Run TypeScript type check (`npx tsc --noEmit`) and fix issues
+- [x] T038 [P] Run TypeScript type check (`npx tsc --noEmit`) and fix issues
 - [ ] T039 [P] Verify RAG Matrix renders without horizontal scroll issues on a 1280px viewport
       (minimum expected admin screen width)
 - [ ] T040 [P] Spot-check every `ResponsiveList`-based screen (Categories, Vendors, Contractors,
@@ -289,3 +289,65 @@ core vendor master data screen other modules (Inventory, Machinery) depend on.
 the compliance monitoring workflow.
 
 **Increment 3 (Phase 8–9, US6 + polish)**: BOCW cess, final consistency checks.
+
+---
+
+## Implementation record — 2026-09-03
+
+39 of 41 tasks complete. T039 and T040 are manual viewport and keyboard passes and
+have not been performed — nothing has been opened in a browser.
+
+### Two tasks were superseded by feature 014, not skipped
+
+- **T001 (add a Partners nav group).** Feature 014 made the sidebar role-filtered from
+  a single `NAV_MODULES` definition, which already contains a Partners entry guarded by
+  the `PARTNERS` permission. Adding a second nav definition here is precisely the drift
+  014's FR-014 exists to prevent. The sub-navigation *within* Partners is new
+  (`app/ui/partners/partners-nav.tsx`); 014 scoped itself to top-level modules only, so
+  that tier was genuinely unbuilt.
+- **T005a (guard `/dashboard/partners/*` in `middleware.ts`).** Not reachable: feature
+  001 keeps the access token in memory only, so middleware never sees it — the reason
+  the Settings and HR guards live at their layout boundaries. 014's `ModuleGuard`
+  already refuses this subtree without `PARTNERS`. What it could not know is that vendor
+  categories are a Settings-owned master gated on `SETTINGS`, so `layout.tsx` adds that
+  one check and nothing else.
+
+### Other deviations
+
+- **T004 / T005.** `formatCurrency` and a partners `StatusBadge` were to be created.
+  `money`/`rupees` already exist in `app/lib/format.ts` and `StatusBadge` in
+  `app/ui/hr/data-table.tsx`; both were extended rather than duplicated. BOCW statuses
+  use `bocw_`-prefixed badge keys because BOCW's `partial` (part-paid, orange) and
+  compliance's `partial` (one of two challans, amber) are different meanings that would
+  otherwise be forced into one colour.
+- **Component file consolidation.** T011–T014 specified four separate vendor tab files
+  and T028 a separate `RagDot`. The tabs share one `react-hook-form` instance, so
+  splitting them across files would mean threading `register`, `control` and `errors`
+  through four prop interfaces to no benefit; they are sections of `vendor-modal.tsx`.
+  Same for the RAG dot, which is one `<button>` in the cell.
+- **`ResponsiveList` not used**, per this spec's own 2026-09-02 amendment: these are
+  desktop surfaces, and `DataTable` puts the horizontal overflow on its own container so
+  the page body never scrolls sideways.
+- **"Verified by [name]" shows a date, not a name.** `GET /partners/compliance` returns
+  `verifiedByUserId` and there is no endpoint that resolves an arbitrary user id, so the
+  row says "Verified {date}". Inventing a name would be worse than omitting one.
+
+### Verified
+
+- `npx tsc --noEmit`, `npm run lint` (0 errors; 1 pre-existing warning), `npm run build`
+  including the serwist step — all clean. All seven partners routes appear in the build.
+- **Every one of the 22 API functions was executed against the running backend and its
+  response parsed by the real zod schema** — the contract check passed on all 22. This is
+  decision D4, and it is the class of bug that produced six defects in feature 005: four
+  schemas there were written from the Prisma models rather than from responses, and each
+  rejected a valid 200.
+- One shape could not be checked live: a BOCW row, because the projects module it reads
+  from is not built and the list is always empty. It is pinned by `bocw.service.spec.ts`
+  in the API instead of guessed.
+
+### Not verified
+
+Nothing has been opened in a browser. The four-tab form's state preservation, the RAG
+matrix's sticky columns at 1280px, keyboard operability, and every screen at a 768px
+tablet width are written to satisfy their requirements and reasoned about, but not seen.
+That is T039 and T040.

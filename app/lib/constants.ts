@@ -48,6 +48,15 @@ export const ROUTES = {
   // users no longer see them at all, which is a strict improvement until the
   // features that own them land.
   projects: '/dashboard/projects',
+
+  // --- Partners (feature 007) ---
+  partnersVendors: '/dashboard/partners/vendors',
+  partnersVendorCategories: '/dashboard/partners/vendors/categories',
+  partnersContractors: '/dashboard/partners/contractors',
+  partnersContractor: (id: string) => `/dashboard/partners/contractors/${id}`,
+  partnersCompliance: '/dashboard/partners/contractors/compliance',
+  partnersRag: '/dashboard/partners/contractors/rag',
+  partnersBocw: '/dashboard/partners/bocw',
   plant: '/dashboard/plant',
   inventory: '/dashboard/inventory',
   partners: '/dashboard/partners',
@@ -344,6 +353,90 @@ export const HR_PERMISSIONS = {
 export type HrSection = keyof typeof HR_PERMISSIONS;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Partners (feature 007)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Mirrors the backend `VendorType` enum exactly. */
+export const VENDOR_TYPES = [
+  'material',
+  'fuel',
+  'hire',
+  'service',
+  'subcontractor',
+  'labour_contractor',
+] as const;
+export type VendorType = (typeof VENDOR_TYPES)[number];
+
+/** The two vendor types that may carry a contractor compliance profile. The backend
+ * refuses the others with a 400, so the vendor picker filters to these rather than
+ * offering a choice that cannot succeed. */
+export const CONTRACTOR_VENDOR_TYPES: readonly VendorType[] = [
+  'subcontractor',
+  'labour_contractor',
+];
+
+export const CONTRACTOR_COMPLIANCE_STATUSES = [
+  'compliant',
+  'partially_compliant',
+  'non_compliant',
+] as const;
+
+export const CONTRACTOR_DOCUMENT_TYPES = [
+  'labour_license',
+  'pf_registration',
+  'esic_registration',
+  'insurance',
+  'bocw_registration',
+] as const;
+export type ContractorDocumentType = (typeof CONTRACTOR_DOCUMENT_TYPES)[number];
+
+export const MONTHLY_COMPLIANCE_STATUSES = [
+  'missing',
+  'partial',
+  'submitted',
+  'verified',
+] as const;
+
+/** The monthly statuses plus `gray`, which the RAG matrix uses for a month that is
+ * not yet due. It is not a compliance state — a filing that is not due has not been
+ * missed — so it exists only here. */
+export const RAG_CELL_STATUSES = [
+  'verified',
+  'submitted',
+  'partial',
+  'missing',
+  'gray',
+] as const;
+export type RagCellStatus = (typeof RAG_CELL_STATUSES)[number];
+
+export const BOCW_STATUSES = ['pending', 'partial', 'paid'] as const;
+export type BocwStatus = (typeof BOCW_STATUSES)[number];
+
+/**
+ * Which permission each `/dashboard/partners/*` section requires.
+ *
+ * Vendor categories are the odd one out: the table lives in `settings` because it is
+ * a company master, and the backend gates it on `SETTINGS` rather than `PARTNERS`
+ * (007 FR-015). A user with `PARTNERS` alone can tag a vendor with a category but
+ * cannot create one, and the guard has to reflect that or the screen 403s on load.
+ */
+export const PARTNERS_PERMISSIONS = {
+  vendors: 'PARTNERS',
+  contractors: 'PARTNERS',
+  bocw: 'PARTNERS',
+} as const;
+
+export type PartnersSection = keyof typeof PARTNERS_PERMISSIONS;
+
+/** Label for a partners enum value. Delegates to the shared enum labeller so there
+ * is one place that turns `labour_contractor` into "Labour contractor", and this
+ * feature's terms live in `ENUM_LABEL_OVERRIDES` with everyone else's. */
+export function partnersLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return hrLabel(value);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * The top-level sidebar modules and the permissions that govern each (feature 014,
@@ -564,6 +657,18 @@ export function enumLabel(value: string): string {
 
 /** Overrides where the mechanical label is wrong or unhelpfully terse. */
 const ENUM_LABEL_OVERRIDES: Record<string, string> = {
+  // Partners (007)
+  labour_contractor: 'Labour contractor',
+  non_compliant: 'Non-compliant',
+  partially_compliant: 'Partially compliant',
+  labour_license: 'Labour licence',
+  pf_registration: 'PF registration',
+  esic_registration: 'ESIC registration',
+  bocw_registration: 'BOCW registration',
+  gray: 'Not yet due',
+  bocw_pending: 'Pending',
+  bocw_partial: 'Partial',
+  bocw_paid: 'Paid',
   lwp: 'Leave Without Pay',
   uan: 'UAN',
   pf: 'PF',
@@ -586,6 +691,22 @@ export function hrLabel(value: string): string {
  * colour-blind reader loses nothing.
  */
 export const STATUS_BADGE_CLASSES: Record<string, string> = {
+  // Partners (007). `bocw_*` keys are deliberately prefixed: BOCW's `partial` means
+  // "part-paid" and reads better in orange, while compliance's `partial` means "one
+  // of two challans filed" and is yellow. One key for both would force the same
+  // colour on two different meanings.
+  compliant: 'bg-green-100 text-green-800',
+  partially_compliant: 'bg-amber-100 text-amber-800',
+  non_compliant: 'bg-red-100 text-red-800',
+  submitted: 'bg-blue-100 text-blue-800',
+  partial: 'bg-amber-100 text-amber-800',
+  missing: 'bg-red-100 text-red-800',
+  gray: 'bg-gray-100 text-gray-600',
+  bocw_pending: 'bg-red-100 text-red-800',
+  bocw_partial: 'bg-orange-100 text-orange-800',
+  bocw_paid: 'bg-green-100 text-green-800',
+  expiring_soon: 'bg-orange-100 text-orange-800',
+  expired: 'bg-red-100 text-red-800',
   // Attendance
   present: 'bg-green-100 text-green-800',
   complete: 'bg-green-100 text-green-800',
