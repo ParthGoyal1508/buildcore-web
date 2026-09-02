@@ -13,9 +13,13 @@ import {
   Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import { SerwistProvider } from '@serwist/next/react';
+import { useQuery } from '@tanstack/react-query';
 import { submitPunch } from '@/app/lib/api/my-workspace';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
+import { hasModuleAccess } from '@/app/lib/permissions';
+import AccessDenied from '@/app/ui/access-denied';
 
 const TABS = [
   { name: 'Punch', href: ROUTES.myPunch, icon: ClockIcon },
@@ -47,6 +51,12 @@ export default function MyWorkspaceLayout({
   const pathname = usePathname();
   const [queued, setQueued] = useState(0);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  // Shares the `['currentUser']` key with the dashboard shell's guards, so moving
+  // between the two shells costs no extra request.
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
 
   useEffect(() => {
     let active = true;
@@ -93,6 +103,17 @@ export default function MyWorkspaceLayout({
       window.removeEventListener('online', onOnline);
     };
   }, []);
+
+  // FR-010a. Deliberately `user &&`, so this refuses ONLY on a successful load that
+  // lacks the permission. A *failed* load falls through to the shell, because this one
+  // is an offline-capable PWA whose whole point is a site worker with no signal: there,
+  // a failed `/users/me` is indistinguishable from having no network, and treating it
+  // as a refusal would lock a worker out of punching at exactly the moment the offline
+  // queue below exists to serve them. `buildcore-api` still refuses the punch on drain
+  // if they genuinely lack access, so nothing is exposed by letting them in.
+  if (user && hasModuleAccess(user.permissions, pathname) === 'refused') {
+    return <AccessDenied />;
+  }
 
   return (
     // Registered here rather than in the root layout: the app shell worth caching

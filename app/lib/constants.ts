@@ -40,6 +40,18 @@ export const ROUTES = {
   hrTds: '/dashboard/hr/tds',
   hrReimbursements: '/dashboard/hr/reimbursements',
   hrReEnrolment: '/dashboard/hr/re-enrolment',
+
+  // --- Modules not yet built (features 006-009) ---
+  // Listed because feature 014 filters and guards the sidebar from one definition,
+  // and that definition has to name every module the sidebar shows. Following any
+  // of these today produces a 404 for everyone; role-based filtering means most
+  // users no longer see them at all, which is a strict improvement until the
+  // features that own them land.
+  projects: '/dashboard/projects',
+  plant: '/dashboard/plant',
+  inventory: '/dashboard/inventory',
+  partners: '/dashboard/partners',
+  reports: '/dashboard/reports',
 } as const;
 
 /**
@@ -205,6 +217,22 @@ export const MESSAGES = {
       : 'Your re-enrolment request was declined.',
   reEnrolmentExpired:
     'Your approval window has closed without being used. Request re-enrolment again to continue.',
+
+  // --- Role-based navigation (feature 014) ---
+  noModulesTitle: 'No modules assigned',
+  noModulesBody:
+    'Your role does not include access to any part of the application yet. Ask a Super Admin to assign the permissions you need.',
+  navLoadFailed: 'Your access could not be checked, so no modules are shown.',
+  navRedirecting: 'Taking you to the first module your role can open…',
+  navPermissionsHint:
+    'These decide which modules this role sees in the sidebar, and which it can open.',
+  /** The nine permissions that gate content *inside* a module rather than a sidebar
+   * entry. Said once, here, rather than repeated on every checkbox: an admin who
+   * clears one of these expecting the menu to change is misled, and the section this
+   * introduces is the place to prevent that (FR-013). */
+  nonNavPermissionsHint:
+    'These grant access to areas inside a module. They do not add or remove anything from the sidebar.',
+  permissionControlsModule: (module: string) => `Shows "${module}" in the sidebar`,
 } as const;
 
 /**
@@ -314,6 +342,152 @@ export const HR_PERMISSIONS = {
 } as const;
 
 export type HrSection = keyof typeof HR_PERMISSIONS;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The top-level sidebar modules and the permissions that govern each (feature 014,
+ * FR-003).
+ *
+ * This is the tier above `SETTINGS_PERMISSIONS` and `HR_PERMISSIONS`: those gate areas
+ * *within* a module, this gates whether the module is reachable at all.
+ *
+ * It is the single definition FR-014 requires. `app/ui/dashboard/nav-links.tsx` renders
+ * the sidebar from it and `app/lib/permissions.ts` answers the route guard from it, so
+ * the menu and the gate cannot disagree about what a user may reach. Two definitions
+ * would drift, and the drift shows up as either a visible link that 403s on click or a
+ * hidden page still reachable by typing its URL.
+ *
+ * `permissions` is ANY-OF — the module appears when the user holds at least one. Two
+ * modules list several because they aggregate what the backend guards separately.
+ *
+ * `href` and `guardPrefix` are separate on purpose. They coincide for eight modules;
+ * My Workspace links to `/my/punch`, the tab a field worker actually wants, but guards
+ * the whole of `/my`. Prefix-matching the link target would leave `/my/leave` and its
+ * siblings matching nothing, and therefore unguarded.
+ *
+ * Icons live in `nav-links.tsx`, not here. This file is imported by server components
+ * throughout the app, and pulling nine icon components into every one of those bundles
+ * for tidiness would cost real bytes for no benefit; `NavModuleId` keeps that record
+ * exhaustive instead.
+ */
+export const NAV_MODULES = [
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    href: ROUTES.dashboard,
+    guardPrefix: ROUTES.dashboard,
+    // The one module that guards a single page rather than a subtree. `/dashboard` is
+    // the prefix of every other route in the shell, so guarding its subtree would put
+    // routes no module claims — `/dashboard/account-creation` today — behind the
+    // DASHBOARD permission, quietly making it the key to the whole application.
+    guardsSubtree: false,
+    permissions: ['DASHBOARD'],
+  },
+  {
+    id: 'hr',
+    name: 'HR & Payroll',
+    href: ROUTES.hr,
+    guardPrefix: ROUTES.hr,
+    guardsSubtree: true,
+    permissions: ['EMPLOYEES', 'ATTENDANCE', 'PAYROLL'],
+  },
+  {
+    id: 'projects',
+    name: 'Projects',
+    href: ROUTES.projects,
+    guardPrefix: ROUTES.projects,
+    guardsSubtree: true,
+    permissions: ['PROJECTS'],
+  },
+  {
+    id: 'plant',
+    name: 'Plant & Machinery',
+    href: ROUTES.plant,
+    guardPrefix: ROUTES.plant,
+    guardsSubtree: true,
+    permissions: ['MACHINERY'],
+  },
+  {
+    id: 'inventory',
+    name: 'Inventory',
+    href: ROUTES.inventory,
+    guardPrefix: ROUTES.inventory,
+    guardsSubtree: true,
+    permissions: ['INVENTORY'],
+  },
+  {
+    id: 'partners',
+    name: 'Partners',
+    href: ROUTES.partners,
+    guardPrefix: ROUTES.partners,
+    guardsSubtree: true,
+    permissions: ['PARTNERS'],
+  },
+  {
+    id: 'reports',
+    name: 'Reports',
+    href: ROUTES.reports,
+    guardPrefix: ROUTES.reports,
+    guardsSubtree: true,
+    permissions: ['REPORTS'],
+  },
+  {
+    // Leaves the `/dashboard` shell entirely, for a user who is both an admin and an
+    // employee (003 research.md §2). The `/my` tree has its own bottom-tab layout.
+    id: 'my-workspace',
+    name: 'My Workspace',
+    href: ROUTES.myPunch,
+    guardPrefix: '/my',
+    guardsSubtree: true,
+    permissions: ['MY_WORKSPACE'],
+  },
+  {
+    id: 'settings',
+    name: 'Settings',
+    href: ROUTES.settings,
+    guardPrefix: ROUTES.settings,
+    guardsSubtree: true,
+    permissions: ['SETTINGS', 'USER_MANAGEMENT', 'COMPANY_SETTINGS'],
+  },
+] as const satisfies readonly {
+  id: string;
+  name: string;
+  href: string;
+  guardPrefix: string;
+  /** Whether `guardPrefix` covers everything beneath it, or only that exact path. */
+  guardsSubtree: boolean;
+  // `satisfies` rather than a plain annotation: it type-checks every value against
+  // the real Permission union while keeping the literal types the derived types below
+  // depend on. A typo'd permission fails to compile here rather than silently hiding
+  // a module from everyone.
+  permissions: readonly Permission[];
+}[];
+
+export type NavModule = (typeof NAV_MODULES)[number];
+export type NavModuleId = NavModule['id'];
+
+/**
+ * The 13 permissions that govern a sidebar module, out of the 22 assignable. The other
+ * 9 — DWR, Project Financials, Challans, Loans, Logbook, Fuel, Daily Worker Registry,
+ * Data Export, Data Delete — gate content below module level, and the roles screen says
+ * so rather than letting an admin clear one and wait for a menu change that never comes
+ * (FR-013).
+ */
+export const NAV_GOVERNING_PERMISSIONS: ReadonlySet<Permission> = new Set(
+  NAV_MODULES.flatMap((navModule) => navModule.permissions),
+);
+
+/**
+ * Which module a permission makes visible, for the roles screen's checkbox captions.
+ * Derived from `NAV_MODULES` rather than written out again, so a module renamed above
+ * cannot leave a stale caption here.
+ */
+export const NAV_MODULE_BY_PERMISSION: ReadonlyMap<Permission, string> = new Map(
+  NAV_MODULES.flatMap((navModule) =>
+    navModule.permissions.map((permission) => [permission, navModule.name] as const),
+  ),
+);
 
 /** Default page size for the server-paginated employee list (spec FR-001). */
 export const EMPLOYEE_PAGE_SIZE = 25;

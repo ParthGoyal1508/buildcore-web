@@ -15,7 +15,13 @@ The single definition required by FR-014, in `app/lib/constants.ts` as `NAV_MODU
 | `href` | route string | Where the sidebar link points. For eight modules a `/dashboard/*` path; for My Workspace, `ROUTES.myPunch`, which leaves the shell. |
 | `guardPrefix` | route string | The subtree the guard protects — **not** always equal to `href`. My Workspace links to `/my/punch` but guards all of `/my`; without this distinction `/my/leave` fails to match `/my/punch` and is admitted unguarded. For the other eight, `guardPrefix` equals `href`. |
 | `permissions` | readonly Permission[] | The governing permissions. **Any-of**: the module is visible when the user holds at least one. Never empty. |
-| `icon` | Heroicon component | Unchanged from the current hardcoded array. |
+| `guardsSubtree` | boolean | Whether `guardPrefix` covers everything beneath it. True for eight modules; **false for Dashboard**, whose `/dashboard` prefix would otherwise capture every route in the shell that no other module claims — putting `/dashboard/account-creation`, and any future unclaimed route, behind the `DASHBOARD` permission. Discovered during implementation. |
+
+The `icon` is deliberately **not** a field here. It lives in a `Record<NavModuleId, …>` in
+`app/ui/dashboard/nav-links.tsx`, because `constants.ts` is imported by server components
+throughout the app and adding nine icon components to it would pull them into every one of
+those bundles. Typing that record over `NavModuleId` keeps it exhaustive, so a module added
+without an icon fails to compile rather than rendering a blank space.
 
 Derived types:
 
@@ -59,7 +65,7 @@ values with no side effects:
 | Function | Returns | Used by |
 |---|---|---|
 | `visibleModules(permissions)` | `NavModule[]` in `NAV_MODULES` order | The sidebar (FR-001, FR-002) |
-| `hasModuleAccess(permissions, pathname)` | `boolean \| 'unknown-route'` | The module guard (FR-006, FR-007). Resolves `pathname` by **longest** `guardPrefix` match, so `/dashboard/hr` resolves to HR & Payroll rather than to Dashboard, whose `/dashboard` prefix matches everything |
+| `hasModuleAccess(permissions, pathname)` | `'granted' \| 'refused' \| 'unknown-route'` | The module guard (FR-006, FR-007). Resolves `pathname` by **longest** `guardPrefix` match among modules whose guard covers it, matching whole path segments only so `/dashboard/hrms` cannot inherit HR's permissions |
 | `landingRoute(permissions)` | route string, or `null` when no module is held | The FR-008 redirect; `null` triggers the FR-009 empty state |
 
 Keeping these in `lib` rather than in component bodies is Principle I; all three read from

@@ -29,6 +29,16 @@ guards all of `/my`. Prefix-matching the link target would leave `/my/leave`, `/
 resolution would attribute `/dashboard/hr` to Dashboard and gate HR behind `DASHBOARD`. Resolution
 MUST take the longest matching `guardPrefix`.
 
+**Dashboard guards one page, not a subtree.** Longest-prefix alone is not enough: `/dashboard`
+still captures every route in the shell that no *other* module claims — `/dashboard/account-creation`
+today, and anything added later before its own module exists — which would silently make `DASHBOARD`
+the key to the whole application. Dashboard's guard therefore matches its exact path only; the other
+eight cover their subtrees.
+
+**Matching is on whole path segments.** `/dashboard/hrms` MUST NOT match the `/dashboard/hr` prefix,
+or a module could be gated by a neighbour's rules purely because their names share an opening
+substring.
+
 The five routes marked **no** are not yet built (features 006–009 own them). They are filtered and
 guarded by this contract regardless, so the behaviour is correct the day those routes land; until
 then those links 404 for everyone, which is itself an argument for filtering them out.
@@ -57,7 +67,8 @@ Applied by `ModuleGuard` for `/dashboard/*` and by the `/my` layout for `/my/*`.
   Hiding a link is presentation; it is never the mechanism preventing access. (FR-007)
 - **I4**: The identity panel and Sign Out render in every state in the table above, including both
   failure rows. (FR-004)
-- **I6**: A pathname resolves to at most one module, by longest `guardPrefix` match. A pathname
-  matching no prefix is not this feature's concern and renders normally.
+- **I6**: A pathname resolves to at most one module, by longest `guardPrefix` match among the
+  modules whose guard covers it, on whole path segments. A pathname matching none is not this
+  feature's concern and renders normally.
 - **I5**: This contract is advisory to the client only. `buildcore-api` refuses the underlying
   requests with `@RequirePermissions` regardless, and that is the enforcement.
