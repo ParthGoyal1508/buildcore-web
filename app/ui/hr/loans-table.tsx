@@ -16,6 +16,7 @@ import { HR_MESSAGES, LOAN_STATUSES, MESSAGES, hrLabel } from '@/app/lib/constan
 import { currentPeriod, dateLabel, money, periodLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -170,6 +171,7 @@ function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => voi
 
   const paid =
     data?.schedule.filter((entry) => entry.status === 'paid').length ?? 0;
+  const outstanding = data?.outstanding;
 
   return (
     <Modal
@@ -184,18 +186,19 @@ function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => voi
     >
       {data && (
         <p className="mb-3 text-sm text-gray-600">
-          {rupees(data.amount)} at {rupees(data.emiAmount)} a month ·{' '}
-          {paid} of {data.schedule.length} instalments paid
+          {rupees(data.amount)} at {rupees(data.emiAmount)} a month · {paid} of{' '}
+          {data.schedule.length} instalments paid ·{' '}
+          {rupees(outstanding ?? 0)} outstanding
         </p>
       )}
       <DataTable
         caption="Repayment schedule"
         columns={[
           {
-            key: 'period',
+            key: 'month',
             header: 'Period',
             sticky: true,
-            render: (row) => periodLabel(row.period),
+            render: (row) => periodLabel(row.month),
           },
           { key: 'emi', header: 'EMI', numeric: true, render: (row) => money(row.emiAmount) },
           {
@@ -203,10 +206,16 @@ function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => voi
             header: 'Status',
             render: (row) => <StatusBadge status={row.status} />,
           },
-          { key: 'paidAt', header: 'Paid on', render: (row) => dateLabel(row.paidAt) },
+          {
+            key: 'run',
+            header: 'Recovered by',
+            // An EMI is collected by a payroll run, so the run is what the
+            // schedule records — there is no separate payment date.
+            render: (row) => (row.paidInPayrollRunId ? 'Payroll run' : '—'),
+          },
         ]}
         rows={data?.schedule ?? []}
-        rowKey={(row) => row.id}
+        rowKey={(row) => row.month}
         isLoading={isLoading}
         error={isError ? MESSAGES.loadFailed : null}
         emptyMessage="No schedule yet — a loan's schedule is generated when it is approved."
@@ -217,6 +226,7 @@ function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => voi
 
 export default function LoansTable() {
   const queryClient = useQueryClient();
+  const employees = useEmployeeNames();
   const [status, setStatus] = useState('');
   const [issuing, setIssuing] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -246,7 +256,7 @@ export default function LoansTable() {
       key: 'employee',
       header: 'Employee',
       sticky: true,
-      render: (row) => row.employeeName ?? row.employeeCode ?? row.employeeId,
+      render: (row) => employees.label(row.employeeId),
     },
     { key: 'amount', header: 'Amount', numeric: true, render: (row) => money(row.amount) },
     { key: 'emi', header: 'EMI', numeric: true, render: (row) => money(row.emiAmount) },

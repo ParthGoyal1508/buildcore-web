@@ -431,19 +431,25 @@ export async function markAttendance(input: MarkAttendanceInput) {
   });
 }
 
+/**
+ * An unresolved face-match or geofence exception.
+ *
+ * Matches `AttendanceAdminService.exceptions()` exactly. The row is keyed on
+ * `punchId`, not `id` — an earlier version of this schema required `id`, so a
+ * perfectly good 200 response failed to parse and the dialog reported "could not
+ * load" for data it had already received.
+ *
+ * The endpoint returns no coordinates or distance: the exception says a punch
+ * fell outside the geofence, not by how far.
+ */
 export const attendanceExceptionSchema = z.object({
-  id: z.string(),
+  punchId: z.string(),
   employeeId: z.string(),
-  employeeCode: z.string().optional(),
-  name: z.string().optional(),
-  punchAt: z.string().optional(),
-  punchTime: z.string().optional(),
-  latitude: nullableDecimal.optional(),
-  longitude: nullableDecimal.optional(),
-  distanceMeters: nullableDecimal.optional(),
-  faceMatchResult: z.string().nullable().optional(),
-  geofenceResult: z.string().nullable().optional(),
-  resolution: z.string().nullable().optional(),
+  employeeCode: z.string().nullable(),
+  capturedAt: z.string(),
+  punchDate: z.string(),
+  faceMatchResult: z.string().nullable(),
+  geofenceResult: z.string().nullable(),
 });
 
 export async function getAttendanceExceptions() {
@@ -457,13 +463,23 @@ export async function getAttendanceExceptions() {
   return Array.isArray(parsed) ? parsed : parsed.rows;
 }
 
+/**
+ * One entry in the attendance modification trail.
+ *
+ * Field names mirror `hr.AttendanceModification` exactly: `before`/`after` hold
+ * the diff and `actorUserId` is who made it. An earlier version of this schema
+ * guessed `changedFrom`/`changedTo`/`changedByUserId`; because those were all
+ * optional, it parsed successfully and rendered a table of em dashes — a wrong
+ * schema that fails loudly is better than one that quietly renders nothing.
+ */
 export const attendanceModificationSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
   date: isoDate,
-  changedByUserId: z.string().nullable().optional(),
-  changedFrom: z.unknown().nullable().optional(),
-  changedTo: z.unknown().nullable().optional(),
+  actorUserId: z.string().nullable().optional(),
+  before: z.unknown().nullable().optional(),
+  after: z.unknown().nullable().optional(),
+  reason: z.string().nullable().optional(),
   createdAt: isoDate,
 });
 
@@ -636,18 +652,24 @@ export async function createHoliday(input: HolidayInput) {
 // Leave administration (US4)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A leave application as the admin list returns it.
+ *
+ * The row is the raw `hr.LeaveApplication`: the day count is `dayCount` (a
+ * Decimal, so it arrives as a string) and the remark is `adminRemarks`. It
+ * carries no employee name or code — only `employeeId` — so the table resolves
+ * the name itself rather than pretending the API supplies one.
+ */
 export const leaveApplicationSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
-  employeeCode: z.string().optional(),
-  employeeName: z.string().optional(),
   leaveType: enumOf(LEAVE_TYPES),
   fromDate: isoDate,
   toDate: isoDate,
-  days: decimal,
+  dayCount: decimal,
   reason: z.string().nullable(),
   status: enumOf(LEAVE_APPLICATION_STATUSES),
-  remarks: z.string().nullable().optional(),
+  adminRemarks: z.string().nullable().optional(),
   decidedAt: nullableIsoDate.optional(),
 });
 
@@ -937,33 +959,43 @@ export async function exportChallan(type: ChallanType, period: string) {
 // Loans (US7)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A loan as `LoansService.toView()` returns it. No employee name or code — the
+ * table resolves those from the roster.
+ */
 export const loanSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
-  employeeCode: z.string().optional(),
-  employeeName: z.string().optional(),
   amount: decimal,
   emiAmount: decimal,
   disbursementDate: isoDate,
   reason: z.string(),
   remarks: z.string().nullable().optional(),
   status: enumOf(LOAN_STATUSES),
-  outstanding: nullableDecimal.optional(),
+  totalRecovered: decimal.optional(),
+  outstanding: decimal.optional(),
+  instalments: z.number().optional(),
 });
 
 export type Loan = z.infer<typeof loanSchema>;
 
+/**
+ * One instalment in a repayment schedule.
+ *
+ * The period key is `month` (`YYYY-MM`) and there is no `id` — an entry is
+ * identified by its loan and month, which is also why the table keys on it. An
+ * instalment records the run that recovered it, not a payment date: an EMI is
+ * collected by a payroll run, so the run is the fact worth keeping.
+ */
 export const loanScheduleEntrySchema = z.object({
-  id: z.string(),
-  period: z.string(),
+  month: z.string(),
   emiAmount: decimal,
   status: enumOf(LOAN_SCHEDULE_STATUSES),
-  paidAt: nullableIsoDate.optional(),
+  paidInPayrollRunId: z.string().nullable().optional(),
 });
 
 const loanDetailSchema = loanSchema.extend({
-  schedule: z.array(loanScheduleEntrySchema).optional(),
-  scheduleEntries: z.array(loanScheduleEntrySchema).optional(),
+  schedule: z.array(loanScheduleEntrySchema),
 });
 
 export async function listLoans(
@@ -977,10 +1009,7 @@ export async function listLoans(
 }
 
 export async function getLoan(id: string) {
-  const parsed = loanDetailSchema.parse(
-    await authFetch<unknown>(`/hr/loans/${id}`),
-  );
-  return { ...parsed, schedule: parsed.schedule ?? parsed.scheduleEntries ?? [] };
+  return loanDetailSchema.parse(await authFetch<unknown>(`/hr/loans/${id}`));
 }
 
 export interface LoanInput {
@@ -1300,18 +1329,22 @@ export async function processFnf(employeeId: string, period?: string) {
 // Reimbursement claims — admin review (US12)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A reimbursement claim as the admin list returns it — the raw
+ * `hr.ReimbursementClaim`: `expenseDate`, `adminRemarks`, and a `categoryId`
+ * rather than a resolved category name.
+ */
 export const adminClaimSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
-  employeeCode: z.string().optional(),
-  employeeName: z.string().optional(),
-  category: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   amount: decimal,
-  claimDate: nullableIsoDate.optional(),
+  expenseDate: nullableIsoDate.optional(),
+  description: z.string().nullable().optional(),
   status: z.string(),
-  remarks: z.string().nullable().optional(),
+  adminRemarks: z.string().nullable().optional(),
   receiptRef: z.string().nullable().optional(),
+  paymentMode: z.string().nullable().optional(),
 });
 
 export type AdminClaim = z.infer<typeof adminClaimSchema>;
@@ -1343,9 +1376,18 @@ export async function rejectClaim(id: string, remarks: string) {
   });
 }
 
+/**
+ * Records that a claim has been paid.
+ *
+ * `paymentMode` is required by the backend and genuinely matters: `payroll` adds
+ * the amount to the employee's next run, while `direct` settles it outside
+ * payroll and wants the transfer reference. There is no safe default — guessing
+ * `payroll` would silently put money into a payroll run that an accountant had
+ * already paid by bank transfer.
+ */
 export async function payClaim(
   id: string,
-  input: { paymentMode?: string; remarks?: string } = {},
+  input: { paymentMode: 'payroll' | 'direct'; paymentReference?: string },
 ) {
   return authFetch<unknown>(`/hr/reimbursements/${id}/pay`, {
     method: 'PATCH',

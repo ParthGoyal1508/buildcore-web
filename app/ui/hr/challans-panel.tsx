@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { ApiError } from '@/app/lib/api/client';
 import { exportChallan, getChallan, saveBlob } from '@/app/lib/api/hr-payroll';
 import { CHALLAN_TYPES, MESSAGES, hrLabel, type ChallanType } from '@/app/lib/constants';
 import { currentPeriod, money, periodLabel } from '@/app/lib/format';
@@ -49,11 +50,27 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
     onError: (err: Error) => setExportError(err.message),
   });
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['hr', 'challan', type, period],
     queryFn: () => getChallan(type, period),
     enabled: period.length > 0,
+    // A 404 here means "no payroll run for that period", which is a normal state
+    // for any month not yet run — retrying it four times just delays the answer.
+    retry: (count, err) =>
+      err instanceof ApiError && err.status === 404 ? false : count < 2,
   });
+
+  /**
+   * The backend answers 404 for a period with no payroll run, and 400 while that
+   * run is still a draft. Neither is a failure — both are the accurate answer to
+   * "show me this month's challan", and rendering them as "could not load" tells
+   * the user something is broken when nothing is. Only a genuinely unexpected
+   * status gets the red treatment.
+   */
+  const expected =
+    error instanceof ApiError && (error.status === 404 || error.status === 400)
+      ? error.message
+      : null;
 
   const rows = (data?.rows ?? data?.items ?? []) as Row[];
   const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
@@ -78,15 +95,23 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
         </SecondaryButton>
       </div>
       <FormError message={exportError} />
-      <DataTable
-        caption={`${hrLabel(type)} challan`}
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => String(row.employeeId ?? row.employeeCode ?? JSON.stringify(row))}
-        isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
-        emptyMessage={`No ${hrLabel(type)} contributions for ${periodLabel(period)}. This usually means the run for that period has not been processed.`}
-      />
+      {expected ? (
+        <p className="rounded-lg bg-blue-50 px-4 py-6 text-sm text-blue-800">
+          {expected}
+        </p>
+      ) : (
+        <DataTable
+          caption={`${hrLabel(type)} challan`}
+          columns={columns}
+          rows={rows}
+          rowKey={(row) =>
+            String(row.employeeId ?? row.employeeCode ?? JSON.stringify(row))
+          }
+          isLoading={isLoading}
+          error={isError ? MESSAGES.loadFailed : null}
+          emptyMessage={`No ${hrLabel(type)} contributions for ${periodLabel(period)}.`}
+        />
+      )}
       {data?.totals && (
         <dl className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-gray-50 p-3 text-sm">
           {Object.entries(data.totals).map(([key, value]) => (

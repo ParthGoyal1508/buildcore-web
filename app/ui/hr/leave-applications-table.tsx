@@ -17,6 +17,7 @@ import {
 import { dateLabel, money } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -37,10 +38,12 @@ import {
 function DecisionModal({
   application,
   decision,
+  employeeLabel,
   onClose,
 }: {
   application: LeaveApplication;
   decision: 'approved' | 'rejected';
+  employeeLabel: string;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -86,7 +89,7 @@ function DecisionModal({
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs uppercase tracking-wide text-gray-500">Employee</dt>
-            <dd>{application.employeeName ?? application.employeeId}</dd>
+            <dd>{employeeLabel}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-gray-500">Leave type</dt>
@@ -100,7 +103,7 @@ function DecisionModal({
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-gray-500">Days</dt>
-            <dd className="tabular-nums">{money(application.days)}</dd>
+            <dd className="tabular-nums">{money(application.dayCount)}</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-xs uppercase tracking-wide text-gray-500">Reason</dt>
@@ -125,6 +128,7 @@ function DecisionModal({
 }
 
 export default function LeaveApplicationsTable() {
+  const employees = useEmployeeNames();
   const [status, setStatus] = useState<string>('pending');
   const [pending, setPending] = useState<{
     application: LeaveApplication;
@@ -146,7 +150,7 @@ export default function LeaveApplicationsTable() {
       key: 'employee',
       header: 'Employee',
       sticky: true,
-      render: (row) => row.employeeName ?? row.employeeCode ?? row.employeeId,
+      render: (row) => employees.label(row.employeeId),
     },
     { key: 'type', header: 'Leave type', render: (row) => hrLabel(row.leaveType) },
     {
@@ -154,14 +158,23 @@ export default function LeaveApplicationsTable() {
       header: 'From – To',
       render: (row) => `${dateLabel(row.fromDate)} – ${dateLabel(row.toDate)}`,
     },
-    { key: 'days', header: 'Days', numeric: true, render: (row) => money(row.days) },
+    {
+      key: 'days',
+      header: 'Days',
+      numeric: true,
+      render: (row) => money(row.dayCount),
+    },
     { key: 'reason', header: 'Reason', render: (row) => row.reason ?? '—' },
     {
       key: 'status',
       header: 'Status',
       render: (row) => <StatusBadge status={row.status} />,
     },
-    { key: 'remarks', header: 'Remarks', render: (row) => row.remarks ?? '—' },
+    {
+      key: 'remarks',
+      header: 'Remarks',
+      render: (row) => row.adminRemarks ?? '—',
+    },
   ];
 
   return (
@@ -217,6 +230,7 @@ export default function LeaveApplicationsTable() {
         <DecisionModal
           application={pending.application}
           decision={pending.decision}
+          employeeLabel={employees.label(pending.application.employeeId)}
           onClose={() => setPending(null)}
         />
       )}

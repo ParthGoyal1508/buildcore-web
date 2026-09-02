@@ -17,7 +17,7 @@ import {
   MESSAGES,
   hrLabel,
 } from '@/app/lib/constants';
-import { todayIso } from '@/app/lib/format';
+import { timeLabel, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
@@ -168,8 +168,8 @@ export default function AttendanceTable() {
   const columns: Column<DailyAttendanceRow>[] = [
     { key: 'code', header: 'Code', sticky: true, render: (row) => row.employeeCode },
     { key: 'name', header: 'Employee', render: (row) => row.name },
-    { key: 'in', header: 'In', render: (row) => row.inTime ?? '—' },
-    { key: 'out', header: 'Out', render: (row) => row.outTime ?? '—' },
+    { key: 'in', header: 'In', render: (row) => timeLabel(row.inTime) },
+    { key: 'out', header: 'Out', render: (row) => timeLabel(row.outTime) },
     {
       key: 'status',
       header: 'Status',

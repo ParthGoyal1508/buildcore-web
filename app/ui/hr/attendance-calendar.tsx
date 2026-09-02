@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { getEmployeeAttendanceMonth } from '@/app/lib/api/hr-payroll';
 import { MESSAGES, STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
+import { timeLabel } from '@/app/lib/format';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -99,7 +100,7 @@ export default function AttendanceCalendar({ employeeId }: { employeeId: string 
                   <div className="mt-0.5">{hrLabel(day.status)}</div>
                   {(day.inTime || day.outTime) && (
                     <div className="mt-0.5 tabular-nums opacity-80">
-                      {day.inTime ?? '—'} – {day.outTime ?? '—'}
+                      {timeLabel(day.inTime)} – {timeLabel(day.outTime)}
                     </div>
                   )}
                   {day.otHours ? (

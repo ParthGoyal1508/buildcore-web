@@ -86,3 +86,26 @@ export function financialYearOf(date: Date = new Date()): string {
   const year = date.getUTCMonth() >= 3 ? date.getUTCFullYear() : date.getUTCFullYear() - 1;
   return `${year}-${String((year + 1) % 100).padStart(2, '0')}`;
 }
+
+/**
+ * A punch time as `HH:mm`, whatever form the API sent.
+ *
+ * The backend has two producers and they disagree: the daily register emits
+ * `"03:49"`, while the attendance history emits a full ISO timestamp. Rendering
+ * the second one raw put `2026-09-02T03:49:41.002Z` in a column headed "In".
+ * ISO values are read in UTC, matching how the register derives its own `HH:mm`
+ * from the same instant.
+ */
+export function timeLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  if (!value.includes('T')) {
+    const short = /^(\d{1,2}):(\d{2})/.exec(value);
+    if (short) return `${short[1].padStart(2, '0')}:${short[2]}`;
+    return value;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${String(parsed.getUTCHours()).padStart(2, '0')}:${String(
+    parsed.getUTCMinutes(),
+  ).padStart(2, '0')}`;
+}

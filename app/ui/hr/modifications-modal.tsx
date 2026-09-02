@@ -6,6 +6,7 @@ import { getAttendanceModifications } from '@/app/lib/api/hr-payroll';
 import { MESSAGES } from '@/app/lib/constants';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import Modal from '@/app/ui/settings/modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
@@ -32,6 +33,7 @@ function describe(value: unknown): string {
 }
 
 export default function ModificationsModal({ onClose }: { onClose: () => void }) {
+  const employees = useEmployeeNames();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'attendanceModifications'],
     queryFn: () => getAttendanceModifications({ pageSize: 100 }),
@@ -44,19 +46,23 @@ export default function ModificationsModal({ onClose }: { onClose: () => void })
       sticky: true,
       render: (row) => dateLabel(row.date),
     },
-    { key: 'employee', header: 'Employee', render: (row) => row.employeeId },
+    {
+      key: 'employee',
+      header: 'Employee',
+      render: (row) => employees.label(row.employeeId),
+    },
     {
       key: 'from',
       header: 'Changed from',
       render: (row) => (
-        <span className="text-red-700">{describe(row.changedFrom)}</span>
+        <span className="text-red-700">{describe(row.before)}</span>
       ),
     },
     {
       key: 'to',
       header: 'Changed to',
       render: (row) => (
-        <span className="text-green-700">{describe(row.changedTo)}</span>
+        <span className="text-green-700">{describe(row.after)}</span>
       ),
     },
     {
