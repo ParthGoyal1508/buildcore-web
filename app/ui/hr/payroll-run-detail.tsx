@@ -4,9 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
+  downloadBankSheet,
+  exportSalaryRegister,
   getDeductionReport,
   getPayrollRun,
   getSalaryRegister,
+  saveBlob,
   setPayrollRunStatus,
   type PayrollLineItem,
 } from '@/app/lib/api/hr-payroll';
@@ -65,6 +68,28 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
     queryKey: ['hr', 'deductionReport', runId],
     queryFn: () => getDeductionReport(runId),
     enabled: processed && tab === 'deductions',
+  });
+
+  /**
+   * Exports are only offered on a processed or paid run.
+   *
+   * A bank sheet generated from a draft is a payment instruction built on figures
+   * that are still allowed to move — the worst possible thing to hand to a bank.
+   */
+  const exportSheet = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await downloadBankSheet(runId);
+      saveBlob(blob, filename);
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const exportRegister = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await exportSalaryRegister(runId);
+      saveBlob(blob, filename);
+    },
+    onError: (err: Error) => setError(err.message),
   });
 
   const setStatus = useMutation({
@@ -168,9 +193,13 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
               Mark as paid
             </Button>
           )}
-          {run.status === 'paid' && (
-            <SecondaryButton type="button" disabled>
-              Paid
+          {processed && (
+            <SecondaryButton
+              type="button"
+              onClick={() => exportSheet.mutate()}
+              disabled={exportSheet.isPending}
+            >
+              {exportSheet.isPending ? 'Preparing…' : 'Bank sheet'}
             </SecondaryButton>
           )}
         </div>
@@ -238,6 +267,15 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
                 {register.reconciliation.message}
               </p>
             )}
+            <div className="mb-3 flex justify-end">
+              <SecondaryButton
+                type="button"
+                onClick={() => exportRegister.mutate()}
+                disabled={exportRegister.isPending}
+              >
+                {exportRegister.isPending ? 'Preparing…' : 'Export register'}
+              </SecondaryButton>
+            </div>
             <DataTable
               caption="Salary register"
               columns={[

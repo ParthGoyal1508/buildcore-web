@@ -23,7 +23,10 @@ import AttendanceCalendar from '@/app/ui/hr/attendance-calendar';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
 import MaskedField from '@/app/ui/hr/masked-field';
+import OffboardingPanel from '@/app/ui/hr/offboarding-panel';
+import TransferModal from '@/app/ui/hr/transfer-modal';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
+import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -67,6 +70,8 @@ const orDash = (value: string | null | undefined) =>
 
 export default function EmployeeDetailTabs({ employeeId }: { employeeId: string }) {
   const [tab, setTab] = useState<TabId>('overview');
+  const [transferring, setTransferring] = useState(false);
+  const [offboarding, setOffboarding] = useState(false);
 
   const { data: employee, isLoading, isError } = useQuery({
     queryKey: ['hr', 'employee', employeeId],
@@ -157,13 +162,21 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
             <StatusBadge status={employee.isActive ? 'active' : 'closed'} />
           </p>
         </div>
-        <Link
-          href={`${ROUTES.hrEmployee(employee.id)}/edit`}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-        >
-          <PencilSquareIcon className="w-4" aria-hidden="true" />
-          Edit
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`${ROUTES.hrEmployee(employee.id)}/edit`}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            <PencilSquareIcon className="w-4" aria-hidden="true" />
+            Edit
+          </Link>
+          <SecondaryButton type="button" onClick={() => setTransferring(true)}>
+            Transfer
+          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => setOffboarding(true)}>
+            Offboard
+          </SecondaryButton>
+        </div>
       </div>
 
       <TabStrip tabs={TABS} active={tab} onChange={setTab} idPrefix="employee-detail" />
@@ -369,6 +382,13 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
           emptyMessage="This employee has no loans."
         />
       </TabPanel>
+
+      {transferring && (
+        <TransferModal employee={employee} onClose={() => setTransferring(false)} />
+      )}
+      {offboarding && (
+        <OffboardingPanel employee={employee} onClose={() => setOffboarding(false)} />
+      )}
     </main>
   );
 }

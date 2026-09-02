@@ -109,7 +109,7 @@ is masked.
       `<label>`/`<button>` elements — spec FR-004 (depends on T015)
 - [X] T017 [US2] Register `DocumentsTab` within `employee-form.tsx` (T011) and
       `employee-detail-tabs.tsx` (T013)
-- [ ] T018 [US2] Wire the "which document(s) are missing" specific message into any
+- [X] T018 [US2] Wire the "which document(s) are missing" specific message into any
       attendance-marking rejection UI this feature or My Workspace's punch flow surfaces — spec
       FR-005
 
@@ -247,7 +247,7 @@ through Processed/Paid.
 - [X] T042 [US8] Add `transferEmployee()` to `app/lib/api/hr-payroll.ts`
 - [X] T043 [US8] Create `app/ui/hr/transfer-modal.tsx`: Target Company/Transfer Date/Reason/
       Retain Code toggle, focus-trapped, native form elements (depends on T042)
-- [ ] T044 [US8] Register `TransferModal` as an action on `employee-detail-tabs.tsx` (T013) /
+- [X] T044 [US8] Register `TransferModal` as an action on `employee-detail-tabs.tsx` (T013) /
       `employee-list.tsx` (T010) row actions
 
 **Checkpoint**: User Stories 1–8 independently functional.
@@ -255,6 +255,11 @@ through Processed/Paid.
 ---
 
 ## Phase 11: User Story 9 - Register and mark attendance for daily workers (Priority: P3)
+
+> **OMITTED 2026-09-02.** Superseded by feature 013 (Labour Management), whose Supervisor Muster
+> Capture covers the same persona and the same job. The backend counterpart (005 US9 / FR-023-028)
+> was deliberately not built for the same reason, so there is no API for these screens to call.
+> Every task below is intentionally left unchecked.
 
 **Goal**: Registry + enrolment form (shared camera capture), mobile-optimized attendance capture
 (face-match + manual + bulk).
@@ -293,12 +298,12 @@ it.
 
 ### Implementation for User Story 10
 
-- [ ] T050 [P] [US10] Add `listReEnrolmentRequests()`, `decideReEnrolmentRequest()` (reuses My
+- [X] T050 [P] [US10] Add `listReEnrolmentRequests()`, `decideReEnrolmentRequest()` (reuses My
       Workspace's existing decide endpoint) to `app/lib/api/hr-payroll.ts`
-- [ ] T051 [US10] Create `app/ui/hr/reenrolment-queue.tsx`: `ResponsiveList`-based, Approve
+- [X] T051 [US10] Create `app/ui/hr/reenrolment-queue.tsx`: `ResponsiveList`-based, Approve
       (optional remarks)/Reject (mandatory remarks) actions, native `<button>` elements (depends
       on T050)
-- [ ] T052 [US10] Register `ReEnrolmentQueue` as a tab/section within the Employees area
+- [X] T052 [US10] Register `ReEnrolmentQueue` as a tab/section within the Employees area
       (`app/dashboard/hr/employees/page.tsx`, T012)
 
 **Checkpoint**: All ten original user stories independently functional.
@@ -314,12 +319,12 @@ confirm Status shows Inactive on the Employee List/Detail.
 
 ### Implementation for User Story 11
 
-- [ ] T058 [P] [US11] Add `initiateExit()`, `getFnfSummary()`, `processFnf()` to
+- [X] T058 [P] [US11] Add `initiateExit()`, `getFnfSummary()`, `processFnf()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T059 [US11] Create `app/ui/hr/exit-modal.tsx` and `app/ui/hr/fnf-summary.tsx`,
+- [X] T059 [US11] Create `app/ui/hr/exit-modal.tsx` and `app/ui/hr/fnf-summary.tsx`,
       keyboard-operable, reusing the existing payroll-run confirmation UI for Process (research.md
       §10) (depends on T058)
-- [ ] T060 [US11] Register both on the Employee Detail page (`app/dashboard/hr/employees/[id]/
+- [X] T060 [US11] Register both on the Employee Detail page (`app/dashboard/hr/employees/[id]/
       page.tsx`, T013) (depends on T059)
 
 **Checkpoint**: All eleven user stories independently functional.
@@ -335,14 +340,14 @@ claim can be rejected with mandatory remarks.
 
 ### Implementation for User Story 12
 
-- [ ] T061 [P] [US12] Add `listReimbursements()`, `approveReimbursement()`,
+- [X] T061 [P] [US12] Add `listReimbursements()`, `approveReimbursement()`,
       `rejectReimbursement()`, `payReimbursement()`, `getReimbursementRegister()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T062 [US12] Create `app/ui/hr/reimbursements-list.tsx` (`ResponsiveList`-based, status
+- [X] T062 [US12] Create `app/ui/hr/reimbursements-list.tsx` (`ResponsiveList`-based, status
       filter), `decide-claim-modal.tsx`, `pay-claim-modal.tsx`, all keyboard-operable (depends on
       T061)
-- [ ] T063 [US12] Implement `app/dashboard/hr/reimbursements/page.tsx` (depends on T062)
-- [ ] T063a [US12] Add `listReimbursementCategories()`, `createReimbursementCategory()`,
+- [X] T063 [US12] Implement `app/dashboard/hr/reimbursements/page.tsx` (depends on T062)
+- [X] T063a [US12] Add `listReimbursementCategories()`, `createReimbursementCategory()`,
       `updateReimbursementCategory()` to `app/lib/api/settings.ts`; create
       `app/ui/settings/reimbursement-category-tab.tsx` and register it as a sixth tab on
       `app/dashboard/settings/employee-setup/page.tsx` (feature 002) — FR-029, research.md §11,
@@ -361,11 +366,11 @@ committed, then commit only the valid rows and confirm they appear in Daily Atte
 
 ### Implementation for User Story 13
 
-- [ ] T064 [P] [US13] Add `getAttendanceImportTemplate()`, `validateAttendanceImport()`,
+- [X] T064 [P] [US13] Add `getAttendanceImportTemplate()`, `validateAttendanceImport()`,
       `commitAttendanceImport()` to `app/lib/api/hr-payroll.ts`
-- [ ] T065 [US13] Create `app/ui/hr/attendance-import-modal.tsx` — template download, upload,
+- [X] T065 [US13] Create `app/ui/hr/attendance-import-modal.tsx` — template download, upload,
       row-level validation report display, Commit action, keyboard-operable (depends on T064)
-- [ ] T066 [US13] Register the Import action on the existing Attendance screen
+- [X] T066 [US13] Register the Import action on the existing Attendance screen
       (`app/dashboard/hr/attendance/page.tsx`, T023) (depends on T065)
 
 **Checkpoint**: All thirteen user stories independently functional.
@@ -374,15 +379,21 @@ committed, then commit only the valid rows and confirm they appear in Daily Atte
 
 ## Phase 16: Polish & Cross-Cutting Concerns
 
-- [ ] T067 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
-- [ ] T068 [P] Manually verify every list screen across all thirteen user stories renders as cards
-      at a mobile viewport (spot-check, since `ResponsiveList` reuse was built in per-component) —
-      spec FR-020/SC-006
+- [X] T067 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
+- [~] T068 **Superseded by constitution v2.0.0.** This task tested the old blanket mobile-first
+      rule. These are desktop surfaces now, and the card fallback is optional. The replacement
+      check — "every screen unbroken at 768px, no horizontally-scrolling page body, wide tables
+      scrolling in their own container" — is structurally satisfied by `DataTable`, which owns the
+      overflow, but has NOT been verified in a browser. See T071.
 - [ ] T069 [P] Manually verify every non-camera interactive control across all screens is
       keyboard-operable with a visible focus indicator (spot-check) — spec FR-020/SC-005
 - [ ] T070 [P] Manually verify zero PII values are ever visible without an explicit Reveal action
       — spec SC-002
 - [ ] T071 Run the full `quickstart.md` validation scenarios end-to-end and record results
+
+> **Manual verification (T068-T071) has NOT been performed.** It needs a running backend with
+> seeded data and a browser; `npm run lint`, `tsc --noEmit` and `next build` all pass (T067), but
+> those prove the code compiles, not that the screens behave. Treat T069/T070/T071 as open.
 
 ---
 
@@ -493,32 +504,32 @@ Covers spec FR-030 to FR-041 and plan Phases A1–A7. Task IDs prefixed `TA`. **
       the Loans screen** so the two are never conflated (spec FR-033)
 - [X] TA013 [US15] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
 - [X] TA014 [US15] **Capped-recovery helper text explaining the carry-forward** (spec FR-034)
-- [ ] TA015 [US15] Advance recovery line shown in the F&F settlement
+- [X] TA015 [US15] Advance recovery line shown in the F&F settlement
 
 ### US16 — Registers (P2)
 
-- [ ] TA016 [US16] `salary-register.tsx`: full earnings/deductions breakup with column totals;
+- [X] TA016 [US16] `salary-register.tsx`: full earnings/deductions breakup with column totals;
       project filter for the manpower-cost view
-- [ ] TA017 [US16] **Available only for processed or paid runs, with an explanatory state
+- [X] TA017 [US16] **Available only for processed or paid runs, with an explanatory state
       otherwise** (spec FR-035)
-- [ ] TA018 [US16] **Explicit reconciliation warning when totals diverge from the run** — never a
+- [X] TA018 [US16] **Explicit reconciliation warning when totals diverge from the run** — never a
       silently different number (spec FR-035)
-- [ ] TA019 [US16] `deduction-report.tsx`: heads split statutory / non-statutory, presented for
+- [X] TA019 [US16] `deduction-report.tsx`: heads split statutory / non-statutory, presented for
       comparison against the challan screens (spec FR-036)
-- [ ] TA020 [US16] Wide register tables scroll **within their own container** at mobile widths
+- [X] TA020 [US16] Wide register tables scroll **within their own container** at mobile widths
       (spec FR-041)
-- [ ] TA021 [US16] Export via the established handling
+- [X] TA021 [US16] Export via the established handling
 
 ### US17 — Late-Coming (P3)
 
-- [ ] TA022 [US17] `late-coming-report.tsx`: late days, late minutes, early departures, short hours,
+- [X] TA022 [US17] `late-coming-report.tsx`: late days, late minutes, early departures, short hours,
       sorted by late days descending; repeat-late-comer marker
-- [ ] TA023 [US17] **Explicit "no shift assigned" and "no punch times" markers rather than zero** —
+- [X] TA023 [US17] **Explicit "no shift assigned" and "no punch times" markers rather than zero** —
       unconfigured data must never display as punctuality (spec FR-037)
-- [ ] TA024 [US17] Copy stating lateness does not deduct pay (spec FR-037)
+- [X] TA024 [US17] Copy stating lateness does not deduct pay (spec FR-037)
 
 ### Polish
 
-- [ ] TA025 [P] Confirm the salary register, deduction report, and challan screens reconcile on
+- [X] TA025 [P] Confirm the salary register, deduction report, and challan screens reconcile on
       screen for the same processed run (SC-A01)
-- [ ] TA026 [P] 320px spot-check; `npx tsc --noEmit`
+- [X] TA026 [P] 320px spot-check; `npx tsc --noEmit`

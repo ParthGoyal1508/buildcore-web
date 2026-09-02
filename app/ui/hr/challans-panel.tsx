@@ -1,14 +1,14 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getChallan } from '@/app/lib/api/hr-payroll';
+import { exportChallan, getChallan, saveBlob } from '@/app/lib/api/hr-payroll';
 import { CHALLAN_TYPES, MESSAGES, hrLabel, type ChallanType } from '@/app/lib/constants';
 import { currentPeriod, money, periodLabel } from '@/app/lib/format';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
-import { TextField } from '@/app/ui/settings/form-fields';
+import { FormError, SecondaryButton, TextField } from '@/app/ui/settings/form-fields';
 
 type Row = Record<string, unknown>;
 
@@ -39,6 +39,16 @@ function cell(value: unknown): string {
  * contract here.
  */
 function ChallanView({ type, period }: { type: ChallanType; period: string }) {
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const download = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await exportChallan(type, period);
+      saveBlob(blob, filename);
+    },
+    onError: (err: Error) => setExportError(err.message),
+  });
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'challan', type, period],
     queryFn: () => getChallan(type, period),
@@ -58,6 +68,16 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex justify-end">
+        <SecondaryButton
+          type="button"
+          onClick={() => download.mutate()}
+          disabled={rows.length === 0 || download.isPending}
+        >
+          {download.isPending ? 'Preparing…' : `Export ${hrLabel(type)}`}
+        </SecondaryButton>
+      </div>
+      <FormError message={exportError} />
       <DataTable
         caption={`${hrLabel(type)} challan`}
         columns={columns}

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { authFetch } from '@/app/lib/session';
+import { API_URL } from '@/app/lib/config';
+import { authFetch, getAccessToken } from '@/app/lib/session';
 import {
   ATTENDANCE_STATUS_OVERRIDES,
   CALCULATION_MODES,
@@ -86,6 +87,52 @@ const paginated = <T extends z.ZodTypeAny>(item: T) =>
     page: z.number(),
     pageSize: z.number(),
   });
+
+/**
+ * Downloads a generated file (register, challan, bank sheet) as a Blob.
+ *
+ * A raw `fetch` rather than `authFetch`, for the same reason My Workspace's
+ * payslip download uses one: `authFetch` parses the response as JSON, which
+ * destroys a spreadsheet body. The cost is that these calls do not get the
+ * refresh-on-401 retry — acceptable, because an export is always a deliberate
+ * click on a screen the user loaded through an authenticated request moments
+ * earlier, so an expired token is a re-click rather than a lost session.
+ *
+ * The filename comes from the response's own `Content-Disposition`, so the
+ * backend stays the single authority on what a downloaded register is called.
+ */
+export async function downloadFile(
+  path: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new Error('Could not produce that export. Please try again.');
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  return {
+    blob: await res.blob(),
+    filename: match ? decodeURIComponent(match[1]) : 'export',
+  };
+}
+
+/** Hands a downloaded blob to the browser as a save. */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoked on the next tick rather than immediately: revoking synchronously can
+  // beat the browser to reading the URL and produce an empty file.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Employees (US1)
@@ -764,8 +811,9 @@ export async function setPayrollRunStatus(
   );
 }
 
-export async function getBankSheet(id: string) {
-  return authFetch<unknown>(`/hr/payroll/runs/${id}/bank-sheet`);
+/** The bank salary sheet for a run, as a file. */
+export async function downloadBankSheet(id: string) {
+  return downloadFile(`/hr/payroll/runs/${id}/bank-sheet`);
 }
 
 // --- Registers (US16) ---
@@ -845,6 +893,15 @@ const deductionReportSchema = z.object({
   totals: z.object({ statutory: decimal, nonStatutory: decimal }),
 });
 
+export async function exportSalaryRegister(
+  runId: string,
+  filters: { departmentId?: string; projectId?: string; siteId?: string } = {},
+) {
+  return downloadFile(
+    `/hr/payroll/runs/${runId}/salary-register/export${qs({ ...filters })}`,
+  );
+}
+
 export async function getDeductionReport(runId: string) {
   return deductionReportSchema.parse(
     await authFetch<unknown>(`/hr/payroll/runs/${runId}/deduction-report`),
@@ -869,6 +926,10 @@ export async function getChallan(type: ChallanType, period: string) {
   return challanSchema.parse(
     await authFetch<unknown>(`/hr/challans/${type}${qs({ period })}`),
   );
+}
+
+export async function exportChallan(type: ChallanType, period: string) {
+  return downloadFile(`/hr/challans/${type}/export${qs({ period })}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
