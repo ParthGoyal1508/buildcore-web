@@ -570,8 +570,9 @@ const importResultSchema = z.object({
 
 export type ImportResult = z.infer<typeof importResultSchema>;
 
-export async function getAttendanceImportTemplate() {
-  return authFetch<unknown>('/hr/attendance/import/template');
+/** The CSV template's header row, as a file the admin fills in and re-uploads. */
+export async function downloadAttendanceImportTemplate() {
+  return downloadFile('/hr/attendance/import/template');
 }
 
 export async function validateAttendanceImport(csv: string) {
@@ -1187,12 +1188,41 @@ export async function getQuarterlyTds(
   );
 }
 
+/**
+ * The figures a Form 16 Part B is built from.
+ *
+ * Not the form itself — this is the computation behind it, which is what an
+ * employee queries and what payroll has to be able to explain. Each declared
+ * section carries both what was declared and what was actually allowed, because
+ * the gap between the two is the usual reason the tax figure surprises someone.
+ */
+const formSixteenSchema = z.object({
+  employeeId: z.string(),
+  financialYear: z.string(),
+  grossSalary: decimal,
+  standardDeduction: decimal,
+  deductionsBySection: z.array(
+    z.object({
+      sectionCode: z.string(),
+      declaredAmount: decimal,
+      allowedAmount: decimal,
+      verified: z.boolean(),
+    }),
+  ),
+  taxableIncome: decimal,
+  taxDeducted: decimal,
+});
+
+export type FormSixteen = z.infer<typeof formSixteenSchema>;
+
 export async function getFormSixteenData(
   employeeId: string,
   financialYear: string,
 ) {
-  return authFetch<unknown>(
-    `/hr/tds/form-16/${employeeId}${qs({ financialYear })}`,
+  return formSixteenSchema.parse(
+    await authFetch<unknown>(
+      `/hr/tds/form-16/${employeeId}${qs({ financialYear })}`,
+    ),
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import FormSixteenView from '@/app/ui/hr/form-sixteen-view';
 import QuarterlyTdsReport from '@/app/ui/hr/quarterly-tds-report';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import TaxDeclarationForm from '@/app/ui/hr/tax-declaration-form';
@@ -11,6 +12,7 @@ const TABS = [
   { id: 'slabs', label: 'Tax slabs' },
   { id: 'declarations', label: 'Declarations' },
   { id: 'quarterly', label: 'Quarterly return' },
+  { id: 'form16', label: 'Form 16' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -28,6 +30,9 @@ export default function TdsWorkspace() {
       </TabPanel>
       <TabPanel id="quarterly" idPrefix="tds" active={tab}>
         <QuarterlyTdsReport />
+      </TabPanel>
+      <TabPanel id="form16" idPrefix="tds" active={tab}>
+        <FormSixteenView />
       </TabPanel>
     </div>
   );

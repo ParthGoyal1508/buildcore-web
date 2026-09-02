@@ -6,6 +6,8 @@ import { useState } from 'react';
 
 import {
   commitAttendanceImport,
+  downloadAttendanceImportTemplate,
+  saveBlob,
   validateAttendanceImport,
   type ImportResult,
 } from '@/app/lib/api/hr-payroll';
@@ -41,6 +43,16 @@ export default function AttendanceImportPanel() {
   const [validation, setValidation] = useState<ImportResult | null>(null);
   const [committed, setCommitted] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Offered before the file picker, because guessing the column order is the
+  // first thing that goes wrong with a bulk import.
+  const template = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await downloadAttendanceImportTemplate();
+      saveBlob(blob, filename);
+    },
+    onError: (err: Error) => setError(err.message),
+  });
 
   const validate = useMutation({
     mutationFn: () => validateAttendanceImport(csv),
@@ -78,6 +90,19 @@ export default function AttendanceImportPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg border border-gray-200 p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-gray-600">
+            Start from the template so the columns are in the order the importer
+            expects.
+          </p>
+          <SecondaryButton
+            type="button"
+            onClick={() => template.mutate()}
+            disabled={template.isPending}
+          >
+            {template.isPending ? 'Preparing…' : 'Download template'}
+          </SecondaryButton>
+        </div>
         <label
           htmlFor="import-file"
           className="mb-1 block text-sm font-medium text-gray-700"
