@@ -318,3 +318,10 @@ correct password succeeds again.
   does not need its own user-facing message distinct from the generic invalid-credentials message;
   only the per-account lockout (FR-014) gets a distinct, lockout-specific message, per the user's
   explicit choice during specification.
+
+## Amendment 2026-09-02 — Desktop-First Responsiveness (constitution v2.0.0)
+
+Constitution Principle VI was redefined from blanket mobile-first to **desktop-first with a closed
+list of mobile-critical surfaces**. Sign-in is **on** that list. It is not field work in itself, but a site user cannot punch without passing through it, so a desktop-only login would make the rest of the mobile-critical list unreachable.
+
+**What changes for this feature:** nothing is relaxed. The sign-in screen stays **mobile-first**, built base-up from a 320px viewport, with 44×44px touch targets and no hover-gated action, and is verified at 320px before merge. It must also render correctly at desktop, where most sign-ins actually happen.

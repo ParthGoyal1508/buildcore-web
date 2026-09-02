@@ -123,19 +123,23 @@ bulk selection saves real time.
 supported by the underlying biometric contract (one photo matches one descriptor per the backend's
 own design) and not requested by the PRD.
 
-## 9. Accessibility and mobile-first patterns
+## 9. Accessibility and responsiveness patterns *(revised 2026-09-02, constitution v2.0.0)*
 
-**Decision**: Reuses the established `ResponsiveList` pattern for every table in this feature
-(Employee List, Attendance, Leave, Payroll, Challans, Loans, Daily Worker Registry/Attendance) and
-the semantic-HTML/keyboard-operability conventions for every form/modal/filter, built into each
-component's own task from the start (per this session's now-consistent practice) rather than
-verified only at Polish.
+**Decision**: Every table in this feature (Employee List, Attendance, Leave, Payroll, Challans,
+Loans) is designed at desktop width inside its own `overflow-x: auto` container, so the page body
+never scrolls sideways and the screen stays unbroken at 768px. The `ResponsiveList` card pattern is
+used only where a table is narrow enough that cards genuinely read better — it is optional here,
+not the default. Semantic-HTML/keyboard-operability conventions apply to every form/modal/filter
+regardless of viewport, built into each component's own task from the start rather than verified
+only at Polish.
 
-**Rationale**: Consistency with the repo-wide convention; explicitly building it in from the start
-avoids the recurring gap-then-fix pattern earlier features in this session needed their own
-analyze passes to catch.
+**Rationale**: Constitution v2.0.0 scopes mobile-first to punch, attendance viewing, leave and
+sign-in; HR/payroll administration is desk work on dense tabular data. Forcing an eighteen-column
+salary register into stacked cards destroys exactly the column-to-column comparison the register
+exists to support. Keyboard operability is *not* scoped by viewport and is unchanged.
 
-**Alternatives considered**: None — settled precedent, applied proactively this time.
+**Alternatives considered**: Keeping `ResponsiveList` on every table (rejected — it is now optional,
+and mandating it would reintroduce the cost the constitution amendment removed).
 
 ## 10. Offboarding/F&F, Reimbursements Admin, Attendance Import — added during the master-PRD
 alignment pass

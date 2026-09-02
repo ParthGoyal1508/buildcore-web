@@ -31,7 +31,8 @@ Verification is manual per [quickstart.md](quickstart.md), notably including the
 new widget, confirm zero code change needed" check (spec SC-002).
 
 **Target Platform**: Desktop web (primary, admin-facing) + mobile web, consistent with this app's
-mobile-first constitution principle applied to every screen regardless of primary usage pattern.
+desktop-first constitution principle (VI, as amended v2.0.0): the dashboard is a back-office
+surface, designed at desktop width and kept unbroken down to 768px.
 
 **Project Type**: Web application — this plan covers only the `buildcore-web` frontend; the
 backend it depends on is already fully specified separately (`buildcore-api`,
@@ -44,7 +45,8 @@ calls.
 **Constraints**: No inline styles (Tailwind + `clsx`, Principle II); no literal strings/URLs
 inline — routes and copy in `app/lib/constants.ts` (Principle III); TypeScript `strict`, `zod` at
 every API boundary (Principle IV); all `buildcore-api` calls through `app/lib/api/dashboard.ts`
-(Principle V); every screen mobile-first and keyboard-operable (Principle VI, spec FR-019); zero
+(Principle V); every screen desktop-first, unbroken at 768px, and keyboard-operable (Principle VI
+as amended v2.0.0, spec FR-019); zero
 per-widget-id conditionals anywhere in this feature's rendering code (spec FR-001, SC-002).
 
 **Scale/Scope**: Five screens/route additions (one of them, `/dashboard`, a rewrite of an existing
@@ -63,7 +65,7 @@ functions. Removes `app/ui/dashboard/cards.tsx` (superseded placeholder).
 | III. Centralized Constants & Configuration (NON-NEGOTIABLE) | New routes, copy, the 30s refresh interval, and the debounce delay for employee search all in `app/lib/constants.ts`. | PASS |
 | IV. Type Safety & Validation | Every `app/lib/api/dashboard.ts` function `zod`-validates its response (data-model.md); export blob responses handled per the established non-JSON pattern (My Workspace research.md §8). | PASS |
 | V. API Access Boundary (NON-NEGOTIABLE) | All calls through `app/lib/api/dashboard.ts`; no ad-hoc `fetch()` in components. | PASS |
-| VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) | Reuses the established `ResponsiveList` pattern for `WidgetTable`; every filter/selector/export control keyboard-operable (spec FR-019). | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): the dashboard is an analytical back-office surface. `WidgetTable` is designed at desktop width and scrolls in its own container below it; the card fallback is optional (see Amendment 2026-09-02). Unbroken at 768px; every filter/selector/export control keyboard-operable (spec FR-019). | PASS |
 
 No violations require a Complexity Tracking entry.
 

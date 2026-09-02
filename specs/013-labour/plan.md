@@ -52,7 +52,7 @@ error treatment (spec FR-009).
 | III. Centralized constants | Routes, attendance types, status labels, denominations, and colour maps in constants (spec FR-022). | PASS |
 | IV. Type safety + zod | Every response validated at the boundary (spec FR-005). | PASS |
 | V. API access boundary | All calls via `app/lib/api/labour.ts` (spec FR-004). | PASS |
-| VI. Mobile-first (NON-NEGOTIABLE) | The muster capture is the app's most field-facing surface: one-handed at 320px, 44×44px targets, no hover-gated action (spec FR-026). Back-office lists use `ResponsiveList`. | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | **Split (constitution v2.0.0).** Muster capture is a named mobile-critical surface and stays mobile-first: one-handed at 320px, 44×44px targets, no hover-gated action (spec FR-026), verified at 320px. Every other screen in this feature (wage-rate masters, payment sheets, advances, reports) is desktop-first — designed at desktop width, wide tables scrolling in their own container, unbroken at 768px, `ResponsiveList` optional. Keyboard operability applies to both halves. | PASS |
 | Reuse over reimplementation | Camera, geofence, and offline queue reused as a hard requirement (spec FR-006), not a preference. | PASS |
 | `middleware.ts` route guard | Labour routes guarded with `DAILY_WORKER_REGISTRY`; reports additionally `REPORTS` (spec FR-002). | PASS |
 

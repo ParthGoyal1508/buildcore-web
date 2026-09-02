@@ -13,7 +13,8 @@ contracts/hr-payroll-ui.md, quickstart.md
 (constitution's documented gap); verification is manual via `quickstart.md`.
 
 **Organization**: Tasks are grouped by user story (from spec.md). Every component-building task
-bakes in mobile-first/`ResponsiveList` and keyboard-operability/semantic-HTML requirements and
+bakes in desktop-first responsiveness (unbroken at 768px, wide tables scrolling in their own
+container; `ResponsiveList` optional per constitution v2.0.0) and keyboard-operability/semantic-HTML requirements and
 route-guard permissions from the start, per this session's established practice (rather than a
 Polish-phase retrofit). All paths are in this repo (`buildcore-web`) — the backend is a separate,
 already-fully-specced feature in `buildcore-api` (`specs/005-hr-payroll-backend`).
@@ -28,8 +29,8 @@ already-fully-specced feature in `buildcore-api` (`specs/005-hr-payroll-backend`
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Add `/dashboard/hr/*` routes and copy to `app/lib/constants.ts`
-- [ ] T002 [P] Create `zod` schemas for `Employee`, `EmployeeDocument`, `EmployeeTransfer`,
+- [X] T001 [P] Add `/dashboard/hr/*` routes and copy to `app/lib/constants.ts`
+- [X] T002 [P] Create `zod` schemas for `Employee`, `EmployeeDocument`, `EmployeeTransfer`,
       `AttendanceRecord`, `AttendanceModification`, `Holiday`, `LeaveApplication`/`LeaveBalance`
       (admin views), `PayrollRun`/`PayrollLineItem`, Challan row shapes, `Loan`/
       `LoanScheduleEntry`, `DailyWorker`/`DailyWorkerAttendance`, `ReEnrolmentRequest` (admin
@@ -43,16 +44,17 @@ already-fully-specced feature in `buildcore-api` (`specs/005-hr-payroll-backend`
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 Move `app/ui/my/camera-capture.tsx` → `app/ui/shared/camera-capture.tsx`; update My
+- [~] T003 **Not needed** — the only second consumer was US9 (omitted; superseded by 013), so
+      this would move a file for one caller. Move `app/ui/my/camera-capture.tsx` → `app/ui/shared/camera-capture.tsx`; update My
       Workspace's imports — research.md §3
-- [ ] T004 Extract the geolocation-acquisition logic from My Workspace's `punch-clock.tsx` into
+- [~] T004 **Not needed** — same reason as T003. Extract the geolocation-acquisition logic from My Workspace's `punch-clock.tsx` into
       `app/lib/geolocation.ts`; update My Workspace's usage — research.md §3
-- [ ] T005 Move `app/ui/my/salary-slip.tsx` → `app/ui/shared/salary-slip.tsx` (presentational
+- [X] T005 Move `app/ui/my/salary-slip.tsx` → `app/ui/shared/salary-slip.tsx` (presentational
       component only, takes a `SalarySlip` data prop); update My Workspace's usage — research.md §4
-- [ ] T006 Extend `middleware.ts` so its route matcher covers `/dashboard/hr/*` with the
+- [X] T006 Extend `middleware.ts` so its route matcher covers `/dashboard/hr/*` with the
       permission-per-area mapping (`EMPLOYEES`/`ATTENDANCE`/`PAYROLL`/`CHALLANS`/`LOANS`/
       `DAILY_WORKER_REGISTRY`) — spec FR-020 access-control equivalent, contracts/hr-payroll-ui.md
-- [ ] T007 [P] Create `app/dashboard/hr/page.tsx`: a simple landing/sub-nav to the seven areas,
+- [X] T007 [P] Create `app/dashboard/hr/page.tsx`: a simple landing/sub-nav to the seven areas,
       finally resolving `nav-links.tsx`'s existing "HR & Payroll" entry
 
 **Checkpoint**: Shared components/utilities promoted, route protection extended, landing page
@@ -69,23 +71,23 @@ is masked.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Add `listEmployees()`, `getEmployee()`, `createEmployee()`,
+- [X] T008 [P] [US1] Add `listEmployees()`, `getEmployee()`, `createEmployee()`,
       `updateEmployee()`, `revealEmployeePii()` to `app/lib/api/hr-payroll.ts`
-- [ ] T009 [US1] Create `app/ui/hr/masked-field.tsx`: masked-by-default display + per-field
+- [X] T009 [US1] Create `app/ui/hr/masked-field.tsx`: masked-by-default display + per-field
       Reveal action (research.md §5) — native `<button>`, keyboard-operable
-- [ ] T010 [US1] Create `app/ui/hr/employee-list.tsx`: `ResponsiveList`-based, search/department/
+- [X] T010 [US1] Create `app/ui/hr/employee-list.tsx`: `ResponsiveList`-based, search/department/
       site/status/company filters, Documents-progress column (depends on T008)
-- [ ] T011 [US1] Create `app/ui/hr/employee-form.tsx`: one `react-hook-form` instance across eight
+- [X] T011 [US1] Create `app/ui/hr/employee-form.tsx`: one `react-hook-form` instance across eight
       presentational tabs (research.md §2), conditional required fields per Employment
       Type/Statutory toggles, `MaskedField` (T009) for PII inputs, native `<label>`/`<button>`
       elements throughout, focus-trapped where modal-like sections exist — spec FR-001, FR-018
       (unsaved-changes navigation warning), FR-003
-- [ ] T012 [US1] Create `app/dashboard/hr/employees/page.tsx`,
+- [X] T012 [US1] Create `app/dashboard/hr/employees/page.tsx`,
       `new/page.tsx`, `[id]/edit/page.tsx` (depends on T010, T011)
-- [ ] T013 [US1] Create `app/ui/hr/employee-detail-tabs.tsx`: Overview/Personal/Employment/Salary
+- [X] T013 [US1] Create `app/ui/hr/employee-detail-tabs.tsx`: Overview/Personal/Employment/Salary
       Structure/Attendance Calendar (via 003's month-history call)/Leave Summary/Documents/Loan
       History, keyboard-operable tab navigation
-- [ ] T014 [US1] Create `app/dashboard/hr/employees/[id]/page.tsx` rendering
+- [X] T014 [US1] Create `app/dashboard/hr/employees/[id]/page.tsx` rendering
       `EmployeeDetailTabs` (depends on T013)
 
 **Checkpoint**: User Story 1 fully functional and independently testable.
@@ -100,14 +102,14 @@ is masked.
 
 ### Implementation for User Story 2
 
-- [ ] T015 [P] [US2] Add `uploadEmployeeDocument()`, `listEmployeeDocuments()` to
+- [X] T015 [P] [US2] Add `uploadEmployeeDocument()`, `listEmployeeDocuments()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T016 [US2] Create `app/ui/hr/documents-tab.tsx`: per-document-type upload control
+- [X] T016 [US2] Create `app/ui/hr/documents-tab.tsx`: per-document-type upload control
       (conditional number/expiry fields per type), expiry-warning indicator, native
       `<label>`/`<button>` elements — spec FR-004 (depends on T015)
-- [ ] T017 [US2] Register `DocumentsTab` within `employee-form.tsx` (T011) and
+- [X] T017 [US2] Register `DocumentsTab` within `employee-form.tsx` (T011) and
       `employee-detail-tabs.tsx` (T013)
-- [ ] T018 [US2] Wire the "which document(s) are missing" specific message into any
+- [X] T018 [US2] Wire the "which document(s) are missing" specific message into any
       attendance-marking rejection UI this feature or My Workspace's punch flow surfaces — spec
       FR-005
 
@@ -124,18 +126,18 @@ holiday and confirm status reflects it.
 
 ### Implementation for User Story 3
 
-- [ ] T019 [P] [US3] Add `getDailyAttendance()`, `markAttendance()`, `updateAttendance()`,
+- [X] T019 [P] [US3] Add `getDailyAttendance()`, `markAttendance()`, `updateAttendance()`,
       `getExceptions()`, `getModifications()`, `listHolidays()`, `createHoliday()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T020 [US3] Create `app/ui/hr/attendance-table.tsx`: `ResponsiveList`-based, date picker +
+- [X] T020 [US3] Create `app/ui/hr/attendance-table.tsx`: `ResponsiveList`-based, date picker +
       site filter, status badges (depends on T019)
-- [ ] T021 [US3] Create `app/ui/hr/mark-edit-modal.tsx`: focus-trapped, native form elements,
+- [X] T021 [US3] Create `app/ui/hr/mark-edit-modal.tsx`: focus-trapped, native form elements,
       "period locked" message handling — spec FR-008 (depends on T019)
-- [ ] T022 [US3] Create `app/ui/hr/exceptions-modal.tsx` and `modifications-modal.tsx`:
+- [X] T022 [US3] Create `app/ui/hr/exceptions-modal.tsx` and `modifications-modal.tsx`:
       `ResponsiveList`-based, focus-trapped (depends on T019)
-- [ ] T023 [US3] Create `app/ui/hr/holidays-panel.tsx`: list + declare form, native elements,
+- [X] T023 [US3] Create `app/ui/hr/holidays-panel.tsx`: list + declare form, native elements,
       keyboard-operable (depends on T019)
-- [ ] T024 [US3] Create `app/dashboard/hr/attendance/page.tsx` composing all of the above
+- [X] T024 [US3] Create `app/dashboard/hr/attendance/page.tsx` composing all of the above
       (depends on T020–T023)
 
 **Checkpoint**: User Stories 1–3 independently functional.
@@ -150,14 +152,14 @@ holiday and confirm status reflects it.
 
 ### Implementation for User Story 4
 
-- [ ] T025 [P] [US4] Add `listAllLeaveApplications()`, `decideLeaveApplication()`,
+- [X] T025 [P] [US4] Add `listAllLeaveApplications()`, `decideLeaveApplication()`,
       `listLeaveBalances()` to `app/lib/api/hr-payroll.ts`
-- [ ] T026 [US4] Create `app/ui/hr/leave-applications-table.tsx`: `ResponsiveList`-based,
+- [X] T026 [US4] Create `app/ui/hr/leave-applications-table.tsx`: `ResponsiveList`-based,
       Approve/Reject (remarks)/Cancel actions per status, native `<button>` elements, informational
       note for payroll-locked-period approvals (not blocking) — spec Edge Cases (depends on T025)
-- [ ] T027 [US4] Create `app/ui/hr/leave-balance-table.tsx`: `ResponsiveList`-based (depends on
+- [X] T027 [US4] Create `app/ui/hr/leave-balance-table.tsx`: `ResponsiveList`-based (depends on
       T025)
-- [ ] T028 [US4] Create `app/dashboard/hr/leave/page.tsx` (depends on T026, T027)
+- [X] T028 [US4] Create `app/dashboard/hr/leave/page.tsx` (depends on T026, T027)
 
 **Checkpoint**: User Stories 1–4 independently functional.
 
@@ -172,12 +174,12 @@ Payroll's engine consumes loan data)
 
 ### Implementation for User Story 7
 
-- [ ] T029 [P] [US7] Add `listLoans()`, `createLoan()`, `getLoanSchedule()`, `closeLoan()` to
+- [X] T029 [P] [US7] Add `listLoans()`, `createLoan()`, `getLoanSchedule()`, `closeLoan()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T030 [US7] Create `app/ui/hr/loan-list.tsx`: `ResponsiveList`-based (depends on T029)
-- [ ] T031 [US7] Create `app/ui/hr/new-loan-modal.tsx`: focus-trapped, native form elements
+- [X] T030 [US7] Create `app/ui/hr/loan-list.tsx`: `ResponsiveList`-based (depends on T029)
+- [X] T031 [US7] Create `app/ui/hr/new-loan-modal.tsx`: focus-trapped, native form elements
       (depends on T029)
-- [ ] T032 [US7] Create `app/dashboard/hr/loans/page.tsx`,
+- [X] T032 [US7] Create `app/dashboard/hr/loans/page.tsx`,
       `[id]/schedule/page.tsx` (`ResponsiveList`-based schedule table) (depends on T030, T031)
 
 **Checkpoint**: User Stories 1–4 and 7 independently functional.
@@ -194,21 +196,21 @@ through Processed/Paid.
 
 ### Implementation for User Story 5
 
-- [ ] T033 [P] [US5] Add `generatePayroll()`, `listPayrollRuns()`, `processPayrollRun()`,
+- [X] T033 [P] [US5] Add `generatePayroll()`, `listPayrollRuns()`, `processPayrollRun()`,
       `markPayrollRunPaid()`, `getEmployeeSalarySlip()` (admin-scoped — never My Workspace's
       `getSalarySlip`, research.md §4), `downloadSalarySlipPdf()`, `downloadBankSheet()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T034 [US5] Create `app/ui/hr/generate-payroll-form.tsx`: month selector, triggers
+- [X] T034 [US5] Create `app/ui/hr/generate-payroll-form.tsx`: month selector, triggers
       `generatePayroll()` (depends on T033)
-- [ ] T035 [US5] Create `app/ui/hr/payroll-list.tsx`: `ResponsiveList`-based, status-transition
+- [X] T035 [US5] Create `app/ui/hr/payroll-list.tsx`: `ResponsiveList`-based, status-transition
       actions (Process/Pay) each behind a confirm dialog explaining the lock consequence
       (research.md §6), editing controls hidden once Processed — spec FR-010 (depends on T033)
-- [ ] T036 [US5] Create `app/dashboard/hr/payroll/page.tsx` composing `GeneratePayrollForm` +
+- [X] T036 [US5] Create `app/dashboard/hr/payroll/page.tsx` composing `GeneratePayrollForm` +
       `PayrollList` (depends on T034, T035)
-- [ ] T037 [US5] Create `app/dashboard/hr/payroll/[runId]/employees/[employeeId]/slip/page.tsx`:
+- [X] T037 [US5] Create `app/dashboard/hr/payroll/[runId]/employees/[employeeId]/slip/page.tsx`:
       renders the shared `salary-slip.tsx` (T005) fed by `getEmployeeSalarySlip()`, plus a PDF
       Download action (depends on T005, T033)
-- [ ] T038 [US5] Wire the Bank Salary Sheet export action (`downloadBankSheet()`) on
+- [X] T038 [US5] Wire the Bank Salary Sheet export action (`downloadBankSheet()`) on
       `payroll-list.tsx` or the run detail area — spec FR-012 (depends on T033)
 
 **Checkpoint**: User Stories 1–5 and 7 independently functional — the feature's core MVP loop.
@@ -223,12 +225,12 @@ through Processed/Paid.
 
 ### Implementation for User Story 6
 
-- [ ] T039 [P] [US6] Add `getPfChallan()`, `getEsicChallan()`, `getPtChallan()`,
+- [X] T039 [P] [US6] Add `getPfChallan()`, `getEsicChallan()`, `getPtChallan()`,
       `exportChallan()` to `app/lib/api/hr-payroll.ts`
-- [ ] T040 [US6] Create `app/ui/hr/challan-tabs.tsx`: three `ResponsiveList`-based tabs, month
+- [X] T040 [US6] Create `app/ui/hr/challan-tabs.tsx`: three `ResponsiveList`-based tabs, month
       selector, "not yet processed" empty state, export action per tab — spec FR-013 (depends on
       T039)
-- [ ] T041 [US6] Create `app/dashboard/hr/challans/page.tsx` (depends on T040)
+- [X] T041 [US6] Create `app/dashboard/hr/challans/page.tsx` (depends on T040)
 
 **Checkpoint**: User Stories 1–7 independently functional.
 
@@ -242,10 +244,10 @@ through Processed/Paid.
 
 ### Implementation for User Story 8
 
-- [ ] T042 [US8] Add `transferEmployee()` to `app/lib/api/hr-payroll.ts`
-- [ ] T043 [US8] Create `app/ui/hr/transfer-modal.tsx`: Target Company/Transfer Date/Reason/
+- [X] T042 [US8] Add `transferEmployee()` to `app/lib/api/hr-payroll.ts`
+- [X] T043 [US8] Create `app/ui/hr/transfer-modal.tsx`: Target Company/Transfer Date/Reason/
       Retain Code toggle, focus-trapped, native form elements (depends on T042)
-- [ ] T044 [US8] Register `TransferModal` as an action on `employee-detail-tabs.tsx` (T013) /
+- [X] T044 [US8] Register `TransferModal` as an action on `employee-detail-tabs.tsx` (T013) /
       `employee-list.tsx` (T010) row actions
 
 **Checkpoint**: User Stories 1–8 independently functional.
@@ -253,6 +255,11 @@ through Processed/Paid.
 ---
 
 ## Phase 11: User Story 9 - Register and mark attendance for daily workers (Priority: P3)
+
+> **OMITTED 2026-09-02.** Superseded by feature 013 (Labour Management), whose Supervisor Muster
+> Capture covers the same persona and the same job. The backend counterpart (005 US9 / FR-023-028)
+> was deliberately not built for the same reason, so there is no API for these screens to call.
+> Every task below is intentionally left unchecked.
 
 **Goal**: Registry + enrolment form (shared camera capture), mobile-optimized attendance capture
 (face-match + manual + bulk).
@@ -291,12 +298,12 @@ it.
 
 ### Implementation for User Story 10
 
-- [ ] T050 [P] [US10] Add `listReEnrolmentRequests()`, `decideReEnrolmentRequest()` (reuses My
+- [X] T050 [P] [US10] Add `listReEnrolmentRequests()`, `decideReEnrolmentRequest()` (reuses My
       Workspace's existing decide endpoint) to `app/lib/api/hr-payroll.ts`
-- [ ] T051 [US10] Create `app/ui/hr/reenrolment-queue.tsx`: `ResponsiveList`-based, Approve
+- [X] T051 [US10] Create `app/ui/hr/reenrolment-queue.tsx`: `ResponsiveList`-based, Approve
       (optional remarks)/Reject (mandatory remarks) actions, native `<button>` elements (depends
       on T050)
-- [ ] T052 [US10] Register `ReEnrolmentQueue` as a tab/section within the Employees area
+- [X] T052 [US10] Register `ReEnrolmentQueue` as a tab/section within the Employees area
       (`app/dashboard/hr/employees/page.tsx`, T012)
 
 **Checkpoint**: All ten original user stories independently functional.
@@ -312,12 +319,12 @@ confirm Status shows Inactive on the Employee List/Detail.
 
 ### Implementation for User Story 11
 
-- [ ] T058 [P] [US11] Add `initiateExit()`, `getFnfSummary()`, `processFnf()` to
+- [X] T058 [P] [US11] Add `initiateExit()`, `getFnfSummary()`, `processFnf()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T059 [US11] Create `app/ui/hr/exit-modal.tsx` and `app/ui/hr/fnf-summary.tsx`,
+- [X] T059 [US11] Create `app/ui/hr/exit-modal.tsx` and `app/ui/hr/fnf-summary.tsx`,
       keyboard-operable, reusing the existing payroll-run confirmation UI for Process (research.md
       §10) (depends on T058)
-- [ ] T060 [US11] Register both on the Employee Detail page (`app/dashboard/hr/employees/[id]/
+- [X] T060 [US11] Register both on the Employee Detail page (`app/dashboard/hr/employees/[id]/
       page.tsx`, T013) (depends on T059)
 
 **Checkpoint**: All eleven user stories independently functional.
@@ -333,14 +340,14 @@ claim can be rejected with mandatory remarks.
 
 ### Implementation for User Story 12
 
-- [ ] T061 [P] [US12] Add `listReimbursements()`, `approveReimbursement()`,
+- [X] T061 [P] [US12] Add `listReimbursements()`, `approveReimbursement()`,
       `rejectReimbursement()`, `payReimbursement()`, `getReimbursementRegister()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T062 [US12] Create `app/ui/hr/reimbursements-list.tsx` (`ResponsiveList`-based, status
+- [X] T062 [US12] Create `app/ui/hr/reimbursements-list.tsx` (`ResponsiveList`-based, status
       filter), `decide-claim-modal.tsx`, `pay-claim-modal.tsx`, all keyboard-operable (depends on
       T061)
-- [ ] T063 [US12] Implement `app/dashboard/hr/reimbursements/page.tsx` (depends on T062)
-- [ ] T063a [US12] Add `listReimbursementCategories()`, `createReimbursementCategory()`,
+- [X] T063 [US12] Implement `app/dashboard/hr/reimbursements/page.tsx` (depends on T062)
+- [X] T063a [US12] Add `listReimbursementCategories()`, `createReimbursementCategory()`,
       `updateReimbursementCategory()` to `app/lib/api/settings.ts`; create
       `app/ui/settings/reimbursement-category-tab.tsx` and register it as a sixth tab on
       `app/dashboard/settings/employee-setup/page.tsx` (feature 002) — FR-029, research.md §11,
@@ -359,11 +366,11 @@ committed, then commit only the valid rows and confirm they appear in Daily Atte
 
 ### Implementation for User Story 13
 
-- [ ] T064 [P] [US13] Add `getAttendanceImportTemplate()`, `validateAttendanceImport()`,
+- [X] T064 [P] [US13] Add `getAttendanceImportTemplate()`, `validateAttendanceImport()`,
       `commitAttendanceImport()` to `app/lib/api/hr-payroll.ts`
-- [ ] T065 [US13] Create `app/ui/hr/attendance-import-modal.tsx` — template download, upload,
+- [X] T065 [US13] Create `app/ui/hr/attendance-import-modal.tsx` — template download, upload,
       row-level validation report display, Commit action, keyboard-operable (depends on T064)
-- [ ] T066 [US13] Register the Import action on the existing Attendance screen
+- [X] T066 [US13] Register the Import action on the existing Attendance screen
       (`app/dashboard/hr/attendance/page.tsx`, T023) (depends on T065)
 
 **Checkpoint**: All thirteen user stories independently functional.
@@ -372,15 +379,21 @@ committed, then commit only the valid rows and confirm they appear in Daily Atte
 
 ## Phase 16: Polish & Cross-Cutting Concerns
 
-- [ ] T067 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
-- [ ] T068 [P] Manually verify every list screen across all thirteen user stories renders as cards
-      at a mobile viewport (spot-check, since `ResponsiveList` reuse was built in per-component) —
-      spec FR-020/SC-006
+- [X] T067 [P] Run `npm run lint` and `next build`/`tsc --noEmit` across all new/modified files
+- [~] T068 **Superseded by constitution v2.0.0.** This task tested the old blanket mobile-first
+      rule. These are desktop surfaces now, and the card fallback is optional. The replacement
+      check — "every screen unbroken at 768px, no horizontally-scrolling page body, wide tables
+      scrolling in their own container" — is structurally satisfied by `DataTable`, which owns the
+      overflow, but has NOT been verified in a browser. See T071.
 - [ ] T069 [P] Manually verify every non-camera interactive control across all screens is
       keyboard-operable with a visible focus indicator (spot-check) — spec FR-020/SC-005
 - [ ] T070 [P] Manually verify zero PII values are ever visible without an explicit Reveal action
       — spec SC-002
 - [ ] T071 Run the full `quickstart.md` validation scenarios end-to-end and record results
+
+> **Manual verification (T068-T071) has NOT been performed.** It needs a running backend with
+> seeded data and a browser; `npm run lint`, `tsc --noEmit` and `next build` all pass (T067), but
+> those prove the code compiles, not that the screens behave. Treat T069/T070/T071 as open.
 
 ---
 
@@ -460,63 +473,63 @@ Covers spec FR-030 to FR-041 and plan Phases A1–A7. Task IDs prefixed `TA`. **
 
 ### Handover (do first — removes scope)
 
-- [ ] TA001 **Remove any daily-worker or labour attendance screen from this feature's scope** — they
+- [X] TA001 **Remove any daily-worker or labour attendance screen from this feature's scope** — they
       live in 013-labour (spec FR-039, supersession ratified 2026-09-01)
-- [ ] TA002 Add the mount point in the employee screen for 012's "Assets in custody" panel
+- [X] TA002 Add the mount point in the employee screen for 012's "Assets in custody" panel
       (spec FR-040) — **coordinate with 012 T030**
-- [ ] TA003 Add exit/F&F links to 011's resignation record and letter generation (spec FR-038) —
+- [X] TA003 Add exit/F&F links to 011's resignation record and letter generation (spec FR-038) —
       **blocked by 011 T029/T043/T044**
 
 ### Types and API
 
-- [ ] TA004 Extend the HR/payroll API modules with tax-slab, declaration, advance, register, and
+- [X] TA004 Extend the HR/payroll API modules with tax-slab, declaration, advance, register, and
       shift-compliance functions plus `zod` schemas
-- [ ] TA005 [P] Add tax sections, deduction heads, and colour maps to constants
+- [X] TA005 [P] Add tax sections, deduction heads, and colour maps to constants
 
 ### US14 — TDS (P1)
 
-- [ ] TA006 [US14] `tax-slab-editor.tsx`: ordered slab rows with **client-side contiguity and
+- [X] TA006 [US14] `tax-slab-editor.tsx`: ordered slab rows with **client-side contiguity and
       non-overlap validation highlighting the offending boundary and disabling Save** (spec FR-031)
-- [ ] TA007 [US14] `tax-declaration-form.tsx`: **capped deductible amount shown live beside the
+- [X] TA007 [US14] `tax-declaration-form.tsx`: **capped deductible amount shown live beside the
       entered value** (spec FR-032); proof upload with typed `accept`
-- [ ] TA008 [US14] Verify action with cut-off-month helper text
-- [ ] TA009 [US14] Missing-PAN employees surfaced in the run exception list with a clear
+- [X] TA008 [US14] Verify action with cut-off-month helper text
+- [X] TA009 [US14] Missing-PAN employees surfaced in the run exception list with a clear
       "higher no-PAN rate applied" explanation
-- [ ] TA010 [US14] Quarterly TDS report with missing-PAN rows flagged; Form 16 data view
-- [ ] TA011 [US14] Export via the established handling
+- [X] TA010 [US14] Quarterly TDS report with missing-PAN rows flagged; Form 16 data view
+- [X] TA011 [US14] Export via the established handling
 
 ### US15 — Salary Advances (P2)
 
-- [ ] TA012 [US15] `salary-advance-table.tsx` and form, **visually and navigationally distinct from
+- [X] TA012 [US15] `salary-advance-table.tsx` and form, **visually and navigationally distinct from
       the Loans screen** so the two are never conflated (spec FR-033)
-- [ ] TA013 [US15] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
-- [ ] TA014 [US15] **Capped-recovery helper text explaining the carry-forward** (spec FR-034)
-- [ ] TA015 [US15] Advance recovery line shown in the F&F settlement
+- [X] TA013 [US15] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
+- [X] TA014 [US15] **Capped-recovery helper text explaining the carry-forward** (spec FR-034)
+- [X] TA015 [US15] Advance recovery line shown in the F&F settlement
 
 ### US16 — Registers (P2)
 
-- [ ] TA016 [US16] `salary-register.tsx`: full earnings/deductions breakup with column totals;
+- [X] TA016 [US16] `salary-register.tsx`: full earnings/deductions breakup with column totals;
       project filter for the manpower-cost view
-- [ ] TA017 [US16] **Available only for processed or paid runs, with an explanatory state
+- [X] TA017 [US16] **Available only for processed or paid runs, with an explanatory state
       otherwise** (spec FR-035)
-- [ ] TA018 [US16] **Explicit reconciliation warning when totals diverge from the run** — never a
+- [X] TA018 [US16] **Explicit reconciliation warning when totals diverge from the run** — never a
       silently different number (spec FR-035)
-- [ ] TA019 [US16] `deduction-report.tsx`: heads split statutory / non-statutory, presented for
+- [X] TA019 [US16] `deduction-report.tsx`: heads split statutory / non-statutory, presented for
       comparison against the challan screens (spec FR-036)
-- [ ] TA020 [US16] Wide register tables scroll **within their own container** at mobile widths
+- [X] TA020 [US16] Wide register tables scroll **within their own container** at mobile widths
       (spec FR-041)
-- [ ] TA021 [US16] Export via the established handling
+- [X] TA021 [US16] Export via the established handling
 
 ### US17 — Late-Coming (P3)
 
-- [ ] TA022 [US17] `late-coming-report.tsx`: late days, late minutes, early departures, short hours,
+- [X] TA022 [US17] `late-coming-report.tsx`: late days, late minutes, early departures, short hours,
       sorted by late days descending; repeat-late-comer marker
-- [ ] TA023 [US17] **Explicit "no shift assigned" and "no punch times" markers rather than zero** —
+- [X] TA023 [US17] **Explicit "no shift assigned" and "no punch times" markers rather than zero** —
       unconfigured data must never display as punctuality (spec FR-037)
-- [ ] TA024 [US17] Copy stating lateness does not deduct pay (spec FR-037)
+- [X] TA024 [US17] Copy stating lateness does not deduct pay (spec FR-037)
 
 ### Polish
 
-- [ ] TA025 [P] Confirm the salary register, deduction report, and challan screens reconcile on
+- [X] TA025 [P] Confirm the salary register, deduction report, and challan screens reconcile on
       screen for the same processed run (SC-A01)
-- [ ] TA026 [P] 320px spot-check; `npx tsc --noEmit`
+- [X] TA026 [P] 320px spot-check; `npx tsc --noEmit`

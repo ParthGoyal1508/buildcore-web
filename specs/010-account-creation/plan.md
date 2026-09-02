@@ -39,7 +39,7 @@ one-line addition to `001-user-login` (the `?activated=1` banner, FR-020 there).
 | No literal API strings | All endpoints in `app/lib/api/account-creation.ts` | PASS |
 | TypeScript + zod at boundaries | Schemas in data-model.md | PASS |
 | API calls through `app/lib/api/` | `account-creation.ts` | PASS |
-| Mobile-first & keyboard-operable | Both forms keyboard-operable, built in from the start — spec FR-009 | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): administrative onboarding, distinct from sign-in (which is mobile-critical). Both forms designed at desktop width, unbroken at 768px, and keyboard-operable — spec FR-009. | PASS |
 | `middleware.ts` route guard | `/dashboard/account-creation/*` guarded (`USER_MANAGEMENT`); `/set-password/:token` deliberately excluded — spec FR-004 | PASS |
 
 ## Project Structure

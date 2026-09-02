@@ -28,10 +28,11 @@ existing My Workspace components to a shared location rather than adding anythin
 **Testing**: No automated test framework installed yet (constitution's documented gap).
 Verification is manual per [quickstart.md](quickstart.md).
 
-**Target Platform**: Desktop web (primary, admin-facing) + mobile web — the Daily Worker
-Attendance capture screen is specifically mobile-optimized within the same shell (research.md §1),
-consistent with this app's blanket mobile-first principle applying to every screen regardless of
-primary usage pattern.
+**Target Platform**: Desktop web. Every screen in this feature is a desktop surface under
+constitution v2.0.0 (Principle VI) — HR and payroll administration is desk work. Screens are
+designed at desktop width and must remain unbroken down to 768px, with wide tables scrolling in
+their own `overflow-x: auto` container. (The Daily Worker Attendance capture screen was the one
+mobile-optimized screen here; it is out of scope — see the User Story 9 note below.)
 
 **Project Type**: Web application — this plan covers only the `buildcore-web` frontend; the
 backend it depends on is already fully specified separately (`buildcore-api`,
@@ -43,8 +44,9 @@ under 15 seconds per worker (spec SC-004).
 
 **Constraints**: No inline styles (Tailwind + `clsx`, Principle II); no literal strings/URLs
 inline (Principle III); TypeScript `strict`, `zod` at every API boundary (Principle IV); all
-`buildcore-api` calls through `app/lib/api/hr-payroll.ts` (Principle V); every screen mobile-first
-and keyboard-operable, built in per-component from the start (Principle VI, spec FR-020); PII
+`buildcore-api` calls through `app/lib/api/hr-payroll.ts` (Principle V); every screen desktop-first
+and unbroken at 768px, and every control keyboard-operable, built in per-component from the start
+(Principle VI as amended v2.0.0, spec FR-020); PII
 fields masked by default everywhere, reveal always an explicit per-field action (spec FR-003).
 
 **Scale/Scope**: The largest frontend feature specced so far — eight route areas (adding
@@ -66,7 +68,7 @@ master-PRD alignment pass after this feature's original build — no other route
 | III. Centralized Constants & Configuration (NON-NEGOTIABLE) | New routes and copy in `app/lib/constants.ts`; no inline literals. | PASS |
 | IV. Type Safety & Validation | Every `app/lib/api/hr-payroll.ts` function `zod`-validates its response (data-model.md); PII fields typed as `{ masked, full }` per research.md §5, never a bare string that could be accidentally logged/displayed unmasked. | PASS |
 | V. API Access Boundary (NON-NEGOTIABLE) | All calls through `app/lib/api/hr-payroll.ts`; admin salary-slip fetching is explicitly its own function, never reusing My Workspace's caller-scoped one (research.md §4). | PASS |
-| VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) | `ResponsiveList` reused for every table; every form/modal/filter keyboard-operable, built into each component's task from the start (research.md §9) rather than a Polish-phase retrofit. | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): HR & payroll administration is a desk-operated surface in full — the *employee's* attendance/leave screens are mobile-critical, but the *administrator's* are not. Tables are designed at desktop width and scroll in their own `overflow-x: auto` container below it; `ResponsiveList` is optional, not mandatory (see Amendment 2026-09-02). Unbroken at 768px. Every form/modal/filter keyboard-operable, built into each component's task from the start (research.md §9) rather than a Polish-phase retrofit. | PASS |
 
 No violations require a Complexity Tracking entry.
 

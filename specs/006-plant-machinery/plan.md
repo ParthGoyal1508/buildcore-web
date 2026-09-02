@@ -49,7 +49,7 @@ document alert badges must be visible on the list itself (spec FR-004).
 | III. Centralized constants | Routes, status names, payment-status labels and colour maps in constants. | PASS |
 | IV. Type safety + zod | Every response validated at the boundary. | PASS |
 | V. API access boundary | All calls via `app/lib/api/plant.ts` (spec FR-007, FR-018). | PASS |
-| VI. Mobile-first (NON-NEGOTIABLE) | `ResponsiveList` on every list (spec FR-010, FR-019); 44×44px targets; no horizontal page scroll at 320px. | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): equipment masters, logs and maintenance are back-office. Lists designed at desktop width, wide tables scroll in their own container, no horizontal page scroll at 768px; `ResponsiveList` optional (see Amendment 2026-09-02); every control keyboard-operable (spec FR-010, FR-019). | PASS |
 | `middleware.ts` route guard | `/dashboard/plant/*` guarded per sub-route (spec FR-009); spare parts and service bills reuse `MAINTENANCE` (spec FR-011). | PASS |
 
 ## Project Structure

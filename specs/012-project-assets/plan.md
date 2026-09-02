@@ -49,7 +49,7 @@ without any depreciation-schedule or accounting language (spec FR-011).
 | III. Centralized constants | Routes, status names, condition labels, and badge colour maps in a constants module (spec FR-018). | PASS |
 | IV. Type safety + zod | Every response validated at the boundary (spec FR-005). | PASS |
 | V. API access boundary | All calls via `app/lib/api/assets.ts` (spec FR-004). | PASS |
-| VI. Mobile-first (NON-NEGOTIABLE) | `ResponsiveList` on every list; wide tables scroll in their own container; 44×44px targets; no hover-gated action (spec FR-024, FR-025). | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): the asset register, allocations and transfer approvals are administrative. Lists designed at desktop width, wide tables scroll in their own container, unbroken at 768px; `ResponsiveList` optional (see Amendment 2026-09-02); every control keyboard-operable (spec FR-024, FR-025). | PASS |
 | `middleware.ts` route guard | `/dashboard/assets/*` guarded with `ASSETS`; report routes additionally `REPORTS` (spec FR-002). | PASS |
 
 ## Project Structure

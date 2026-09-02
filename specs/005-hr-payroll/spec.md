@@ -242,8 +242,16 @@ Company column updates in the Employee List while their transfer history is logg
 A Site Supervisor enrols a daily worker (name, trade, wage rate, photo capture, consent
 attestation) and marks daily attendance via a mobile-optimized capture screen.
 
+> **OUT OF SCOPE as of 2026-09-02.** User Story 9 is superseded by feature **013 (Labour
+> Management)**, whose Supervisor Muster Capture covers the same ground for the same persona. The
+> backend counterpart (`buildcore-api` 005 US9 / FR-023–FR-028) was deliberately omitted for the
+> same reason, so there is no API for this screen to call. Build the muster capture in 013, not
+> here. This story is retained below for traceability only.
+
 **Why this priority**: A distinct, mobile-first flow for a different persona (Site Supervisor)
-reusing the biometric photo-capture pattern this app already has (My Workspace).
+reusing the biometric photo-capture pattern this app already has (My Workspace). *(Mobile-first is
+correct here and remains so — the surface simply lives in feature 013 now, where the constitution's
+mobile-critical list names it explicitly.)*
 
 **Independent Test**: Can be fully tested by enrolling a worker with 3 photos, then marking them
 present on the attendance capture screen and confirming the Daily Worker Attendance table reflects
@@ -443,11 +451,13 @@ committed, then committing only the valid rows.
   unsaved changes.
 - **FR-019**: All requests to `buildcore-api`'s HR & Payroll endpoints MUST go through the typed
   `app/lib/api/` fetch wrapper, per the constitution's API Access Boundary principle.
-- **FR-020**: Every screen in this feature MUST remain usable at mobile viewport widths (tables as
-  cards, per this app's established `ResponsiveList` pattern) and every non-camera interactive
-  control MUST be keyboard-operable with semantic HTML, consistent with this app's established
-  mobile-first and basic-accessibility conventions — built in from the start on every new
-  component, not verified only at the end.
+- **FR-020**: *(Revised by Amendment 2026-09-02.)* Every screen in this feature is a **desktop
+  surface**. Each MUST be designed at desktop width and MUST remain usable and unbroken down to a
+  768px tablet width — nothing clipped, no control unreachable, and the page body MUST NOT scroll
+  horizontally; wide tables scroll inside their own `overflow-x: auto` container. The
+  `ResponsiveList` card fallback MAY be used where the data reads better as cards but is NOT
+  required. Independent of viewport, every interactive control MUST be keyboard-operable with
+  semantic HTML — built in from the start on every new component, not verified only at the end.
 
 **Offboarding & Full and Final Settlement**
 
@@ -743,3 +753,28 @@ are visible, with repeat lateness surfaced.
   processed run, and any divergence is visible rather than silent.
 - **SC-A02**: No employee without a configured shift is ever displayed as punctual.
 - **SC-A03**: A slab set with a gap or overlap cannot be submitted from the UI.
+
+## Amendment 2026-09-02 — Desktop-First Responsiveness (constitution v2.0.0)
+
+Constitution Principle VI was redefined from blanket mobile-first to **desktop-first with a closed
+list of mobile-critical surfaces** (punch in/out, attendance including supervisor muster, leave,
+and sign-in). HR & Payroll administration is a **desktop surface** in full — every user story here is operated by HR or payroll staff at a desk. Note the distinction from feature 003: the *employee's* attendance and leave screens are mobile-critical, but the **administrator's** attendance register, leave approvals queue, payroll runs, registers and challans are not. The same domain, a different persona and a different device.
+
+**What changes for this feature:**
+
+- Screens are designed at **desktop width first**. Base Tailwind classes target the desktop layout;
+  smaller-viewport variants exist to keep the screen unbroken, not to produce a phone-optimised one.
+- Every screen MUST still remain **usable and unbroken down to 768px** (tablet): nothing clipped, no
+  control unreachable, and the page body MUST NOT scroll horizontally. Wide content — tables,
+  boards, wide forms — scrolls inside its own `overflow-x: auto` container.
+- The `ResponsiveList` card-layout fallback is now **OPTIONAL**, not mandatory. Use it where the data
+  genuinely reads better as cards; for a dense back-office grid, a horizontally-scrolling table in
+  its own container is an acceptable and often better answer. Any earlier requirement in this spec
+  that mandates `ResponsiveList` on *every* list is relaxed to this standard.
+- **Keyboard operability is unchanged and still applies everywhere** — every interactive control on
+  every screen MUST be reachable and operable by keyboard. Nothing in this amendment relaxes that.
+- 44×44px touch targets and the "no hover-gated action" rule are no longer mandatory on this
+  feature's screens, but remain good practice; hover MUST still not be the *only* way to discover a
+  control's existence.
+
+**Review gate:** these screens are verified at desktop, then re-checked at 768px for breakage only.

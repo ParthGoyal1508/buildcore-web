@@ -477,3 +477,14 @@ and confirm the man-days match the musters.
   handover is out of scope for this pass.
 - Piece-rate labour is out of scope, matching the backend — day rate and overtime only.
 - Printing the denomination panel relies on a print stylesheet; no PDF generation happens client-side.
+
+## Amendment 2026-09-02 — Desktop-First Responsiveness (constitution v2.0.0)
+
+Constitution Principle VI was redefined from blanket mobile-first to **desktop-first with a closed
+list of mobile-critical surfaces**. This feature is **split**. The supervisor's daily muster capture is on the mobile-critical list — the constitution names it explicitly, because marking labour attendance on site is attendance capture by another name. Everything else in this feature (wage-rate masters, payment sheets, advances, the back-office lists and reports) is a desktop surface.
+
+**What changes for this feature:** the split is now explicit rather than incidental.
+
+- **Muster capture** stays **mobile-first**: one-handed at 320px, 44×44px touch targets, no hover-gated action, verified at 320px before merge. Unchanged from what this spec already required.
+- **Everything else** becomes **desktop-first**, and must remain usable and unbroken down to 768px with wide tables scrolling in their own `overflow-x: auto` container. The `ResponsiveList` card fallback is now OPTIONAL on these back-office lists rather than mandatory.
+- **Keyboard operability is unchanged and still applies to every screen in both halves.**

@@ -50,7 +50,8 @@ completing (SC-002).
 permission names inline — routes, copy, and the `PERMISSIONS` list live in `app/lib/constants.ts`
 (Principle III); TypeScript `strict`, no `any`/`@ts-ignore` (Principle IV); every API response
 `zod`-validated (Principle IV); all `buildcore-api` calls through `app/lib/api/settings.ts`, never
-an ad-hoc `fetch()` in a component (Principle V); every screen mobile-first and keyboard-operable
+an ad-hoc `fetch()` in a component (Principle V); every screen desktop-first, unbroken at 768px,
+and keyboard-operable (Principle VI as amended v2.0.0)
 (Principle VI, spec FR-021/FR-024).
 
 **Scale/Scope**: Four route trees (`companies`, `roles`, `users`, `employee-setup` — the latter
@@ -69,7 +70,7 @@ the `/login` or `/dashboard` (home) pages from feature 001.
 | III. Centralized Constants & Configuration (NON-NEGOTIABLE) | New routes (`/dashboard/settings/*`), user-facing copy (validation/error messages, confirmation dialogs), and the `PERMISSIONS` list all go into `app/lib/constants.ts` (research.md §4) — no inline literals in components. | PASS |
 | IV. Type Safety & Validation | Every new `app/lib/api/settings.ts` function validates its response with a `zod` schema (data-model.md); `z.infer` types used downstream, not hand-written duplicates. | PASS |
 | V. API Access Boundary (NON-NEGOTIABLE) | All Settings calls added as typed functions in `app/lib/api/settings.ts`, following the existing `auth.ts` pattern — no direct DB/ORM access, no ad-hoc `fetch()`. | PASS |
-| VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) | Every list screen ships the `hidden md:table` / `md:hidden` card pair from its first version (research.md §7); every interactive control keyboard-operable (research.md §8) — built in from the start, per this principle's own "not retrofitted afterward" wording. | PASS |
+| VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE) | Desktop-first (constitution v2.0.0): Settings is a back-office surface. Masters tables are designed at desktop width; the `ResponsiveList` card pair is retained where it already reads well but is no longer mandatory (see Amendment 2026-09-02). Every screen stays unbroken at 768px with wide tables scrolling in their own container; every interactive control keyboard-operable (research.md §8). | PASS |
 
 No violations require a Complexity Tracking entry — `@tanstack/react-query`'s introduction is a
 pre-approved addition being exercised for the first time, not a new architectural dependency

@@ -19,6 +19,27 @@ export const ROUTES = {
   mySalary: '/my/salary',
   myFaceEnrol: '/my/face-enrol',
   myReimbursements: '/my/reimbursements',
+
+  // --- HR & Payroll admin (feature 005) ---
+  // Nested under the existing /dashboard shell: unlike My Workspace above, these
+  // are desktop surfaces operated by HR and payroll staff at a desk
+  // (Constitution VI as amended v2.0.0).
+  hr: '/dashboard/hr',
+  hrEmployees: '/dashboard/hr/employees',
+  hrEmployee: (id: string) => `/dashboard/hr/employees/${id}`,
+  hrAttendance: '/dashboard/hr/attendance',
+  hrHolidays: '/dashboard/hr/attendance/holidays',
+  hrAttendanceImport: '/dashboard/hr/attendance/import',
+  hrLateComing: '/dashboard/hr/attendance/late-coming',
+  hrLeave: '/dashboard/hr/leave',
+  hrPayroll: '/dashboard/hr/payroll',
+  hrPayrollRun: (id: string) => `/dashboard/hr/payroll/${id}`,
+  hrChallans: '/dashboard/hr/challans',
+  hrLoans: '/dashboard/hr/loans',
+  hrAdvances: '/dashboard/hr/advances',
+  hrTds: '/dashboard/hr/tds',
+  hrReimbursements: '/dashboard/hr/reimbursements',
+  hrReEnrolment: '/dashboard/hr/re-enrolment',
 } as const;
 
 /**
@@ -263,3 +284,237 @@ export function formatLockoutMessage(rawMessage: string): string {
   if (Number.isNaN(unlockTime.getTime())) return MESSAGES.lockoutFallback;
   return `Account temporarily locked. Try again after ${unlockTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR & Payroll (feature 005)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Which permission each `/dashboard/hr/*` area requires, enforced by
+ * `app/dashboard/hr/layout.tsx`.
+ *
+ * Same shape and same caveat as `SETTINGS_PERMISSIONS`: this is a UX affordance
+ * that avoids rendering a page the user cannot use. `buildcore-api` guards every
+ * one of these endpoints with `@RequirePermissions`, and that is the real gate.
+ * The values mirror the controller decorators exactly — where the backend guards
+ * an area with `ATTENDANCE` rather than the permission the area's name suggests
+ * (leave administration is one), this map follows the backend, not the name.
+ */
+export const HR_PERMISSIONS = {
+  employees: 'EMPLOYEES',
+  attendance: 'ATTENDANCE',
+  leave: 'ATTENDANCE',
+  payroll: 'PAYROLL',
+  challans: 'CHALLANS',
+  loans: 'LOANS',
+  advances: 'PAYROLL',
+  tds: 'PAYROLL',
+  reimbursements: 'EMPLOYEES',
+  're-enrolment': 'EMPLOYEES',
+} as const;
+
+export type HrSection = keyof typeof HR_PERMISSIONS;
+
+/** Default page size for the server-paginated employee list (spec FR-001). */
+export const EMPLOYEE_PAGE_SIZE = 25;
+
+/**
+ * How long after a reveal the unmasked PII value stays on screen (spec FR-003).
+ *
+ * A revealed Aadhaar left visible until navigation is a shoulder-surfing exposure
+ * that outlives the reason it was revealed for, and every reveal is separately
+ * written to the backend's audit log — so the value re-masks itself rather than
+ * relying on the clerk to remember.
+ */
+export const PII_REVEAL_TIMEOUT_MS = 30_000;
+
+/** The four fields the audited reveal endpoint accepts, one per call. */
+export const PII_FIELDS = ['aadhaar', 'pan', 'bankAccountNumber', 'uan'] as const;
+export type PiiField = (typeof PII_FIELDS)[number];
+
+export const PII_FIELD_LABELS: Record<PiiField, string> = {
+  aadhaar: 'Aadhaar',
+  pan: 'PAN',
+  bankAccountNumber: 'Bank account number',
+  uan: 'UAN',
+};
+
+// --- Enum value lists, mirroring buildcore-api's prisma schema exactly ---
+
+export const GENDERS = ['male', 'female', 'other'] as const;
+export const MARITAL_STATUSES = ['single', 'married', 'divorced', 'widowed'] as const;
+export const EMPLOYMENT_TYPES = ['full_time', 'contract', 'daily_wage'] as const;
+export const CALCULATION_MODES = ['monthly', 'daily'] as const;
+export const ATTENDANCE_STATUS_OVERRIDES = [
+  'present',
+  'absent',
+  'on_leave',
+  'weekly_off',
+  'holiday',
+] as const;
+export const LEAVE_TYPES = ['earned', 'casual', 'sick', 'lwp'] as const;
+export const LEAVE_APPLICATION_STATUSES = [
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled',
+] as const;
+export const HOLIDAY_TYPES = ['national', 'regional', 'company'] as const;
+export const PAYROLL_RUN_STATUSES = ['draft', 'processed', 'paid'] as const;
+export const LOAN_STATUSES = ['pending', 'active', 'closed'] as const;
+export const LOAN_SCHEDULE_STATUSES = ['upcoming', 'paid', 'overdue'] as const;
+export const SALARY_ADVANCE_STATUSES = [
+  'pending',
+  'approved',
+  'disbursed',
+  'closed',
+] as const;
+export const EXIT_REASONS = ['resignation', 'termination', 'contract_end'] as const;
+export const TAX_DECLARATION_STATUSES = ['declared', 'verified'] as const;
+export const CHALLAN_TYPES = ['pf', 'esic', 'pt', 'tds'] as const;
+export type ChallanType = (typeof CHALLAN_TYPES)[number];
+
+/**
+ * Turns a snake_case enum value into a display label ("full_time" → "Full Time").
+ *
+ * Deliberately the same transformation `permissionLabel` applies, kept as its own
+ * export rather than reused under that name because the two mirror different
+ * backend enums and are free to diverge.
+ */
+export function enumLabel(value: string): string {
+  return value
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/** Overrides where the mechanical label is wrong or unhelpfully terse. */
+const ENUM_LABEL_OVERRIDES: Record<string, string> = {
+  lwp: 'Leave Without Pay',
+  uan: 'UAN',
+  pf: 'PF',
+  esic: 'ESIC',
+  pt: 'Professional Tax',
+  tds: 'TDS',
+  on_leave: 'On Leave',
+  full_time: 'Full Time',
+  daily_wage: 'Daily Wage',
+};
+
+export function hrLabel(value: string): string {
+  return ENUM_LABEL_OVERRIDES[value] ?? enumLabel(value);
+}
+
+/**
+ * Badge colours for the statuses that appear in HR tables (spec FR-006).
+ *
+ * Colour is never the only signal — every badge also carries its text label, so a
+ * colour-blind reader loses nothing.
+ */
+export const STATUS_BADGE_CLASSES: Record<string, string> = {
+  // Attendance
+  present: 'bg-green-100 text-green-800',
+  complete: 'bg-green-100 text-green-800',
+  absent: 'bg-red-100 text-red-800',
+  half_day: 'bg-orange-100 text-orange-800',
+  on_leave: 'bg-blue-100 text-blue-800',
+  weekly_off: 'bg-gray-100 text-gray-700',
+  holiday: 'bg-gray-100 text-gray-700',
+  // Workflow
+  pending: 'bg-amber-100 text-amber-800',
+  approved: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-700',
+  draft: 'bg-gray-100 text-gray-700',
+  processed: 'bg-blue-100 text-blue-800',
+  paid: 'bg-green-100 text-green-800',
+  active: 'bg-blue-100 text-blue-800',
+  closed: 'bg-gray-100 text-gray-700',
+  disbursed: 'bg-indigo-100 text-indigo-800',
+  declared: 'bg-amber-100 text-amber-800',
+  verified: 'bg-green-100 text-green-800',
+  overdue: 'bg-red-100 text-red-800',
+  upcoming: 'bg-gray-100 text-gray-700',
+};
+
+/**
+ * Statutory ceilings per deduction section, mirroring `buildcore-api`'s
+ * `hrPayroll.tds.sectionCeilings` defaults.
+ *
+ * Held here so the declaration form can show the capped deductible amount live
+ * beside what the employee declared — a ₹300,000 80C declaration is worth
+ * ₹150,000, and finding that out only when the payslip arrives is what generates
+ * the query. The backend caps it regardless; this is the same number shown early.
+ *
+ * A deployment that overrides `TDS_CEILING_*` must update these to match — they
+ * are display-only, so a mismatch misinforms rather than miscalculates.
+ */
+export const TDS_SECTION_CEILINGS: Record<string, number> = {
+  '80C': 150_000,
+  '80D': 25_000,
+  '80CCD1B': 50_000,
+  HRA: 0,
+};
+
+/** The sections the declaration form offers, in the order they are usually filed. */
+export const TDS_SECTIONS = ['80C', '80D', '80CCD1B', 'HRA'] as const;
+
+export const HR_MESSAGES = {
+  // Employees
+  employeeSaved: 'Employee saved.',
+  employeeLoadFailed: 'Could not load this employee.',
+  statutoryNeedsNumbers:
+    'PF requires both a UAN and a PF number; ESIC requires an ESIC number. Fill them in or turn the contribution off.',
+  revealPiiHint: (field: string) =>
+    `Revealing the full ${field} is recorded against your account.`,
+  piiReRedacted: 'Hidden again.',
+  noEmployees: 'No employees match these filters.',
+
+  // Documents
+  documentsProgress: (done: number, total: number) =>
+    `${done} of ${total} mandatory documents uploaded`,
+  documentExpiringSoon: (days: number) =>
+    days < 0
+      ? `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`
+      : `Expires in ${days} day${days === 1 ? '' : 's'}`,
+
+  // Attendance
+  periodLocked:
+    'That period is locked by a processed payroll run, so attendance for it can no longer be changed.',
+  noAttendance: 'No attendance records for this date and site.',
+  attendanceSaved: 'Attendance updated.',
+  importNothingValid:
+    'Nothing in this file can be imported — every row failed validation. Fix the errors and upload again.',
+  importPartial: (ok: number, bad: number) =>
+    `${ok} row${ok === 1 ? '' : 's'} ready to import, ${bad} rejected. Only the valid rows will be committed.`,
+
+  // Leave
+  rejectNeedsRemarks: 'A rejection needs a reason — the employee sees this remark.',
+  leaveDecided: 'Application updated.',
+
+  // Payroll
+  runLocked:
+    'This run has been processed, so its figures can no longer change. Reverse it or start a new run.',
+  confirmProcessRun:
+    'Process this payroll run? Its figures are frozen afterwards and the period is locked against attendance edits.',
+  confirmMarkPaid:
+    'Mark this run as paid? This is the final state — it cannot be reopened.',
+  registerNeedsProcessedRun:
+    'A register is produced from a processed or paid run. Process this run first.',
+  registerMismatch:
+    'The register total does not match the run. Do not file this until the difference is explained.',
+  missingPan:
+    'Employees without a PAN are taxed at the higher rate. Resolve these before filing.',
+
+  // Loans & advances
+  confirmApproveLoan: (amount: string) =>
+    `Approve this loan of ${amount}? The repayment schedule is generated on approval and EMIs start deducting from the next run.`,
+  advanceDistinctFromLoan:
+    'An advance is recovered in full from the next payroll run; a loan is repaid over an EMI schedule.',
+
+  // Offboarding
+  confirmProcessFnf:
+    'Process this full & final settlement? It creates a draft payroll run and closes every outstanding loan and advance.',
+  fnfNegative:
+    'This settlement is negative — recoveries exceed what is owed. It must be collected separately; payroll will not pay a negative amount.',
+} as const;
