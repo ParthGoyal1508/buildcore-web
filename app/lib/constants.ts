@@ -437,6 +437,28 @@ export const STATUS_BADGE_CLASSES: Record<string, string> = {
   upcoming: 'bg-gray-100 text-gray-700',
 };
 
+/**
+ * Statutory ceilings per deduction section, mirroring `buildcore-api`'s
+ * `hrPayroll.tds.sectionCeilings` defaults.
+ *
+ * Held here so the declaration form can show the capped deductible amount live
+ * beside what the employee declared — a ₹300,000 80C declaration is worth
+ * ₹150,000, and finding that out only when the payslip arrives is what generates
+ * the query. The backend caps it regardless; this is the same number shown early.
+ *
+ * A deployment that overrides `TDS_CEILING_*` must update these to match — they
+ * are display-only, so a mismatch misinforms rather than miscalculates.
+ */
+export const TDS_SECTION_CEILINGS: Record<string, number> = {
+  '80C': 150_000,
+  '80D': 25_000,
+  '80CCD1B': 50_000,
+  HRA: 0,
+};
+
+/** The sections the declaration form offers, in the order they are usually filed. */
+export const TDS_SECTIONS = ['80C', '80D', '80CCD1B', 'HRA'] as const;
+
 export const HR_MESSAGES = {
   // Employees
   employeeSaved: 'Employee saved.',

@@ -174,12 +174,12 @@ Payroll's engine consumes loan data)
 
 ### Implementation for User Story 7
 
-- [ ] T029 [P] [US7] Add `listLoans()`, `createLoan()`, `getLoanSchedule()`, `closeLoan()` to
+- [X] T029 [P] [US7] Add `listLoans()`, `createLoan()`, `getLoanSchedule()`, `closeLoan()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T030 [US7] Create `app/ui/hr/loan-list.tsx`: `ResponsiveList`-based (depends on T029)
-- [ ] T031 [US7] Create `app/ui/hr/new-loan-modal.tsx`: focus-trapped, native form elements
+- [X] T030 [US7] Create `app/ui/hr/loan-list.tsx`: `ResponsiveList`-based (depends on T029)
+- [X] T031 [US7] Create `app/ui/hr/new-loan-modal.tsx`: focus-trapped, native form elements
       (depends on T029)
-- [ ] T032 [US7] Create `app/dashboard/hr/loans/page.tsx`,
+- [X] T032 [US7] Create `app/dashboard/hr/loans/page.tsx`,
       `[id]/schedule/page.tsx` (`ResponsiveList`-based schedule table) (depends on T030, T031)
 
 **Checkpoint**: User Stories 1–4 and 7 independently functional.
@@ -196,21 +196,21 @@ through Processed/Paid.
 
 ### Implementation for User Story 5
 
-- [ ] T033 [P] [US5] Add `generatePayroll()`, `listPayrollRuns()`, `processPayrollRun()`,
+- [X] T033 [P] [US5] Add `generatePayroll()`, `listPayrollRuns()`, `processPayrollRun()`,
       `markPayrollRunPaid()`, `getEmployeeSalarySlip()` (admin-scoped — never My Workspace's
       `getSalarySlip`, research.md §4), `downloadSalarySlipPdf()`, `downloadBankSheet()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T034 [US5] Create `app/ui/hr/generate-payroll-form.tsx`: month selector, triggers
+- [X] T034 [US5] Create `app/ui/hr/generate-payroll-form.tsx`: month selector, triggers
       `generatePayroll()` (depends on T033)
-- [ ] T035 [US5] Create `app/ui/hr/payroll-list.tsx`: `ResponsiveList`-based, status-transition
+- [X] T035 [US5] Create `app/ui/hr/payroll-list.tsx`: `ResponsiveList`-based, status-transition
       actions (Process/Pay) each behind a confirm dialog explaining the lock consequence
       (research.md §6), editing controls hidden once Processed — spec FR-010 (depends on T033)
-- [ ] T036 [US5] Create `app/dashboard/hr/payroll/page.tsx` composing `GeneratePayrollForm` +
+- [X] T036 [US5] Create `app/dashboard/hr/payroll/page.tsx` composing `GeneratePayrollForm` +
       `PayrollList` (depends on T034, T035)
-- [ ] T037 [US5] Create `app/dashboard/hr/payroll/[runId]/employees/[employeeId]/slip/page.tsx`:
+- [X] T037 [US5] Create `app/dashboard/hr/payroll/[runId]/employees/[employeeId]/slip/page.tsx`:
       renders the shared `salary-slip.tsx` (T005) fed by `getEmployeeSalarySlip()`, plus a PDF
       Download action (depends on T005, T033)
-- [ ] T038 [US5] Wire the Bank Salary Sheet export action (`downloadBankSheet()`) on
+- [X] T038 [US5] Wire the Bank Salary Sheet export action (`downloadBankSheet()`) on
       `payroll-list.tsx` or the run detail area — spec FR-012 (depends on T033)
 
 **Checkpoint**: User Stories 1–5 and 7 independently functional — the feature's core MVP loop.
@@ -225,12 +225,12 @@ through Processed/Paid.
 
 ### Implementation for User Story 6
 
-- [ ] T039 [P] [US6] Add `getPfChallan()`, `getEsicChallan()`, `getPtChallan()`,
+- [X] T039 [P] [US6] Add `getPfChallan()`, `getEsicChallan()`, `getPtChallan()`,
       `exportChallan()` to `app/lib/api/hr-payroll.ts`
-- [ ] T040 [US6] Create `app/ui/hr/challan-tabs.tsx`: three `ResponsiveList`-based tabs, month
+- [X] T040 [US6] Create `app/ui/hr/challan-tabs.tsx`: three `ResponsiveList`-based tabs, month
       selector, "not yet processed" empty state, export action per tab — spec FR-013 (depends on
       T039)
-- [ ] T041 [US6] Create `app/dashboard/hr/challans/page.tsx` (depends on T040)
+- [X] T041 [US6] Create `app/dashboard/hr/challans/page.tsx` (depends on T040)
 
 **Checkpoint**: User Stories 1–7 independently functional.
 
@@ -244,8 +244,8 @@ through Processed/Paid.
 
 ### Implementation for User Story 8
 
-- [ ] T042 [US8] Add `transferEmployee()` to `app/lib/api/hr-payroll.ts`
-- [ ] T043 [US8] Create `app/ui/hr/transfer-modal.tsx`: Target Company/Transfer Date/Reason/
+- [X] T042 [US8] Add `transferEmployee()` to `app/lib/api/hr-payroll.ts`
+- [X] T043 [US8] Create `app/ui/hr/transfer-modal.tsx`: Target Company/Transfer Date/Reason/
       Retain Code toggle, focus-trapped, native form elements (depends on T042)
 - [ ] T044 [US8] Register `TransferModal` as an action on `employee-detail-tabs.tsx` (T013) /
       `employee-list.tsx` (T010) row actions
@@ -462,37 +462,37 @@ Covers spec FR-030 to FR-041 and plan Phases A1–A7. Task IDs prefixed `TA`. **
 
 ### Handover (do first — removes scope)
 
-- [ ] TA001 **Remove any daily-worker or labour attendance screen from this feature's scope** — they
+- [X] TA001 **Remove any daily-worker or labour attendance screen from this feature's scope** — they
       live in 013-labour (spec FR-039, supersession ratified 2026-09-01)
-- [ ] TA002 Add the mount point in the employee screen for 012's "Assets in custody" panel
+- [X] TA002 Add the mount point in the employee screen for 012's "Assets in custody" panel
       (spec FR-040) — **coordinate with 012 T030**
-- [ ] TA003 Add exit/F&F links to 011's resignation record and letter generation (spec FR-038) —
+- [X] TA003 Add exit/F&F links to 011's resignation record and letter generation (spec FR-038) —
       **blocked by 011 T029/T043/T044**
 
 ### Types and API
 
-- [ ] TA004 Extend the HR/payroll API modules with tax-slab, declaration, advance, register, and
+- [X] TA004 Extend the HR/payroll API modules with tax-slab, declaration, advance, register, and
       shift-compliance functions plus `zod` schemas
-- [ ] TA005 [P] Add tax sections, deduction heads, and colour maps to constants
+- [X] TA005 [P] Add tax sections, deduction heads, and colour maps to constants
 
 ### US14 — TDS (P1)
 
-- [ ] TA006 [US14] `tax-slab-editor.tsx`: ordered slab rows with **client-side contiguity and
+- [X] TA006 [US14] `tax-slab-editor.tsx`: ordered slab rows with **client-side contiguity and
       non-overlap validation highlighting the offending boundary and disabling Save** (spec FR-031)
-- [ ] TA007 [US14] `tax-declaration-form.tsx`: **capped deductible amount shown live beside the
+- [X] TA007 [US14] `tax-declaration-form.tsx`: **capped deductible amount shown live beside the
       entered value** (spec FR-032); proof upload with typed `accept`
-- [ ] TA008 [US14] Verify action with cut-off-month helper text
-- [ ] TA009 [US14] Missing-PAN employees surfaced in the run exception list with a clear
+- [X] TA008 [US14] Verify action with cut-off-month helper text
+- [X] TA009 [US14] Missing-PAN employees surfaced in the run exception list with a clear
       "higher no-PAN rate applied" explanation
-- [ ] TA010 [US14] Quarterly TDS report with missing-PAN rows flagged; Form 16 data view
-- [ ] TA011 [US14] Export via the established handling
+- [X] TA010 [US14] Quarterly TDS report with missing-PAN rows flagged; Form 16 data view
+- [X] TA011 [US14] Export via the established handling
 
 ### US15 — Salary Advances (P2)
 
-- [ ] TA012 [US15] `salary-advance-table.tsx` and form, **visually and navigationally distinct from
+- [X] TA012 [US15] `salary-advance-table.tsx` and form, **visually and navigationally distinct from
       the Loans screen** so the two are never conflated (spec FR-033)
-- [ ] TA013 [US15] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
-- [ ] TA014 [US15] **Capped-recovery helper text explaining the carry-forward** (spec FR-034)
+- [X] TA013 [US15] Exceeds-limit inline warning; duplicate open advance 409 inline with a link
+- [X] TA014 [US15] **Capped-recovery helper text explaining the carry-forward** (spec FR-034)
 - [ ] TA015 [US15] Advance recovery line shown in the F&F settlement
 
 ### US16 — Registers (P2)
