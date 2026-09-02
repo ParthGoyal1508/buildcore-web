@@ -126,18 +126,18 @@ holiday and confirm status reflects it.
 
 ### Implementation for User Story 3
 
-- [ ] T019 [P] [US3] Add `getDailyAttendance()`, `markAttendance()`, `updateAttendance()`,
+- [X] T019 [P] [US3] Add `getDailyAttendance()`, `markAttendance()`, `updateAttendance()`,
       `getExceptions()`, `getModifications()`, `listHolidays()`, `createHoliday()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T020 [US3] Create `app/ui/hr/attendance-table.tsx`: `ResponsiveList`-based, date picker +
+- [X] T020 [US3] Create `app/ui/hr/attendance-table.tsx`: `ResponsiveList`-based, date picker +
       site filter, status badges (depends on T019)
-- [ ] T021 [US3] Create `app/ui/hr/mark-edit-modal.tsx`: focus-trapped, native form elements,
+- [X] T021 [US3] Create `app/ui/hr/mark-edit-modal.tsx`: focus-trapped, native form elements,
       "period locked" message handling — spec FR-008 (depends on T019)
-- [ ] T022 [US3] Create `app/ui/hr/exceptions-modal.tsx` and `modifications-modal.tsx`:
+- [X] T022 [US3] Create `app/ui/hr/exceptions-modal.tsx` and `modifications-modal.tsx`:
       `ResponsiveList`-based, focus-trapped (depends on T019)
-- [ ] T023 [US3] Create `app/ui/hr/holidays-panel.tsx`: list + declare form, native elements,
+- [X] T023 [US3] Create `app/ui/hr/holidays-panel.tsx`: list + declare form, native elements,
       keyboard-operable (depends on T019)
-- [ ] T024 [US3] Create `app/dashboard/hr/attendance/page.tsx` composing all of the above
+- [X] T024 [US3] Create `app/dashboard/hr/attendance/page.tsx` composing all of the above
       (depends on T020–T023)
 
 **Checkpoint**: User Stories 1–3 independently functional.
@@ -152,14 +152,14 @@ holiday and confirm status reflects it.
 
 ### Implementation for User Story 4
 
-- [ ] T025 [P] [US4] Add `listAllLeaveApplications()`, `decideLeaveApplication()`,
+- [X] T025 [P] [US4] Add `listAllLeaveApplications()`, `decideLeaveApplication()`,
       `listLeaveBalances()` to `app/lib/api/hr-payroll.ts`
-- [ ] T026 [US4] Create `app/ui/hr/leave-applications-table.tsx`: `ResponsiveList`-based,
+- [X] T026 [US4] Create `app/ui/hr/leave-applications-table.tsx`: `ResponsiveList`-based,
       Approve/Reject (remarks)/Cancel actions per status, native `<button>` elements, informational
       note for payroll-locked-period approvals (not blocking) — spec Edge Cases (depends on T025)
-- [ ] T027 [US4] Create `app/ui/hr/leave-balance-table.tsx`: `ResponsiveList`-based (depends on
+- [X] T027 [US4] Create `app/ui/hr/leave-balance-table.tsx`: `ResponsiveList`-based (depends on
       T025)
-- [ ] T028 [US4] Create `app/dashboard/hr/leave/page.tsx` (depends on T026, T027)
+- [X] T028 [US4] Create `app/dashboard/hr/leave/page.tsx` (depends on T026, T027)
 
 **Checkpoint**: User Stories 1–4 independently functional.
 
