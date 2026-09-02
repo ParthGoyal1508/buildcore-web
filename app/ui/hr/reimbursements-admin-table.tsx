@@ -14,8 +14,16 @@ import { HR_MESSAGES, MESSAGES, hrLabel } from '@/app/lib/constants';
 import { dateLabel, money } from '@/app/lib/format';
 import { getReimbursementCategories } from '@/app/lib/api/my-workspace';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
+import Modal from '@/app/ui/settings/modal';
+import { Button } from '@/app/ui/button';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
-import { FormError, RowAction, SelectField } from '@/app/ui/settings/form-fields';
+import {
+  FormError,
+  RowAction,
+  SecondaryButton,
+  SelectField,
+  TextField,
+} from '@/app/ui/settings/form-fields';
 
 const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
 
@@ -28,6 +36,95 @@ const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
  * them into one control makes "paid" reachable from "submitted" without anyone
  * having approved it.
  */
+/**
+ * Asks how a claim was paid.
+ *
+ * `paymentMode` is required by the backend and there is no safe default:
+ * `payroll` adds the amount to the employee's next run, while `direct` settles
+ * it outside payroll. Defaulting to either one silently pays the claim twice or
+ * not at all, so the choice is put to whoever is recording it. A direct payment
+ * additionally wants the transfer reference, which is the only record that the
+ * money actually moved.
+ */
+function PayClaimModal({
+  claim,
+  employeeLabel,
+  onClose,
+}: {
+  claim: AdminClaim;
+  employeeLabel: string;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [paymentMode, setPaymentMode] = useState<'payroll' | 'direct'>('payroll');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const needsReference = paymentMode === 'direct';
+  const canSubmit = !needsReference || paymentReference.trim().length > 0;
+
+  const pay = useMutation({
+    mutationFn: () =>
+      payClaim(claim.id, {
+        paymentMode,
+        paymentReference: paymentReference.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr', 'claims'] });
+      onClose();
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  return (
+    <Modal
+      title="Record payment"
+      onClose={onClose}
+      footer={
+        <>
+          <SecondaryButton type="button" onClick={onClose}>
+            Cancel
+          </SecondaryButton>
+          <Button
+            type="button"
+            onClick={() => pay.mutate()}
+            disabled={!canSubmit || pay.isPending}
+          >
+            {pay.isPending ? 'Saving…' : 'Mark paid'}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <FormError message={error} />
+        <p className="text-sm text-gray-600">
+          {employeeLabel} · {money(claim.amount)}
+        </p>
+        <SelectField
+          id="pay-mode"
+          label="Payment mode"
+          value={paymentMode}
+          onChange={(event) =>
+            setPaymentMode(event.target.value as 'payroll' | 'direct')
+          }
+        >
+          <option value="payroll">Through payroll — added to the next run</option>
+          <option value="direct">Direct — settled outside payroll</option>
+        </SelectField>
+        {needsReference && (
+          <TextField
+            id="pay-reference"
+            label="Transfer reference"
+            value={paymentReference}
+            onChange={(event) => setPaymentReference(event.target.value)}
+            hint="The only record that this money actually moved."
+          />
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 export default function ReimbursementsAdminTable() {
   const queryClient = useQueryClient();
   const employees = useEmployeeNames();
@@ -40,6 +137,7 @@ export default function ReimbursementsAdminTable() {
     (id && categories?.find((c) => c.id === id)?.name) || '—';
   const [status, setStatus] = useState<string>('submitted');
   const [error, setError] = useState<string | null>(null);
+  const [paying, setPaying] = useState<AdminClaim | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'claims', status],
@@ -58,12 +156,6 @@ export default function ReimbursementsAdminTable() {
   const reject = useMutation({
     mutationFn: ({ id, remarks }: { id: string; remarks: string }) =>
       rejectClaim(id, remarks),
-    onSuccess: invalidate,
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const pay = useMutation({
-    mutationFn: (id: string) => payClaim(id),
     onSuccess: invalidate,
     onError: (err: Error) => setError(err.message),
   });
@@ -157,7 +249,7 @@ export default function ReimbursementsAdminTable() {
               </>
             )}
             {row.status === 'approved' && (
-              <RowAction type="button" onClick={() => pay.mutate(row.id)}>
+              <RowAction type="button" onClick={() => setPaying(row)}>
                 Mark paid
               </RowAction>
             )}
@@ -167,6 +259,14 @@ export default function ReimbursementsAdminTable() {
           </>
         )}
       />
+
+      {paying && (
+        <PayClaimModal
+          claim={paying}
+          employeeLabel={employees.label(paying.employeeId)}
+          onClose={() => setPaying(null)}
+        />
+      )}
     </div>
   );
 }

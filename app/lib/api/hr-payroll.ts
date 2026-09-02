@@ -959,33 +959,43 @@ export async function exportChallan(type: ChallanType, period: string) {
 // Loans (US7)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A loan as `LoansService.toView()` returns it. No employee name or code — the
+ * table resolves those from the roster.
+ */
 export const loanSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
-  employeeCode: z.string().optional(),
-  employeeName: z.string().optional(),
   amount: decimal,
   emiAmount: decimal,
   disbursementDate: isoDate,
   reason: z.string(),
   remarks: z.string().nullable().optional(),
   status: enumOf(LOAN_STATUSES),
-  outstanding: nullableDecimal.optional(),
+  totalRecovered: decimal.optional(),
+  outstanding: decimal.optional(),
+  instalments: z.number().optional(),
 });
 
 export type Loan = z.infer<typeof loanSchema>;
 
+/**
+ * One instalment in a repayment schedule.
+ *
+ * The period key is `month` (`YYYY-MM`) and there is no `id` — an entry is
+ * identified by its loan and month, which is also why the table keys on it. An
+ * instalment records the run that recovered it, not a payment date: an EMI is
+ * collected by a payroll run, so the run is the fact worth keeping.
+ */
 export const loanScheduleEntrySchema = z.object({
-  id: z.string(),
-  period: z.string(),
+  month: z.string(),
   emiAmount: decimal,
   status: enumOf(LOAN_SCHEDULE_STATUSES),
-  paidAt: nullableIsoDate.optional(),
+  paidInPayrollRunId: z.string().nullable().optional(),
 });
 
 const loanDetailSchema = loanSchema.extend({
-  schedule: z.array(loanScheduleEntrySchema).optional(),
-  scheduleEntries: z.array(loanScheduleEntrySchema).optional(),
+  schedule: z.array(loanScheduleEntrySchema),
 });
 
 export async function listLoans(
@@ -999,10 +1009,7 @@ export async function listLoans(
 }
 
 export async function getLoan(id: string) {
-  const parsed = loanDetailSchema.parse(
-    await authFetch<unknown>(`/hr/loans/${id}`),
-  );
-  return { ...parsed, schedule: parsed.schedule ?? parsed.scheduleEntries ?? [] };
+  return loanDetailSchema.parse(await authFetch<unknown>(`/hr/loans/${id}`));
 }
 
 export interface LoanInput {
@@ -1369,9 +1376,18 @@ export async function rejectClaim(id: string, remarks: string) {
   });
 }
 
+/**
+ * Records that a claim has been paid.
+ *
+ * `paymentMode` is required by the backend and genuinely matters: `payroll` adds
+ * the amount to the employee's next run, while `direct` settles it outside
+ * payroll and wants the transfer reference. There is no safe default — guessing
+ * `payroll` would silently put money into a payroll run that an accountant had
+ * already paid by bank transfer.
+ */
 export async function payClaim(
   id: string,
-  input: { paymentMode?: string; remarks?: string } = {},
+  input: { paymentMode: 'payroll' | 'direct'; paymentReference?: string },
 ) {
   return authFetch<unknown>(`/hr/reimbursements/${id}/pay`, {
     method: 'PATCH',
