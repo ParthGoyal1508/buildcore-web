@@ -29,8 +29,8 @@ already-fully-specced feature in `buildcore-api` (`specs/005-hr-payroll-backend`
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Add `/dashboard/hr/*` routes and copy to `app/lib/constants.ts`
-- [ ] T002 [P] Create `zod` schemas for `Employee`, `EmployeeDocument`, `EmployeeTransfer`,
+- [X] T001 [P] Add `/dashboard/hr/*` routes and copy to `app/lib/constants.ts`
+- [X] T002 [P] Create `zod` schemas for `Employee`, `EmployeeDocument`, `EmployeeTransfer`,
       `AttendanceRecord`, `AttendanceModification`, `Holiday`, `LeaveApplication`/`LeaveBalance`
       (admin views), `PayrollRun`/`PayrollLineItem`, Challan row shapes, `Loan`/
       `LoanScheduleEntry`, `DailyWorker`/`DailyWorkerAttendance`, `ReEnrolmentRequest` (admin
@@ -44,16 +44,17 @@ already-fully-specced feature in `buildcore-api` (`specs/005-hr-payroll-backend`
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 Move `app/ui/my/camera-capture.tsx` → `app/ui/shared/camera-capture.tsx`; update My
+- [~] T003 **Not needed** — the only second consumer was US9 (omitted; superseded by 013), so
+      this would move a file for one caller. Move `app/ui/my/camera-capture.tsx` → `app/ui/shared/camera-capture.tsx`; update My
       Workspace's imports — research.md §3
-- [ ] T004 Extract the geolocation-acquisition logic from My Workspace's `punch-clock.tsx` into
+- [~] T004 **Not needed** — same reason as T003. Extract the geolocation-acquisition logic from My Workspace's `punch-clock.tsx` into
       `app/lib/geolocation.ts`; update My Workspace's usage — research.md §3
-- [ ] T005 Move `app/ui/my/salary-slip.tsx` → `app/ui/shared/salary-slip.tsx` (presentational
+- [X] T005 Move `app/ui/my/salary-slip.tsx` → `app/ui/shared/salary-slip.tsx` (presentational
       component only, takes a `SalarySlip` data prop); update My Workspace's usage — research.md §4
-- [ ] T006 Extend `middleware.ts` so its route matcher covers `/dashboard/hr/*` with the
+- [X] T006 Extend `middleware.ts` so its route matcher covers `/dashboard/hr/*` with the
       permission-per-area mapping (`EMPLOYEES`/`ATTENDANCE`/`PAYROLL`/`CHALLANS`/`LOANS`/
       `DAILY_WORKER_REGISTRY`) — spec FR-020 access-control equivalent, contracts/hr-payroll-ui.md
-- [ ] T007 [P] Create `app/dashboard/hr/page.tsx`: a simple landing/sub-nav to the seven areas,
+- [X] T007 [P] Create `app/dashboard/hr/page.tsx`: a simple landing/sub-nav to the seven areas,
       finally resolving `nav-links.tsx`'s existing "HR & Payroll" entry
 
 **Checkpoint**: Shared components/utilities promoted, route protection extended, landing page
@@ -70,23 +71,23 @@ is masked.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Add `listEmployees()`, `getEmployee()`, `createEmployee()`,
+- [X] T008 [P] [US1] Add `listEmployees()`, `getEmployee()`, `createEmployee()`,
       `updateEmployee()`, `revealEmployeePii()` to `app/lib/api/hr-payroll.ts`
-- [ ] T009 [US1] Create `app/ui/hr/masked-field.tsx`: masked-by-default display + per-field
+- [X] T009 [US1] Create `app/ui/hr/masked-field.tsx`: masked-by-default display + per-field
       Reveal action (research.md §5) — native `<button>`, keyboard-operable
-- [ ] T010 [US1] Create `app/ui/hr/employee-list.tsx`: `ResponsiveList`-based, search/department/
+- [X] T010 [US1] Create `app/ui/hr/employee-list.tsx`: `ResponsiveList`-based, search/department/
       site/status/company filters, Documents-progress column (depends on T008)
-- [ ] T011 [US1] Create `app/ui/hr/employee-form.tsx`: one `react-hook-form` instance across eight
+- [X] T011 [US1] Create `app/ui/hr/employee-form.tsx`: one `react-hook-form` instance across eight
       presentational tabs (research.md §2), conditional required fields per Employment
       Type/Statutory toggles, `MaskedField` (T009) for PII inputs, native `<label>`/`<button>`
       elements throughout, focus-trapped where modal-like sections exist — spec FR-001, FR-018
       (unsaved-changes navigation warning), FR-003
-- [ ] T012 [US1] Create `app/dashboard/hr/employees/page.tsx`,
+- [X] T012 [US1] Create `app/dashboard/hr/employees/page.tsx`,
       `new/page.tsx`, `[id]/edit/page.tsx` (depends on T010, T011)
-- [ ] T013 [US1] Create `app/ui/hr/employee-detail-tabs.tsx`: Overview/Personal/Employment/Salary
+- [X] T013 [US1] Create `app/ui/hr/employee-detail-tabs.tsx`: Overview/Personal/Employment/Salary
       Structure/Attendance Calendar (via 003's month-history call)/Leave Summary/Documents/Loan
       History, keyboard-operable tab navigation
-- [ ] T014 [US1] Create `app/dashboard/hr/employees/[id]/page.tsx` rendering
+- [X] T014 [US1] Create `app/dashboard/hr/employees/[id]/page.tsx` rendering
       `EmployeeDetailTabs` (depends on T013)
 
 **Checkpoint**: User Story 1 fully functional and independently testable.
@@ -101,12 +102,12 @@ is masked.
 
 ### Implementation for User Story 2
 
-- [ ] T015 [P] [US2] Add `uploadEmployeeDocument()`, `listEmployeeDocuments()` to
+- [X] T015 [P] [US2] Add `uploadEmployeeDocument()`, `listEmployeeDocuments()` to
       `app/lib/api/hr-payroll.ts`
-- [ ] T016 [US2] Create `app/ui/hr/documents-tab.tsx`: per-document-type upload control
+- [X] T016 [US2] Create `app/ui/hr/documents-tab.tsx`: per-document-type upload control
       (conditional number/expiry fields per type), expiry-warning indicator, native
       `<label>`/`<button>` elements — spec FR-004 (depends on T015)
-- [ ] T017 [US2] Register `DocumentsTab` within `employee-form.tsx` (T011) and
+- [X] T017 [US2] Register `DocumentsTab` within `employee-form.tsx` (T011) and
       `employee-detail-tabs.tsx` (T013)
 - [ ] T018 [US2] Wire the "which document(s) are missing" specific message into any
       attendance-marking rejection UI this feature or My Workspace's punch flow surfaces — spec
