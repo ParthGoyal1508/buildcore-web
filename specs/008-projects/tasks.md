@@ -470,3 +470,35 @@ Verification:
 
 Not done — the manual passes in `quickstart.md` still need a human at a browser. No
 screen in this feature has been opened in one.
+
+---
+
+## Phase 12: Convergence
+
+Appended 2026-09-03 by `/speckit-converge`, assessing the shipped US1–US3 code against
+spec.md, plan.md and contracts/projects-web-api.md. Scoped to those three stories — US4–US8
+and the `TA*` amendment are correctly unbuilt and are not reported here.
+
+- [ ] T056 Make the Project Manager field a searchable employee picker per FR-002 (partial)
+      — `app/ui/projects/project-form.tsx` renders a plain `<select>` over
+      `listEmployees({ pageSize: 200 })`. FR-002 requires a searchable picker reusing HR's
+      pattern, which exists: `app/ui/account-creation/create-user-form.tsx` holds an
+      `employeeSearch` term in state and feeds it to the query. Adopt that shape. A company
+      with more than 200 active employees currently cannot assign a manager outside the
+      first 200, and nothing on screen says so.
+- [ ] T057 Handle the 200-row dropdown cap explicitly in
+      `app/ui/projects/project-form.tsx` and `app/ui/projects/site-modal.tsx` (partial)
+      — the client picker, the site modal's project picker and the sites-page project
+      filter all request `pageSize: 200`, which is `MAX_PAGE_SIZE` on the backend, and
+      silently drop everything past it. Either make them searchable like T056 or, at
+      minimum, say when the list is truncated. Silent truncation in a required field is
+      the worse of the two failures: the form looks complete and cannot be completed.
+- [ ] T058 Reconcile FR-013 with the architecture (contradicts) — FR-013 requires
+      `middleware.ts` to be extended with a `/dashboard/projects/*` route guard mapping
+      sub-routes to `PROJECTS`/`DWR`/`PROJECT_FINANCIALS`. That is unimplementable and was
+      when it was written: feature 001 keeps the access token in memory only
+      (`app/lib/session.ts`), so `proxy.ts` sees a presence-only `session_hint` cookie and
+      never a permission. The guard shipped in `app/dashboard/projects/layout.tsx`,
+      matching the settings and HR layouts. Amend FR-013 to describe the layout boundary,
+      so the next feature does not inherit the same impossible requirement — feature 014
+      already had to reason its way out of it once.
