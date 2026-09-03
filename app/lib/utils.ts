@@ -54,3 +54,23 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
     totalPages,
   ];
 };
+
+/**
+ * An amount in whole rupees, formatted for display.
+ *
+ * Distinct from `formatCurrency` above, which divides by 100 because it was written
+ * for amounts stored in paise. `buildcore-api` sends money as Prisma `Decimal`
+ * columns in rupees — `contractValue: "25000000.00"` is ₹2.5 crore, not ₹2.5 lakh —
+ * so passing those through the paise formatter would understate every figure on the
+ * screen by two orders of magnitude.
+ *
+ * `en-IN` rather than a manual lakh/crore split: `Intl` already groups Indian digits
+ * correctly (₹2,50,00,000), and reimplementing that grouping is how it ends up
+ * subtly wrong for eight-digit values.
+ */
+export const formatRupees = (amountInRupees: number) =>
+  amountInRupees.toLocaleString('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  });

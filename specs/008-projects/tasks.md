@@ -25,26 +25,26 @@ implementation and testing of each story.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Add "Projects" nav group to `app/ui/dashboard/nav-links.tsx` with sub-items:
+- [X] T001 [P] Add "Projects" nav group to `app/ui/dashboard/nav-links.tsx` with sub-items:
       Portfolio (`/dashboard/projects/portfolio`), DWR (`/dashboard/projects/dwr`),
       Clients (`/dashboard/projects/clients`), Sites (`/dashboard/projects/sites`)
-- [ ] T002 [P] Create `app/dashboard/projects/layout.tsx` with breadcrumb and sub-nav shell
+- [X] T002 [P] Create `app/dashboard/projects/layout.tsx` with breadcrumb and sub-nav shell
       consistent with the existing dashboard module layout pattern
-- [ ] T003 [P] Add `formatCurrency(amount: number): string` utility to `app/lib/utils.ts`
+- [X] T003 [P] Add `formatCurrency(amount: number): string` utility to `app/lib/utils.ts`
       using `Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })` — research.md §8,
       FR-010
-- [ ] T004 [P] Create `app/lib/api/projects.ts` with all typed API function signatures
+- [X] T004 [P] Create `app/lib/api/projects.ts` with all typed API function signatures
       (stubs returning `fetch` calls to the correct endpoints) — research.md §7,
       contracts/projects-web-api.md
-- [ ] T005 [P] Create `app/ui/projects/ProjectLockContext.tsx`: React context providing
+- [X] T005 [P] Create `app/ui/projects/ProjectLockContext.tsx`: React context providing
       `isLocked: boolean` and `projectId: string`; consumed by all tab components and action
       buttons to disable writes — plan.md constraint
-- [ ] T006 [P] Create `app/ui/projects/StatusBadge.tsx`: shared badge component accepting
+- [X] T006 [P] Create `app/ui/projects/StatusBadge.tsx`: shared badge component accepting
       `status` prop with colour maps for project status (Planning=gray, Ongoing=green,
       On Hold=orange, Completed=blue), DWR status (Draft=gray, Submitted=orange,
       Approved=green), and RA Bill status (Draft=gray, Submitted=yellow, Approved=green) —
       FR-009, research.md §9
-- [ ] T006a [P] Extend `middleware.ts` with a `/dashboard/projects/*` route matcher (`PROJECTS`/
+- [X] T006a [P] Extend `middleware.ts` with a `/dashboard/projects/*` route matcher (`PROJECTS`/
       `DWR`/`PROJECT_FINANCIALS` per sub-route — spec FR-013, research.md §10)
 
 **Checkpoint**: Nav, layout, API module, lock context, currency formatter, status badge, and
@@ -54,7 +54,7 @@ route guard ready.
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T007 Define all TypeScript interfaces and zod schemas from data-model.md in
+- [X] T007 Define all TypeScript interfaces and zod schemas from data-model.md in
       `app/lib/api/projects.ts`: `Client`, `Site`, `Project`, `ProjectDetail`, `BOQTaskGroup`,
       `BOQTaskItem`, `DWR`, `Revenue`, `RABill`, `WorkOrder`, `PnlCostRow`, `ProjectPnl`,
       `projectSchema`, `dwrTaskSchema` — these type the API functions from T004
@@ -73,17 +73,17 @@ data needed.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Implement `getClients`, `createClient`, `updateClient`, `deleteClient` in
+- [X] T008 [P] [US1] Implement `getClients`, `createClient`, `updateClient`, `deleteClient` in
       `app/lib/api/projects.ts` — contracts/projects-web-api.md Clients section
-- [ ] T009 [P] [US1] Create `app/ui/projects/ClientModal.tsx`: `react-hook-form` form with
+- [X] T009 [P] [US1] Create `app/ui/projects/ClientModal.tsx`: `react-hook-form` form with
       zod validation for Name (required), Contact Person, Phone, Email, Address, GSTIN
       (15-char alphanumeric format validation per FR in spec); handles create and edit modes
-- [ ] T010 [US1] Create `app/dashboard/projects/clients/page.tsx`: `ClientsPage` —
+- [X] T010 [US1] Create `app/dashboard/projects/clients/page.tsx`: `ClientsPage` —
       `ResponsiveList`-based, keyboard-operable table (FR-014) with columns (Client Name,
       Contact Person, Phone, Email, Projects count, Status, Actions), search + status filter,
       pagination, "Add Client" button opening `ClientModal`, inline delete with `409` handling
       ("Client has linked projects")
-- [ ] T011 [US1] Wire `@tanstack/react-query` for client list (`['projects', 'clients', params]`
+- [X] T011 [US1] Wire `@tanstack/react-query` for client list (`['projects', 'clients', params]`
       query key) and mutations (create/update/delete with `invalidateQueries` on success)
 
 **Checkpoint**: Clients CRUD fully functional and independently verifiable.
@@ -99,13 +99,13 @@ radius — no DWR or BOQ needed.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [P] [US2] Implement `getSites`, `createSite`, `updateSite` in
+- [X] T012 [P] [US2] Implement `getSites`, `createSite`, `updateSite` in
       `app/lib/api/projects.ts`
-- [ ] T013 [P] [US2] Create `app/ui/projects/SiteModal.tsx`: fields for Site Name, Project
+- [X] T013 [P] [US2] Create `app/ui/projects/SiteModal.tsx`: fields for Site Name, Project
       (searchable dropdown), Location address, Latitude (`@Min(-90)/@Max(90)` via zod),
       Longitude (`@Min(-180)/@Max(180)`), Geofence Radius (positive integer, helper label
       "Employees outside this radius will be flagged") — spec FR-012
-- [ ] T014 [US2] Create `app/dashboard/projects/sites/page.tsx`: `SitesPage` —
+- [X] T014 [US2] Create `app/dashboard/projects/sites/page.tsx`: `SitesPage` —
       `ResponsiveList`-based, keyboard-operable table (FR-014) with (Site Name, Project linked,
       Location, Geofence Radius m, Status, Actions), project filter, "Add Site" button,
       `SiteModal` integration
@@ -124,23 +124,23 @@ form; lock toggle with confirmation.
 
 ### Implementation for User Story 3
 
-- [ ] T015 [P] [US3] Implement `getProjects`, `createProject`, `updateProject`, `deleteProject`
+- [X] T015 [P] [US3] Implement `getProjects`, `createProject`, `updateProject`, `deleteProject`
       in `app/lib/api/projects.ts`
-- [ ] T016 [P] [US3] Create `app/ui/projects/ProjectForm.tsx`: single `react-hook-form`
+- [X] T016 [P] [US3] Create `app/ui/projects/ProjectForm.tsx`: single `react-hook-form`
       instance with `projectSchema` (data-model.md), grouped fields (Basic Info, Contract,
       Dates, Assignment), Client searchable dropdown, Project Manager searchable employee
       dropdown (calls HR employee list API), route-change interception for unsaved changes
       ("Discard changes?" dialog) — spec FR-002, research.md §3
-- [ ] T017 [P] [US3] Create `app/ui/projects/ProjectListTable.tsx`: `ResponsiveList`-based,
+- [X] T017 [P] [US3] Create `app/ui/projects/ProjectListTable.tsx`: `ResponsiveList`-based,
       keyboard-operable table (FR-014) with (Code, Name, Client, Location, Contract Value via
       `formatCurrency`, Status badge, Start Date, End Date, lock icon if `isLocked`,
       Actions: View/Edit/Delete) — FR-010
-- [ ] T018 [US3] Create `app/dashboard/projects/portfolio/page.tsx`: `PortfolioPage` with
+- [X] T018 [US3] Create `app/dashboard/projects/portfolio/page.tsx`: `PortfolioPage` with
       `ProjectListTable`, search/status/client filters, "Add Project" button
-- [ ] T019 [US3] Create `app/dashboard/projects/portfolio/new/page.tsx` and
+- [X] T019 [US3] Create `app/dashboard/projects/portfolio/new/page.tsx` and
       `app/dashboard/projects/portfolio/[id]/edit/page.tsx` using `ProjectForm` for create
       and edit respectively; redirect to detail page on save
-- [ ] T020 [US3] Lock toggle: in the Edit form, "Is Locked" toggle shows a confirmation dialog
+- [X] T020 [US3] Lock toggle: in the Edit form, "Is Locked" toggle shows a confirmation dialog
       ("Lock this project? All data entry will be disabled.") before saving; on save, re-fetch
       project data to propagate lock state through `ProjectLockContext`
 
@@ -415,3 +415,90 @@ Covers spec FR-015 to FR-024 and plan Phases A1–A5. Task IDs prefixed `TA`. **
 - [ ] TA019 [US10] Export via the established handling
 - [ ] TA020 [P] Confirm target actuals reconcile with approved DWR measurements (SC-A01); 320px
       spot-check every chart; `npx tsc --noEmit`
+
+---
+
+## Implementation note — 2026-09-03, User Stories 1-3
+
+Phases 1-5 are complete (T001-T020). Phases 6-11 (US4-US8) and every `TA*` amendment
+task are untouched, by scope decision. `contracts/projects-web-api.md` lists API
+functions for BOQ, DWR, revenue, billing, budget, P&L and documents; none is written,
+because the endpoints they would call do not exist yet.
+
+Deviations from the task text, and why:
+
+- **T001** needed no code and would have been wrong to do literally. Feature 014
+  replaced the hardcoded `nav-links.tsx` array with `NAV_MODULES` in
+  `app/lib/constants.ts`, which already carries a `projects` entry. The sub-items the
+  task lists became `app/ui/projects/sections.ts`, read by both the index tiles and
+  the tab strip — the pattern standardised in 8296913.
+- **T002** replaces the `<ModuleInProgress />` placeholder 014 put at
+  `/dashboard/projects` with a tile index, and puts the tab strip in the layout,
+  hidden on the index. Same shape as HR, Settings and Partners.
+- **T003** adds `formatRupees` rather than the specified `formatCurrency`, because a
+  `formatCurrency` already existed and divides by 100 for amounts in paise. The API
+  sends rupees, so reusing it would have understated every figure by two orders of
+  magnitude. The old one has no callers — it is Next.js starter-template residue —
+  but repurposing a function whose name promises paise would be a trap for the next
+  reader.
+- **T006a** must NOT be done as written: there is no `middleware.ts`, and there
+  cannot usefully be one. Feature 001 keeps the access token in memory only, so
+  `proxy.ts` sees a presence-only `session_hint` cookie and not a single permission.
+  The guard is in `app/dashboard/projects/layout.tsx`, matching the settings and HR
+  layouts.
+- **T014** calls `GET /projects/sites/list`, not `GET /projects/sites`. The latter is
+  003's site picker, still returning a bare array that HR's employee form reads
+  directly; the backend added the paginated list alongside it rather than changing a
+  shape a working form depends on.
+- **T016**'s route-change interception is `beforeunload` only. The App Router has no
+  navigation-interception API, so an in-app `<Link>` cannot be intercepted without
+  hand-wrapping every anchor; the explicit Cancel button asks instead.
+- **T019** redirects to the portfolio list on save, not to the detail page. The
+  project detail page is User Story 4 and is not built (user's scope decision).
+
+Verification:
+
+- `npm run lint` — 0 errors (1 pre-existing warning in `app/lib/api/account-creation.ts`).
+- `npx tsc --noEmit` — clean.
+- `npm run build` — succeeds; all five `/dashboard/projects/*` routes emitted.
+- Every `zod` schema in `app/lib/api/projects.ts` was checked against responses from a
+  running `buildcore-api`, not written from `data-model.md` — the mistake `partners.ts`
+  documents 005 making six times. This caught a real inconsistency worth knowing about:
+  `POST /projects` returns `contractValue` as the string `"25000000"` (a Prisma
+  `Decimal`) while `GET /projects` returns the number `25000000` (service-computed).
+  The `decimal` coercion handles both; all seven schemas parse live payloads.
+
+Not done — the manual passes in `quickstart.md` still need a human at a browser. No
+screen in this feature has been opened in one.
+
+---
+
+## Phase 12: Convergence
+
+Appended 2026-09-03 by `/speckit-converge`, assessing the shipped US1–US3 code against
+spec.md, plan.md and contracts/projects-web-api.md. Scoped to those three stories — US4–US8
+and the `TA*` amendment are correctly unbuilt and are not reported here.
+
+- [ ] T056 Make the Project Manager field a searchable employee picker per FR-002 (partial)
+      — `app/ui/projects/project-form.tsx` renders a plain `<select>` over
+      `listEmployees({ pageSize: 200 })`. FR-002 requires a searchable picker reusing HR's
+      pattern, which exists: `app/ui/account-creation/create-user-form.tsx` holds an
+      `employeeSearch` term in state and feeds it to the query. Adopt that shape. A company
+      with more than 200 active employees currently cannot assign a manager outside the
+      first 200, and nothing on screen says so.
+- [ ] T057 Handle the 200-row dropdown cap explicitly in
+      `app/ui/projects/project-form.tsx` and `app/ui/projects/site-modal.tsx` (partial)
+      — the client picker, the site modal's project picker and the sites-page project
+      filter all request `pageSize: 200`, which is `MAX_PAGE_SIZE` on the backend, and
+      silently drop everything past it. Either make them searchable like T056 or, at
+      minimum, say when the list is truncated. Silent truncation in a required field is
+      the worse of the two failures: the form looks complete and cannot be completed.
+- [ ] T058 Reconcile FR-013 with the architecture (contradicts) — FR-013 requires
+      `middleware.ts` to be extended with a `/dashboard/projects/*` route guard mapping
+      sub-routes to `PROJECTS`/`DWR`/`PROJECT_FINANCIALS`. That is unimplementable and was
+      when it was written: feature 001 keeps the access token in memory only
+      (`app/lib/session.ts`), so `proxy.ts` sees a presence-only `session_hint` cookie and
+      never a permission. The guard shipped in `app/dashboard/projects/layout.tsx`,
+      matching the settings and HR layouts. Amend FR-013 to describe the layout boundary,
+      so the next feature does not inherit the same impossible requirement — feature 014
+      already had to reason its way out of it once.

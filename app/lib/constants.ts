@@ -43,14 +43,18 @@ export const ROUTES = {
   hrReimbursements: '/dashboard/hr/reimbursements',
   hrReEnrolment: '/dashboard/hr/re-enrolment',
 
-  // --- Modules not yet built (features 006-009) ---
-  // Listed because feature 014 filters and guards the sidebar from one definition,
-  // and that definition has to name every module the sidebar shows. Each has a
-  // placeholder page rendering <ModuleInProgress>, so following a sidebar link the
-  // app itself drew explains itself rather than 404ing. Only the module index is
-  // stubbed — a deeper path under one of these is a genuinely wrong URL and still
-  // 404s.
+  // --- Projects (feature 008) ---
+  // Clients, Sites and the Portfolio are built (US1-US3). BOQ, DWR, revenue,
+  // billing, budget, P&L and documents are specified but not yet built, so they
+  // have no routes here — a route that leads nowhere is the dead link feature 014
+  // exists to prevent.
   projects: '/dashboard/projects',
+  projectsPortfolio: '/dashboard/projects/portfolio',
+  projectsNewProject: '/dashboard/projects/portfolio/new',
+  projectsEditProject: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/edit`,
+  projectsClients: '/dashboard/projects/clients',
+  projectsSites: '/dashboard/projects/sites',
 
   // --- Partners (feature 007) ---
   partnersVendors: '/dashboard/partners/vendors',
@@ -60,6 +64,13 @@ export const ROUTES = {
   partnersCompliance: '/dashboard/partners/contractors/compliance',
   partnersRag: '/dashboard/partners/contractors/rag',
   partnersBocw: '/dashboard/partners/bocw',
+  // --- Modules not yet built (features 006, 009) ---
+  // Listed because feature 014 filters and guards the sidebar from one definition,
+  // and that definition has to name every module the sidebar shows. Each has a
+  // placeholder page rendering <ModuleInProgress>, so following a sidebar link the
+  // app itself drew explains itself rather than 404ing. Only the module index is
+  // stubbed — a deeper path under one of these is a genuinely wrong URL and still
+  // 404s.
   plant: '/dashboard/plant',
   inventory: '/dashboard/inventory',
   partners: '/dashboard/partners',
@@ -253,6 +264,28 @@ export const MESSAGES = {
   nonNavPermissionsHint:
     'These grant access to areas inside a module. They do not add or remove anything from the sidebar.',
   permissionControlsModule: (module: string) => `Shows "${module}" in the sidebar`,
+
+  // --- Projects (feature 008) ---
+  /** The 409 from `DELETE /projects/clients/:id`. The API's own message names the
+   * project count; this is the fallback when it does not reach us. */
+  clientHasProjects:
+    'This client has linked projects and cannot be deleted. Set it inactive instead.',
+  projectHasRecords:
+    'This project has recorded data and cannot be deleted. Set its status to completed instead.',
+  siteInUse:
+    'This site is still in use and cannot be deleted. Set it inactive instead.',
+  /** Shown on every write control while a project is locked (spec FR-003). */
+  projectLocked:
+    'This project is locked. An administrator must unlock it before anything can be changed.',
+  projectLockConfirm:
+    'Lock this project? All data entry will be disabled until it is unlocked.',
+  projectUnlockConfirm:
+    'Unlock this project? Data entry will be re-enabled for everyone.',
+  /** The route-change interception on the project form (spec FR-002). */
+  discardChanges: 'Discard your changes to this project?',
+  gstinFormat: 'Enter a valid 15-character GSTIN, e.g. 27AAPFU0939F1ZV.',
+  /** Said on the site form, where the number is not self-explanatory. */
+  geofenceHint: 'Employees punching outside this radius will be flagged.',
 } as const;
 
 /**
@@ -431,6 +464,55 @@ export type BocwStatus = (typeof BOCW_STATUSES)[number];
  * (007 FR-015). A user with `PARTNERS` alone can tag a vendor with a category but
  * cannot create one, and the guard has to reflect that or the screen 403s on load.
  */
+/**
+ * The status and classification vocabularies of the Projects module (feature 008).
+ *
+ * Mirrors the Prisma enums exactly. Declared here rather than inline in the zod
+ * schemas so a badge's colour map and the schema that validates the value cannot
+ * come to disagree about what the values are (Principle III).
+ */
+export const CLIENT_STATUSES = ['active', 'inactive'] as const;
+export type ClientStatus = (typeof CLIENT_STATUSES)[number];
+
+export const SITE_STATUSES = ['active', 'inactive'] as const;
+export type SiteStatus = (typeof SITE_STATUSES)[number];
+
+export const PROJECT_STATUSES = [
+  'planning',
+  'ongoing',
+  'on_hold',
+  'completed',
+] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export const PROJECT_DIVISIONS = ['contract', 'own'] as const;
+export type ProjectDivision = (typeof PROJECT_DIVISIONS)[number];
+
+export const PROJECT_SITE_TYPES = ['site', 'toll', 'plant'] as const;
+export type ProjectSiteType = (typeof PROJECT_SITE_TYPES)[number];
+
+/**
+ * Which permission each `/dashboard/projects/*` section requires.
+ *
+ * All three are `PROJECTS` today. The map exists anyway because the sections that
+ * follow do not share it — the backend gates DWR on `DWR` and revenue, billing and
+ * P&L on `PROJECT_FINANCIALS` — and adding a section then means adding a row here
+ * rather than discovering the guard was never per-section in the first place.
+ */
+export const PROJECTS_PERMISSIONS = {
+  portfolio: 'PROJECTS',
+  clients: 'PROJECTS',
+  sites: 'PROJECTS',
+} as const;
+
+export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;
+
+/** Label for a projects enum value, via the shared enum labeller. */
+export function projectsLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return hrLabel(value);
+}
+
 export const PARTNERS_PERMISSIONS = {
   vendors: 'PARTNERS',
   contractors: 'PARTNERS',
@@ -670,6 +752,12 @@ export function enumLabel(value: string): string {
 
 /** Overrides where the mechanical label is wrong or unhelpfully terse. */
 const ENUM_LABEL_OVERRIDES: Record<string, string> = {
+  // Projects (008)
+  on_hold: 'On hold',
+  // "Own" alone reads as a typo in a status column; the pair is contract work vs
+  // work the company is doing for itself.
+  own: 'Own work',
+
   // Partners (007)
   labour_contractor: 'Labour contractor',
   non_compliant: 'Non-compliant',
