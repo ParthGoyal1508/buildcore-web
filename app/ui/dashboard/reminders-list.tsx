@@ -48,17 +48,36 @@ export default function RemindersList() {
    * Filter options come from the data, not a hardcoded list.
    *
    * The set of modules and types is open — that is the engine's whole design — so a
-   * fixed dropdown would go stale the first time a module registers a rule. Built
-   * from the unfiltered dimensions of the current response, which is why the module
-   * and type filters are derived while severity uses the closed constant.
+   * fixed dropdown would go stale the first time a module registers a rule.
+   *
+   * Deliberately a SECOND, unfiltered query rather than a reading of `data`. Deriving
+   * the options from the filtered response collapses each dropdown to whatever the
+   * current filter left standing: pick a module and every other module disappears,
+   * so the only move available is back to "All modules" — you can never go sideways.
+   * With no filters active the two queries share a key and react-query serves both
+   * from one fetch, so the extra request only happens once a filter is on.
    */
+  const { data: unfiltered } = useQuery({
+    queryKey: ['reminders', {}],
+    queryFn: () => getReminders({}),
+  });
+
   const { modules, types } = useMemo(() => {
-    const reminders = data?.reminders ?? [];
+    const reminders = unfiltered?.reminders ?? [];
+    // The active selection is always an option, even when nothing matches it any
+    // more — snooze the last reminder in a module and that module leaves the
+    // unfiltered list, which would otherwise leave the `select` showing blank
+    // against a value it no longer offers.
+    const withSelection = (values: string[], selected?: string) =>
+      Array.from(new Set(selected ? [...values, selected] : values)).sort();
     return {
-      modules: Array.from(new Set(reminders.map((r) => r.sourceModule))).sort(),
-      types: Array.from(new Set(reminders.map((r) => r.type))).sort(),
+      modules: withSelection(
+        reminders.map((r) => r.sourceModule),
+        filters.module,
+      ),
+      types: withSelection(reminders.map((r) => r.type), filters.type),
     };
-  }, [data]);
+  }, [unfiltered, filters.module, filters.type]);
 
   const hasFilters = Boolean(filters.module || filters.type || filters.severity);
 

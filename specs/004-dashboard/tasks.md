@@ -404,7 +404,7 @@ Appended 2026-09-03 after the reminders-centre slice. Scoped to that slice only 
 widget, dashboard, activity-log, notification and report tasks above are unbuilt by
 decision, not by oversight, and are not restated here.
 
-- [ ] T047 Derive the module and type filter options from an unfiltered source in
+- [X] T047 Derive the module and type filter options from an unfiltered source in
       `app/ui/dashboard/reminders-list.tsx`. They are currently built from
       `data.reminders`, which is the response for the *current* filters — so selecting
       a module removes every other module from the dropdown and the user can only
@@ -420,3 +420,13 @@ decision, not by oversight, and are not restated here.
       module still reports every pending module, naming sources irrelevant to what is
       on screen and diluting the notice for the module the user is actually looking at,
       per FR-026 (partial)
+
+**T047 closed 2026-09-03.** The dropdown options now come from a second, unfiltered
+query rather than from the filtered response. With no filter active the two queries
+share a key and react-query serves both from one fetch, so the extra request only
+happens once a filter is on. The active selection is also forced into its own option
+list: snoozing the last reminder in a module drops that module out of the unfiltered
+result, which would otherwise leave the `select` blank against a value it no longer
+offers.
+
+T048 and T049 remain open, as does TA013's 320px pass.
