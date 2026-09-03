@@ -56,6 +56,15 @@ export const ROUTES = {
   projectsClients: '/dashboard/projects/clients',
   projectsSites: '/dashboard/projects/sites',
 
+  // --- Dashboard: Reminders centre (feature 004, US9) ---
+  // Not a NAV_MODULES entry: Reminders is part of the Dashboard module, not a
+  // module of its own, and it is gated by DASHBOARD. Note that the `dashboard`
+  // entry in NAV_MODULES carries `guardsSubtree: false`, so `ModuleGuard` returns
+  // 'unknown-route' for this path — the permission check lives in
+  // `app/dashboard/reminders/layout.tsx`, the same way HR and Settings gate their
+  // own sections.
+  reminders: '/dashboard/reminders',
+
   // --- Partners (feature 007) ---
   partnersVendors: '/dashboard/partners/vendors',
   partnersVendorCategories: '/dashboard/partners/vendors/categories',
@@ -148,6 +157,79 @@ export const ENROLMENT_PHOTO_RANGE = { min: 3, max: 5 } as const;
 export const CAPTURE_MAX_DIMENSION = 1280;
 export const CAPTURE_JPEG_QUALITY = 0.85;
 
+/**
+ * Reminder severity bands, in the order the list presents them (spec FR-025).
+ *
+ * Ordered worst-first to match the API's own sort, so a filter dropdown built from
+ * this array reads the same way the rows below it do.
+ */
+export const REMINDER_SEVERITIES = ['overdue', 'warning', 'info'] as const;
+
+export type ReminderSeverity = (typeof REMINDER_SEVERITIES)[number];
+
+/**
+ * Copy for each severity band.
+ *
+ * Centralised per Principle III, and separate from the colour map below because the
+ * two change for different reasons — a wording tweak should not risk a colour.
+ */
+export const REMINDER_SEVERITY_LABELS: Record<ReminderSeverity, string> = {
+  overdue: 'Overdue',
+  warning: 'Due soon',
+  info: 'Upcoming',
+};
+
+/**
+ * How the reminders list renders a signed days-remaining figure (spec FR-025).
+ *
+ * The sign carries the meaning, so it is spelled out in words rather than shown as a
+ * bare `-3`: a negative number in a column headed "days remaining" is read as a
+ * mistake at least as often as it is read as "overdue".
+ */
+export function daysRemainingLabel(days: number): string {
+  if (days < 0) {
+    const late = Math.abs(days);
+    return `${late} day${late === 1 ? '' : 's'} overdue`;
+  }
+  if (days === 0) return 'Due today';
+  return `${days} day${days === 1 ? '' : 's'} left`;
+}
+
+/**
+ * Human labels for the reminder source modules the engine can report.
+ *
+ * Falls back to a de-slugged form for a module registered after this map was
+ * written — the engine is extensible by design, so a new `sourceModule` string
+ * arriving here is expected rather than an error.
+ */
+const REMINDER_MODULE_LABELS: Record<string, string> = {
+  settings: 'Settings',
+  machinery: 'Plant & Machinery',
+  project_assets: 'Project Assets',
+  projects: 'Projects',
+  inventory: 'Inventory',
+  partners: 'Partners',
+  hr: 'HR & Payroll',
+};
+
+export function reminderModuleLabel(sourceModule: string): string {
+  return (
+    REMINDER_MODULE_LABELS[sourceModule] ??
+    sourceModule
+      .split(/[_-]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  );
+}
+
+/** The same treatment for a reminder `type`, e.g. `document_expiry`. */
+export function reminderTypeLabel(type: string): string {
+  return type
+    .split(/[_-]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
   welcomeBack: (name: string) => `Welcome back, ${name}!`,
@@ -168,6 +250,22 @@ export const MESSAGES = {
   confirmDelete: (what: string, name: string) =>
     `Delete the ${what} "${name}"? This cannot be undone.`,
   protectedRole: 'The Super Admin role is protected and cannot be edited or deleted.',
+
+  // --- Dashboard: Reminders centre (feature 004, US9) ---
+  remindersEmpty: 'Nothing is due. Reminders appear here as due dates approach.',
+  remindersEmptyFiltered:
+    'No reminders match these filters. Clear them to see everything that is due.',
+  /** Spec FR-026: an unavailable source is reported, never allowed to fail the screen. */
+  remindersUnavailable: (modules: string) =>
+    `Not counted yet: ${modules}. These modules are not built, so anything due in them cannot be shown.`,
+  remindersLoadFailed:
+    'Could not load reminders. Nothing has been missed — try again.',
+  reminderSnoozed: (until: string) => `Snoozed until ${until}.`,
+  snoozeReasonRequired: 'Give a reason, so the next person to see this knows why.',
+  snoozeDatePast: 'Pick a date in the future, or the reminder returns immediately.',
+  /** Spec FR-028, for a reminder whose module has no screen to open yet. */
+  reminderNoDestination:
+    'This reminder has no screen to open yet — its module is still being built.',
 
   // --- My Workspace (feature 003) ---
   claimReceiptRequired: (category: string, threshold: number) =>

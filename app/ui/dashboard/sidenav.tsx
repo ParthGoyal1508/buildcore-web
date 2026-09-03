@@ -7,6 +7,7 @@ import { PowerIcon } from '@heroicons/react/24/outline';
 import { lusitana } from '@/app/ui/fonts';
 import { logout } from '@/app/lib/api/auth';
 import CurrentUser from '@/app/ui/dashboard/current-user';
+import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
 
 export default function SideNav() {
   const router = useRouter();
@@ -38,6 +39,11 @@ export default function SideNav() {
           Desktop keeps the stacked column via `md:flex-col md:flex-nowrap`. */}
       <div className="flex flex-wrap gap-2 md:grow md:flex-col md:flex-nowrap md:gap-2">
         <NavLinks />
+        {/* Reminders is not a module, so it is not in NAV_MODULES and not part of
+            NavLinks — it is a shortcut into the Dashboard module, rendered only for
+            a user who holds DASHBOARD. It sits after the modules so it never pushes
+            one out of the first mobile row. */}
+        <ReminderBadge />
         {/* Spacer, desktop only. Below it the identity panel and Sign Out render in
             every state — including both failure states — so a user whose permissions
             filtered to nothing, or could not be read at all, still knows who they are

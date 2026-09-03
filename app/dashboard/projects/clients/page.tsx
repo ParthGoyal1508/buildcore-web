@@ -14,7 +14,7 @@ import { CLIENT_STATUSES, MESSAGES, projectsLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { lusitana } from '@/app/ui/fonts';
 import ClientModal from '@/app/ui/projects/client-modal';
-import StatusBadge from '@/app/ui/projects/status-badge';
+import StatusBadge from '@/app/ui/status-badge';
 import {
   RowAction,
   SelectField,

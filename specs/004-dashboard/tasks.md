@@ -296,9 +296,9 @@ Covers spec FR-020 to FR-030 and plan Phases A1–A4. Task IDs prefixed `TA`. **
 **Build-order note**: TA006–TA011 (the Reminders centre) unblock the 002, 006, and 012 amendments,
 which all render from it rather than evaluating reminders themselves. Schedule them early.
 
-- [ ] TA001 Extend the dashboard API module with department-widget and reminders functions plus
+- [X] TA001 Extend the dashboard API module with department-widget and reminders functions plus
       `zod` schemas
-- [ ] TA002 [P] Add reminder severity labels and colour maps to constants
+- [X] TA002 [P] Add reminder severity labels and colour maps to constants
 - [ ] TA003 [US8] `department-selector.tsx` populated from the API, showing **only the caller's
       permitted departments** (spec FR-023)
 - [ ] TA004 [US8] `app/dashboard/department/page.tsx` rendering through the **existing shared widget
@@ -306,17 +306,92 @@ which all render from it rather than evaluating reminders themselves. Schedule t
 - [ ] TA005 [US8] Selected department encoded in the URL so the view is shareable and survives
       reload (spec FR-022); empty department renders zero values, not an error (spec FR-021);
       unbuilt-module widgets fall through to the existing "Coming soon" treatment
-- [ ] TA006 [US9] `reminders-list.tsx`: source module, type, subject, due date, signed days
+- [X] TA006 [US9] `reminders-list.tsx`: source module, type, subject, due date, signed days
       remaining, and severity via `StatusBadge`; **overdue first, then soonest due** (spec FR-025)
-- [ ] TA007 [US9] Module / type / severity filters without a full-page reload
-- [ ] TA008 [US9] An unavailable module source **reported as such without failing the screen**
+- [X] TA007 [US9] Module / type / severity filters without a full-page reload
+- [X] TA008 [US9] An unavailable module source **reported as such without failing the screen**
       (spec FR-026)
-- [ ] TA009 [US9] `snooze-modal.tsx` collecting an until-date and a reason (spec FR-029)
-- [ ] TA010 [US9] Header reminder count **visually distinguishable from the existing notifications
+- [X] TA009 [US9] `snooze-modal.tsx` collecting an until-date and a reason (spec FR-029)
+- [X] TA010 [US9] Header reminder count **visually distinguishable from the existing notifications
       badge** (spec FR-027)
-- [ ] TA011 [US9] Row click navigates to the underlying record in its owning module (spec FR-028);
+- [X] TA011 [US9] Row click navigates to the underlying record in its owning module (spec FR-028);
       distinct empty state, not an error
 - [ ] TA012 [P] Confirm no cross-department KPI leakage (SC-A01)
 - [ ] TA013 [P] 320px spot-check both screens; `npx tsc --noEmit`
 
 **Unblocks**: 002 TA011, 006 TA017, 012 T044.
+
+---
+
+## Implementation note — 2026-09-03 (reminders centre slice)
+
+The Reminders centre (TA001 reminders half, TA002, TA006–TA011) was built as **wave 1**
+of feature 004, matching the backend slice in `buildcore-api`
+`specs/004-dashboard-backend`. It is the single client surface for due-date reminders
+(spec FR-024); features 002, 006 and 012 render from it rather than each evaluating
+their own.
+
+**Still open and correctly unchecked**: T001–T046 (widgets, company dashboard, activity
+log, notifications, site/group dashboards, reports), TA003–TA005 and TA012 (Department
+Dashboard, US8), and TA013 (below).
+
+### Deviations from the task text
+
+- **TA010 says "header"; this shell has no header.** `app/dashboard/layout.tsx` is a
+  sidenav beside a content column. The count is rendered in the sidenav
+  (`app/ui/dashboard/reminder-badge.tsx`) because a count that is only visible on the
+  page it describes is not a badge at all.
+- **FR-027's "visually distinguishable from the existing notifications badge" was
+  satisfied in advance.** That badge is US4's and does not exist yet. The reminders
+  badge takes a clock icon and a severity-coloured count (red when anything is
+  overdue, amber otherwise); whoever builds the notifications bell must keep it
+  plainly different.
+- **Reminders is not a `NAV_MODULES` entry.** It is part of the Dashboard module, not
+  a module of its own, and feature 014's single-definition rule governs the module
+  tier. Consequence worth knowing: the `dashboard` entry carries
+  `guardsSubtree: false`, so `ModuleGuard` returns `'unknown-route'` for
+  `/dashboard/reminders` and the DASHBOARD check lives in
+  `app/dashboard/reminders/layout.tsx`, the same way HR and Settings gate their own
+  sections.
+- **`StatusBadge` moved from `app/ui/projects/status-badge.tsx` to
+  `app/ui/status-badge.tsx`.** FR-025 requires severity to render through
+  `StatusBadge`, and importing a Projects component into Dashboard would point the
+  dependency backwards. It gained an optional `label` prop, because `projectsLabel()`
+  is the copy source for project statuses only and routing severities through it would
+  either mislabel them or force unrelated entries into that map. Three import sites in
+  feature 008 were updated.
+- **Module and type filters are built from the response, not a constant.** The set of
+  registered rules is open by design, so a hardcoded dropdown would go stale the first
+  time a module registers a rule. Severity uses the closed constant because it is a
+  closed set. `reminderModuleLabel()` and `reminderTypeLabel()` fall back to a
+  de-slugged form for a value this build has never seen, for the same reason.
+- **TA011's row click is a link only when the API supplied an `actionLink`.** No module
+  that registers a rule is built yet, so most rows have no screen to open; a link to
+  nowhere is worse than plain text, and the row carries a title explaining why.
+- **Sorting is the API's.** The engine already returns overdue-first-then-soonest, and
+  re-sorting client-side would be a second source of truth that silently disagrees the
+  day a rule changes.
+
+### Verification performed
+
+- `npx tsc --noEmit` clean; `npm run lint` 0 errors (the single warning is
+  pre-existing in feature 010's `app/lib/api/account-creation.ts`); `npm run build`
+  succeeds and emits `/dashboard/reminders`.
+- **All three zod schemas were parsed against live API responses**, not against
+  `data-model.md`. The API was booted with a rule registered from a module outside
+  `src/dashboard/`, producing one reminder in each severity band, and the real exported
+  `getReminders`/`getReminderCount`/`snoozeReminder` functions parsed the captured
+  bodies: 3 reminders and 6 unavailable sources, all three PASS. This also confirmed
+  that the composite reminder id survives `encodeURIComponent` through the
+  `PATCH /dashboard/reminders/:id/snooze` route — the id contains a colon, and the
+  snooze response returned it decoded.
+
+### Not verified — TA013 remains unchecked
+
+The `npx tsc --noEmit` half of TA013 is done; **the 320px/tablet spot-check is not**.
+Nothing in this slice has been opened in a browser. The reminders table scrolls inside
+its own `overflow-x-auto` container as constitution v2.0.0 requires of a desktop
+surface, and the sidenav badge reuses the exact `flex-1 basis-[20%]` classes the Sign
+Out target already uses so the mobile row reflows — but it adds an eleventh target to
+that row, and that is precisely the kind of thing the 320px pass exists to catch.
+`quickstart.md`'s manual passes are likewise undone.

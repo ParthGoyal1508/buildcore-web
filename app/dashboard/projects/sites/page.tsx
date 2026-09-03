@@ -14,7 +14,7 @@ import { MESSAGES, SITE_STATUSES, projectsLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { lusitana } from '@/app/ui/fonts';
 import SiteModal from '@/app/ui/projects/site-modal';
-import StatusBadge from '@/app/ui/projects/status-badge';
+import StatusBadge from '@/app/ui/status-badge';
 import {
   RowAction,
   SelectField,
