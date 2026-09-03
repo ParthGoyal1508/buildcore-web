@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   deletePurchase,
+  getPurchaseBill,
   getPurchases,
   type Purchase,
 } from '@/app/lib/api/inventory';
@@ -21,6 +22,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 
@@ -34,10 +36,13 @@ export default function PurchasesPage() {
   const [paymentStatus, setPaymentStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openingBill, setOpeningBill] = useState<string | null>(null);
 
   const filters = {
+    page,
     ...(siteId ? { siteId } : {}),
     ...(vendorId ? { vendorId } : {}),
     ...(paymentStatus ? { paymentStatus } : {}),
@@ -49,6 +54,31 @@ export default function PurchasesPage() {
     queryKey: ['inventory', 'purchases', filters],
     queryFn: () => getPurchases(filters),
   });
+
+  /**
+   * Opens a stored bill in a new tab.
+   *
+   * Fetched rather than linked: the endpoint needs the bearer token, which lives in
+   * memory and never appears in a URL, so a plain `<a href>` would 401. The object
+   * URL is revoked on a timer rather than immediately — revoking it before the new
+   * tab has read it is a race the tab loses.
+   */
+  async function openBill(id: string) {
+    setOpeningBill(id);
+    setError(null);
+    try {
+      const blob = await getPurchaseBill(id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Could not open this bill.',
+      );
+    } finally {
+      setOpeningBill(null);
+    }
+  }
 
   const remove = useMutation({
     mutationFn: (id: string) => deletePurchase(id),
@@ -95,7 +125,19 @@ export default function PurchasesPage() {
       key: 'bill',
       header: 'Bill',
       hideOnCard: true,
-      render: (row) => (row.hasBillFile ? 'Attached' : '—'),
+      render: (row) =>
+        row.hasBillFile ? (
+          <button
+            type="button"
+            onClick={() => void openBill(row.id)}
+            disabled={openingBill === row.id}
+            className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400"
+          >
+            {openingBill === row.id ? 'Opening…' : 'View'}
+          </button>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'paymentStatus',
@@ -123,7 +165,12 @@ export default function PurchasesPage() {
           id="purchases-site"
           label="Store"
           value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
+          onChange={(event) => {
+            setSiteId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All stores</option>
           {(sites.data ?? []).map((site) => (
@@ -137,7 +184,12 @@ export default function PurchasesPage() {
           id="purchases-vendor"
           label="Vendor"
           value={vendorId}
-          onChange={(event) => setVendorId(event.target.value)}
+          onChange={(event) => {
+            setVendorId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All vendors</option>
           {(vendors.data ?? []).map((vendor) => (
@@ -151,7 +203,12 @@ export default function PurchasesPage() {
           id="purchases-status"
           label="Payment"
           value={paymentStatus}
-          onChange={(event) => setPaymentStatus(event.target.value)}
+          onChange={(event) => {
+            setPaymentStatus(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">Any status</option>
           {PURCHASE_BILL_STATUSES.map((status) => (
@@ -166,14 +223,24 @@ export default function PurchasesPage() {
           label="From"
           type="date"
           value={dateFrom}
-          onChange={(event) => setDateFrom(event.target.value)}
+          onChange={(event) => {
+            setDateFrom(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         />
         <TextField
           id="purchases-to"
           label="To"
           type="date"
           value={dateTo}
-          onChange={(event) => setDateTo(event.target.value)}
+          onChange={(event) => {
+            setDateTo(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         />
       </div>
 
@@ -198,6 +265,14 @@ export default function PurchasesPage() {
             Delete
           </RowAction>
         )}
+      />
+
+      <Pager
+        total={data?.total ?? 0}
+        page={data?.page ?? 1}
+        pageSize={data?.pageSize ?? 25}
+        onPageChange={setPage}
+        noun="purchase"
       />
 
       {showModal && <PurchaseModal onClose={() => setShowModal(false)} />}

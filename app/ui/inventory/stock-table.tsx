@@ -9,6 +9,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import Pager from './pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { useSites } from './use-inventory-refs';
 
@@ -34,6 +35,7 @@ export default function StockTable({
   const [categoryId, setCategoryId] = useState('');
   const [search, setSearch] = useState('');
   const [belowOnly, setBelowOnly] = useState(false);
+  const [page, setPage] = useState(1);
 
   const sites = useSites();
   const categories = useQuery({
@@ -50,12 +52,14 @@ export default function StockTable({
   const canEditMasters = user?.permissions.includes('SETTINGS') ?? false;
 
   const filters = {
+    page,
     ...(siteId ? { siteId } : {}),
     ...(categoryId ? { categoryId } : {}),
     ...(search ? { search } : {}),
     ...(belowOnly ? { belowReorderLevel: true } : {}),
   };
-  const isFiltered = Object.keys(filters).length > 0;
+  // `page` is always present, so it does not count as a filter.
+  const isFiltered = Object.keys(filters).length > 1;
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['inventory', 'stock', filters],
@@ -166,7 +170,10 @@ export default function StockTable({
           <select
             id="stock-site"
             value={siteId}
-            onChange={(event) => setSiteId(event.target.value)}
+            onChange={(event) => {
+              setSiteId(event.target.value);
+              setPage(1);
+            }}
             className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
           >
             <option value="">All stores</option>
@@ -188,7 +195,10 @@ export default function StockTable({
           <select
             id="stock-category"
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) => {
+              setCategoryId(event.target.value);
+              setPage(1);
+            }}
             className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
           >
             <option value="">All categories</option>
@@ -210,7 +220,10 @@ export default function StockTable({
           <input
             id="stock-search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
             placeholder="Item name or code"
             className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
           />
@@ -221,7 +234,10 @@ export default function StockTable({
             <input
               type="checkbox"
               checked={belowOnly}
-              onChange={(event) => setBelowOnly(event.target.checked)}
+              onChange={(event) => {
+              setBelowOnly(event.target.checked);
+              setPage(1);
+            }}
               className="h-4 w-4 rounded border-gray-300 text-blue-600"
             />
             Below reorder level only
@@ -238,6 +254,14 @@ export default function StockTable({
         emptyMessage={
           isFiltered ? MESSAGES.inventoryEmptyFiltered : MESSAGES.inventoryEmpty
         }
+      />
+
+      <Pager
+        total={data?.total ?? 0}
+        page={data?.page ?? 1}
+        pageSize={data?.pageSize ?? 25}
+        onPageChange={setPage}
+        noun="stock row"
       />
     </div>
   );

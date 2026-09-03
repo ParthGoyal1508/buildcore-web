@@ -17,6 +17,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 
 export default function PaymentsPage() {
@@ -27,10 +28,12 @@ export default function PaymentsPage() {
   const [paymentMode, setPaymentMode] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const filters = {
+    page,
     ...(vendorId ? { vendorId } : {}),
     ...(paymentMode ? { paymentMode } : {}),
     ...(dateFrom ? { dateFrom } : {}),
@@ -107,7 +110,12 @@ export default function PaymentsPage() {
           id="payments-vendor"
           label="Vendor"
           value={vendorId}
-          onChange={(event) => setVendorId(event.target.value)}
+          onChange={(event) => {
+            setVendorId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All vendors</option>
           {(vendors.data ?? []).map((vendor) => (
@@ -121,7 +129,12 @@ export default function PaymentsPage() {
           id="payments-mode"
           label="Mode"
           value={paymentMode}
-          onChange={(event) => setPaymentMode(event.target.value)}
+          onChange={(event) => {
+            setPaymentMode(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">Any mode</option>
           {PAYMENT_MODES.map((mode) => (
@@ -136,14 +149,24 @@ export default function PaymentsPage() {
           label="From"
           type="date"
           value={dateFrom}
-          onChange={(event) => setDateFrom(event.target.value)}
+          onChange={(event) => {
+            setDateFrom(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         />
         <TextField
           id="payments-to"
           label="To"
           type="date"
           value={dateTo}
-          onChange={(event) => setDateTo(event.target.value)}
+          onChange={(event) => {
+            setDateTo(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         />
       </div>
 
@@ -168,6 +191,14 @@ export default function PaymentsPage() {
             Delete
           </RowAction>
         )}
+      />
+
+      <Pager
+        total={data?.total ?? 0}
+        page={data?.page ?? 1}
+        pageSize={data?.pageSize ?? 25}
+        onPageChange={setPage}
+        noun="payment"
       />
 
       {showModal && <PaymentModal onClose={() => setShowModal(false)} />}

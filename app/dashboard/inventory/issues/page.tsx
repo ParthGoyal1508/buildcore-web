@@ -16,6 +16,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 
 export default function IssuesPage() {
@@ -27,10 +28,12 @@ export default function IssuesPage() {
   const [itemId, setItemId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const filters = {
+    page,
     ...(siteId ? { siteId } : {}),
     ...(itemId ? { itemId } : {}),
     ...(dateFrom ? { dateFrom } : {}),
@@ -94,7 +97,12 @@ export default function IssuesPage() {
           id="issues-site"
           label="Store"
           value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
+          onChange={(event) => {
+            setSiteId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All stores</option>
           {(sites.data ?? []).map((site) => (
@@ -108,7 +116,12 @@ export default function IssuesPage() {
           id="issues-item"
           label="Item"
           value={itemId}
-          onChange={(event) => setItemId(event.target.value)}
+          onChange={(event) => {
+            setItemId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All items</option>
           {(items.data ?? []).map((item) => (
@@ -123,14 +136,24 @@ export default function IssuesPage() {
           label="From"
           type="date"
           value={dateFrom}
-          onChange={(event) => setDateFrom(event.target.value)}
+          onChange={(event) => {
+            setDateFrom(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         />
         <TextField
           id="issues-to"
           label="To"
           type="date"
           value={dateTo}
-          onChange={(event) => setDateTo(event.target.value)}
+          onChange={(event) => {
+            setDateTo(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         />
       </div>
 
@@ -155,6 +178,14 @@ export default function IssuesPage() {
             Delete
           </RowAction>
         )}
+      />
+
+      <Pager
+        total={data?.total ?? 0}
+        page={data?.page ?? 1}
+        pageSize={data?.pageSize ?? 25}
+        onPageChange={setPage}
+        noun="issue"
       />
 
       {showModal && <IssueModal onClose={() => setShowModal(false)} />}

@@ -26,6 +26,7 @@ import {
   SecondaryButton,
   SelectField,
 } from '@/app/ui/settings/form-fields';
+import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 
@@ -37,10 +38,12 @@ export default function TransfersPage() {
   const [fromSiteId, setFromSiteId] = useState('');
   const [itemId, setItemId] = useState('');
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const filters = {
+    page,
     ...(fromSiteId ? { fromSiteId } : {}),
     ...(itemId ? { itemId } : {}),
     ...(status ? { status } : {}),
@@ -112,7 +115,12 @@ export default function TransfersPage() {
           id="transfers-from"
           label="From store"
           value={fromSiteId}
-          onChange={(event) => setFromSiteId(event.target.value)}
+          onChange={(event) => {
+            setFromSiteId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All stores</option>
           {(sites.data ?? []).map((site) => (
@@ -126,7 +134,12 @@ export default function TransfersPage() {
           id="transfers-item"
           label="Item"
           value={itemId}
-          onChange={(event) => setItemId(event.target.value)}
+          onChange={(event) => {
+            setItemId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All items</option>
           {(items.data ?? []).map((item) => (
@@ -140,7 +153,12 @@ export default function TransfersPage() {
           id="transfers-status"
           label="Status"
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onChange={(event) => {
+            setStatus(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">Any status</option>
           {TRANSFER_STATUSES.map((value) => (
@@ -192,6 +210,14 @@ export default function TransfersPage() {
             </RowAction>
           </div>
         )}
+      />
+
+      <Pager
+        total={data?.total ?? 0}
+        page={data?.page ?? 1}
+        pageSize={data?.pageSize ?? 25}
+        onPageChange={setPage}
+        noun="transfer"
       />
 
       {showModal && <TransferModal onClose={() => setShowModal(false)} />}

@@ -20,6 +20,7 @@ import {
   SecondaryButton,
   SelectField,
 } from '@/app/ui/settings/form-fields';
+import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 
@@ -27,6 +28,7 @@ export default function IndentsPage() {
   const sites = useSites();
   const [status, setStatus] = useState('');
   const [siteId, setSiteId] = useState('');
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
 
   const { data: user } = useQuery({
@@ -36,6 +38,7 @@ export default function IndentsPage() {
   const canApprove = user?.permissions.includes('INVENTORY_APPROVE') ?? false;
 
   const filters = {
+    page,
     ...(status ? { status } : {}),
     ...(siteId ? { siteId } : {}),
   };
@@ -124,7 +127,12 @@ export default function IndentsPage() {
           id="indents-status"
           label="Status"
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onChange={(event) => {
+            setStatus(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">Any status</option>
           {INDENT_STATUSES.map((value) => (
@@ -138,7 +146,12 @@ export default function IndentsPage() {
           id="indents-site"
           label="Store"
           value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
+          onChange={(event) => {
+            setSiteId(event.target.value);
+            // Back to the first page: narrowing the list while on page
+            // three would show an empty screen for a filter that matches.
+            setPage(1);
+          }}
         >
           <option value="">All stores</option>
           {(sites.data ?? []).map((site) => (
@@ -156,6 +169,14 @@ export default function IndentsPage() {
         isLoading={isPending}
         error={isError ? MESSAGES.inventoryLoadFailed : undefined}
         emptyMessage={MESSAGES.indentsEmpty}
+      />
+
+      <Pager
+        total={data?.total ?? 0}
+        page={data?.page ?? 1}
+        pageSize={data?.pageSize ?? 25}
+        onPageChange={setPage}
+        noun="indent"
       />
 
       {showForm && <IndentForm onClose={() => setShowForm(false)} />}

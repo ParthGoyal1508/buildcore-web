@@ -7,7 +7,7 @@ import {
   PURCHASE_BILL_STATUSES,
   TRANSFER_STATUSES,
 } from '@/app/lib/constants';
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchBlob } from '@/app/lib/session';
 
 /**
  * Every `/dashboard/inventory/*` call to `buildcore-api` (feature 009).
@@ -313,6 +313,17 @@ export async function createPurchase(input: PurchaseInput): Promise<Purchase> {
 
 export async function deletePurchase(id: string): Promise<void> {
   await authFetch<void>(`/inventory/purchases/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * The uploaded bill, as a blob the caller can hand to the browser.
+ *
+ * Not a plain `<a href>`: the endpoint is behind the bearer token, which lives in
+ * memory and never reaches a URL. So the file is fetched with the same auth every
+ * other call uses and handed over as an object URL.
+ */
+export async function getPurchaseBill(id: string): Promise<Blob> {
+  return authFetchBlob(`/inventory/purchases/${id}/bill`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -384,3 +384,34 @@ the task text, and why.
 - **T024a and TA015's viewport pass.** No browser has been opened on any of this. The
   `themeColor` build warnings are pre-existing and repo-wide.
 - `quickstart.md`'s manual scenarios.
+
+---
+
+## Phase 11: Convergence — 2026-09-04
+
+Gaps found by reading the shipped code back against spec.md, plan.md and
+contracts/inventory-web-api.md. The first two were fixed in the same pass.
+
+- [X] T025 Add page controls to all six lists (missing). Every list endpoint returns
+      `total`, `page` and `pageSize`, and all six screens ignored them — a company
+      with thirty purchases saw twenty-five and had no way to know the rest existed.
+      Every filter now resets to page 1 as well, so narrowing a list while on page
+      three cannot show an empty screen for a filter that matches.
+- [X] T026 Offer the uploaded bill for viewing (missing). The purchase list showed
+      "Attached" as plain text against a bill nothing could open. It cannot be an
+      `<a href>` — the endpoint needs the bearer token, which lives in memory and
+      never appears in a URL — so it is fetched and handed over as an object URL.
+      Needed `authFetchBlob`, which shares `authFetch`'s refresh-and-retry rather
+      than repeating it.
+- [ ] T027 Offer indent deletion (missing). `DELETE /inventory/indents/:id` exists
+      and no screen reaches it. Cancel is offered instead, which is the right action
+      in almost every case — but an indent raised against the wrong store has no
+      remedy but to sit there cancelled.
+- [ ] T028 Add an item filter to the purchases list (partial). The endpoint takes
+      `itemId`; the screen offers store, vendor, payment status and dates but not
+      item, so "everything we bought of this" cannot be asked.
+- [ ] T029 The 320px and keyboard pass (T024a, TA015). No browser has been opened on
+      any of this feature. Note that 004 shipped a filter row that spilled its own
+      borders and it took a screenshot to find; these filter rows use grids for that
+      reason, but nobody has looked.
+- [ ] T030 Run `quickstart.md`'s manual scenarios.

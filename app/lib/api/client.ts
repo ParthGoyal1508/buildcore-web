@@ -41,3 +41,29 @@ export async function apiFetch<T>(
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
 }
+
+/**
+ * Same request handling as `apiFetch`, returning the raw bytes.
+ *
+ * Needed for the endpoints that serve a stored file. They cannot be a plain
+ * `<a href>`: the access token lives in memory and never appears in a URL, so the
+ * only way to reach an authenticated file is to fetch it and hand the browser an
+ * object URL for what came back.
+ */
+export async function apiFetchBlob(
+  path: string,
+  init?: RequestInit,
+): Promise<Blob> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: { ...init?.headers },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.message || res.statusText, res.status, body.code);
+  }
+
+  return res.blob();
+}
