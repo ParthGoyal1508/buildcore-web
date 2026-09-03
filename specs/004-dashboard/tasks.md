@@ -395,3 +395,28 @@ surface, and the sidenav badge reuses the exact `flex-1 basis-[20%]` classes the
 Out target already uses so the mobile row reflows — but it adds an eleventh target to
 that row, and that is precisely the kind of thing the 320px pass exists to catch.
 `quickstart.md`'s manual passes are likewise undone.
+
+---
+
+## Phase 11: Convergence
+
+Appended 2026-09-03 after the reminders-centre slice. Scoped to that slice only — the
+widget, dashboard, activity-log, notification and report tasks above are unbuilt by
+decision, not by oversight, and are not restated here.
+
+- [ ] T047 Derive the module and type filter options from an unfiltered source in
+      `app/ui/dashboard/reminders-list.tsx`. They are currently built from
+      `data.reminders`, which is the response for the *current* filters — so selecting
+      a module removes every other module from the dropdown and the user can only
+      return to "All modules" rather than switch directly to another. The code comment
+      claims the options come from "the unfiltered dimensions of the current response",
+      which is not what it does. Fetch the dimensions separately or filter client-side,
+      per FR-025 / TA007 (contradicts)
+- [ ] T048 Surface the API's `truncated` flag in the reminders list. The schema parses
+      it and the component discards it, so a list clipped at the response cap renders
+      as though it were complete — the same failure mode FR-026 exists to prevent for
+      unavailable sources, per FR-026 (partial)
+- [ ] T049 Filter the unavailable-sources note by the active module filter. Viewing one
+      module still reports every pending module, naming sources irrelevant to what is
+      on screen and diluting the notice for the module the user is actually looking at,
+      per FR-026 (partial)
