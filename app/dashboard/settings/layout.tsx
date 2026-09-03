@@ -3,12 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { getCurrentUser } from '@/app/lib/api/users';
-import {
-  SETTINGS_PERMISSIONS,
-  USER_ADMIN_ROLES,
-  MESSAGES,
-} from '@/app/lib/constants';
+import { SETTINGS_PERMISSIONS, MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import SettingsNav from '@/app/ui/settings/settings-nav';
+import { maySettingsAdministerUsers } from '@/app/ui/settings/sections';
 
 /**
  * The single permission chokepoint for every `/dashboard/settings/*` page.
@@ -67,10 +65,7 @@ export default function SettingsLayout({
     // Users administration additionally requires one of two roles (spec FR-010),
     // mirroring UsersAdminService.assertMayAdminister() on the backend.
     if (section === 'users') {
-      const mayAdminister = user.roleNames.some((name) =>
-        (USER_ADMIN_ROLES as readonly string[]).includes(name),
-      );
-      if (!mayAdminister) {
+      if (!maySettingsAdministerUsers(user)) {
         return (
           <AccessDenied detail="Only a Super Admin or HO User can administer accounts." />
         );
@@ -78,5 +73,16 @@ export default function SettingsLayout({
     }
   }
 
-  return <>{children}</>;
+  // Not on the index: there the tiles are the navigation, and a strip repeating
+  // them would be the same links twice with no tab active.
+  if (pathname === ROUTES.settings) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SettingsNav />
+      {children}
+    </div>
+  );
 }

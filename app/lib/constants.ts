@@ -14,6 +14,8 @@ export const ROUTES = {
   // --- My Workspace (feature 003) ---
   // A separate top-level tree, not nested under /dashboard: its users are field
   // employees on phones, and it gets a bottom-tab shell rather than the sidenav.
+  /** The My Workspace module index — tiles, like every other module's landing. */
+  myWorkspace: '/my',
   myPunch: '/my/punch',
   myLeave: '/my/leave',
   mySalary: '/my/salary',
@@ -535,11 +537,13 @@ export const NAV_MODULES = [
     permissions: ['REPORTS'],
   },
   {
-    // Leaves the `/dashboard` shell entirely, for a user who is both an admin and an
-    // employee (003 research.md §2). The `/my` tree has its own bottom-tab layout.
+    // Leaves the `/dashboard` route tree, for a user who is both an admin and an
+    // employee (003 research.md §2). `/my` keeps its own shell — a bottom tab bar on
+    // a phone — but mounts the same SideNav from `md` up, so following this link on a
+    // desktop no longer drops every other module.
     id: 'my-workspace',
     name: 'My Workspace',
-    href: ROUTES.myPunch,
+    href: ROUTES.myWorkspace,
     guardPrefix: '/my',
     guardsSubtree: true,
     permissions: ['MY_WORKSPACE'],

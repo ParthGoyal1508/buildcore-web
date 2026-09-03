@@ -4,14 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import {
-  ClockIcon,
-  CalendarDaysIcon,
-  BanknotesIcon,
-  FaceSmileIcon,
-  ReceiptPercentIcon,
-  Squares2X2Icon,
-} from '@heroicons/react/24/outline';
+import { Squares2X2Icon } from '@heroicons/react/24/outline';
 import { SerwistProvider } from '@serwist/next/react';
 import { useQuery } from '@tanstack/react-query';
 import { submitPunch } from '@/app/lib/api/my-workspace';
@@ -21,17 +14,8 @@ import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
 import { hasModuleAccess } from '@/app/lib/permissions';
 import AccessDenied from '@/app/ui/access-denied';
 import SideNav from '@/app/ui/dashboard/sidenav';
+import { MY_SECTIONS } from '@/app/ui/my/sections';
 import SectionTabs from '@/app/ui/section-tabs';
-
-const TABS = [
-  { name: 'Punch', href: ROUTES.myPunch, icon: ClockIcon },
-  { name: 'Leave', href: ROUTES.myLeave, icon: CalendarDaysIcon },
-  { name: 'Salary', href: ROUTES.mySalary, icon: BanknotesIcon },
-  // "Claims", not "Reimbursements": six tabs share the width of a phone, and the
-  // full word would either wrap or force the label smaller than the others.
-  { name: 'Claims', href: ROUTES.myReimbursements, icon: ReceiptPercentIcon },
-  { name: 'Face', href: ROUTES.myFaceEnrol, icon: FaceSmileIcon },
-];
 
 /**
  * The My Workspace shell (research.md §1).
@@ -153,11 +137,13 @@ export default function MyWorkspaceLayout({
       <div className="flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
         {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
             sidebar beside it already covers moving between shells. */}
-        <SectionTabs
-          label="My Workspace sections"
-          tabs={TABS}
-          className="mb-6 hidden md:block"
-        />
+        {pathname !== ROUTES.myWorkspace && (
+          <SectionTabs
+            label="My Workspace sections"
+            tabs={MY_SECTIONS}
+            className="mb-6 hidden md:block"
+          />
+        )}
         {queued > 0 && (
           <p
             role="status"
@@ -189,7 +175,7 @@ export default function MyWorkspaceLayout({
         className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white md:hidden"
       >
         <ul className="flex">
-          {TABS.map((tab) => {
+          {MY_SECTIONS.map((tab) => {
             const Icon = tab.icon;
             const isActive = pathname.startsWith(tab.href);
             return (
