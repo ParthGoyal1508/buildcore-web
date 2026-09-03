@@ -2,65 +2,21 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import {
-  BuildingOffice2Icon,
-  IdentificationIcon,
-  UsersIcon,
-  WrenchScrewdriverIcon,
-} from '@heroicons/react/24/outline';
-import { getCurrentUser } from '@/app/lib/api/users';
-import { ROUTES, SETTINGS_PERMISSIONS, USER_ADMIN_ROLES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 
-const SECTIONS = [
-  {
-    key: 'companies' as const,
-    href: ROUTES.settingsCompanies,
-    title: 'Companies',
-    description: 'Registration, statutory and payroll settings per company.',
-    icon: BuildingOffice2Icon,
-  },
-  {
-    key: 'roles' as const,
-    href: ROUTES.settingsRoles,
-    title: 'Roles',
-    description: 'Define roles and the permissions each one grants.',
-    icon: IdentificationIcon,
-  },
-  {
-    key: 'users' as const,
-    href: ROUTES.settingsUsers,
-    title: 'Users',
-    description: 'Administer existing accounts — role, status, removal.',
-    icon: UsersIcon,
-  },
-  {
-    key: 'employee-setup' as const,
-    href: ROUTES.settingsEmployeeSetup,
-    title: 'Employee Setup',
-    description: 'Departments, designations, document types, shifts, code series.',
-    icon: WrenchScrewdriverIcon,
-  },
-];
+import { getCurrentUser } from '@/app/lib/api/users';
+import { lusitana } from '@/app/ui/fonts';
+import { visibleSettingsSections } from '@/app/ui/settings/sections';
 
 /** Lists only the sections the signed-in user can actually open, so nobody is
- * invited into a page that will just refuse them. */
+ * invited into a page that will just refuse them. The list itself lives in
+ * `sections.ts`, shared with the in-module tab strip. */
 export default function SettingsPage() {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
 
-  const visible = SECTIONS.filter((section) => {
-    if (!user) return false;
-    if (!user.permissions.includes(SETTINGS_PERMISSIONS[section.key])) return false;
-    if (section.key === 'users') {
-      return user.roleNames.some((name) =>
-        (USER_ADMIN_ROLES as readonly string[]).includes(name),
-      );
-    }
-    return true;
-  });
+  const visible = visibleSettingsSections(user);
 
   return (
     <main>

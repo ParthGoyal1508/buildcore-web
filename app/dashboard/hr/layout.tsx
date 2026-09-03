@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { HR_PERMISSIONS, MESSAGES, type HrSection } from '@/app/lib/constants';
+import { HR_PERMISSIONS, MESSAGES, ROUTES, type HrSection } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import HrNav from '@/app/ui/hr/hr-nav';
 
 /**
  * The single permission chokepoint for every `/dashboard/hr/*` page.
@@ -50,5 +51,16 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
     }
   }
 
-  return <>{children}</>;
+  // Not on the index: there the tiles are the navigation, and a strip repeating
+  // them would be the same links twice with no tab active.
+  if (pathname === ROUTES.hr) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <HrNav />
+      {children}
+    </div>
+  );
 }

@@ -27,6 +27,15 @@ shells (mobile-first bottom-tab vs. desktop sidenav) into one compromise layout.
 rejected: reintroduces exactly the "no dedicated shell" option the clarification already declined,
 just implemented as one component instead of two routes.
 
+> **Superseded 2026-09-03 (user decision).** The rejected alternative is what `/my/*` now does.
+> Two fixed shells read correctly on paper but not in use: opening any `/my` URL on a desktop
+> dropped the sidebar entirely, so a signed-in admin lost every other module and got a phone
+> layout stretched across a wide screen. `app/my/layout.tsx` now renders the bottom tab bar below
+> `md` — unchanged, and still what Principle VI's mobile-critical list covers — and `SideNav` plus
+> a `SectionTabs` strip at `md` and up. The switch is CSS only, so both navigations are in the
+> markup and neither shell flashes. FR-017 is still satisfied: the cross-shell route is the
+> sidebar on desktop and the "Admin" tab on mobile.
+
 ## 3. Camera capture
 
 **Decision**: A single reusable `CameraCapture` component (`app/ui/my/camera-capture.tsx`) wraps
