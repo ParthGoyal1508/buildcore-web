@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ProjectListItem } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
-import StatusBadge from '@/app/ui/projects/status-badge';
+import StatusBadge from '@/app/ui/status-badge';
 import { RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 
