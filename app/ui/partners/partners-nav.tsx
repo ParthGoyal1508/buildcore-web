@@ -25,16 +25,32 @@ const TABS = [
 
 export default function PartnersNav() {
   const pathname = usePathname();
+
+  /**
+   * The deepest tab whose route the current path falls under, or '' for a path under
+   * no tab at all (the module index).
+   *
+   * A plain `startsWith` cannot decide this on its own, because two tabs' routes are
+   * prefixes of other tabs' routes: /vendors of /vendors/categories, and
+   * /contractors of both /contractors/compliance and /contractors/rag. Under a
+   * prefix test those parents match alongside the child and two tabs light at once —
+   * which is also two elements carrying aria-current="page", so a screen reader
+   * announces two current pages.
+   *
+   * Dropping `startsWith` for an exact match is not the answer either: the contractor
+   * detail page at /contractors/<id> has no tab of its own and has to light
+   * Contractors. Longest match resolves both — the same rule feature 014 applies to
+   * the sidebar's guardPrefix list in app/lib/permissions.ts.
+   */
+  const activeHref = TABS.map((tab) => tab.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .reduce((best, href) => (href.length > best.length ? href : best), '');
+
   return (
     <nav aria-label="Partners sections" className="overflow-x-auto">
       <ul className="flex min-w-max gap-1 border-b border-gray-200">
         {TABS.map((tab) => {
-          // Exact match, not `startsWith`: /vendors is a prefix of
-          // /vendors/categories, and a prefix test would light both tabs at once.
-          const isActive =
-            pathname === tab.href ||
-            (tab.href !== ROUTES.partnersVendors &&
-              pathname.startsWith(`${tab.href}/`));
+          const isActive = tab.href === activeHref;
           return (
             <li key={tab.href}>
               <Link
