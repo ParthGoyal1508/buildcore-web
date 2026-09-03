@@ -103,8 +103,15 @@ export default function RemindersList() {
   return (
     <div className="flex flex-col gap-4">
       {/* Filters change a query key, so the list refetches in place — no navigation,
-          no full-page reload (TA007). */}
-      <div className="flex flex-wrap gap-3">
+          no full-page reload (TA007).
+
+          A grid, not `flex flex-wrap`: as flex items these fields had no width of
+          their own, so each one shrank to fit its *label* — "Module", "Type" — and
+          the `w-full` select inside inherited that, leaving "All modules" spilling
+          over its own border and covering the native chevron. Fixed columns give
+          every field the same real width, and they stack full-width below `sm` so
+          the row still works at 320px. */}
+      <div className="grid gap-3 sm:max-w-2xl sm:grid-cols-3">
         <SelectField
           id="filter-module"
           label="Module"
