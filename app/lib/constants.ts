@@ -43,10 +43,11 @@ export const ROUTES = {
 
   // --- Modules not yet built (features 006-009) ---
   // Listed because feature 014 filters and guards the sidebar from one definition,
-  // and that definition has to name every module the sidebar shows. Following any
-  // of these today produces a 404 for everyone; role-based filtering means most
-  // users no longer see them at all, which is a strict improvement until the
-  // features that own them land.
+  // and that definition has to name every module the sidebar shows. Each has a
+  // placeholder page rendering <ModuleInProgress>, so following a sidebar link the
+  // app itself drew explains itself rather than 404ing. Only the module index is
+  // stubbed — a deeper path under one of these is a genuinely wrong URL and still
+  // 404s.
   projects: '/dashboard/projects',
 
   // --- Partners (feature 007) ---
@@ -235,6 +236,14 @@ export const MESSAGES = {
   navRedirecting: 'Taking you to the first module your role can open…',
   navPermissionsHint:
     'These decide which modules this role sees in the sidebar, and which it can open.',
+  /**
+   * Shown at a module whose sidebar entry exists but whose feature has not been
+   * built yet. Named rather than generic: someone who arrived from the sidebar
+   * needs to know it is *this* module that is unfinished, not that they mistyped.
+   */
+  moduleInProgressTitle: (name: string) => `${name} is in progress`,
+  moduleInProgressBody:
+    'This part of BuildCore is still being built. Check back soon.',
   /** The nine permissions that gate content *inside* a module rather than a sidebar
    * entry. Said once, here, rather than repeated on every checkbox: an admin who
    * clears one of these expecting the menu to change is misled, and the section this

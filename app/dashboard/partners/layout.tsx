@@ -38,6 +38,14 @@ export default function PartnersLayout({
 
   const needsSettings = pathname.startsWith(ROUTES.partnersVendorCategories);
 
+  // The module index is already a grid of tiles naming each section, so the tab bar
+  // there restates them — and with no tab active, since the index is not one of the
+  // tabs. The tiles are that page's navigation; the tabs are how you move *between*
+  // sections once inside one. Note the tiles omit Categories, which the tabs carry;
+  // it stays reachable from every section's tab bar, and belongs under Vendors
+  // rather than as a peer of them.
+  const isModuleIndex = pathname === ROUTES.partners;
+
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
@@ -58,7 +66,7 @@ export default function PartnersLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      <PartnersNav />
+      {!isModuleIndex && <PartnersNav />}
       {children}
     </div>
   );
