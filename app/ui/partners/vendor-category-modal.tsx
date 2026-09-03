@@ -49,6 +49,13 @@ export default function VendorCategoryModal({
     onError: (error: unknown) => {
       // A duplicate name is a field problem, not a page problem — putting it on the
       // input is what lets someone fix it without hunting for the cause.
+      //
+      // This mapping is only safe because a 409 from this endpoint means exactly one
+      // thing: the name is taken (see the controller's @ApiConflictResponse). It
+      // briefly meant two — the "companyId is required for a cross-company caller"
+      // refusal was also a 409, and so rendered under the name field, where it made
+      // no sense. That refusal is a 400 now. If a second 409 is ever added here,
+      // this branch has to distinguish them rather than assume.
       if (error instanceof ApiError && error.status === 409) {
         setNameError(error.message);
         return;
