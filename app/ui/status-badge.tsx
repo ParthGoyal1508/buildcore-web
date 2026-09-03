@@ -31,6 +31,32 @@ const STATUS_STYLES: Record<string, string> = {
   overdue: 'bg-red-100 text-red-800',
   warning: 'bg-amber-100 text-amber-900',
   info: 'bg-blue-100 text-blue-800',
+
+  // Bill payment status (009 FR-011). Red for money still owed, amber for part
+  // settled, green for closed — the same three-step urgency the severities above
+  // use, so a user reading two screens is not learning two colour languages.
+  unpaid: 'bg-red-100 text-red-800',
+  part_paid: 'bg-amber-100 text-amber-900',
+  paid: 'bg-green-100 text-green-800',
+
+  // Transfer movement status (009). `received` deliberately does NOT reuse the
+  // green above: a received transfer is complete, but so is a paid bill, and the
+  // two carry no relation. Blue reads as "done, nothing owed" rather than "good".
+  pending: 'bg-gray-100 text-gray-700',
+  in_transit: 'bg-blue-100 text-blue-800',
+  received: 'bg-green-100 text-green-800',
+
+  // Indent status (009 FR-025). `draft` and `submitted` are neutral — nobody has
+  // decided yet. `rejected` and `cancelled` are grey rather than red: neither is a
+  // problem to fix, they are both settled outcomes, and red would put an alarm on
+  // every indent an approver correctly turned down.
+  draft: 'bg-gray-100 text-gray-700',
+  submitted: 'bg-blue-100 text-blue-800',
+  approved: 'bg-green-100 text-green-800',
+  rejected: 'bg-gray-200 text-gray-700',
+  partially_fulfilled: 'bg-amber-100 text-amber-900',
+  fulfilled: 'bg-green-100 text-green-800',
+  cancelled: 'bg-gray-200 text-gray-700',
 };
 
 /** The style for a status nobody has assigned a colour to yet. Neutral rather than
