@@ -20,6 +20,8 @@ import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
 import { hasModuleAccess } from '@/app/lib/permissions';
 import AccessDenied from '@/app/ui/access-denied';
+import SideNav from '@/app/ui/dashboard/sidenav';
+import SectionTabs from '@/app/ui/section-tabs';
 
 const TABS = [
   { name: 'Punch', href: ROUTES.myPunch, icon: ClockIcon },
@@ -34,9 +36,24 @@ const TABS = [
 /**
  * The My Workspace shell (research.md §1).
  *
- * A bottom tab bar rather than `/dashboard`'s sidenav: this shell's users are site
- * employees holding a phone one-handed, where the reachable part of the screen is
- * the bottom.
+ * Responsive by viewport, which supersedes 003 research.md §2. That decision kept
+ * `/my/*` and `/dashboard/*` as two fixed shells joined by a plain link, and
+ * explicitly rejected "a single adaptive shell that switches sidenav/bottom-tab by
+ * viewport". In use the fixed shell turned out to be the wrong trade on a desktop:
+ * opening any `/my` URL there dropped the sidebar entirely, so a signed-in admin lost
+ * every other module and got a phone layout stretched across a wide screen. The
+ * user's call to change it; recorded here rather than left as a silent divergence.
+ *
+ * Below `md` nothing changes: a bottom tab bar, because this shell's users are site
+ * employees holding a phone one-handed, where the reachable part of the screen is the
+ * bottom. That is the surface Principle VI's mobile-critical list is about, and it
+ * keeps its 44px targets.
+ *
+ * At `md` and up it borrows `/dashboard`'s furniture — the same `SideNav`, the same
+ * content padding — and moves the five sections into a `SectionTabs` strip, the tab
+ * pattern the other modules already use. The switch is pure CSS (`hidden md:block` /
+ * `md:hidden`), never a JS viewport read: both navigations are in the markup, so
+ * there is no hydration mismatch and no flash of the wrong shell.
  *
  * It also owns the single `online` listener that drains the offline punch queue
  * (research.md §5). Here, not on the Punch screen, because a worker who regains
@@ -124,8 +141,23 @@ export default function MyWorkspaceLayout({
       swUrl="/sw.js"
       disable={process.env.NODE_ENV === 'development'}
     >
-      <div className="flex min-h-screen flex-col bg-gray-50">
-      <main className="flex-grow p-4 pb-24">
+      <div className="flex min-h-screen flex-col bg-gray-50 md:h-screen md:flex-row md:overflow-hidden md:bg-transparent">
+      {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
+          keeps every module they can reach instead of being stranded in this one. */}
+      <div className="hidden flex-none md:block md:w-64">
+        <SideNav />
+      </div>
+
+      {/* `pb-24` clears the fixed bottom bar; at `md` that bar is gone, so the
+          padding goes with it and the column scrolls in place like the dashboard's. */}
+      <div className="flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
+        {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
+            sidebar beside it already covers moving between shells. */}
+        <SectionTabs
+          label="My Workspace sections"
+          tabs={TABS}
+          className="mb-6 hidden md:block"
+        />
         {queued > 0 && (
           <p
             role="status"
@@ -150,11 +182,11 @@ export default function MyWorkspaceLayout({
           </p>
         )}
         {children}
-      </main>
+      </div>
 
       <nav
         aria-label="My Workspace"
-        className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white"
+        className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white md:hidden"
       >
         <ul className="flex">
           {TABS.map((tab) => {
