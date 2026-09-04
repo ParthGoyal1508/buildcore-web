@@ -19,13 +19,17 @@ export default function Pager({
   pageSize,
   onPageChange,
   noun,
+  plural,
 }: {
   total: number;
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
-  /** Singular; pluralised with a bare "s". */
+  /** Singular. Pluralised with a bare "s" unless `plural` is given. */
   noun: string;
+  /** For nouns a bare "s" gets wrong — "entry" becomes "entrys" otherwise. Added
+   * by 006, whose lists count entries, machines and spare parts. */
+  plural?: string;
 }) {
   if (total <= pageSize) return null;
 
@@ -34,8 +38,8 @@ export default function Pager({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-gray-600" aria-live="polite">
-        {total} {noun}
-        {total === 1 ? '' : 's'} · page {page} of {lastPage}
+        {total} {total === 1 ? noun : (plural ?? `${noun}s`)} · page {page} of{' '}
+        {lastPage}
       </p>
       <div className="flex gap-2">
         <SecondaryButton

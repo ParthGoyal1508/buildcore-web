@@ -103,16 +103,29 @@ export const ROUTES = {
   musterCapture: '/labour/muster',
 
   // --- Modules not yet built (feature 006) ---
+  // --- Plant & Machinery (feature 006) ---
+  plant: '/dashboard/plant',
+  plantEquipment: '/dashboard/plant/equipment',
+  plantEquipmentDetail: (id: string) => `/dashboard/plant/equipment/${id}`,
+  plantLogbook: '/dashboard/plant/logbook',
+  plantFuel: '/dashboard/plant/fuel',
+  plantServices: '/dashboard/plant/services',
+  plantMaintenance: '/dashboard/plant/maintenance',
+  plantHireBills: '/dashboard/plant/hire-bills',
+  plantSpareParts: '/dashboard/plant/spare-parts',
+  plantMasters: '/dashboard/plant/masters',
+
+  // Built by 009; the module index is a real screen rather than
+  // <ModuleInProgress>. Kept here because NAV_MODULES points the sidebar at it.
+  inventory: '/dashboard/inventory',
+
+  // --- Modules not yet built ---
   // Listed because feature 014 filters and guards the sidebar from one definition,
   // and that definition has to name every module the sidebar shows. Each has a
   // placeholder page rendering <ModuleInProgress>, so following a sidebar link the
   // app itself drew explains itself rather than 404ing. Only the module index is
   // stubbed — a deeper path under one of these is a genuinely wrong URL and still
   // 404s.
-  plant: '/dashboard/plant',
-  // Built by 009; the module index now redirects to Stock rather than rendering
-  // <ModuleInProgress>. Kept here because NAV_MODULES points the sidebar at it.
-  inventory: '/dashboard/inventory',
   partners: '/dashboard/partners',
   reports: '/dashboard/reports',
 } as const;
@@ -417,6 +430,44 @@ export const MESSAGES = {
   geofenceHint: 'Employees punching outside this radius will be flagged.',
 
   // Inventory (feature 009)
+  // --- Plant & Machinery (feature 006) ---
+  plantEquipmentEmpty: 'No machines are registered yet.',
+  plantEquipmentEmptyFiltered: 'No machines match these filters.',
+  plantLogbookEmpty: 'No logbook entries yet.',
+  plantFuelEmpty: 'No fuel entries yet.',
+  plantServicesEmpty: 'No service schedules yet.',
+  plantMaintenanceEmpty: 'No maintenance jobs yet.',
+  plantHireBillsEmpty: 'No hire bills yet.',
+  plantSparePartsEmpty: 'No spare parts are registered yet.',
+  plantServiceBillsEmpty: 'No service bills against this job yet.',
+  plantPartsEmpty: 'No parts have been consumed on this job yet.',
+  plantReconciliationEmpty:
+    'No spare part declares a link to an inventory item.',
+  plantLoadFailed: 'Could not load this list. Try again.',
+  plantSaveFailed: 'Could not save. Try again.',
+  plantNoCategories:
+    'No equipment categories exist yet. Add one under Masters before registering a machine.',
+  plantNoDocTypes:
+    'No document types exist yet. Add one under Masters before attaching a document.',
+  plantStatusLocked:
+    'Under Maintenance is set by opening a maintenance job, not on this form.',
+  plantClosedJobParts:
+    'This job is closed. Parts cannot be added to work whose cost has already been reported.',
+  plantUnverifiedPay:
+    'Verify this bill before recording a payment against it.',
+  plantIncompatiblePart:
+    'This part is not listed as compatible with this machine’s category. You can still fit it — the consumption will be flagged for review.',
+  plantReversalReason: 'Say why this consumption is being reversed.',
+  plantNoHireRate:
+    'No hire rate is on file for this category on that date. Add one under Masters, or enter a rate on the bill.',
+  plantHireBillOwned:
+    'Hire bills are for hired machines. A repair invoice for a machine you own is a service bill.',
+  plantConfirmDeleteEquipmentDoc: 'Remove this document?',
+  plantConfirmDeleteLogbook:
+    'Delete this entry? The machine’s reading and utilisation will be re-derived from what remains.',
+  plantConfirmVerifyHireBill: (variance: string) =>
+    `Billed hours differ from the logbook by ${variance}. Verify this bill anyway?`,
+
   inventoryEmpty: 'Nothing has been received into stock yet.',
   inventoryEmptyFiltered: 'No stock matches these filters.',
   purchasesEmpty: 'No purchases recorded yet.',
@@ -496,6 +547,17 @@ export const PERMISSIONS = [
   'DATA_EXPORT',
   'DATA_DELETE',
   'LABOUR_APPROVE',
+  /**
+   * Added by 009 and 006 respectively, mirroring the backend's `Permission` enum.
+   *
+   * They were missing here, which meant the Roles screen — the only place an
+   * administrator can grant a permission — could not render a checkbox for them.
+   * `INVENTORY_APPROVE` had been in that state since 009 shipped: the backend
+   * gated indent approval on it and the UI offered no way to grant it.
+   */
+  'INVENTORY_APPROVE',
+  'MAINTENANCE',
+  'HIRE_BILLS',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -765,7 +827,20 @@ export const NAV_MODULES = [
     href: ROUTES.plant,
     guardPrefix: ROUTES.plant,
     guardsSubtree: true,
-    permissions: ['MACHINERY'],
+    // Any-of, unlike most entries here, because 006's sections genuinely carry
+    // five different permissions — 002's enum reserved MACHINERY, LOGBOOK and FUEL
+    // separately and 006 adds MAINTENANCE and HIRE_BILLS. Gating the subtree on
+    // MACHINERY alone would lock an operator who holds only LOGBOOK out of the
+    // logbook the backend would happily serve them. The per-section check is in
+    // `app/dashboard/plant/layout.tsx`; this list is only "may this user see the
+    // module at all".
+    permissions: [
+      'MACHINERY',
+      'LOGBOOK',
+      'FUEL',
+      'MAINTENANCE',
+      'HIRE_BILLS',
+    ],
   },
   {
     id: 'inventory',
@@ -962,6 +1037,11 @@ const ENUM_LABEL_OVERRIDES: Record<string, string> = {
   on_leave: 'On Leave',
   full_time: 'Full Time',
   daily_wage: 'Daily Wage',
+
+  // Plant (006). `enumLabel` would give "Ok" and "Km", which read as typos.
+  ok: 'OK',
+  km: 'Kilometres',
+  hours: 'Hours',
 };
 
 export function hrLabel(value: string): string {
@@ -1272,4 +1352,129 @@ export const CASH_DENOMINATIONS = [
 export function labourLabel(value: string | null | undefined): string {
   if (!value) return '—';
   return ATTENDANCE_TYPE_LABELS[value] ?? hrLabel(value);
+// Plant & Machinery (feature 006)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** What an equipment category's machines meter. */
+export const METER_TYPES = ['hours', 'km'] as const;
+export type MeterType = (typeof METER_TYPES)[number];
+
+export const EQUIPMENT_OWNERSHIPS = ['owned', 'hired'] as const;
+export type EquipmentOwnership = (typeof EQUIPMENT_OWNERSHIPS)[number];
+
+export const POWER_SOURCES = [
+  'diesel',
+  'petrol',
+  'electric',
+  'manual',
+] as const;
+export type PowerSource = (typeof POWER_SOURCES)[number];
+
+/**
+ * `under_maintenance` is deliberately absent from what the equipment form offers.
+ *
+ * The backend refuses it outright (006 FR-002): a machine goes under maintenance by
+ * having a job opened against it, and letting the form set it would let the register
+ * and the job list disagree about whether a machine is down.
+ */
+export const EQUIPMENT_STATUSES = [
+  'active',
+  'under_maintenance',
+  'inactive',
+] as const;
+export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
+
+/** The two an admin may actually choose. */
+export const SETTABLE_EQUIPMENT_STATUSES = ['active', 'inactive'] as const;
+
+export const SERVICE_SCHEDULE_STATUSES = ['ok', 'due_soon', 'overdue'] as const;
+export type ServiceScheduleStatus = (typeof SERVICE_SCHEDULE_STATUSES)[number];
+
+export const MAINTENANCE_TYPES = ['breakdown', 'scheduled'] as const;
+export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
+
+export const MAINTENANCE_STATUSES = ['open', 'closed'] as const;
+export type MaintenanceStatus = (typeof MAINTENANCE_STATUSES)[number];
+
+export const HIRE_BILL_STATUSES = [
+  'pending_verification',
+  'verified',
+  'paid',
+] as const;
+export type HireBillStatus = (typeof HIRE_BILL_STATUSES)[number];
+
+export const SERVICE_BILL_STATUSES = ['pending_verification', 'verified'] as const;
+export type ServiceBillStatus = (typeof SERVICE_BILL_STATUSES)[number];
+
+export const SERVICE_BILL_PAYMENT_STATUSES = [
+  'unpaid',
+  'partially_paid',
+  'paid',
+] as const;
+export type ServiceBillPaymentStatus =
+  (typeof SERVICE_BILL_PAYMENT_STATUSES)[number];
+
+export const SPARE_PART_MOVEMENT_TYPES = [
+  'receipt',
+  'consumption',
+  'reversal',
+] as const;
+export type SparePartMovementType = (typeof SPARE_PART_MOVEMENT_TYPES)[number];
+
+/**
+ * Which permission each `/dashboard/plant/*` section requires.
+ *
+ * Mirrors the backend's corrected mapping (006 research.md §7): `MACHINERY`,
+ * `LOGBOOK` and `FUEL` were reserved by name in 002 and are reused verbatim; only
+ * `MAINTENANCE` and `HIRE_BILLS` are new. The three machinery masters are `SETTINGS`
+ * for the same reason the item and vendor category masters are — they are
+ * `settings`-schema company reference data.
+ *
+ * Spare parts and service bills reuse `MAINTENANCE` (006 FR-028), adding no
+ * permission of their own.
+ */
+export const PLANT_PERMISSIONS = {
+  equipment: 'MACHINERY',
+  logbook: 'LOGBOOK',
+  fuel: 'FUEL',
+  services: 'MAINTENANCE',
+  maintenance: 'MAINTENANCE',
+  spareParts: 'MAINTENANCE',
+  serviceBills: 'MAINTENANCE',
+  hireBills: 'HIRE_BILLS',
+  masters: 'SETTINGS',
+} as const;
+
+export type PlantSection = keyof typeof PLANT_PERMISSIONS;
+
+/** Label for a plant enum value, via the shared enum labeller. */
+export function plantLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return hrLabel(value);
+}
+
+/**
+ * A meter reading with its unit, so "1,208" never has to be guessed at.
+ *
+ * The unit follows the machine rather than the reading: a crane's life is measured
+ * in running hours and a tipper's in kilometres, and the same number means very
+ * different things on the two.
+ */
+export function formatReading(
+  value: number,
+  meterType: MeterType | string | null | undefined,
+): string {
+  const unit = meterType === 'km' ? 'km' : 'hrs';
+  return `${value.toLocaleString('en-IN')} ${unit}`;
+}
+
+/**
+ * A fuel variance as a signed percentage.
+ *
+ * Signed deliberately: under-consumption is as informative as over-consumption, and
+ * showing "25%" for both would hide which one a machine is doing.
+ */
+export function formatVariance(value: number | null): string {
+  if (value === null) return '—';
+  return `${value > 0 ? '+' : ''}${value}%`;
 }
