@@ -23,7 +23,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { usePlantCategories } from './use-plant-refs';
+import { usePlantCategories, usePlantCompanyId } from './use-plant-refs';
 
 /**
  * Add or edit an equipment category.
@@ -41,6 +41,7 @@ export function CategoryModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const companyId = usePlantCompanyId();
   const isEdit = category !== undefined;
 
   const [name, setName] = useState(category?.name ?? '');
@@ -72,7 +73,7 @@ export function CategoryModal({
       };
       return isEdit
         ? updateEquipmentCategory(category.id, { ...body, active })
-        : createEquipmentCategory(body);
+        : createEquipmentCategory(body, companyId ?? undefined);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
@@ -190,6 +191,7 @@ export function DocTypeModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const companyId = usePlantCompanyId();
   const isEdit = docType !== undefined;
 
   const [name, setName] = useState(docType?.name ?? '');
@@ -202,7 +204,7 @@ export function DocTypeModal({
       const body = { name: name.trim(), alertDays: Number(alertDays) };
       return isEdit
         ? updateEquipmentDocType(docType.id, { ...body, active })
-        : createEquipmentDocType(body);
+        : createEquipmentDocType(body, companyId ?? undefined);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
@@ -281,6 +283,7 @@ export function DocTypeModal({
  */
 export function HireRateModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const companyId = usePlantCompanyId();
   const categories = usePlantCategories();
 
   const [categoryId, setCategoryId] = useState('');
@@ -290,11 +293,14 @@ export function HireRateModal({ onClose }: { onClose: () => void }) {
 
   const save = useMutation({
     mutationFn: () =>
-      createHireRate({
-        categoryId,
-        ratePerUnit: Number(ratePerUnit),
-        effectiveFrom,
-      }),
+      createHireRate(
+        {
+          categoryId,
+          ratePerUnit: Number(ratePerUnit),
+          effectiveFrom,
+        },
+        companyId ?? undefined,
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
       onClose();

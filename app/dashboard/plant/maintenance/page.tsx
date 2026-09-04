@@ -23,7 +23,10 @@ import {
   OpenJobModal,
 } from '@/app/ui/plant/maintenance-modal';
 import ServiceBillPanel from '@/app/ui/plant/service-bill-panel';
-import { usePlantEquipment } from '@/app/ui/plant/use-plant-refs';
+import {
+  usePlantEquipment,
+  usePlantCompanyId,
+} from '@/app/ui/plant/use-plant-refs';
 import {
   RowAction,
   SecondaryButton,
@@ -50,8 +53,11 @@ export default function MaintenancePage() {
   const [closing, setClosing] = useState<MaintenanceJob | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const companyId = usePlantCompanyId();
+
   const filters = {
     page,
+    ...(companyId ? { companyId } : {}),
     ...(equipmentId ? { equipmentId } : {}),
     ...(status ? { status } : {}),
     ...(type ? { type } : {}),

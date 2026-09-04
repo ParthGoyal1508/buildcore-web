@@ -23,6 +23,7 @@ import HireBillModal from '@/app/ui/plant/hire-bill-modal';
 import {
   usePlantEquipment,
   usePlantVendors,
+  usePlantCompanyId,
 } from '@/app/ui/plant/use-plant-refs';
 import {
   FormError,
@@ -52,8 +53,11 @@ export default function HireBillsPage() {
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const companyId = usePlantCompanyId();
+
   const filters = {
     page,
+    ...(companyId ? { companyId } : {}),
     ...(equipmentId ? { equipmentId } : {}),
     ...(vendorId ? { vendorId } : {}),
     ...(status ? { status } : {}),

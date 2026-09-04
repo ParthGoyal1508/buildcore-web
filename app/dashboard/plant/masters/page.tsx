@@ -22,6 +22,7 @@ import {
   DocTypeModal,
   HireRateModal,
 } from '@/app/ui/plant/masters-modal';
+import { usePlantCompanyId } from '@/app/ui/plant/use-plant-refs';
 import {
   FormError,
   RowAction,
@@ -55,17 +56,22 @@ export default function MastersPage() {
   const [showRate, setShowRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Scoped to the company `CompanyProvider` selected in the layout above. A
+  // cross-company administrator otherwise sees every tenant's masters in one list,
+  // which reads as the same ten categories repeated once per company.
+  const companyId = usePlantCompanyId();
+
   const categories = useQuery({
-    queryKey: ['plant', 'categories', 'all'],
-    queryFn: getEquipmentCategories,
+    queryKey: ['plant', 'categories', 'all', companyId],
+    queryFn: () => getEquipmentCategories(companyId ?? undefined),
   });
   const docTypes = useQuery({
-    queryKey: ['plant', 'doc-types', 'all'],
-    queryFn: getEquipmentDocTypes,
+    queryKey: ['plant', 'doc-types', 'all', companyId],
+    queryFn: () => getEquipmentDocTypes(companyId ?? undefined),
   });
   const rates = useQuery({
-    queryKey: ['plant', 'rates', 'all'],
-    queryFn: () => getHireRates(),
+    queryKey: ['plant', 'rates', 'all', companyId],
+    queryFn: () => getHireRates(undefined, companyId ?? undefined),
   });
 
   const removeCategory = useMutation({

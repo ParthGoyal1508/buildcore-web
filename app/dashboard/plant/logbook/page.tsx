@@ -14,7 +14,10 @@ import { MESSAGES } from '@/app/lib/constants';
 import { lusitana } from '@/app/ui/fonts';
 import Pager from '@/app/ui/inventory/pager';
 import LogbookModal from '@/app/ui/plant/logbook-modal';
-import { usePlantEquipment } from '@/app/ui/plant/use-plant-refs';
+import {
+  usePlantEquipment,
+  usePlantCompanyId,
+} from '@/app/ui/plant/use-plant-refs';
 import {
   FormError,
   RowAction,
@@ -42,8 +45,11 @@ export default function LogbookPage() {
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const companyId = usePlantCompanyId();
+
   const filters = {
     page,
+    ...(companyId ? { companyId } : {}),
     ...(equipmentId ? { equipmentId } : {}),
     ...(dateFrom ? { dateFrom } : {}),
     ...(dateTo ? { dateTo } : {}),

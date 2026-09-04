@@ -108,15 +108,18 @@ export interface EquipmentCategoryInput {
   active?: boolean;
 }
 
-export async function getEquipmentCategories(): Promise<EquipmentCategory[]> {
-  const raw = await authFetch<unknown>('/plant/categories');
+export async function getEquipmentCategories(
+  companyId?: string,
+): Promise<EquipmentCategory[]> {
+  const raw = await authFetch<unknown>(`/plant/categories${qs({ companyId })}`);
   return z.array(equipmentCategorySchema).parse(raw);
 }
 
 export async function createEquipmentCategory(
   input: EquipmentCategoryInput,
+  companyId?: string,
 ): Promise<EquipmentCategory> {
-  const raw = await authFetch<unknown>('/plant/categories', {
+  const raw = await authFetch<unknown>(`/plant/categories${qs({ companyId })}`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -157,15 +160,18 @@ export interface EquipmentDocTypeInput {
   active?: boolean;
 }
 
-export async function getEquipmentDocTypes(): Promise<EquipmentDocType[]> {
-  const raw = await authFetch<unknown>('/plant/doc-types');
+export async function getEquipmentDocTypes(
+  companyId?: string,
+): Promise<EquipmentDocType[]> {
+  const raw = await authFetch<unknown>(`/plant/doc-types${qs({ companyId })}`);
   return z.array(equipmentDocTypeSchema).parse(raw);
 }
 
 export async function createEquipmentDocType(
   input: EquipmentDocTypeInput,
+  companyId?: string,
 ): Promise<EquipmentDocType> {
-  const raw = await authFetch<unknown>('/plant/doc-types', {
+  const raw = await authFetch<unknown>(`/plant/doc-types${qs({ companyId })}`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -206,13 +212,21 @@ export interface HireRateInput {
   effectiveTo?: string;
 }
 
-export async function getHireRates(categoryId?: string): Promise<HireRate[]> {
-  const raw = await authFetch<unknown>(`/plant/rates${qs({ categoryId })}`);
+export async function getHireRates(
+  categoryId?: string,
+  companyId?: string,
+): Promise<HireRate[]> {
+  const raw = await authFetch<unknown>(
+    `/plant/rates${qs({ categoryId, companyId })}`,
+  );
   return z.array(hireRateSchema).parse(raw);
 }
 
-export async function createHireRate(input: HireRateInput): Promise<HireRate> {
-  const raw = await authFetch<unknown>('/plant/rates', {
+export async function createHireRate(
+  input: HireRateInput,
+  companyId?: string,
+): Promise<HireRate> {
+  const raw = await authFetch<unknown>(`/plant/rates${qs({ companyId })}`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -325,8 +339,9 @@ export interface EquipmentInput {
 
 export async function createEquipment(
   input: EquipmentInput,
+  companyId?: string,
 ): Promise<Equipment> {
-  const raw = await authFetch<unknown>('/plant/equipment', {
+  const raw = await authFetch<unknown>(`/plant/equipment${qs({ companyId })}`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -538,8 +553,13 @@ export const fuelSummarySchema = z.object({
 });
 export type FuelSummary = z.infer<typeof fuelSummarySchema>;
 
-export async function getFuelSummary(month: string): Promise<FuelSummary> {
-  const raw = await authFetch<unknown>(`/plant/fuel/summary${qs({ month })}`);
+export async function getFuelSummary(
+  month: string,
+  companyId?: string,
+): Promise<FuelSummary> {
+  const raw = await authFetch<unknown>(
+    `/plant/fuel/summary${qs({ month, companyId })}`,
+  );
   return fuelSummarySchema.parse(raw);
 }
 
@@ -832,8 +852,9 @@ export interface SparePartInput {
 
 export async function createSparePart(
   input: SparePartInput,
+  companyId?: string,
 ): Promise<SparePart> {
-  const raw = await authFetch<unknown>('/plant/spare-parts', {
+  const raw = await authFetch<unknown>(`/plant/spare-parts${qs({ companyId })}`, {
     method: 'POST',
     body: JSON.stringify(input),
   });

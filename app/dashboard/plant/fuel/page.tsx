@@ -14,7 +14,10 @@ import { formatRupees } from '@/app/lib/utils';
 import { lusitana } from '@/app/ui/fonts';
 import Pager from '@/app/ui/inventory/pager';
 import FuelModal from '@/app/ui/plant/fuel-modal';
-import { usePlantEquipment } from '@/app/ui/plant/use-plant-refs';
+import {
+  usePlantEquipment,
+  usePlantCompanyId,
+} from '@/app/ui/plant/use-plant-refs';
 import {
   CheckboxField,
   SecondaryButton,
@@ -41,8 +44,11 @@ export default function FuelPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
 
+  const companyId = usePlantCompanyId();
+
   const filters = {
     page,
+    ...(companyId ? { companyId } : {}),
     ...(equipmentId ? { equipmentId } : {}),
     ...(dateFrom ? { dateFrom } : {}),
     ...(dateTo ? { dateTo } : {}),
@@ -55,8 +61,8 @@ export default function FuelPage() {
   });
 
   const summary = useQuery({
-    queryKey: ['plant', 'fuel', 'summary', month],
-    queryFn: () => getFuelSummary(month),
+    queryKey: ['plant', 'fuel', 'summary', month, companyId],
+    queryFn: () => getFuelSummary(month, companyId ?? undefined),
   });
 
   const columns: Column<FuelEntry>[] = [

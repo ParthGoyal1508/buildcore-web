@@ -22,7 +22,11 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { usePlantCategories, usePlantVendors } from './use-plant-refs';
+import {
+  usePlantCategories,
+  usePlantCompanyId,
+  usePlantVendors,
+} from './use-plant-refs';
 
 /**
  * Add or edit a spare part.
@@ -41,6 +45,7 @@ export default function SparePartModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const companyId = usePlantCompanyId();
   const categories = usePlantCategories();
   const isEdit = part !== undefined;
 
@@ -81,7 +86,7 @@ export default function SparePartModal({
       };
       return isEdit
         ? updateSparePart(part.id, { ...body, active })
-        : createSparePart(body);
+        : createSparePart(body, companyId ?? undefined);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });

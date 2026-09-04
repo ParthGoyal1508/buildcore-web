@@ -242,3 +242,27 @@ from the task text, and what was verified.
   which spec FR-019 requires but plan.md's Constitution VI row explicitly does not —
   it classes this module as desktop-first back-office. The two documents disagree and
   the disagreement is unresolved rather than decided here.
+
+### Correction — 2026-09-04, after a first look at the running screens
+
+The Masters screen showed every category three times. Not duplicate data: the local
+database has three companies, the seed migration gave each the ten defaults, and
+`companyScope()` deliberately widens for a caller holding `CROSS_COMPANY_ACCESS` who
+has not named a company. Thirty rows, ten distinct names, nothing on screen saying
+which company each belonged to.
+
+Fixed by mounting feature 002's `CompanyProvider` across the whole
+`/dashboard/plant` subtree and threading the selected company through every read and
+every create. That component's own doc comment already described this exact failure
+("without it, their reference-data lists would show every company's rows mixed
+together") — it was written for Employee Setup and simply had not been reused here.
+It renders a selector for a cross-company administrator and nothing at all for
+everyone else, so an ordinary user's screens are unchanged.
+
+`companyId` is part of every query key, so switching company refetches rather than
+showing the previous company's list from cache.
+
+**Still unscoped**: the spare-parts reconciliation view. Its endpoint takes no
+`companyId`, so a cross-company administrator sees linked pairs from every company.
+Left alone rather than widening the API surface as an afterthought; it needs the
+same treatment as the rest.

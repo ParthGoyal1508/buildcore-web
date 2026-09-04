@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, PLANT_PERMISSIONS, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import PlantNav from '@/app/ui/plant/plant-nav';
+import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 /**
  * The per-section permission check `/dashboard/plant/*` needs beyond the module tier.
@@ -89,7 +90,12 @@ export default function PlantLayout({
   return (
     <div className="flex flex-col gap-6">
       {!isModuleIndex && <PlantNav />}
-      {children}
+      {/*
+        Renders a company selector for a cross-company administrator and nothing at
+        all for everyone else. Without it their lists show every tenant's rows at
+        once — see `usePlantRefs` for what that looks like on the masters screen.
+      */}
+      <CompanyProvider>{children}</CompanyProvider>
     </div>
   );
 }

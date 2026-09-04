@@ -27,6 +27,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import {
   usePlantCategories,
+  usePlantCompanyId,
   usePlantSites,
   usePlantVendors,
 } from './use-plant-refs';
@@ -49,6 +50,7 @@ export default function EquipmentModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const companyId = usePlantCompanyId();
   const categories = usePlantCategories();
   const vendors = usePlantVendors();
   const sites = usePlantSites();
@@ -92,7 +94,7 @@ export default function EquipmentModal({
     mutationFn: (input: EquipmentInput) =>
       isEdit
         ? updateEquipment(equipment.id, input)
-        : createEquipment(input),
+        : createEquipment(input, companyId ?? undefined),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
       onClose();

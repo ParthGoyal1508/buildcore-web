@@ -24,12 +24,18 @@ export function useCompanyContext(): CompanyContextValue {
 }
 
 /**
- * Scopes the Employee Setup tabs to one company (research.md §6).
+ * Scopes a screen's reference-data reads to one company (002 research.md §6).
  *
  * Defaults to the signed-in user's own company. A cross-company Super Admin has no
  * `companyId` of their own to fall back on, so they get the selector below and the
  * first active company as a starting point — without it, their reference-data lists
  * would show every company's rows mixed together.
+ *
+ * Written for the Employee Setup tabs; feature 006 mounts it across the whole
+ * `/dashboard/plant` subtree, which hit exactly the failure the paragraph above
+ * describes — ten seeded equipment categories across three companies rendered as
+ * thirty rows named in triplicate, with nothing on screen saying which was which.
+ * Reused rather than copied so the two cannot drift.
  */
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [selected, setSelected] = useState<string | null>(null);

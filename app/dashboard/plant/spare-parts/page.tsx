@@ -17,7 +17,10 @@ import Pager from '@/app/ui/inventory/pager';
 import SparePartModal, {
   ReceivePartModal,
 } from '@/app/ui/plant/spare-part-modal';
-import { usePlantCategories } from '@/app/ui/plant/use-plant-refs';
+import {
+  usePlantCategories,
+  usePlantCompanyId,
+} from '@/app/ui/plant/use-plant-refs';
 import {
   CheckboxField,
   FormError,
@@ -42,8 +45,11 @@ export default function SparePartsPage() {
   const [showReconciliation, setShowReconciliation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const companyId = usePlantCompanyId();
+
   const filters = {
     page,
+    ...(companyId ? { companyId } : {}),
     ...(search ? { search } : {}),
     ...(categoryId ? { categoryId } : {}),
     ...(belowReorder ? { belowReorder: 'true' } : {}),

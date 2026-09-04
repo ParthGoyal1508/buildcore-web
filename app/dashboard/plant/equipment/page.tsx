@@ -22,6 +22,7 @@ import Pager from '@/app/ui/inventory/pager';
 import {
   usePlantCategories,
   usePlantSites,
+  usePlantCompanyId,
 } from '@/app/ui/plant/use-plant-refs';
 import {
   RowAction,
@@ -45,8 +46,11 @@ export default function AssetRegisterPage() {
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [showModal, setShowModal] = useState(false);
 
+  const companyId = usePlantCompanyId();
+
   const filters = {
     page,
+    ...(companyId ? { companyId } : {}),
     ...(search ? { search } : {}),
     ...(categoryId ? { categoryId } : {}),
     ...(siteId ? { siteId } : {}),
