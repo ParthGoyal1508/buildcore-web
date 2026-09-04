@@ -1352,6 +1352,9 @@ export const CASH_DENOMINATIONS = [
 export function labourLabel(value: string | null | undefined): string {
   if (!value) return '—';
   return ATTENDANCE_TYPE_LABELS[value] ?? hrLabel(value);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Plant & Machinery (feature 006)
 // ─────────────────────────────────────────────────────────────────────────────
 
