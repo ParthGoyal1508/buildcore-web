@@ -53,13 +53,20 @@ export function SelectField({
   id,
   label,
   error,
+  hint,
   children,
   ...rest
 }: React.SelectHTMLAttributes<HTMLSelectElement> & {
   id: string;
   label: string;
   error?: string;
+  /** Added by 006, matching `TextField`: a disabled or constrained select needs to
+   * say *why* under itself, not leave the reader to guess. */
+  hint?: string;
 }) {
+  const describedBy = [error && `${id}-error`, hint && `${id}-hint`]
+    .filter(Boolean)
+    .join(' ');
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
@@ -68,13 +75,19 @@ export function SelectField({
       <select
         id={id}
         aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy || undefined}
         {...rest}
         className={clsx(inputClass, error && 'border-red-500')}
       >
         {children}
       </select>
+      {hint && (
+        <p id={`${id}-hint`} className="mt-1 text-xs text-gray-500">
+          {hint}
+        </p>
+      )}
       {error && (
-        <p className="mt-1 text-xs text-red-600" role="alert">
+        <p id={`${id}-error`} className="mt-1 text-xs text-red-600" role="alert">
           {error}
         </p>
       )}
