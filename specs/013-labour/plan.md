@@ -196,3 +196,35 @@ middleware.ts                      # MODIFIED — labour route mapping
 - [ ] Confirm no unmasked worker PII in any client-side storage (SC-005)
 - [ ] Confirm by inspection that no second camera, geofence, or queue implementation was introduced
       (spec FR-006)
+
+## Implementation deviations (2026-09-04)
+
+Deltas from the plan above, recorded per the constitution's "update the spec when you
+change it" rule:
+
+- **No `middleware.ts`.** The spec repeatedly references `middleware.ts` route guards,
+  but this app deliberately holds the access token in memory only, so the edge never
+  sees it. Labour routes are guarded exactly like every other module — by `NAV_MODULES`
+  + the `/dashboard` `ModuleGuard` (`DAILY_WORKER_REGISTRY`) and a `LabourLayout` section
+  guard that additionally gates the reports sub-tree on `REPORTS` (FR-002). The field
+  muster capture at `/labour/muster` (outside `/dashboard`) has its own layout guard.
+- **GPS extracted to `app/lib/location.ts`.** The two-attempt GPS acquisition was pulled
+  out of `punch-clock.tsx` into a shared module (`resolvePosition`, `assertAccurate`,
+  `isAccurateEnough`); `punch-clock.tsx` now imports it, so there is a single GPS
+  implementation the muster wizard reuses (FR-006). The punch flow gates on accuracy;
+  the muster flow records the fix and flags low accuracy (record-don't-reject).
+- **Offline muster uses a second object store in the same `offline-queue.ts` module.**
+  The muster reuses the queue's mechanics (`openDb`, `promisify`, `DrainResult`, the
+  capture-order replay) via `enqueueMuster`/`drainMusters`/`getQueuedMusterCount`, in a
+  `muster-queue` store alongside `punch-queue` in the same IndexedDB database. A separate
+  store — rather than the one shared store the data-model imagined — keeps the punch
+  drain and the muster drain from submitting each other's payloads; both run the
+  identical logic. No second queue *module* or second IndexedDB *database* was
+  introduced.
+- **Synchronous handling only.** Export/async-job affordances (FR-031) are deferred to
+  match the backend's synchronous-only posture (no queue infrastructure yet).
+- **Live face-match chip deferred.** Face match is computed server-side on submit, so the
+  "needs review" chip renders on the muster approval detail rather than live on the
+  capture card. The capture flow still reuses `camera-capture.tsx` for every photo and
+  the acknowledgement image, and never blocks on face match (FR-009).
+

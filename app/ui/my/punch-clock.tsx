@@ -11,12 +11,9 @@ import {
   type TodayPunchState,
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
-import {
-  DEV_FALLBACK_POSITION,
-  MAX_GPS_ACCURACY_METERS,
-  MESSAGES,
-} from '@/app/lib/constants';
+import { DEV_FALLBACK_POSITION, MESSAGES } from '@/app/lib/constants';
 import { enqueue } from '@/app/lib/offline-queue';
+import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
 import CameraCapture from '@/app/ui/my/camera-capture';
@@ -47,97 +44,13 @@ const timeOnly = (iso: string | null) =>
  * Reads the current position, rejecting a fix too vague to be worth sending
  * (research.md §4, spec FR-007).
  *
- * The accuracy gate is here rather than only server-side because a reading accurate
- * to half a kilometre cannot distinguish inside from outside a 200-metre geofence.
- * Sending it anyway would produce an exception for an admin to resolve by hand, when
- * what the worker actually needs is to be told to wait a few seconds.
+ * Acquisition and the accuracy gate both live in `app/lib/location.ts` now — the
+ * single GPS implementation feature 013 reuses for the muster wizard (013 FR-006).
+ * The punch flow's gate throws on a vague fix (`assertAccurate`); the muster flow
+ * records the same fix and merely flags it.
  */
-/** One `getCurrentPosition` call, promisified so the two attempts below can await. */
-function requestPosition(
-  options: PositionOptions,
-): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) =>
-    navigator.geolocation.getCurrentPosition(resolve, reject, options),
-  );
-}
-
 async function getPosition(): Promise<GeolocationPosition> {
-  if (!navigator.geolocation) {
-    throw new Error(MESSAGES.locationUnavailable);
-  }
-  // Checked explicitly because the browser reports an insecure origin as an
-  // ordinary position failure, which would otherwise be reported to the user as
-  // bad sky visibility — advice that can never fix it.
-  if (!window.isSecureContext) {
-    throw new Error(MESSAGES.locationInsecureConnection);
-  }
-
-  try {
-    // Ask for the best fix available first: on a phone on site, this is the GPS
-    // reading the geofence check actually needs.
-    return checkAccuracy(
-      await requestPosition({
-        enableHighAccuracy: true,
-        timeout: 15_000,
-        // A fix from the last half-minute still describes where someone is
-        // standing, and accepting one lets a device that already knows its position
-        // answer instantly rather than powering up the GPS. `0` forces a fresh
-        // acquisition on every punch — the slowest path to the same answer.
-        maximumAge: 30_000,
-      }),
-    );
-  } catch (error) {
-    const code = (error as GeolocationPositionError)?.code;
-    // A refusal is final — retrying cannot change it, and the fix is in browser
-    // settings rather than anything the app can do.
-    if (code === 1 /* PERMISSION_DENIED */) {
-      throw new Error(MESSAGES.locationDenied);
-    }
-    // Anything the accuracy gate itself rejected is already a usable message.
-    if (code === undefined) {
-      throw error;
-    }
-
-    // High accuracy failed. Retry coarsely rather than giving up: a device with no
-    // GPS hardware (a laptop, most desktops) cannot satisfy the first request at
-    // all, but positions fine from Wi-Fi — and a coarse fix that the accuracy gate
-    // below still has to pass beats refusing to let anyone punch in.
-    try {
-      return checkAccuracy(
-        await requestPosition({
-          enableHighAccuracy: false,
-          // Shorter than the precise attempt on purpose: coarse positioning
-          // resolves from Wi-Fi or the network almost immediately when it can
-          // resolve at all, so a long timeout here only adds dead waiting on a
-          // device that was never going to answer.
-          timeout: 8_000,
-          // A recent cached fix is fine here; this branch is already the fallback.
-          maximumAge: 60_000,
-        }),
-      );
-    } catch (fallbackError) {
-      const fallbackCode = (fallbackError as GeolocationPositionError)?.code;
-      if (fallbackCode === 1) {
-        throw new Error(MESSAGES.locationDenied);
-      }
-      if (fallbackCode === undefined) {
-        throw fallbackError;
-      }
-      throw new Error(
-        fallbackCode === 3 /* TIMEOUT */
-          ? MESSAGES.locationTimedOut
-          : MESSAGES.locationUnavailable,
-      );
-    }
-  }
-}
-
-/** Rejects a fix too vague to place someone inside or outside a site geofence. */
-function checkAccuracy(position: GeolocationPosition): GeolocationPosition {
-  if (position.coords.accuracy > MAX_GPS_ACCURACY_METERS) {
-    throw new Error(MESSAGES.locationInaccurate(position.coords.accuracy));
-  }
-  return position;
+  return assertAccurate(await resolvePosition());
 }
 
 export default function PunchClock() {
