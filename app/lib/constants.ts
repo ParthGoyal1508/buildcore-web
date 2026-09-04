@@ -83,6 +83,26 @@ export const ROUTES = {
   inventoryIndent: (id: string) => `/dashboard/inventory/indents/${id}`,
   inventoryProcurement: '/dashboard/inventory/indents/procurement',
 
+  // --- Labour (feature 013) ---
+  // Back-office surfaces under the /dashboard shell (desktop-first, responsive); the
+  // supervisor muster capture is a field surface OUTSIDE /dashboard, a phone-first
+  // sibling of /my (spec FR-001).
+  labour: '/dashboard/labour',
+  labourWageRates: '/dashboard/labour/wage-rates',
+  labourWorkers: '/dashboard/labour/workers',
+  labourGangs: '/dashboard/labour/gangs',
+  labourMusters: '/dashboard/labour/musters',
+  labourMuster: (id: string) => `/dashboard/labour/musters/${id}`,
+  labourPaymentSheets: '/dashboard/labour/payment-sheets',
+  labourPaymentSheet: (id: string) => `/dashboard/labour/payment-sheets/${id}`,
+  labourAdvances: '/dashboard/labour/advances',
+  labourReportsDeployment: '/dashboard/labour/reports/deployment',
+  labourReportsAttendance: '/dashboard/labour/reports/attendance',
+  labourReportsPaymentRegister: '/dashboard/labour/reports/payment-register',
+  /** Field muster capture, outside /dashboard (spec FR-001). */
+  musterCapture: '/labour/muster',
+
+  // --- Modules not yet built (feature 006) ---
   // --- Plant & Machinery (feature 006) ---
   plant: '/dashboard/plant',
   plantEquipment: '/dashboard/plant/equipment',
@@ -526,6 +546,7 @@ export const PERMISSIONS = [
   'COMPANY_SETTINGS',
   'DATA_EXPORT',
   'DATA_DELETE',
+  'LABOUR_APPROVE',
   /**
    * Added by 009 and 006 respectively, mirroring the backend's `Permission` enum.
    *
@@ -828,6 +849,16 @@ export const NAV_MODULES = [
     guardPrefix: ROUTES.inventory,
     guardsSubtree: true,
     permissions: ['INVENTORY'],
+  },
+  {
+    id: 'labour',
+    name: 'Labour',
+    href: ROUTES.labour,
+    guardPrefix: ROUTES.labour,
+    guardsSubtree: true,
+    // Any-of: the registry permission opens the module; report sub-routes
+    // additionally require REPORTS, gated in the labour layout (spec FR-002).
+    permissions: ['DAILY_WORKER_REGISTRY'],
   },
   {
     id: 'partners',
@@ -1236,6 +1267,91 @@ export function inventoryLabel(value: string | null | undefined): string {
 export function overdueLabel(days: number): string {
   if (days <= 0) return '';
   return days === 1 ? '1 day overdue' : `${days} days overdue`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Labour (feature 013)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Which permission each labour section requires, enforced by the labour layout.
+ * Mirrors the backend controllers: the registry permission opens the module and
+ * every operational screen; reports additionally require REPORTS; the LABOUR_APPROVE
+ * actions are hidden without that permission (spec FR-002, FR-003).
+ */
+export const LABOUR_PERMISSIONS = {
+  'wage-rates': 'DAILY_WORKER_REGISTRY',
+  workers: 'DAILY_WORKER_REGISTRY',
+  gangs: 'DAILY_WORKER_REGISTRY',
+  musters: 'DAILY_WORKER_REGISTRY',
+  'payment-sheets': 'DAILY_WORKER_REGISTRY',
+  advances: 'DAILY_WORKER_REGISTRY',
+  reports: 'REPORTS',
+} as const;
+
+export type LabourSection = keyof typeof LABOUR_PERMISSIONS;
+
+/** Labour attendance types (spec FR-029: an unrecognised value renders its raw
+ * label rather than being dropped — the zod schema uses `.catch`). */
+export const ATTENDANCE_TYPES = [
+  'full_day',
+  'half_day',
+  'absent',
+  'overtime_only',
+] as const;
+
+export const ATTENDANCE_TYPE_LABELS: Record<string, string> = {
+  full_day: 'Full Day',
+  half_day: 'Half Day',
+  absent: 'Absent',
+  overtime_only: 'Overtime Only',
+};
+
+export const MUSTER_STATUSES = ['draft', 'submitted', 'approved'] as const;
+
+export const ENGAGEMENT_TYPES = ['direct', 'contractor'] as const;
+
+export const PAYMENT_SHEET_STATUSES = [
+  'draft',
+  'approved',
+  'partially_disbursed',
+  'closed',
+] as const;
+
+export const PAYMENT_SHEET_LINE_STATUSES = [
+  'pending',
+  'disbursed',
+  'reversed',
+] as const;
+
+export const ADVANCE_STATUSES = [
+  'pending',
+  'approved',
+  'disbursed',
+  'closed',
+] as const;
+
+export const LABOUR_PAYMENT_MODES = ['cash', 'bank'] as const;
+
+export const RATE_SOURCES = ['override', 'project_rate'] as const;
+
+export const RATE_SOURCE_LABELS: Record<string, string> = {
+  override: 'Worker override',
+  project_rate: 'Project rate',
+};
+
+/** Indian currency note denominations, descending — the client renders the
+ * server-computed breakup against these; the authoritative list is company config on
+ * the backend (spec FR-027). */
+export const CASH_DENOMINATIONS = [
+  500, 200, 100, 50, 20, 10, 5, 1,
+] as const;
+
+/** Label for a labour enum value, via the shared enum labeller, with attendance
+ * types given friendly copy. */
+export function labourLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return ATTENDANCE_TYPE_LABELS[value] ?? hrLabel(value);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
