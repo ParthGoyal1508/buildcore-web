@@ -14,6 +14,7 @@ import {
   Cog6ToothIcon,
   ClockIcon,
   WrenchScrewdriverIcon,
+  UserPlusIcon,
 } from '@heroicons/react/24/outline';
 
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -37,6 +38,7 @@ const ICONS: Record<NavModuleId, ComponentType<SVGProps<SVGSVGElement>>> = {
   inventory: ArchiveBoxIcon,
   partners: UserGroupIcon,
   labour: WrenchScrewdriverIcon,
+  recruitment: UserPlusIcon,
   reports: ChartBarIcon,
   'my-workspace': ClockIcon,
   settings: Cog6ToothIcon,

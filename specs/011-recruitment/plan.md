@@ -186,3 +186,28 @@ middleware.ts                          # MODIFIED — /dashboard/recruitment/* m
 - [ ] Spot-check every screen at 320px and for keyboard operability; confirm the board's
       table fallback and that no action is hover-gated
 - [ ] Confirm by inspection that no unmasked PII is written to any client-side storage (SC-002)
+
+## Implementation deviations (2026-09-04)
+
+Deltas from the plan above, recorded per the constitution's "update the spec when you
+change it" rule:
+
+- **No `middleware.ts`.** The spec references a `middleware.ts` matcher, but this app
+  holds the access token in memory only, so the edge never sees it. Recruitment routes
+  are guarded like every other module — `NAV_MODULES` + the `/dashboard` `ModuleGuard`
+  (`RECRUITMENT`) plus a `RecruitmentLayout` section guard that gates the reports
+  sub-tree on `REPORTS` (spec FR-002).
+- **Pipeline board is button-based, not drag-and-drop.** No DnD library is installed and
+  the offline environment makes `npm install` unreliable, so the board offers a
+  keyboard-accessible "→ next stage" button per card (mirroring the backend's manual
+  transition machine) alongside the table view — meeting the accessibility requirement
+  (Principle VI) without a new dependency.
+- **Manager and interviewer references are id inputs.** There is no shared employee-list
+  API in the frontend, so the offer's reporting manager and an interview's interviewers
+  are entered as employee ids; a picker can replace them when an employee-list endpoint
+  is exposed.
+- **Synchronous letter/report handling.** Matches the backend's synchronous-only posture;
+  the async-job export affordance is deferred.
+- **Reveal holds unmasked PII in component state only** (never react-query cache or
+  storage), via a non-cached `getCandidate` fetch (spec FR-006, SC-002).
+
