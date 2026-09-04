@@ -1,4 +1,4 @@
-import { apiFetch, ApiError } from './api/client';
+import { apiFetch, apiFetchBlob, ApiError } from './api/client';
 import { ROUTES } from './constants';
 
 /** The backend's code for "this account must change its password first"
@@ -71,6 +71,27 @@ export function consumeJustLoggedIn(): boolean {
  * cases: expired access token mid-session, revoked/expired refresh token).
  */
 export async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  return withAuth(path, init, apiFetch<T>);
+}
+
+/**
+ * `authFetch` for an endpoint that serves a file rather than JSON.
+ *
+ * Shares the refresh-and-retry path below rather than repeating it: an expired
+ * token has to be renewed the same way whatever the response body turns out to be.
+ */
+export async function authFetchBlob(
+  path: string,
+  init?: RequestInit,
+): Promise<Blob> {
+  return withAuth(path, init, apiFetchBlob);
+}
+
+async function withAuth<T>(
+  path: string,
+  init: RequestInit | undefined,
+  run: (path: string, init?: RequestInit) => Promise<T>,
+): Promise<T> {
   const withAuthHeader = (token: string | null): RequestInit => ({
     ...init,
     headers: {
@@ -80,7 +101,7 @@ export async function authFetch<T>(path: string, init?: RequestInit): Promise<T>
   });
 
   try {
-    return await apiFetch<T>(path, withAuthHeader(accessToken));
+    return await run(path, withAuthHeader(accessToken));
   } catch (err) {
     // The account owes a forced password change (010 FR-017a). Routed here rather
     // than handled per-caller: every screen can hit this, and the only useful
@@ -101,7 +122,7 @@ export async function authFetch<T>(path: string, init?: RequestInit): Promise<T>
     try {
       const { refreshToken } = await import('./api/auth');
       const newToken = await refreshToken();
-      return await apiFetch<T>(path, withAuthHeader(newToken));
+      return await run(path, withAuthHeader(newToken));
     } catch (refreshErr) {
       clearSession();
       // The hint cookie must go too, not just the in-memory token: proxy.ts

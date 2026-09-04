@@ -73,7 +73,17 @@ export const ROUTES = {
   partnersCompliance: '/dashboard/partners/contractors/compliance',
   partnersRag: '/dashboard/partners/contractors/rag',
   partnersBocw: '/dashboard/partners/bocw',
-  // --- Modules not yet built (features 006, 009) ---
+  // --- Inventory (feature 009) ---
+  inventoryStock: '/dashboard/inventory/stock',
+  inventoryPurchases: '/dashboard/inventory/purchases',
+  inventoryIssues: '/dashboard/inventory/issues',
+  inventoryTransfers: '/dashboard/inventory/transfers',
+  inventoryPayments: '/dashboard/inventory/payments',
+  inventoryIndents: '/dashboard/inventory/indents',
+  inventoryIndent: (id: string) => `/dashboard/inventory/indents/${id}`,
+  inventoryProcurement: '/dashboard/inventory/indents/procurement',
+
+  // --- Modules not yet built (feature 006) ---
   // Listed because feature 014 filters and guards the sidebar from one definition,
   // and that definition has to name every module the sidebar shows. Each has a
   // placeholder page rendering <ModuleInProgress>, so following a sidebar link the
@@ -81,6 +91,8 @@ export const ROUTES = {
   // stubbed — a deeper path under one of these is a genuinely wrong URL and still
   // 404s.
   plant: '/dashboard/plant',
+  // Built by 009; the module index now redirects to Stock rather than rendering
+  // <ModuleInProgress>. Kept here because NAV_MODULES points the sidebar at it.
   inventory: '/dashboard/inventory',
   partners: '/dashboard/partners',
   reports: '/dashboard/reports',
@@ -384,6 +396,49 @@ export const MESSAGES = {
   gstinFormat: 'Enter a valid 15-character GSTIN, e.g. 27AAPFU0939F1ZV.',
   /** Said on the site form, where the number is not self-explanatory. */
   geofenceHint: 'Employees punching outside this radius will be flagged.',
+
+  // Inventory (feature 009)
+  inventoryEmpty: 'Nothing has been received into stock yet.',
+  inventoryEmptyFiltered: 'No stock matches these filters.',
+  purchasesEmpty: 'No purchases recorded yet.',
+  issuesEmpty: 'No material has been issued yet.',
+  transfersEmpty: 'No transfers recorded yet.',
+  paymentsEmpty: 'No payments recorded yet.',
+  indentsEmpty: 'No material has been indented yet.',
+  itemsEmpty: 'No items yet. Add one to start recording purchases.',
+  categoriesEmpty: 'No categories yet.',
+  inventoryLoadFailed: 'Could not load this list. Try again.',
+  confirmDeletePurchase:
+    'Delete this purchase? The stock it added is reversed and the average rate recalculated. The record is kept, not erased.',
+  confirmDeleteIssue:
+    'Delete this issue? The material returns to the store it came from.',
+  confirmDeleteTransfer:
+    'Delete this transfer? Both stores go back to the balances they had.',
+  confirmDeletePayment:
+    'Delete this payment? Every bill it settled goes back to what it owed.',
+  purchaseHasAllocations:
+    'This bill has allocated payments. Delete the payment before deleting the purchase.',
+  itemInUse:
+    'This item has movement history and cannot be deleted. Retire it instead — it stays on old records and stops appearing in new ones.',
+  categoryHasItems:
+    'This category still has items. Recategorise them before deleting it.',
+  transferSameSite: 'Source and destination stores cannot be the same.',
+  insufficientStock: (available: number, unit: string) =>
+    `Insufficient stock — ${available} ${unit} available.`,
+  stockHint: (available: number, unit: string) =>
+    `Available: ${available} ${unit}`,
+  paymentFifoNote:
+    "Allocated automatically against this vendor's oldest unpaid bills first. Anything beyond what is owed is recorded as an advance.",
+  approvalDoesNotReserve:
+    'Approving an indent does not reserve stock. Material is only committed when it is actually issued, so an approved indent can still be short if another site issues first.',
+  procurementNotSummed:
+    'Indent demand and reorder shortfall are listed separately on purpose. The same item can appear in both, and adding them together would order it twice.',
+  indentHasFulfilment:
+    'This indent has been partly fulfilled and can no longer be cancelled.',
+  reductionNeedsReason:
+    'Approving less than was requested needs a reason, so the site can tell a decision from an oversight.',
+  outstandingExceeded: (outstanding: number) =>
+    `This indent line has only ${outstanding} outstanding.`,
 } as const;
 
 /**
@@ -1012,3 +1067,94 @@ export const HR_MESSAGES = {
   fnfNegative:
     'This settlement is negative — recoveries exceed what is owed. It must be collected separately; payroll will not pay a negative amount.',
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inventory (feature 009)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The eight units the item master accepts (009 FR-018). */
+export const ITEM_UNITS = [
+  'BAG',
+  'CUM',
+  'KG',
+  'NOS',
+  'MT',
+  'LTR',
+  'RMT',
+  'SQM',
+] as const;
+export type ItemUnit = (typeof ITEM_UNITS)[number];
+
+export const PURCHASE_BILL_STATUSES = ['unpaid', 'part_paid', 'paid'] as const;
+export type PurchaseBillStatus = (typeof PURCHASE_BILL_STATUSES)[number];
+
+export const PAYMENT_MODES = ['upi', 'bank_transfer', 'cash', 'cheque'] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
+export const TRANSFER_STATUSES = ['pending', 'in_transit', 'received'] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+export const INDENT_STATUSES = [
+  'draft',
+  'submitted',
+  'approved',
+  'rejected',
+  'partially_fulfilled',
+  'fulfilled',
+  'cancelled',
+] as const;
+export type IndentStatus = (typeof INDENT_STATUSES)[number];
+
+/**
+ * The transitions the backend's transfer state machine permits, from each state.
+ *
+ * Held here so the status control offers only what will succeed, rather than
+ * letting the user pick a transition the API answers with a 409.
+ */
+export const TRANSFER_NEXT_STATUSES: Record<
+  TransferStatus,
+  readonly TransferStatus[]
+> = {
+  pending: ['in_transit', 'received'],
+  in_transit: ['received'],
+  received: [],
+};
+
+/**
+ * Which permission each `/dashboard/inventory/*` section requires.
+ *
+ * Stock and the movement screens are `INVENTORY`. The item and category masters are
+ * `SETTINGS`, because they are `settings`-schema company reference data and the
+ * backend gates them that way (009 research.md §1) — the same split vendor
+ * categories already have in Partners. Indent *approval* is `INVENTORY_APPROVE`,
+ * the one permission value 009 adds.
+ */
+export const INVENTORY_PERMISSIONS = {
+  stock: 'INVENTORY',
+  purchases: 'INVENTORY',
+  issues: 'INVENTORY',
+  transfers: 'INVENTORY',
+  payments: 'INVENTORY',
+  indents: 'INVENTORY',
+  masters: 'SETTINGS',
+  approve: 'INVENTORY_APPROVE',
+} as const;
+
+export type InventorySection = keyof typeof INVENTORY_PERMISSIONS;
+
+/** Label for an inventory enum value, via the shared enum labeller. */
+export function inventoryLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return hrLabel(value);
+}
+
+/**
+ * How far past its required-by date an indent is, in words.
+ *
+ * The backend already computes `overdueByDays`; this is only the wording, kept
+ * beside the other copy so a change lands in one place.
+ */
+export function overdueLabel(days: number): string {
+  if (days <= 0) return '';
+  return days === 1 ? '1 day overdue' : `${days} days overdue`;
+}
