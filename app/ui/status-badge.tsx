@@ -46,6 +46,33 @@ const STATUS_STYLES: Record<string, string> = {
   in_transit: 'bg-blue-100 text-blue-800',
   received: 'bg-green-100 text-green-800',
 
+  // Plant (006). `under_maintenance` is orange rather than red: a machine in the
+  // workshop is not a failure, it is a machine being looked after — red belongs to
+  // a service that is late. `inactive` reuses the grey above; a decommissioned
+  // machine and a retired client mean the same thing.
+  under_maintenance: 'bg-orange-100 text-orange-800',
+
+  // Service schedule status (006 FR-006). `ok` is green, `due_soon` amber,
+  // `overdue` red — reusing the `overdue` entry the reminder severities already
+  // define, because a service past its reading and a certificate past its date
+  // carry exactly the same urgency.
+  ok: 'bg-green-100 text-green-800',
+  due_soon: 'bg-amber-100 text-amber-900',
+
+  // Maintenance job (006). `open` is amber because an open job means a machine is
+  // down; `closed` is blue rather than green for the reason `received` is — the work
+  // is finished, which is not the same as good news.
+  open: 'bg-amber-100 text-amber-900',
+  closed: 'bg-blue-100 text-blue-800',
+
+  // Hire and service bill verification (006 FR-005, FR-021). Grey while nobody has
+  // checked it, blue once someone has — `verified` is deliberately not green,
+  // because a verified bill is still money owed and green would read as settled.
+  // `paid` above already carries that.
+  pending_verification: 'bg-gray-100 text-gray-700',
+  verified: 'bg-blue-100 text-blue-800',
+  partially_paid: 'bg-amber-100 text-amber-900',
+
   // Indent status (009 FR-025). `draft` and `submitted` are neutral — nobody has
   // decided yet. `rejected` and `cancelled` are grey rather than red: neither is a
   // problem to fix, they are both settled outcomes, and red would put an alarm on
