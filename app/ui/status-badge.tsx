@@ -84,6 +84,21 @@ const STATUS_STYLES: Record<string, string> = {
   partially_fulfilled: 'bg-amber-100 text-amber-900',
   fulfilled: 'bg-green-100 text-green-800',
   cancelled: 'bg-gray-200 text-gray-700',
+
+  // Assets (012 FR-018). `idle` is green because an asset on the shelf is available,
+  // which is the good state for a register — it is `allocated` that ties up capital.
+  // `allocated` reuses the blue `in_transit` and `received` already carry: in use,
+  // nothing wrong. `not_in_service` is grey — registered but not yet live, the same
+  // "not yet real" the draft statuses above mean. `under_repair` is orange rather
+  // than red for the reason `under_maintenance` is: a tool in the workshop is being
+  // looked after. `scrapped` is red, and is the one asset state that is genuinely
+  // terminal.
+  not_in_service: 'bg-gray-100 text-gray-700',
+  idle: 'bg-green-100 text-green-800',
+  allocated: 'bg-blue-100 text-blue-800',
+  under_repair: 'bg-orange-100 text-orange-800',
+  scrapped: 'bg-red-100 text-red-800',
+  closed_with_shortage: 'bg-amber-100 text-amber-900',
 };
 
 /** The style for a status nobody has assigned a colour to yet. Neutral rather than

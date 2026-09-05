@@ -14,6 +14,7 @@ import {
   Cog6ToothIcon,
   ClockIcon,
   WrenchScrewdriverIcon,
+  CubeIcon,
 } from '@heroicons/react/24/outline';
 
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -35,6 +36,10 @@ const ICONS: Record<NavModuleId, ComponentType<SVGProps<SVGSVGElement>>> = {
   projects: BriefcaseIcon,
   plant: TruckIcon,
   inventory: ArchiveBoxIcon,
+  // A cube rather than another box: Inventory already owns the archive box, and the
+  // two modules sitting next to each other with the same glyph is the confusion
+  // 012's own spec asks the sidebar to avoid.
+  assets: CubeIcon,
   partners: UserGroupIcon,
   labour: WrenchScrewdriverIcon,
   reports: ChartBarIcon,
