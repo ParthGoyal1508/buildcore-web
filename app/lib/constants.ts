@@ -102,6 +102,20 @@ export const ROUTES = {
   /** Field muster capture, outside /dashboard (spec FR-001). */
   musterCapture: '/labour/muster',
 
+  // --- Recruitment & Onboarding (feature 011) ---
+  recruitment: '/dashboard/recruitment',
+  recruitmentRequisitions: '/dashboard/recruitment/requisitions',
+  recruitmentPipeline: '/dashboard/recruitment/pipeline',
+  recruitmentInterviews: '/dashboard/recruitment/interviews',
+  recruitmentOnboarding: (employeeId: string) =>
+    `/dashboard/recruitment/onboarding/${employeeId}`,
+  recruitmentLetterTemplates: '/dashboard/recruitment/letter-templates',
+  recruitmentLetters: '/dashboard/recruitment/letters',
+  recruitmentResignations: '/dashboard/recruitment/resignations',
+  recruitmentReportsNewJoinings: '/dashboard/recruitment/reports/new-joinings',
+  recruitmentReportsFunnel: '/dashboard/recruitment/reports/funnel',
+  recruitmentReportsResignations: '/dashboard/recruitment/reports/resignations',
+
   // --- Modules not yet built (feature 006) ---
   // --- Plant & Machinery (feature 006) ---
   plant: '/dashboard/plant',
@@ -584,6 +598,8 @@ export const PERMISSIONS = [
   'INVENTORY_APPROVE',
   'MAINTENANCE',
   'HIRE_BILLS',
+  'RECRUITMENT',
+  'RECRUITMENT_APPROVE',
   /**
    * Added by 012. `ASSETS` opens the module; `ASSETS_APPROVE` gates the approvals
    * the backend reserves — request approval, transfer cancellation and
@@ -892,6 +908,15 @@ export const NAV_MODULES = [
     // Any-of: the registry permission opens the module; report sub-routes
     // additionally require REPORTS, gated in the labour layout (spec FR-002).
     permissions: ['DAILY_WORKER_REGISTRY'],
+  },
+  {
+    id: 'recruitment',
+    name: 'Recruitment',
+    href: ROUTES.recruitment,
+    guardPrefix: ROUTES.recruitment,
+    guardsSubtree: true,
+    // Report sub-routes additionally require REPORTS, gated in the layout.
+    permissions: ['RECRUITMENT'],
   },
   {
     id: 'assets',
@@ -1529,6 +1554,128 @@ export function formatReading(
 export function formatVariance(value: number | null): string {
   if (value === null) return '—';
   return `${value > 0 ? '+' : ''}${value}%`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recruitment & Onboarding (feature 011)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Which permission each recruitment section requires, enforced by the layout.
+ * Reports additionally require REPORTS (spec FR-002); RECRUITMENT_APPROVE actions
+ * are hidden without that permission (spec FR-003). */
+export const RECRUITMENT_PERMISSIONS = {
+  requisitions: 'RECRUITMENT',
+  pipeline: 'RECRUITMENT',
+  interviews: 'RECRUITMENT',
+  onboarding: 'RECRUITMENT',
+  'letter-templates': 'RECRUITMENT',
+  letters: 'RECRUITMENT',
+  resignations: 'RECRUITMENT',
+  reports: 'REPORTS',
+} as const;
+
+export type RecruitmentSection = keyof typeof RECRUITMENT_PERMISSIONS;
+
+export const REQUISITION_STATUSES = [
+  'draft',
+  'pending_approval',
+  'open',
+  'rejected',
+  'closed',
+] as const;
+
+/** Candidate pipeline stages (spec FR-025: an unrecognised value renders its raw
+ * label — the zod schema uses `.catch`). */
+export const CANDIDATE_STAGES = [
+  'applied',
+  'shortlisted',
+  'interviewing',
+  'selected',
+  'offer_issued',
+  'offer_accepted',
+  'joined',
+  'rejected',
+  'no_show',
+] as const;
+
+/** The board's ordered, recruiter-visible columns. */
+export const PIPELINE_COLUMNS = [
+  'applied',
+  'shortlisted',
+  'interviewing',
+  'selected',
+  'offer_issued',
+  'offer_accepted',
+  'joined',
+] as const;
+
+export const OFFER_STATUSES = [
+  'draft',
+  'issued',
+  'accepted',
+  'declined',
+  'superseded',
+] as const;
+
+export const INTERVIEW_ROUND_TYPES = [
+  'telephonic',
+  'technical',
+  'hr',
+  'managerial',
+  'final',
+] as const;
+
+export const INTERVIEW_MODES = ['in_person', 'phone', 'video'] as const;
+export const INTERVIEW_OUTCOMES = ['recommend', 'hold', 'reject'] as const;
+
+export const REQUISITION_EMPLOYMENT_TYPES = ['permanent', 'contract', 'walk_in'] as const;
+
+export const CANDIDATE_SOURCES = [
+  'referral',
+  'agency',
+  'walk_in',
+  'portal',
+  'internal',
+] as const;
+
+export const LETTER_TYPES = [
+  'offer',
+  'appointment',
+  'confirmation',
+  'relieving',
+  'experience',
+] as const;
+
+export const RESIGNATION_REASON_CATEGORIES = [
+  'better_opportunity',
+  'personal',
+  'relocation',
+  'health',
+  'compensation',
+  'work_environment',
+  'other',
+] as const;
+
+export const RESIGNATION_STATUSES = ['submitted', 'accepted', 'withdrawn'] as const;
+
+const RECRUITMENT_STAGE_LABELS: Record<string, string> = {
+  applied: 'Applied',
+  shortlisted: 'Shortlisted',
+  interviewing: 'Interviewing',
+  selected: 'Selected',
+  offer_issued: 'Offer Issued',
+  offer_accepted: 'Joining Pending',
+  joined: 'Joined',
+  rejected: 'Rejected',
+  no_show: 'No Show',
+  pending_approval: 'Pending',
+};
+
+/** Label for a recruitment enum value, via the shared title-caser, with friendly
+ * copy for the stages that need it. */
+export function recruitmentLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return RECRUITMENT_STAGE_LABELS[value] ?? hrLabel(value);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
