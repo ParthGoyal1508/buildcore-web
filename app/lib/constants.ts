@@ -119,6 +119,16 @@ export const ROUTES = {
   // <ModuleInProgress>. Kept here because NAV_MODULES points the sidebar at it.
   inventory: '/dashboard/inventory',
 
+  // --- Project Assets (feature 012) ---
+  assets: '/dashboard/assets',
+  assetsRegister: '/dashboard/assets/register',
+  assetsAsset: (id: string) => `/dashboard/assets/register/${id}`,
+  assetsStock: '/dashboard/assets/stock',
+  assetsSummary: '/dashboard/assets/summary',
+  assetsAllocations: '/dashboard/assets/allocations',
+  assetsCustody: '/dashboard/assets/allocations/custody',
+  assetsMasters: '/dashboard/assets/masters',
+
   // --- Modules not yet built ---
   // Listed because feature 014 filters and guards the sidebar from one definition,
   // and that definition has to name every module the sidebar shows. Each has a
@@ -286,6 +296,22 @@ export const MESSAGES = {
     'Your role does not include the permission this page requires. Ask a Super Admin if you think this is wrong.',
   saveFailed: 'Could not save your changes. Please review the form and try again.',
   loadFailed: 'Could not load this list. Please try again.',
+
+  // --- Project Assets (feature 012) ---
+  assetsLoadFailed: 'Could not load the asset register. Please try again.',
+  assetsSaveFailed: 'Could not save this asset. Please review the form and try again.',
+  assetsEmpty:
+    'No assets registered yet. Register one to start tracking where it is and who holds it.',
+  assetsEmptyFiltered: 'No assets match these filters.',
+  assetsStockEmpty: 'Nothing in stock at any site yet.',
+  assetsAllocationsEmpty: 'Nothing has been allocated yet.',
+  assetsAllocationsEmptyFiltered: 'No allocations match these filters.',
+  assetsCustodyEmpty: 'Nobody is currently holding an asset.',
+  assetsNoCategories:
+    'No asset categories exist yet. Add one under Masters before registering an asset.',
+  assetsNoGrades:
+    'No condition grades exist yet. Add them under Masters — a return cannot be recorded without one.',
+  assetsExportFailed: 'Could not build the export. Please try again.',
   never: 'Never',
   confirmDeleteRole: (name: string, users: number) =>
     users > 0
@@ -558,6 +584,13 @@ export const PERMISSIONS = [
   'INVENTORY_APPROVE',
   'MAINTENANCE',
   'HIRE_BILLS',
+  /**
+   * Added by 012. `ASSETS` opens the module; `ASSETS_APPROVE` gates the approvals
+   * the backend reserves — request approval, transfer cancellation and
+   * condemnation. Both are assignable, so both need a checkbox here.
+   */
+  'ASSETS',
+  'ASSETS_APPROVE',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -861,6 +894,18 @@ export const NAV_MODULES = [
     permissions: ['DAILY_WORKER_REGISTRY'],
   },
   {
+    id: 'assets',
+    name: 'Assets',
+    href: ROUTES.assets,
+    guardPrefix: ROUTES.assets,
+    guardsSubtree: true,
+    // A module of its own rather than a section of Inventory or Plant (012 web
+    // T001). The three hold different things — assets are allocated and returned,
+    // materials are consumed, machines are metered — and a user who has to guess
+    // which module holds a scaffolding pipe looks in all three.
+    permissions: ['ASSETS'],
+  },
+  {
     id: 'partners',
     name: 'Partners',
     href: ROUTES.partners,
@@ -914,11 +959,15 @@ export type NavModule = (typeof NAV_MODULES)[number];
 export type NavModuleId = NavModule['id'];
 
 /**
- * The 13 permissions that govern a sidebar module, out of the 22 assignable. The other
- * 9 — DWR, Project Financials, Challans, Loans, Logbook, Fuel, Daily Worker Registry,
- * Data Export, Data Delete — gate content below module level, and the roles screen says
- * so rather than letting an admin clear one and wait for a menu change that never comes
- * (FR-013).
+ * The permissions that govern a sidebar module, out of the assignable set. The rest —
+ * DWR, Project Financials, Challans, Loans, Logbook, Fuel, Daily Worker Registry, Data
+ * Export, Data Delete, and the two `*_APPROVE` permissions — gate content below module
+ * level, and the roles screen says so rather than letting an admin clear one and wait
+ * for a menu change that never comes (FR-013).
+ *
+ * Counted rather than listed on purpose: the split was "13 of 22" when 014 shipped and
+ * has moved twice since (006's MAINTENANCE and HIRE_BILLS, 012's ASSETS), and a number
+ * written into prose here goes stale silently while the derivation below never does.
  */
 export const NAV_GOVERNING_PERMISSIONS: ReadonlySet<Permission> = new Set(
   NAV_MODULES.flatMap((navModule) => navModule.permissions),
@@ -1480,4 +1529,97 @@ export function formatReading(
 export function formatVariance(value: number | null): string {
   if (value === null) return '—';
   return `${value > 0 ? '+' : ''}${value}%`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Project Assets (feature 012)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The asset lifecycle, mirroring the backend's `AssetStatus` (spec FR-018).
+ *
+ * Listed in lifecycle order rather than alphabetically, because that is the order a
+ * status filter reads best in: a user scanning the dropdown is looking for "where in
+ * its life is this thing", not for a word beginning with `s`.
+ */
+export const ASSET_STATUSES = [
+  'not_in_service',
+  'idle',
+  'allocated',
+  'in_transit',
+  'under_repair',
+  'scrapped',
+] as const;
+export type AssetStatus = (typeof ASSET_STATUSES)[number];
+
+/**
+ * The statuses an edit may set directly.
+ *
+ * `allocated` and `in_transit` are absent because the backend refuses them on the
+ * register endpoint: they belong to the allocation and transfer flows, which also
+ * move the stock behind them. Offering an option that always fails is worse than not
+ * offering it — the same treatment `SETTABLE_EQUIPMENT_STATUSES` gives
+ * `under_maintenance`.
+ */
+export const SETTABLE_ASSET_STATUSES = [
+  'idle',
+  'under_repair',
+  'scrapped',
+] as const;
+
+/** Statuses that count as "in service" for the summary's active totals (FR-021). */
+export const ACTIVE_ASSET_STATUSES: readonly string[] = [
+  'not_in_service',
+  'idle',
+  'allocated',
+  'in_transit',
+  'under_repair',
+];
+
+export const ASSET_TRACKING_MODES = ['serialised', 'bulk'] as const;
+export type AssetTrackingMode = (typeof ASSET_TRACKING_MODES)[number];
+
+export const ASSET_ALLOCATION_STATUSES = ['open', 'closed'] as const;
+export type AssetAllocationStatus =
+  (typeof ASSET_ALLOCATION_STATUSES)[number];
+
+/**
+ * Which permission each Assets section requires beyond the module tier.
+ *
+ * Only the masters differ: editing a company master is an administrator's job and the
+ * backend gates those routes on `SETTINGS`, not `ASSETS`. Everything else in the
+ * module shares `ASSETS`, so the module guard already covers it — unlike Plant, whose
+ * sections genuinely carry five different permissions.
+ */
+export const ASSETS_PERMISSIONS = {
+  register: 'ASSETS',
+  stock: 'ASSETS',
+  summary: 'ASSETS',
+  allocations: 'ASSETS',
+  masters: 'SETTINGS',
+} as const;
+
+export type AssetsSection = keyof typeof ASSETS_PERMISSIONS;
+
+/** Label for an assets enum value, via the shared enum labeller. */
+export function assetsLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  return hrLabel(value);
+}
+
+/**
+ * A quantity with its unit of measure.
+ *
+ * A bulk asset's quantity means nothing without its unit — "40" is forty pipes or
+ * forty metres of pipe, and the two are not the same order. A serialised asset has
+ * no unit and reads as a bare 1.
+ */
+export function formatAssetQuantity(
+  quantity: number,
+  unitOfMeasure: string | null | undefined,
+): string {
+  const number = quantity.toLocaleString('en-IN', {
+    maximumFractionDigits: 3,
+  });
+  return unitOfMeasure ? `${number} ${unitOfMeasure}` : number;
 }
