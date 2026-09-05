@@ -38,8 +38,20 @@ export default function RequisitionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
-  const departments = useQuery({ queryKey: ['departments'], queryFn: () => listDepartments() });
-  const designations = useQuery({ queryKey: ['designations'], queryFn: () => listDesignations() });
+  // Scoped to the selected company, and keyed on it so switching company refetches
+  // rather than serving the previous one from cache. Unscoped, a cross-company
+  // Super Admin sees every tenant's departments at once and can file a requisition
+  // against one company using another's department — the requisition itself already
+  // carries the selected `companyId`, so the two would disagree.
+  const { companyId } = useCompanyContext();
+  const departments = useQuery({
+    queryKey: ['departments', companyId],
+    queryFn: () => listDepartments(companyId ?? undefined),
+  });
+  const designations = useQuery({
+    queryKey: ['designations', companyId],
+    queryFn: () => listDesignations(companyId ?? undefined),
+  });
   const requisitions = useQuery({
     queryKey: ['requisitions', status],
     queryFn: () => getRequisitions({ status: status || undefined, pageSize: 200 }),
