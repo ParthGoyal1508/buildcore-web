@@ -28,9 +28,10 @@ import {
  * input here; that would let an admin type a value the API rejects, so it is
  * deliberately not reproduced.
  *
- * The list is split in two (014 FR-013). Thirteen of the twenty-two permissions decide
- * what appears in the sidebar; the other nine gate content *within* a module and change
- * nothing about the menu. Presented as one undifferentiated list, an admin clears one of
+ * The list is split in two (014 FR-013). Some permissions decide what appears in the
+ * sidebar; the rest gate content *within* a module and change nothing about the menu.
+ * Both halves are derived, so a module added to `NAV_MODULES` — 012's Assets was the
+ * most recent — moves its permission across on its own. Presented as one undifferentiated list, an admin clears one of
  * those nine, expects a module to disappear, and is silently misled — this screen is
  * where they configure navigation, so it has to say which checkbox does that.
  */

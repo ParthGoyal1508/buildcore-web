@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import RecruitmentNav from '@/app/ui/recruitment/recruitment-nav';
+import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 /**
  * Section guard for `/dashboard/recruitment/*`. `ModuleGuard` already refuses the
@@ -48,7 +49,14 @@ export default function RecruitmentLayout({
   return (
     <div className="flex flex-col gap-6">
       {!isModuleIndex && <RecruitmentNav canSeeReports={canSeeReports} />}
-      {children}
+      {/*
+        Renders a company selector for a cross-company administrator and nothing at
+        all for everyone else — the same mounting Plant does across its subtree.
+        Without it a Super Admin, who has no company of their own, had no way to say
+        which company a requisition, candidate, resignation or letter template
+        belonged to, and every write in this module was refused.
+      */}
+      <CompanyProvider>{children}</CompanyProvider>
     </div>
   );
 }

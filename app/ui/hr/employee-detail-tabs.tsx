@@ -25,6 +25,8 @@ import DocumentsTab from '@/app/ui/hr/documents-tab';
 import MaskedField from '@/app/ui/hr/masked-field';
 import OffboardingPanel from '@/app/ui/hr/offboarding-panel';
 import TransferModal from '@/app/ui/hr/transfer-modal';
+import { getCurrentUser } from '@/app/lib/api/users';
+import AssetsInCustody from '@/app/ui/assets/assets-in-custody';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
@@ -76,6 +78,13 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
   const { data: employee, isLoading, isError } = useQuery({
     queryKey: ['hr', 'employee', employeeId],
     queryFn: () => getEmployee(employeeId),
+  });
+
+  // Gates the assets-in-custody panel below. Resolves from the same ['currentUser']
+  // cache entry the sidebar already populated, so it costs no extra request.
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
   });
 
   const { data: departments } = useQuery({
@@ -195,6 +204,19 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
           <Field label="Email">{orDash(employee.email)}</Field>
           <Field label="Monthly gross">{rupees(grossMonthly)}</Field>
         </Fields>
+
+        {/*
+          What this person is currently holding (012 FR-028). Gated on ASSETS
+          rather than on an HR permission: it is the assets module's data, and an
+          HR administrator without access to that module should not read it here
+          instead. Renders nothing when they hold nothing, so most employees show
+          no extra chrome at all.
+        */}
+        {(currentUser?.permissions ?? []).includes('ASSETS' as never) && (
+          <div className="mt-6">
+            <AssetsInCustody employeeId={employee.id} />
+          </div>
+        )}
       </TabPanel>
 
       <TabPanel id="personal" idPrefix="employee-detail" active={tab}>

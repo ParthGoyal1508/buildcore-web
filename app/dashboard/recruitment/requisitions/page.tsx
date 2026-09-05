@@ -28,6 +28,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function RequisitionsPage() {
   const queryClient = useQueryClient();
@@ -37,8 +38,20 @@ export default function RequisitionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
-  const departments = useQuery({ queryKey: ['departments'], queryFn: () => listDepartments() });
-  const designations = useQuery({ queryKey: ['designations'], queryFn: () => listDesignations() });
+  // Scoped to the selected company, and keyed on it so switching company refetches
+  // rather than serving the previous one from cache. Unscoped, a cross-company
+  // Super Admin sees every tenant's departments at once and can file a requisition
+  // against one company using another's department — the requisition itself already
+  // carries the selected `companyId`, so the two would disagree.
+  const { companyId } = useCompanyContext();
+  const departments = useQuery({
+    queryKey: ['departments', companyId],
+    queryFn: () => listDepartments(companyId ?? undefined),
+  });
+  const designations = useQuery({
+    queryKey: ['designations', companyId],
+    queryFn: () => listDesignations(companyId ?? undefined),
+  });
   const requisitions = useQuery({
     queryKey: ['requisitions', status],
     queryFn: () => getRequisitions({ status: status || undefined, pageSize: 200 }),
@@ -171,6 +184,9 @@ function RequisitionForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  // The company a cross-company Super Admin has selected; null for everyone else,
+  // who is pinned to their own company by the backend anyway.
+  const { companyId } = useCompanyContext();
   const [form, setForm] = useState({
     departmentId: '',
     designationId: '',
@@ -198,6 +214,7 @@ function RequisitionForm({
         budgetedCtcMin: Number(form.budgetedCtcMin),
         budgetedCtcMax: Number(form.budgetedCtcMax),
         justification: form.justification,
+        ...(companyId ? { companyId } : {}),
       }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not create.'),
