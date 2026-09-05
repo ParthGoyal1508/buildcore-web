@@ -53,13 +53,20 @@ function place(anchor: HTMLElement): Placement {
     Math.min(PANEL_MAX_HEIGHT, room),
   );
 
+  // Hangs from the bell's right edge when the bell is on the right of the viewport —
+  // its home in the top bar — and from its left edge otherwise. Left-aligning a 288px
+  // panel to a 44px button sitting near the right margin would throw it off the screen
+  // and leave the clamp below to drag it back, so it would no longer line up with
+  // anything. Then clamped anyway, for the narrow viewports where neither edge fits.
+  const anchorCentre = rect.left + rect.width / 2;
+  const preferredLeft =
+    anchorCentre > window.innerWidth / 2 ? rect.right - PANEL_WIDTH : rect.left;
+
   return {
     top: openUp ? rect.top - GAP - maxHeight : rect.bottom + GAP,
-    // The panel is wider than the 256px sidenav, so its left edge is clamped to keep
-    // the right edge on screen rather than letting it run off a narrow viewport.
     left: Math.max(
       VIEWPORT_MARGIN,
-      Math.min(rect.left, window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN),
+      Math.min(preferredLeft, window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN),
     ),
     maxHeight,
   };
@@ -73,11 +80,11 @@ function place(anchor: HTMLElement): Placement {
  *
  * Rendered through a portal into `document.body` and positioned `fixed` against the
  * bell's own rect, rather than `absolute` inside the bell. The dashboard shell is
- * `h-screen … md:overflow-hidden` and the bell is the last control in the sidenav
- * column, so an absolutely-positioned panel opened downward into space the shell then
- * clipped: the panel was mounted and populated but drawn below the fold, which read as
- * "the dropdown does not open". A portal escapes that clip entirely, and `place()`
- * flips the panel above the bell when there is no room beneath it.
+ * `h-screen … md:overflow-hidden`, so an absolutely-positioned panel is clipped the
+ * moment it needs more room than its own column has — which is how this first failed,
+ * mounted and populated but drawn below the fold. A portal escapes that regardless of
+ * where the bell is later moved to, which is why the move to the top bar did not need
+ * to touch it.
  */
 export default function NotificationPanel({
   anchorRef,

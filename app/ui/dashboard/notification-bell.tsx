@@ -11,10 +11,21 @@ import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
 import NotificationPanel from '@/app/ui/dashboard/notification-panel';
 
 /**
- * The notifications bell and its count (spec FR-008), rendered in the sidenav next to
- * the reminders badge. A neutral (blue) count keeps it visually distinct from the
- * reminders badge's amber/red, per FR-027. Gated on DASHBOARD so it never becomes a
- * guaranteed 403.
+ * The notifications bell and its count (spec FR-008), rendered in the shell's top bar.
+ *
+ * It began life in the sidenav, beside the reminders badge, because this shell had no
+ * header. That put a dropdown at the bottom of a nav column: the panel had to open
+ * upward and drew straight over the module links it was anchored beneath, which read as
+ * a menu covering the navigation rather than a notifications tray. The top bar exists
+ * for it now, so the panel opens downward into empty content space.
+ *
+ * Reminders stays in the sidenav: it is a link to a page, not a dropdown, so it has
+ * none of that problem, and FR-027's requirement is only that the two counts be
+ * *distinguishable* — a neutral blue count on a bell against the badge's severity
+ * amber/red still is, and they are no longer even adjacent.
+ *
+ * Gated on DASHBOARD so it never becomes a guaranteed 403 — and it renders nothing at
+ * all without it, leaving the top bar empty rather than showing a dead control.
  */
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -38,30 +49,41 @@ export default function NotificationBell() {
   const total = count ?? 0;
 
   return (
-    <div
-      ref={wrapperRef}
-      className="relative flex-1 basis-[20%] md:w-full md:flex-none md:basis-auto"
-    >
+    <div ref={wrapperRef}>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label={
+          total > 0 ? `Notifications, ${total} active` : 'Notifications'
+        }
+        // 44px square: the top bar carries a Dashboard shortcut on a surface that is
+        // visible on mobile, so it holds the minimum touch target Principle VI asks of
+        // this shell, the same as every sidenav target.
         className={clsx(
-          'flex h-[48px] w-full items-center justify-center gap-2 rounded-md p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:justify-start md:p-2 md:px-3',
-          open ? 'bg-sky-100 text-blue-600' : 'bg-gray-50',
+          'relative flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:bg-sky-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+          open && 'bg-sky-100 text-blue-600',
         )}
       >
         <BellIcon className="w-6 shrink-0" />
-        <span className="hidden md:block">Notifications</span>
         {total > 0 && (
-          <span className="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-blue-800">
-            <span aria-hidden="true">{total}</span>
-            <span className="sr-only">{total} notifications</span>
+          // Solid blue on the icon rather than a pill beside it: there is no label to
+          // sit next to in the top bar. The count is `aria-hidden` because the button's
+          // own label already reads it out, and announcing it twice is worse than not
+          // announcing it at all.
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1 text-xs font-semibold tabular-nums text-white"
+          >
+            {total}
           </span>
         )}
       </button>
       {open && (
-        <NotificationPanel anchorRef={wrapperRef} onClose={() => setOpen(false)} />
+        <NotificationPanel
+          anchorRef={wrapperRef}
+          onClose={() => setOpen(false)}
+        />
       )}
     </div>
   );

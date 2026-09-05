@@ -8,7 +8,6 @@ import { lusitana } from '@/app/ui/fonts';
 import { logout } from '@/app/lib/api/auth';
 import CurrentUser from '@/app/ui/dashboard/current-user';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
-import NotificationBell from '@/app/ui/dashboard/notification-bell';
 
 export default function SideNav() {
   const router = useRouter();
@@ -45,10 +44,9 @@ export default function SideNav() {
             a user who holds DASHBOARD. It sits after the modules so it never pushes
             one out of the first mobile row. */}
         <ReminderBadge />
-        {/* The notifications bell sits beside the reminders badge — both are Dashboard
-            shortcuts, not modules, and a neutral blue count keeps it distinct from the
-            reminders badge's amber/red (spec FR-027). */}
-        <NotificationBell />
+        {/* The notifications bell was here too, and moved to the shell's top bar: a
+            dropdown anchored to the bottom of this column could only open over the
+            module links above it. See notification-bell.tsx. */}
         {/* Spacer, desktop only. Below it the identity panel and Sign Out render in
             every state — including both failure states — so a user whose permissions
             filtered to nothing, or could not be read at all, still knows who they are
