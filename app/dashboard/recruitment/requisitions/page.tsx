@@ -28,6 +28,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function RequisitionsPage() {
   const queryClient = useQueryClient();
@@ -171,6 +172,9 @@ function RequisitionForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  // The company a cross-company Super Admin has selected; null for everyone else,
+  // who is pinned to their own company by the backend anyway.
+  const { companyId } = useCompanyContext();
   const [form, setForm] = useState({
     departmentId: '',
     designationId: '',
@@ -198,6 +202,7 @@ function RequisitionForm({
         budgetedCtcMin: Number(form.budgetedCtcMin),
         budgetedCtcMax: Number(form.budgetedCtcMax),
         justification: form.justification,
+        ...(companyId ? { companyId } : {}),
       }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not create.'),

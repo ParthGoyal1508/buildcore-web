@@ -21,6 +21,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 /** Documented token set per letter type — mirrors the backend's LETTER_TOKENS so
  * unknown tokens are highlighted before save (spec FR-011). */
@@ -91,6 +92,9 @@ function TemplateEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  // The company a cross-company Super Admin has selected; null for everyone else,
+  // who is pinned to their own company by the backend anyway.
+  const { companyId } = useCompanyContext();
   const [letterType, setLetterType] = useState(template?.letterType ?? 'offer');
   const [name, setName] = useState(template?.name ?? '');
   const [body, setBody] = useState(template?.bodyTemplate ?? '');
@@ -117,7 +121,13 @@ function TemplateEditor({
     mutationFn: () =>
       template
         ? updateLetterTemplate(template.id, { name, bodyTemplate: body, isActive })
-        : createLetterTemplate({ letterType, name, bodyTemplate: body, isActive }),
+        : createLetterTemplate({
+            letterType,
+            name,
+            bodyTemplate: body,
+            isActive,
+            ...(companyId ? { companyId } : {}),
+          }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not save the template.'),
   });

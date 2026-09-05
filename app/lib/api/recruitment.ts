@@ -100,6 +100,15 @@ export async function getRequisition(id: string): Promise<Requisition> {
   return requisitionSchema.parse(await authFetch(`/recruitment/requisitions/${id}`));
 }
 export interface RequisitionInput {
+  /**
+   * The company the write belongs to.
+   *
+   * Required from a cross-company Super Admin, who has no company of their own to
+   * fall back on — the backend refuses the write without it. Supplied by the
+   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
+   * for a caller pinned to a single company.
+   */
+  companyId?: string;
   departmentId: string;
   designationId: string;
   positionCount: number;
@@ -211,6 +220,15 @@ export async function getCandidate(id: string): Promise<CandidateDetail> {
   return candidateDetailSchema.parse(await authFetch(`/recruitment/candidates/${id}`));
 }
 export interface CandidateInput {
+  /**
+   * The company the write belongs to.
+   *
+   * Required from a cross-company Super Admin, who has no company of their own to
+   * fall back on — the backend refuses the write without it. Supplied by the
+   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
+   * for a caller pinned to a single company.
+   */
+  companyId?: string;
   requisitionId: string;
   fullName: string;
   phone: string;
@@ -496,6 +514,15 @@ export async function getLetterTemplates(): Promise<LetterTemplate[]> {
   return z.array(letterTemplateSchema).parse(await authFetch('/recruitment/letter-templates'));
 }
 export interface LetterTemplateInput {
+  /**
+   * The company the write belongs to.
+   *
+   * Required from a cross-company Super Admin, who has no company of their own to
+   * fall back on — the backend refuses the write without it. Supplied by the
+   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
+   * for a caller pinned to a single company.
+   */
+  companyId?: string;
   letterType: string;
   name: string;
   bodyTemplate: string;
@@ -572,6 +599,15 @@ export async function getResignations(query: { status?: string } = {}): Promise<
   );
 }
 export interface ResignationInput {
+  /**
+   * The company the write belongs to.
+   *
+   * Required from a cross-company Super Admin, who has no company of their own to
+   * fall back on — the backend refuses the write without it. Supplied by the
+   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
+   * for a caller pinned to a single company.
+   */
+  companyId?: string;
   employeeId: string;
   resignationDate: string;
   reasonCategory: string;
