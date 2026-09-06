@@ -1,21 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 
 import { getWidgets, type WidgetResult } from '@/app/lib/api/dashboard';
-import { DASHBOARD_REFRESH_INTERVAL_MS, ROUTES } from '@/app/lib/constants';
+import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
+import DashboardNav from '@/app/ui/dashboard/dashboard-nav';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import WelcomeBanner from '@/app/ui/dashboard/welcome-banner';
 import PageHeader from '@/app/ui/page-header';
-
-const SUB_DASHBOARDS = [
-  { href: ROUTES.siteDashboard, label: 'Site Dashboard' },
-  { href: ROUTES.groupDashboard, label: 'Group Dashboard' },
-  { href: ROUTES.activityLog, label: 'Activity Log' },
-  { href: ROUTES.reminders, label: 'Reminders' },
-  { href: ROUTES.reports, label: 'Reports' },
-];
 
 function section(widgets: WidgetResult[], name: string): WidgetResult[] {
   return widgets.filter((w) => w.section === name);
@@ -31,20 +23,11 @@ export default function DashboardPage() {
   return (
     <main>
       <WelcomeBanner />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <PageHeader title="Dashboard" />
-        <nav className="flex flex-wrap gap-2">
-          {SUB_DASHBOARDS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <PageHeader title="Dashboard" className="mb-4" />
+      {/* The row of buttons this replaces lived only here, so reaching the Activity
+          Log from the Site Dashboard meant coming back to /dashboard first. The strip
+          now rides along on all six screens. */}
+      <DashboardNav className="mb-6" />
 
       {widgets.isPending && (
         <p className="p-4 text-sm text-gray-500" role="status">
