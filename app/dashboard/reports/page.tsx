@@ -19,6 +19,7 @@ import FilterField from '@/app/ui/dashboard/filter-field';
 import ReportResultTable from '@/app/ui/dashboard/report-result-table';
 import ReportTypeList from '@/app/ui/dashboard/report-type-list';
 import PageHeader from '@/app/ui/page-header';
+import { inlineSelectClass } from '@/app/ui/settings/form-fields';
 
 function buildBody(values: Record<string, string>) {
   const { fromDate, toDate, ...rest } = values;
@@ -187,7 +188,7 @@ export default function ReportsPage() {
                 <label className="text-sm">
                   <span className="sr-only">Export format</span>
                   <select
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className={inlineSelectClass}
                     value={format}
                     onChange={(e) =>
                       setFormat(e.target.value as 'pdf' | 'excel')

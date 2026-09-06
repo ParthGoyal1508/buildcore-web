@@ -12,6 +12,7 @@ import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import Pager from './pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { useSites } from './use-inventory-refs';
+import { selectClass } from '@/app/ui/settings/form-fields';
 
 /**
  * The stock position, and the four things you can do from it.
@@ -174,7 +175,7 @@ export default function StockTable({
               setSiteId(event.target.value);
               setPage(1);
             }}
-            className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+            className={selectClass}
           >
             <option value="">All stores</option>
             {(sites.data ?? []).map((site) => (
@@ -199,7 +200,7 @@ export default function StockTable({
               setCategoryId(event.target.value);
               setPage(1);
             }}
-            className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+            className={selectClass}
           >
             <option value="">All categories</option>
             {(categories.data ?? []).map((category) => (

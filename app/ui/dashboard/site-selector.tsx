@@ -1,8 +1,16 @@
 'use client';
 
 import type { Site } from '@/app/lib/api/dashboard';
+import { SelectField } from '@/app/ui/settings/form-fields';
 
-/** The site selector for the Site Dashboard (spec FR-013, FR-019 — native select). */
+/**
+ * The site selector for the Site Dashboard (spec FR-013, FR-019 — native select).
+ *
+ * Built from the shared `SelectField` rather than its own label-and-select pair,
+ * which is what it was: a bare content-width select whose right padding the native
+ * chevron drew straight over. Capped rather than full-width because it is a single
+ * control on a wide dashboard, not a column in a form.
+ */
 export default function SiteSelector({
   sites,
   value,
@@ -13,10 +21,10 @@ export default function SiteSelector({
   onChange: (siteId: string) => void;
 }) {
   return (
-    <label className="text-sm">
-      <span className="mb-1 block text-gray-700">Site</span>
-      <select
-        className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+    <div className="max-w-xs">
+      <SelectField
+        id="site-dashboard-site"
+        label="Site"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -26,7 +34,7 @@ export default function SiteSelector({
             {site.name}
           </option>
         ))}
-      </select>
-    </label>
+      </SelectField>
+    </div>
   );
 }

@@ -1,6 +1,9 @@
 'use client';
 
+import clsx from 'clsx';
+
 import type { FilterSpec } from '@/app/lib/api/dashboard';
+import { fieldClass, selectClass } from '@/app/ui/settings/form-fields';
 
 /**
  * Renders one report filter from its {@link FilterSpec} (spec FR-013). Native
@@ -16,9 +19,6 @@ export default function FilterField({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const inputClass =
-    'mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
-
   return (
     <label className="block text-sm">
       <span className="text-gray-700">
@@ -27,7 +27,7 @@ export default function FilterField({
       </span>
       {spec.type === 'select' ? (
         <select
-          className={inputClass}
+          className={clsx('mt-1', selectClass)}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -40,7 +40,7 @@ export default function FilterField({
         </select>
       ) : (
         <input
-          className={inputClass}
+          className={clsx('mt-1', fieldClass)}
           type={
             spec.type === 'date' || spec.type === 'dateRange' ? 'date' : 'text'
           }

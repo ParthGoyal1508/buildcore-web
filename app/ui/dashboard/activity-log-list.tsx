@@ -17,9 +17,7 @@ import {
 import ResponsiveList, {
   type Column,
 } from '@/app/ui/settings/responsive-list';
-
-const selectClass =
-  'rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+import { inlineSelectClass } from '@/app/ui/settings/form-fields';
 
 export default function ActivityLogList() {
   const [module, setModule] = useState('');
@@ -74,7 +72,7 @@ export default function ActivityLogList() {
         <label className="text-sm">
           <span className="mb-1 block text-gray-700">Module</span>
           <select
-            className={selectClass}
+            className={inlineSelectClass}
             value={module}
             onChange={(e) => {
               setModule(e.target.value);
@@ -93,7 +91,7 @@ export default function ActivityLogList() {
         <label className="text-sm">
           <span className="mb-1 block text-gray-700">Time range</span>
           <select
-            className={selectClass}
+            className={inlineSelectClass}
             value={timeRange}
             onChange={(e) => {
               setTimeRange(e.target.value);

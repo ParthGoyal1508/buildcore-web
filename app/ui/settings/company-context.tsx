@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, useMemo, useState } from 'react';
 import { listActiveCompanies } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
+import { inlineSelectClass } from '@/app/ui/settings/form-fields';
 
 interface CompanyContextValue {
   /** The company the Employee Setup tabs are currently scoped to. */
@@ -76,7 +77,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             id="company-selector"
             value={value.companyId ?? ''}
             onChange={(event) => setSelected(event.target.value)}
-            className="rounded-md border border-gray-200 py-2 pl-3 pr-8 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className={inlineSelectClass}
           >
             {(companies ?? []).map((company) => (
               <option key={company.id} value={company.id}>

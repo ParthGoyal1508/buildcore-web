@@ -19,6 +19,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { compactSelectClass } from '@/app/ui/settings/form-fields';
 
 interface LineDraft {
   id?: string;
@@ -132,7 +133,7 @@ export default function TaxDeclarationForm() {
                 ),
               )
             }
-            className="rounded-md border border-gray-200 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className={compactSelectClass}
           >
             <option value="">Select</option>
             {TDS_SECTIONS.map((section) => (
