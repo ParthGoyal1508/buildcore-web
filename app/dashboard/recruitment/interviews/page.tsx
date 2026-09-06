@@ -28,6 +28,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function InterviewsPage() {
   const queryClient = useQueryClient();
@@ -49,10 +50,10 @@ export default function InterviewsPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Interviews</h1>
-          <p className="text-sm text-gray-500">Today&apos;s, upcoming and overdue rounds.</p>
-        </div>
+        <PageHeader
+          title="Interviews"
+          description="Today's, upcoming and overdue rounds."
+        />
         <Button onClick={() => setShowSchedule(true)}>Schedule Interview</Button>
       </div>
 

@@ -20,9 +20,9 @@ import {
 } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
+import PageHeader from '@/app/ui/page-header';
 
 /** Reads a File as base64 without the `data:` prefix — the shape the API expects. */
 function toBase64(file: File): Promise<string> {
@@ -152,9 +152,7 @@ export default function ContractorDetailPage() {
   return (
     <main>
       <div className="mb-6">
-        <h1 className={`${lusitana.className} mb-1 text-2xl`}>
-          {data.vendorName ?? 'Contractor'}
-        </h1>
+        <PageHeader title={data.vendorName ?? 'Contractor'} className="mb-1" />
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
           <span>{data.vendorCode}</span>
           <StatusBadge status={data.complianceStatus} />

@@ -6,9 +6,9 @@ import { useState } from 'react';
 import { BocwRow, getBocw } from '@/app/lib/api/partners';
 import { MESSAGES } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
-import { lusitana } from '@/app/ui/fonts';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import BocwPaymentModal from '@/app/ui/partners/bocw-payment-modal';
+import PageHeader from '@/app/ui/page-header';
 
 export default function BocwPage() {
   const [paying, setPaying] = useState<BocwRow | null>(null);
@@ -71,14 +71,11 @@ export default function BocwPage() {
 
   return (
     <main>
-      <div className="mb-6">
-        <h1 className={`${lusitana.className} mb-2 text-2xl`}>BOCW cess</h1>
-        <p className="text-sm text-gray-600">
-          Liability is the project’s contract value times the company cess rate,
-          computed at request time rather than stored — so correcting a payment
-          corrects the balance immediately.
-        </p>
-      </div>
+      <PageHeader
+        title="BOCW cess"
+        description="Liability is the project’s contract value times the company cess rate, computed at request time rather than stored — so correcting a payment corrects the balance immediately."
+        className="mb-6"
+      />
 
       {unavailable.length > 0 && (
         // The distinction the backend is careful to make: no projects listed does

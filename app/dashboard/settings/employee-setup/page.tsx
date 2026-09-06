@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { lusitana } from '@/app/ui/fonts';
 import { CompanyProvider } from '@/app/ui/settings/company-context';
 import CodeSeriesTab from '@/app/ui/settings/code-series-tab';
 import DepartmentTab from '@/app/ui/settings/department-tab';
 import DesignationTab from '@/app/ui/settings/designation-tab';
 import DocumentTypeTab from '@/app/ui/settings/document-type-tab';
 import ShiftTab from '@/app/ui/settings/shift-tab';
+import PageHeader from '@/app/ui/page-header';
 
 const TABS = [
   { id: 'departments', label: 'Departments', render: () => <DepartmentTab /> },
@@ -30,7 +30,7 @@ export default function EmployeeSetupPage() {
 
   return (
     <main>
-      <h1 className={`${lusitana.className} mb-6 text-2xl`}>Employee Setup</h1>
+      <PageHeader title="Employee Setup" className="mb-6" />
 
       <CompanyProvider>
         <div

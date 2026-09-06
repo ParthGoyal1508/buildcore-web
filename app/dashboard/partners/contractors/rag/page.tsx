@@ -8,8 +8,8 @@ import clsx from 'clsx';
 import { getRagMatrix } from '@/app/lib/api/partners';
 import { MESSAGES, ROUTES, partnersLabel, type RagCellStatus } from '@/app/lib/constants';
 import { financialYearOf, periodLabel } from '@/app/lib/format';
-import { lusitana } from '@/app/ui/fonts';
 import { Field, SelectInput } from '@/app/ui/partners/form-controls';
+import PageHeader from '@/app/ui/page-header';
 
 /** Dot colours. Distinct from `StatusBadge` because a dot has no text to carry the
  * meaning, so each one gets a `title` and an accessible label instead. */
@@ -44,14 +44,10 @@ function RagMatrixBody() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className={`${lusitana.className} mb-2 text-2xl`}>RAG matrix</h1>
-          <p className="max-w-2xl text-sm text-gray-600">
-            One financial year of filings for every active contractor. A month that
-            is not yet due is grey rather than red — a filing that is not due has not
-            been missed.
-          </p>
-        </div>
+        <PageHeader
+          title="RAG matrix"
+          description="One financial year of filings for every active contractor. A month that is not yet due is grey rather than red — a filing that is not due has not been missed."
+        />
         <div className="w-48">
           <Field id="rag-fy" label="Financial year">
             <SelectInput

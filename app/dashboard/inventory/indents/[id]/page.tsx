@@ -14,7 +14,6 @@ import {
 } from '@/app/lib/api/inventory';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, inventoryLabel, overdueLabel } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import ApproveIndentModal from '@/app/ui/inventory/approve-indent-modal';
 import IssueModal from '@/app/ui/inventory/issue-modal';
 import {
@@ -25,6 +24,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function IndentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -158,9 +158,7 @@ export default function IndentDetailPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className={`${lusitana.className} text-2xl`}>
-            {data.indentNumber}
-          </h1>
+          <PageHeader title={data.indentNumber} />
           <p className="text-sm text-gray-600">
             {data.siteName} · required by {data.requiredByDate.slice(0, 10)}
           </p>

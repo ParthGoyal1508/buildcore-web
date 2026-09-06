@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 
-import { lusitana } from '@/app/ui/fonts';
 import IssueModal from '@/app/ui/inventory/issue-modal';
 import MastersModal from '@/app/ui/inventory/masters-modal';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import StockTable from '@/app/ui/inventory/stock-table';
 import TransferModal from '@/app/ui/inventory/transfer-modal';
+import PageHeader from '@/app/ui/page-header';
 
 type OpenModal = 'purchase' | 'issue' | 'transfer' | 'masters' | null;
 
@@ -25,7 +25,7 @@ export default function StockPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={`${lusitana.className} text-2xl`}>Stock</h1>
+      <PageHeader title="Stock" />
 
       <StockTable
         onNewPurchase={() => setOpen('purchase')}

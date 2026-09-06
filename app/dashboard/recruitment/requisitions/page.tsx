@@ -29,6 +29,7 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
+import PageHeader from '@/app/ui/page-header';
 
 export default function RequisitionsPage() {
   const queryClient = useQueryClient();
@@ -103,10 +104,10 @@ export default function RequisitionsPage() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Requisitions</h1>
-          <p className="text-sm text-gray-500">Open positions and their approvals.</p>
-        </div>
+        <PageHeader
+          title="Requisitions"
+          description="Open positions and their approvals."
+        />
         <div className="flex items-end gap-2">
           <SelectField id="req-status" label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All</option>

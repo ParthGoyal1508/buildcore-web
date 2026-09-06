@@ -10,6 +10,7 @@ import { MUSTER_STATUSES, ROUTES } from '@/app/lib/constants';
 import { RowAction, SelectField } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function MustersPage() {
   const [status, setStatus] = useState('submitted');
@@ -62,12 +63,10 @@ export default function MustersPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Musters</h1>
-          <p className="text-sm text-gray-500">
-            Review and approve supervisor attendance, oldest first.
-          </p>
-        </div>
+        <PageHeader
+          title="Musters"
+          description="Review and approve supervisor attendance, oldest first."
+        />
         <SelectField
           id="muster-status"
           label="Status"

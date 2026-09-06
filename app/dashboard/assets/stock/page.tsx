@@ -17,9 +17,9 @@ import {
   useAssetSites,
   useAssetsCompanyId,
 } from '@/app/ui/assets/use-asset-refs';
-import { lusitana } from '@/app/ui/fonts';
 import { SelectField } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 /**
  * Where everything is (spec US3, FR-007).
@@ -117,7 +117,7 @@ export default function AssetStockPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={`${lusitana.className} text-2xl`}>Asset Stock</h1>
+      <PageHeader title="Asset Stock" />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <SelectField

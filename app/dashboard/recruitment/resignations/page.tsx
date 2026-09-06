@@ -28,6 +28,7 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
+import PageHeader from '@/app/ui/page-header';
 
 export default function ResignationsPage() {
   const queryClient = useQueryClient();
@@ -57,10 +58,10 @@ export default function ResignationsPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Resignations</h1>
-          <p className="text-sm text-gray-500">Separations and their last working days.</p>
-        </div>
+        <PageHeader
+          title="Resignations"
+          description="Separations and their last working days."
+        />
         <Button onClick={() => setShowForm(true)}>New Resignation</Button>
       </div>
 

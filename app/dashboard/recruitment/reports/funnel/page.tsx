@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getFunnelReport } from '@/app/lib/api/recruitment';
 import { PIPELINE_COLUMNS, recruitmentLabel } from '@/app/lib/constants';
+import PageHeader from '@/app/ui/page-header';
 
 export default function FunnelReportPage() {
   const report = useQuery({ queryKey: ['report-funnel'], queryFn: () => getFunnelReport() });
@@ -15,7 +16,7 @@ export default function FunnelReportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-900">Recruitment Funnel</h1>
+      <PageHeader title="Recruitment Funnel" />
 
       {report.isPending && <p className="text-sm text-gray-500">Loading…</p>}
 

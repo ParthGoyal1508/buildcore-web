@@ -24,6 +24,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function PaymentSheetsPage() {
   const queryClient = useQueryClient();
@@ -66,12 +67,10 @@ export default function PaymentSheetsPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Payment Sheets</h1>
-          <p className="text-sm text-gray-500">
-            Generate, approve and disburse cash payment sheets per project.
-          </p>
-        </div>
+        <PageHeader
+          title="Payment Sheets"
+          description="Generate, approve and disburse cash payment sheets per project."
+        />
         <Button onClick={() => setShowForm(true)}>Generate Sheet</Button>
       </div>
 

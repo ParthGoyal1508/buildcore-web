@@ -7,6 +7,7 @@ import { getDeploymentReport } from '@/app/lib/api/labour';
 import { getProjects } from '@/app/lib/api/projects';
 import { Button } from '@/app/ui/button';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
 
 export default function DeploymentReportPage() {
   const [projectId, setProjectId] = useState('');
@@ -28,7 +29,7 @@ export default function DeploymentReportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-900">Deployment Report</h1>
+      <PageHeader title="Deployment Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
         <SelectField
           id="dep-project"

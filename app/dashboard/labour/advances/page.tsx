@@ -27,6 +27,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function AdvancesPage() {
   const queryClient = useQueryClient();
@@ -88,12 +89,10 @@ export default function AdvancesPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Advances</h1>
-          <p className="text-sm text-gray-500">
-            Advances against wages and their recovery through payment sheets.
-          </p>
-        </div>
+        <PageHeader
+          title="Advances"
+          description="Advances against wages and their recovery through payment sheets."
+        />
         <Button onClick={() => setShowForm(true)}>New Advance</Button>
       </div>
 

@@ -22,7 +22,6 @@ import {
   useAssetSites,
   useAssetsCompanyId,
 } from '@/app/ui/assets/use-asset-refs';
-import { lusitana } from '@/app/ui/fonts';
 import Pager from '@/app/ui/inventory/pager';
 import {
   RowAction,
@@ -30,6 +29,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 type View = 'allocations' | 'custody';
 
@@ -122,7 +122,7 @@ export default function AllocationsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Allocations</h1>
+        <PageHeader title="Allocations" />
         <div className="flex gap-2">
           <RowAction
             onClick={() => setView('allocations')}

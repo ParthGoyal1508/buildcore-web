@@ -18,7 +18,7 @@ export default async function SetPasswordPage({
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-sm">
-        <h1 className={`${lusitana.className} mb-4 text-2xl`}>
+        <h1 className={`${lusitana.className} mb-3 text-2xl`}>
           Set your password
         </h1>
         <SetPasswordForm token={token} />

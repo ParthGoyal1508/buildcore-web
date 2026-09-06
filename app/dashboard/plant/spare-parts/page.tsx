@@ -12,7 +12,6 @@ import {
 } from '@/app/lib/api/plant';
 import { MESSAGES } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { lusitana } from '@/app/ui/fonts';
 import Pager from '@/app/ui/inventory/pager';
 import SparePartModal, {
   ReceivePartModal,
@@ -30,6 +29,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 export default function SparePartsPage() {
   const queryClient = useQueryClient();
@@ -137,7 +137,7 @@ export default function SparePartsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Spare Parts</h1>
+        <PageHeader title="Spare Parts" />
         <div className="flex flex-wrap gap-2">
           <SecondaryButton
             type="button"

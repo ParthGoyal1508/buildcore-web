@@ -21,6 +21,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 export default function GangsPage() {
   const queryClient = useQueryClient();
@@ -48,12 +49,10 @@ export default function GangsPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Gangs</h1>
-          <p className="text-sm text-gray-500">
-            Group workers under a leader for faster muster capture.
-          </p>
-        </div>
+        <PageHeader
+          title="Gangs"
+          description="Group workers under a leader for faster muster capture."
+        />
         <Button onClick={() => setShowForm(true)}>New Gang</Button>
       </div>
 

@@ -26,6 +26,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function WorkersPage() {
   const queryClient = useQueryClient();
@@ -83,12 +84,10 @@ export default function WorkersPage() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Workers</h1>
-          <p className="text-sm text-gray-500">
-            The labour registry — Aadhaar and bank account are shown masked.
-          </p>
-        </div>
+        <PageHeader
+          title="Workers"
+          description="The labour registry — Aadhaar and bank account are shown masked."
+        />
         <Button onClick={() => setShowForm(true)}>New Worker</Button>
       </div>
 

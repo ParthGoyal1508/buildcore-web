@@ -26,6 +26,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function WageRatesPage() {
   const queryClient = useQueryClient();
@@ -79,12 +80,10 @@ export default function WageRatesPage() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Wage Rates</h1>
-          <p className="text-sm text-gray-500">
-            Per-project daily rates by skill category, effective-dated.
-          </p>
-        </div>
+        <PageHeader
+          title="Wage Rates"
+          description="Per-project daily rates by skill category, effective-dated."
+        />
         <div className="flex gap-2">
           <SecondaryButton onClick={() => setShowMasters(true)}>
             Skill Categories

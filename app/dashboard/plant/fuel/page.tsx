@@ -11,7 +11,6 @@ import {
 } from '@/app/lib/api/plant';
 import { MESSAGES, formatVariance } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { lusitana } from '@/app/ui/fonts';
 import Pager from '@/app/ui/inventory/pager';
 import FuelModal from '@/app/ui/plant/fuel-modal';
 import {
@@ -25,6 +24,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 export default function FuelPage() {
   const equipment = usePlantEquipment();
@@ -112,7 +112,7 @@ export default function FuelPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Fuel</h1>
+        <PageHeader title="Fuel" />
         <SecondaryButton type="button" onClick={() => setShowModal(true)}>
           Record fuel
         </SecondaryButton>

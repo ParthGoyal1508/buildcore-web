@@ -227,7 +227,7 @@ export default function MusterCapturePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Muster Capture</h1>
+        <h1 className="text-xl font-semibold text-gray-900">Muster Capture</h1>
         <span className="text-xs text-gray-500">Step {step} of 3</span>
       </div>
       {queuedCount > 0 && (

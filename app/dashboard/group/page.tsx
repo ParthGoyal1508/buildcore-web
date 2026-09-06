@@ -8,6 +8,7 @@ import {
 } from '@/app/lib/api/dashboard';
 import EmployeeSearch from '@/app/ui/dashboard/employee-search';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
+import PageHeader from '@/app/ui/page-header';
 
 export default function GroupDashboardPage() {
   const companies = useQuery({
@@ -21,14 +22,11 @@ export default function GroupDashboardPage() {
 
   return (
     <main>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">
-          Group Dashboard
-        </h1>
-        <p className="text-sm text-gray-500">
-          Every company you can access, plus a group total.
-        </p>
-      </div>
+      <PageHeader
+        title="Group Dashboard"
+        description="Every company you can access, plus a group total."
+        className="mb-4"
+      />
 
       <div className="mb-6">
         <EmployeeSearch />

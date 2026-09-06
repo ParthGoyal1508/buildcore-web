@@ -3,8 +3,8 @@
 import Link from 'next/link';
 
 import { ROUTES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import ProjectForm from '@/app/ui/projects/project-form';
+import PageHeader from '@/app/ui/page-header';
 
 /** Create a project (spec US3). */
 export default function NewProjectPage() {
@@ -20,7 +20,7 @@ export default function NewProjectPage() {
         <span aria-hidden="true"> / </span>
         <span className="text-gray-900">New project</span>
       </nav>
-      <h1 className={`${lusitana.className} mb-6 text-2xl`}>New project</h1>
+      <PageHeader title="New project" className="mb-6" />
       <ProjectForm />
     </main>
   );

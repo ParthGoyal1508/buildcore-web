@@ -33,6 +33,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 interface Breakup {
   notes: Record<string, number>;
@@ -90,14 +91,14 @@ export default function PaymentSheetDetailPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">
-            Payment Sheet — {s.periodFrom} → {s.periodTo}
-          </h1>
-          <p className="text-sm text-gray-500">
-            {labourLabel(s.engagementType)} engagement
-          </p>
-        </div>
+        <PageHeader
+          title={
+            <>
+              Payment Sheet — {s.periodFrom} → {s.periodTo}
+            </>
+          }
+          description={<>{labourLabel(s.engagementType)} engagement</>}
+        />
         <StatusBadge status={s.status} label={labourLabel(s.status)} />
       </div>
 

@@ -19,9 +19,9 @@ import {
   useAssetProjects,
   useAssetsCompanyId,
 } from '@/app/ui/assets/use-asset-refs';
-import { lusitana } from '@/app/ui/fonts';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 type Grouping = 'category' | 'status' | 'project';
 
@@ -138,7 +138,7 @@ export default function AssetSummaryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Asset Summary</h1>
+        <PageHeader title="Asset Summary" />
         <SecondaryButton type="button" onClick={download} disabled={exporting}>
           {exporting ? 'Building…' : 'Export to Excel'}
         </SecondaryButton>

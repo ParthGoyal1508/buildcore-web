@@ -11,6 +11,7 @@ import {
 import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
 import SiteSelector from '@/app/ui/dashboard/site-selector';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
+import PageHeader from '@/app/ui/page-header';
 
 export default function SiteDashboardPage() {
   const [siteId, setSiteId] = useState('');
@@ -33,14 +34,11 @@ export default function SiteDashboardPage() {
 
   return (
     <main>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">
-          Site Dashboard
-        </h1>
-        <p className="text-sm text-gray-500">
-          Attendance and activity for one site.
-        </p>
-      </div>
+      <PageHeader
+        title="Site Dashboard"
+        description="Attendance and activity for one site."
+        className="mb-4"
+      />
 
       <div className="mb-6">
         <SiteSelector

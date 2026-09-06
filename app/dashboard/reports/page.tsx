@@ -18,6 +18,7 @@ import {
 import FilterField from '@/app/ui/dashboard/filter-field';
 import ReportResultTable from '@/app/ui/dashboard/report-result-table';
 import ReportTypeList from '@/app/ui/dashboard/report-type-list';
+import PageHeader from '@/app/ui/page-header';
 
 function buildBody(values: Record<string, string>) {
   const { fromDate, toDate, ...rest } = values;
@@ -125,14 +126,11 @@ export default function ReportsPage() {
 
   return (
     <main>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">
-          Reports
-        </h1>
-        <p className="text-sm text-gray-500">
-          Run a report, then export it to PDF or Excel.
-        </p>
-      </div>
+      <PageHeader
+        title="Reports"
+        description="Run a report, then export it to PDF or Excel."
+        className="mb-4"
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">

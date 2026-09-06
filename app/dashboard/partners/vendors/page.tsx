@@ -20,10 +20,10 @@ import {
   partnersLabel,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import VendorModal from '@/app/ui/partners/vendor-modal';
+import PageHeader from '@/app/ui/page-header';
 
 const PAGE_SIZE = 25;
 
@@ -149,13 +149,10 @@ export default function VendorsPage() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className={`${lusitana.className} mb-2 text-2xl`}>Vendors</h1>
-          <p className="text-sm text-gray-600">
-            Suppliers, hirers and subcontractors. Vendor codes are allocated by the
-            company series and cannot be edited.
-          </p>
-        </div>
+        <PageHeader
+          title="Vendors"
+          description="Suppliers, hirers and subcontractors. Vendor codes are allocated by the company series and cannot be edited."
+        />
         <div className="flex gap-2">
           <Link
             href={ROUTES.partnersVendorCategories}

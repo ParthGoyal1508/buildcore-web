@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getEmployee } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import EmployeeForm from '@/app/ui/hr/employee-form';
+import PageHeader from '@/app/ui/page-header';
 
 /**
  * Loads the record the edit form starts from.
@@ -38,10 +38,11 @@ export default function EmployeeEditor({ employeeId }: { employeeId: string }) {
 
   return (
     <main>
-      <h1 className={`${lusitana.className} mb-2 text-2xl`}>
-        {name || data.employeeCode}
-      </h1>
-      <p className="mb-4 text-sm text-gray-600">{data.employeeCode}</p>
+      <PageHeader
+        title={name || data.employeeCode}
+        description={data.employeeCode}
+        className="mb-4"
+      />
       <EmployeeForm employee={data} />
     </main>
   );

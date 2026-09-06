@@ -7,6 +7,7 @@ import { getWidgets, type WidgetResult } from '@/app/lib/api/dashboard';
 import { DASHBOARD_REFRESH_INTERVAL_MS, ROUTES } from '@/app/lib/constants';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import WelcomeBanner from '@/app/ui/dashboard/welcome-banner';
+import PageHeader from '@/app/ui/page-header';
 
 const SUB_DASHBOARDS = [
   { href: ROUTES.siteDashboard, label: 'Site Dashboard' },
@@ -31,9 +32,7 @@ export default function DashboardPage() {
     <main>
       <WelcomeBanner />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">
-          Dashboard
-        </h1>
+        <PageHeader title="Dashboard" />
         <nav className="flex flex-wrap gap-2">
           {SUB_DASHBOARDS.map((link) => (
             <Link

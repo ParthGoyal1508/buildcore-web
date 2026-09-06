@@ -18,7 +18,6 @@ import {
 } from '@/app/lib/api/settings';
 import { HR_MESSAGES, ROUTES, hrLabel } from '@/app/lib/constants';
 import { dateLabel, money, rupees } from '@/app/lib/format';
-import { lusitana } from '@/app/ui/fonts';
 import AttendanceCalendar from '@/app/ui/hr/attendance-calendar';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
@@ -29,6 +28,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import AssetsInCustody from '@/app/ui/assets/assets-in-custody';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -165,7 +165,7 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
     <main>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className={`${lusitana.className} text-2xl`}>{name}</h1>
+          <PageHeader title={name} />
           <p className="mt-1 text-sm text-gray-600">
             {employee.employeeCode} ·{' '}
             <StatusBadge status={employee.isActive ? 'active' : 'closed'} />
