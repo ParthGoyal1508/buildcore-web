@@ -2,6 +2,7 @@
 
 import {
   BanknotesIcon,
+  CameraIcon,
   ClipboardDocumentCheckIcon,
   CreditCardIcon,
   DocumentTextIcon,
@@ -13,7 +14,26 @@ import { ROUTES } from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
 import TileGrid, { type Tile } from '@/app/ui/tile-grid';
 
+/**
+ * Capture is first because it is the daily action; everything below it is review or
+ * masters. It is also the only tile that leaves the dashboard shell — the capture
+ * screen lives at `/labour/muster`, outside `/dashboard`, because it is the
+ * supervisor's phone flow (013 FR-001). It had no entry point at all until now:
+ * `ROUTES.musterCapture` was defined and never linked, so the screen was reachable
+ * only by typing its URL.
+ *
+ * No permission filtering, for the same reason the other six tiles have none:
+ * capture needs `DAILY_WORKER_REGISTRY`, which `ModuleGuard` has already established
+ * for anyone who can see this page at all.
+ */
 const TILES: Tile[] = [
+  {
+    name: 'Capture Muster',
+    href: ROUTES.musterCapture,
+    icon: CameraIcon,
+    description:
+      'Mark today’s workers present on site, with a photo and a GPS fix.',
+  },
   {
     name: 'Wage Rates',
     href: ROUTES.labourWageRates,
