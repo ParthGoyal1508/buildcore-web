@@ -22,11 +22,18 @@ export default function SideNav() {
 
   return (
     <div className="flex h-full flex-col px-3 py-4 md:px-2">
+      {/* A compact brand bar at one height, not `md:h-40`. That 160px was always the
+          declared height but was never seen: before `shrink-0` this was a flex child
+          with the default `flex-shrink: 1`, so a full module list squashed it to about
+          70px, and pinning it for the scroll fix let it spring to its real size. The
+          height is now what it looks like — and `items-center`, since a logo centred
+          in a short band reads better than one dropped against the bottom edge the way
+          the old text wordmark was. */}
       <Link
-        className="mb-2 flex h-20 shrink-0 items-end justify-start rounded-md bg-blue-600 p-4 md:h-40"
+        className="mb-2 flex h-20 shrink-0 items-center justify-start rounded-md bg-blue-600 px-4"
         href="/dashboard"
       >
-        <Logo knockout priority className="h-8 md:h-10" />
+        <Logo knockout priority className="h-9" />
       </Link>
       {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets
           fill each row evenly at *any* count (feature 014 made the count variable —
