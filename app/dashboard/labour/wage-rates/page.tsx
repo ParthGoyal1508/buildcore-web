@@ -27,8 +27,10 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function WageRatesPage() {
+  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [projectId, setProjectId] = useState('');
   const [skillCategoryId, setSkillCategoryId] = useState('');
@@ -36,21 +38,24 @@ export default function WageRatesPage() {
   const [showRateForm, setShowRateForm] = useState(false);
   const [showMasters, setShowMasters] = useState(false);
 
+  // `companyId` is in every key as well as every call: without it react-query serves
+  // one company's cached list to the next company selected.
   const projects = useQuery({
-    queryKey: ['projects', 'all'],
+    queryKey: ['projects', 'all', companyId],
     queryFn: () => getProjects({ pageSize: 200 }),
   });
   const skills = useQuery({
-    queryKey: ['skill-categories'],
-    queryFn: () => getSkillCategories(),
+    queryKey: ['skill-categories', companyId],
+    queryFn: () => getSkillCategories(companyId ?? undefined),
   });
   const rates = useQuery({
-    queryKey: ['wage-rates', projectId, skillCategoryId, asOf],
+    queryKey: ['wage-rates', projectId, skillCategoryId, asOf, companyId],
     queryFn: () =>
       getWageRates({
         projectId: projectId || undefined,
         skillCategoryId: skillCategoryId || undefined,
         asOf: asOf || undefined,
+        ...(companyId ? { companyId } : {}),
       }),
   });
 
@@ -173,6 +178,7 @@ function WageRateForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [projectId, setProjectId] = useState('');
   const [skillCategoryId, setSkillCategoryId] = useState('');
   const [dailyRate, setDailyRate] = useState('');
@@ -182,6 +188,9 @@ function WageRateForm({
   const mutation = useMutation({
     mutationFn: () =>
       createWageRate({
+        // A cross-company caller has no company of their own for the backend to fall
+        // back on, so a write from them must say which company it belongs to.
+        ...(companyId ? { companyId } : {}),
         projectId,
         skillCategoryId,
         dailyRate: Number(dailyRate),
@@ -272,6 +281,7 @@ function SkillCategoryMasters({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [defaultDailyRate, setDefaultDailyRate] = useState('');
@@ -280,6 +290,7 @@ function SkillCategoryMasters({
   const create = useMutation({
     mutationFn: () =>
       createSkillCategory({
+        ...(companyId ? { companyId } : {}),
         name,
         code,
         defaultDailyRate: defaultDailyRate ? Number(defaultDailyRate) : undefined,

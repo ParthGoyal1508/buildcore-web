@@ -27,8 +27,10 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function WorkersPage() {
+  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [siteId, setSiteId] = useState('');
   const [search, setSearch] = useState('');
@@ -36,15 +38,15 @@ export default function WorkersPage() {
   const [deactivating, setDeactivating] = useState<Worker | null>(null);
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
+    queryKey: ['sites', 'all', companyId],
     queryFn: () => getSites({ pageSize: 200 }),
   });
   const skills = useQuery({
-    queryKey: ['skill-categories'],
-    queryFn: () => getSkillCategories(),
+    queryKey: ['skill-categories', companyId],
+    queryFn: () => getSkillCategories(companyId ?? undefined),
   });
   const workers = useQuery({
-    queryKey: ['workers', siteId, search],
+    queryKey: ['workers', siteId, search, companyId],
     queryFn: () =>
       getWorkers({
         siteId: siteId || undefined,
@@ -165,6 +167,7 @@ function WorkerForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('male');
@@ -189,6 +192,7 @@ function WorkerForm({
   const mutation = useMutation({
     mutationFn: () =>
       createWorker({
+        ...(companyId ? { companyId } : {}),
         fullName,
         phone,
         gender,

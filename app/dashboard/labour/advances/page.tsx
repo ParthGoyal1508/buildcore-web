@@ -28,16 +28,18 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function AdvancesPage() {
+  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
   const advances = useQuery({
-    queryKey: ['advances'],
-    queryFn: () => getAdvances(),
+    queryKey: ['advances', companyId],
+    queryFn: () => getAdvances(companyId ? { companyId } : {}),
   });
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   const invalidate = () =>
@@ -139,6 +141,7 @@ function AdvanceForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [workerId, setWorkerId] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -147,8 +150,13 @@ function AdvanceForm({
   const [error, setError] = useState<string | null>(null);
 
   const workers = useQuery({
-    queryKey: ['workers', 'advance'],
-    queryFn: () => getWorkers({ status: 'active', pageSize: 200 }),
+    queryKey: ['workers', 'advance', companyId],
+    queryFn: () =>
+      getWorkers({
+        status: 'active',
+        pageSize: 200,
+        ...(companyId ? { companyId } : {}),
+      }),
   });
 
   const instalment =
@@ -159,6 +167,7 @@ function AdvanceForm({
   const mutation = useMutation({
     mutationFn: () =>
       createAdvance({
+        ...(companyId ? { companyId } : {}),
         workerId,
         amount: Number(amount),
         reason,

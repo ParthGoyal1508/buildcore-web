@@ -25,18 +25,20 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function PaymentSheetsPage() {
+  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
   const projects = useQuery({
-    queryKey: ['projects', 'all'],
+    queryKey: ['projects', 'all', companyId],
     queryFn: () => getProjects({ pageSize: 200 }),
   });
   const sheets = useQuery({
-    queryKey: ['payment-sheets'],
-    queryFn: () => getPaymentSheets(),
+    queryKey: ['payment-sheets', companyId],
+    queryFn: () => getPaymentSheets(companyId ? { companyId } : {}),
   });
 
   const projectName = (id: string) =>
@@ -111,6 +113,7 @@ function GenerateSheetForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [projectId, setProjectId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
@@ -121,7 +124,13 @@ function GenerateSheetForm({
 
   const mutation = useMutation({
     mutationFn: () =>
-      generatePaymentSheet({ projectId, periodFrom, periodTo, engagementType }),
+      generatePaymentSheet({
+        ...(companyId ? { companyId } : {}),
+        projectId,
+        periodFrom,
+        periodTo,
+        engagementType,
+      }),
     onSuccess: onSaved,
     onError: (e) =>
       setError(

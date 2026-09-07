@@ -15,17 +15,19 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function MustersPage() {
+  const { companyId } = useCompanyContext();
   const [status, setStatus] = useState('submitted');
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
+    queryKey: ['sites', 'all', companyId],
     queryFn: () => getSites({ pageSize: 200 }),
   });
   const musters = useQuery({
-    queryKey: ['musters', status],
-    queryFn: () => getMusters({ status }),
+    queryKey: ['musters', status, companyId],
+    queryFn: () => getMusters({ status, ...(companyId ? { companyId } : {}) }),
   });
 
   const siteName = (id: string) =>

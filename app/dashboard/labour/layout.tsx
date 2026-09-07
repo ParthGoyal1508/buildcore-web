@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import LabourNav from '@/app/ui/labour/labour-nav';
+import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 /**
  * The one place `/dashboard/labour/*` adds a permission check beyond the module
@@ -56,7 +57,15 @@ export default function LabourLayout({
   return (
     <div className="flex flex-col gap-6">
       {!isModuleIndex && <LabourNav canSeeReports={canSeeReports} />}
-      {children}
+      {/*
+        Renders a company selector for a cross-company administrator and nothing at all
+        for everyone else — the same treatment Plant and Assets already mount over their
+        whole subtree, and for the reason `company-context.tsx` documents: without a
+        company named, `companyScope()` on the API side returns every tenant's rows, so
+        two companies' six skill categories arrived as twelve entries listed in pairs
+        with nothing on screen saying which was which.
+      */}
+      <CompanyProvider>{children}</CompanyProvider>
     </div>
   );
 }
