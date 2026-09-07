@@ -11,8 +11,10 @@ import SectionTabs from '@/app/ui/section-tabs';
  */
 export default function LabourNav({
   canSeeReports,
+  className,
 }: {
   canSeeReports: boolean;
+  className?: string;
 }) {
   const tabs = [
     { name: 'Wage Rates', href: ROUTES.labourWageRates },
@@ -25,5 +27,7 @@ export default function LabourNav({
       ? [{ name: 'Reports', href: ROUTES.labourReportsDeployment }]
       : []),
   ];
-  return <SectionTabs label="Labour sections" tabs={tabs} />;
+  return (
+    <SectionTabs label="Labour sections" tabs={tabs} className={className} />
+  );
 }
