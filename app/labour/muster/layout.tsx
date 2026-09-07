@@ -29,9 +29,6 @@ import LabourNav from '@/app/ui/labour/labour-nav';
  * away. The switch is pure CSS, never a JS viewport read, so there is no hydration
  * mismatch and no flash of the wrong shell.
  *
- * `SectionTabs` lights no tab here, which is correct: capture is not one of the Labour
- * sections, it is the field surface they feed.
- *
  * The `DAILY_WORKER_REGISTRY` check stands in for the `ModuleGuard` that does not
  * reach this path — the same permission the backend's muster endpoints require. No
  * `middleware.ts`: the token is in memory only.
