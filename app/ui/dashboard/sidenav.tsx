@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NavLinks from '@/app/ui/dashboard/nav-links';
 import { PowerIcon } from '@heroicons/react/24/outline';
-import { lusitana } from '@/app/ui/fonts';
 import { logout } from '@/app/lib/api/auth';
 import CurrentUser from '@/app/ui/dashboard/current-user';
+import Logo from '@/app/ui/logo';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
 
 export default function SideNav() {
@@ -26,9 +26,7 @@ export default function SideNav() {
         className="mb-2 flex h-20 shrink-0 items-end justify-start rounded-md bg-blue-600 p-4 md:h-40"
         href="/dashboard"
       >
-        <div className={`${lusitana.className} text-xl text-white md:text-2xl`}>
-          BuildCore
-        </div>
+        <Logo knockout priority className="h-8 md:h-10" />
       </Link>
       {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets
           fill each row evenly at *any* count (feature 014 made the count variable —

@@ -7,7 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { landingRoute } from '@/app/lib/permissions';
 import NotificationBell from '@/app/ui/dashboard/notification-bell';
-import { lusitana } from '@/app/ui/fonts';
+import Logo from '@/app/ui/logo';
 
 /**
  * The bar every shell opens with: a wordmark on mobile, the notifications bell on
@@ -45,11 +45,7 @@ export default function ShellHeader() {
   // that a guard screen is a better outcome than a heading that shifts under a thumb.
   const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
 
-  const wordmark = (
-    <span className={`${lusitana.className} text-lg text-blue-600`}>
-      BuildCore
-    </span>
-  );
+  const wordmark = <Logo className="h-7" />;
 
   return (
     <header className="sticky top-0 z-30 flex h-14 flex-none items-center justify-between gap-2 border-b border-gray-100 bg-white px-6 md:justify-end md:px-12">
