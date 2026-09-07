@@ -61,8 +61,8 @@ export default function NotificationBell() {
         // visible on mobile, so it holds the minimum touch target Principle VI asks of
         // this shell, the same as every sidenav target.
         className={clsx(
-          'relative flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:bg-sky-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
-          open && 'bg-sky-100 text-blue-600',
+          'relative flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+          open && 'bg-blue-50 text-blue-600',
         )}
       >
         <BellIcon className="w-6 shrink-0" />
