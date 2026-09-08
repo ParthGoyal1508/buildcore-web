@@ -17,7 +17,6 @@ import {
   inventoryLabel,
   type TransferStatus,
 } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import TransferModal from '@/app/ui/inventory/transfer-modal';
 import { useItems, useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
@@ -29,6 +28,7 @@ import {
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function TransfersPage() {
   const queryClient = useQueryClient();
@@ -104,7 +104,7 @@ export default function TransfersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Transfers</h1>
+        <PageHeader title="Transfers" />
         <SecondaryButton type="button" onClick={() => setShowModal(true)}>
           New transfer
         </SecondaryButton>

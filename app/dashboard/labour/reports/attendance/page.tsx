@@ -7,26 +7,35 @@ import { getAttendanceReport } from '@/app/lib/api/labour';
 import { getSites } from '@/app/lib/api/projects';
 import { Button } from '@/app/ui/button';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function AttendanceReportPage() {
+  const { companyId } = useCompanyContext();
   const [siteId, setSiteId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
+    queryKey: ['sites', 'all', companyId],
     queryFn: () => getSites({ pageSize: 200 }),
   });
   const report = useQuery({
-    queryKey: ['report-attendance', siteId, periodFrom, periodTo],
-    queryFn: () => getAttendanceReport({ siteId, periodFrom, periodTo }),
+    queryKey: ['report-attendance', siteId, periodFrom, periodTo, companyId],
+    queryFn: () =>
+      getAttendanceReport({
+        siteId,
+        periodFrom,
+        periodTo,
+        ...(companyId ? { companyId } : {}),
+      }),
     enabled: submitted && !!siteId && !!periodFrom && !!periodTo,
   });
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-900">Attendance Report</h1>
+      <PageHeader title="Attendance Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         <SelectField
           id="att-site"

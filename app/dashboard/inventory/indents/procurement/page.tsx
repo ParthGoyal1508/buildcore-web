@@ -6,10 +6,10 @@ import { useState } from 'react';
 
 import { getProcurementNeeded } from '@/app/lib/api/inventory';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 type Demand = Awaited<
   ReturnType<typeof getProcurementNeeded>
@@ -94,7 +94,7 @@ export default function ProcurementNeededPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className={`${lusitana.className} text-2xl`}>Procurement needed</h1>
+      <PageHeader title="Procurement needed" />
 
       <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
         {MESSAGES.procurementNotSummed}

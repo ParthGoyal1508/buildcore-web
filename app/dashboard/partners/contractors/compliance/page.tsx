@@ -13,9 +13,9 @@ import {
 import { MESSAGES } from '@/app/lib/constants';
 import { dateLabel, money, periodLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import ComplianceModal from '@/app/ui/partners/compliance-modal';
+import PageHeader from '@/app/ui/page-header';
 
 function CompliancePageBody() {
   const searchParams = useSearchParams();
@@ -112,13 +112,15 @@ function CompliancePageBody() {
     <main>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className={`${lusitana.className} mb-2 text-2xl`}>
-            Monthly compliance
-          </h1>
-          <p className="text-sm text-gray-600">
-            PF and ESIC filings per contractor per month.
-            {contractorId && ' Filtered to one contractor.'}
-          </p>
+          <PageHeader
+            title="Monthly compliance"
+            description={
+              <>
+                PF and ESIC filings per contractor per month.
+                {contractorId && ' Filtered to one contractor.'}
+              </>
+            }
+          />
         </div>
         <Button onClick={() => setModalOpen(true)}>Record filing</Button>
       </div>

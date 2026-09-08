@@ -12,7 +12,6 @@ import {
 } from '@/app/lib/api/inventory';
 import { MESSAGES, PURCHASE_BILL_STATUSES, inventoryLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { lusitana } from '@/app/ui/fonts';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import { useSites, useVendors } from '@/app/ui/inventory/use-inventory-refs';
 import {
@@ -25,6 +24,7 @@ import {
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function PurchasesPage() {
   const queryClient = useQueryClient();
@@ -154,7 +154,7 @@ export default function PurchasesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Purchases</h1>
+        <PageHeader title="Purchases" />
         <SecondaryButton type="button" onClick={() => setShowModal(true)}>
           New purchase
         </SecondaryButton>

@@ -533,3 +533,19 @@ Covers spec FR-030 to FR-041 and plan Phases A1–A7. Task IDs prefixed `TA`. **
 - [X] TA025 [P] Confirm the salary register, deduction report, and challan screens reconcile on
       screen for the same processed run (SC-A01)
 - [X] TA026 [P] 320px spot-check; `npx tsc --noEmit`
+
+### Attendance Date Integrity (Amendment 2026-09-08)
+
+- [X] TA027 `todayIso()` in `app/lib/format.ts` computed in `Asia/Kolkata` via `en-CA` `Intl`
+      formatting rather than UTC truncation (spec FR-044); verify the four other consumers
+      (transfer, offboarding, loans, BOCW payment) still behave
+- [X] TA028 `status` added to `dailyAttendanceRowSchema` in `app/lib/api/hr-payroll.ts` as a
+      required enum matching the API's five values (spec FR-042)
+- [X] TA029 `attendance-table.tsx` renders `row.status` and the `?? 'present'` fallback is removed
+      (spec FR-042)
+- [X] TA030 `max` of today on the date input and the `›` control disabled at today, with the
+      disabled state on the element and not conveyed by colour alone (spec FR-043)
+- [X] TA031 A future-date refusal from the API renders as its own explanatory state rather than the
+      generic load-failure copy (spec FR-045)
+- [ ] TA032 [P] Verify against a live API: past date with no punches shows real statuses and no
+      `Present`; `›` disabled at today; 320px spot-check of the date row (SC-A06, SC-A07)

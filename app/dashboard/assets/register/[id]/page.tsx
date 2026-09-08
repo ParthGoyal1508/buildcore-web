@@ -25,7 +25,6 @@ import AllocateModal from '@/app/ui/assets/allocate-modal';
 import AssetModal from '@/app/ui/assets/asset-modal';
 import AssetDocumentModal from '@/app/ui/assets/document-modal';
 import ReturnModal from '@/app/ui/assets/return-modal';
-import { lusitana } from '@/app/ui/fonts';
 import {
   FormError,
   RowAction,
@@ -33,6 +32,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 type Tab = 'documents' | 'allocations' | 'stock';
 
@@ -215,9 +215,13 @@ export default function AssetDetailPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className={`${lusitana.className} text-2xl`}>
-            {row.assetCode} — {row.name}
-          </h1>
+          <PageHeader
+            title={
+              <>
+                {row.assetCode} — {row.name}
+              </>
+            }
+          />
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
             <StatusBadge status={row.status} label={assetsLabel(row.status)} />
             <span>{row.categoryName}</span>

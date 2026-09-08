@@ -85,6 +85,9 @@ export async function getSkillCategories(
 }
 
 export interface SkillCategoryInput {
+  /** Required of a cross-company caller, who has no company of their own to fall
+   *  back on — the backend answers 400 without it. */
+  companyId?: string;
   name: string;
   code: string;
   defaultDailyRate?: number;
@@ -133,6 +136,7 @@ const wageRateSchema = z.object({
 export type WageRate = z.infer<typeof wageRateSchema>;
 
 export interface WageRateQuery {
+  companyId?: string;
   projectId?: string;
   skillCategoryId?: string;
   asOf?: string;
@@ -146,6 +150,7 @@ export async function getWageRates(
 }
 
 export interface WageRateInput {
+  companyId?: string;
   projectId: string;
   skillCategoryId: string;
   dailyRate: number;
@@ -207,6 +212,7 @@ const workerDetailSchema = workerSchema.extend({
 export type WorkerDetail = z.infer<typeof workerDetailSchema>;
 
 export interface WorkerQuery {
+  companyId?: string;
   siteId?: string;
   skillCategoryId?: string;
   status?: string;
@@ -228,6 +234,7 @@ export async function getWorker(id: string): Promise<WorkerDetail> {
 }
 
 export interface WorkerInput {
+  companyId?: string;
   fullName: string;
   phone: string;
   gender: string;
@@ -282,7 +289,9 @@ const gangSchema = z.object({
 });
 export type Gang = z.infer<typeof gangSchema>;
 
-export async function getGangs(query: { siteId?: string } = {}): Promise<Gang[]> {
+export async function getGangs(
+  query: { siteId?: string; companyId?: string } = {},
+): Promise<Gang[]> {
   const data = await authFetch<unknown>(`/labour/gangs${qs({ ...query })}`);
   return z.array(gangSchema).parse(data);
 }
@@ -293,6 +302,7 @@ export async function getGang(id: string): Promise<Gang> {
 }
 
 export interface GangInput {
+  companyId?: string;
   name: string;
   gangLeaderWorkerId: string;
   siteId: string;
@@ -362,6 +372,7 @@ const musterDetailSchema = z.object({
 export type MusterDetail = z.infer<typeof musterDetailSchema>;
 
 export interface MusterQuery {
+  companyId?: string;
   status?: string;
   siteId?: string;
   flagged?: boolean;
@@ -532,6 +543,7 @@ const paymentSheetSchema = z.object({
 export type PaymentSheet = z.infer<typeof paymentSheetSchema>;
 
 export interface PaymentSheetQuery {
+  companyId?: string;
   projectId?: string;
   engagementType?: string;
   status?: string;
@@ -552,6 +564,7 @@ export async function getPaymentSheet(id: string): Promise<PaymentSheet> {
 }
 
 export interface GeneratePaymentSheetInput {
+  companyId?: string;
   projectId: string;
   periodFrom: string;
   periodTo: string;
@@ -671,6 +684,7 @@ const advanceDetailSchema = advanceSchema.extend({
 export type AdvanceDetail = z.infer<typeof advanceDetailSchema>;
 
 export interface AdvanceQuery {
+  companyId?: string;
   workerId?: string;
   status?: string;
 }
@@ -688,6 +702,7 @@ export async function getAdvance(id: string): Promise<AdvanceDetail> {
 }
 
 export interface AdvanceInput {
+  companyId?: string;
   workerId: string;
   amount: number;
   reason: string;
@@ -722,6 +737,7 @@ export async function disburseAdvance(id: string): Promise<Advance> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ReportPeriodQuery {
+  companyId?: string;
   periodFrom: string;
   periodTo: string;
 }

@@ -16,7 +16,6 @@ import {
   formatReading,
   plantLabel,
 } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import EquipmentModal from '@/app/ui/plant/equipment-modal';
 import Pager from '@/app/ui/inventory/pager';
 import {
@@ -32,6 +31,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function AssetRegisterPage() {
   const categories = usePlantCategories();
@@ -143,7 +143,7 @@ export default function AssetRegisterPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Asset Register</h1>
+        <PageHeader title="Asset Register" />
         <SecondaryButton
           type="button"
           onClick={() => {

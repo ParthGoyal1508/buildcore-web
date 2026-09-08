@@ -6,9 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getProject } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import ProjectForm from '@/app/ui/projects/project-form';
 import { ProjectLockProvider } from '@/app/ui/projects/project-lock-context';
+import PageHeader from '@/app/ui/page-header';
 
 /** Edit a project, including its lock (spec US3, FR-003). */
 export default function EditProjectPage() {
@@ -33,9 +33,10 @@ export default function EditProjectPage() {
         <span className="text-gray-900">{project?.name ?? 'Edit project'}</span>
       </nav>
 
-      <h1 className={`${lusitana.className} mb-6 text-2xl`}>
-        {project ? project.name : 'Edit project'}
-      </h1>
+      <PageHeader
+        title={project ? project.name : 'Edit project'}
+        className="mb-6"
+      />
 
       {isLoading && (
         <p className="text-sm text-gray-500" role="status">

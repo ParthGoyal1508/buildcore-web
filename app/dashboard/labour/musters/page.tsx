@@ -7,20 +7,27 @@ import { useState } from 'react';
 import { getMusters, type MusterListItem } from '@/app/lib/api/labour';
 import { getSites } from '@/app/lib/api/projects';
 import { MUSTER_STATUSES, ROUTES } from '@/app/lib/constants';
-import { RowAction, SelectField } from '@/app/ui/settings/form-fields';
+import {
+  RowAction,
+  SecondaryButton,
+  SelectField,
+} from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function MustersPage() {
+  const { companyId } = useCompanyContext();
   const [status, setStatus] = useState('submitted');
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
+    queryKey: ['sites', 'all', companyId],
     queryFn: () => getSites({ pageSize: 200 }),
   });
   const musters = useQuery({
-    queryKey: ['musters', status],
-    queryFn: () => getMusters({ status }),
+    queryKey: ['musters', status, companyId],
+    queryFn: () => getMusters({ status, ...(companyId ? { companyId } : {}) }),
   });
 
   const siteName = (id: string) =>
@@ -62,24 +69,30 @@ export default function MustersPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Musters</h1>
-          <p className="text-sm text-gray-500">
-            Review and approve supervisor attendance, oldest first.
-          </p>
+        <PageHeader
+          title="Musters"
+          description="Review and approve supervisor attendance, oldest first."
+        />
+        <div className="flex items-end gap-2">
+          <SelectField
+            id="muster-status"
+            label="Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            {MUSTER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </option>
+            ))}
+          </SelectField>
+          {/* The second way into the capture screen, which had none. This list is
+              where you stand when you notice a muster is missing, and the screen it
+              opens is outside the dashboard shell (013 FR-001). */}
+          <Link href={ROUTES.musterCapture}>
+            <SecondaryButton type="button">Capture muster</SecondaryButton>
+          </Link>
         </div>
-        <SelectField
-          id="muster-status"
-          label="Status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          {MUSTER_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </option>
-          ))}
-        </SelectField>
       </div>
 
       <ResponsiveList

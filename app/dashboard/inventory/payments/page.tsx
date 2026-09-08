@@ -7,7 +7,6 @@ import { ApiError } from '@/app/lib/api/client';
 import { deletePayment, getPayments, type Payment } from '@/app/lib/api/inventory';
 import { MESSAGES, PAYMENT_MODES, inventoryLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { lusitana } from '@/app/ui/fonts';
 import PaymentModal from '@/app/ui/inventory/payment-modal';
 import { useVendors } from '@/app/ui/inventory/use-inventory-refs';
 import {
@@ -19,6 +18,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
@@ -99,7 +99,7 @@ export default function PaymentsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Payments</h1>
+        <PageHeader title="Payments" />
         <SecondaryButton type="button" onClick={() => setShowModal(true)}>
           Record payment
         </SecondaryButton>

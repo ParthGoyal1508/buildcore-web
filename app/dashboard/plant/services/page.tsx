@@ -15,7 +15,6 @@ import {
   SERVICE_SCHEDULE_STATUSES,
   plantLabel,
 } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import Pager from '@/app/ui/inventory/pager';
 import ServiceScheduleModal from '@/app/ui/plant/service-schedule-modal';
 import {
@@ -30,6 +29,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function ServiceSchedulesPage() {
   const queryClient = useQueryClient();
@@ -127,7 +127,7 @@ export default function ServiceSchedulesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Service Schedules</h1>
+        <PageHeader title="Service Schedules" />
         <SecondaryButton
           type="button"
           onClick={() => {

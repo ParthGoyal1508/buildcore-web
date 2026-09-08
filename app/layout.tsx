@@ -37,7 +37,7 @@ export const metadata: Metadata = {
       type: 'image/png',
     },
   ],
-  themeColor: '#0f172a',
+  themeColor: '#002d4e',
   colorScheme: 'light',
 };
 

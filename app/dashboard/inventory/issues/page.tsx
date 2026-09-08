@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import { deleteIssue, getIssues, type Issue } from '@/app/lib/api/inventory';
 import { MESSAGES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import IssueModal from '@/app/ui/inventory/issue-modal';
 import { useItems, useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
@@ -18,6 +17,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 export default function IssuesPage() {
   const queryClient = useQueryClient();
@@ -86,7 +86,7 @@ export default function IssuesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Issues</h1>
+        <PageHeader title="Issues" />
         <SecondaryButton type="button" onClick={() => setShowModal(true)}>
           New issue
         </SecondaryButton>

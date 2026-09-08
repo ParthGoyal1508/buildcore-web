@@ -18,8 +18,8 @@ import { money, periodLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
-import { lusitana } from '@/app/ui/fonts';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
 
 const TABS = [
   { id: 'lines', label: 'Line items' },
@@ -154,10 +154,14 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
     <main>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className={`${lusitana.className} text-2xl`}>
-            {periodLabel(run.period)}
-            {run.isFnf && ' · Full & Final'}
-          </h1>
+          <PageHeader
+            title={
+              <>
+                {periodLabel(run.period)}
+                {run.isFnf && ' · Full & Final'}
+              </>
+            }
+          />
           <p className="mt-1 flex items-center gap-2 text-sm text-gray-600">
             <StatusBadge status={run.status} />
             <span>

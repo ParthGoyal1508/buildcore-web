@@ -16,6 +16,7 @@ import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { FormError, SecondaryButton, TextField } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function MusterDetailPage() {
   const params = useParams<{ id: string }>();
@@ -58,12 +59,10 @@ export default function MusterDetailPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">
-            Muster — {m.date}
-          </h1>
-          <p className="text-sm text-gray-500">Supervisor {m.supervisorId}</p>
-        </div>
+        <PageHeader
+          title={<>Muster — {m.date}</>}
+          description={<>Supervisor {m.supervisorId}</>}
+        />
         <StatusBadge status={m.status} />
       </div>
 

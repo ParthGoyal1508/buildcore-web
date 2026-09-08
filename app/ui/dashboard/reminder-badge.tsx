@@ -55,8 +55,8 @@ export default function ReminderBadge() {
       href={ROUTES.reminders}
       aria-current={active ? 'page' : undefined}
       className={clsx(
-        'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:w-full md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3',
-        active ? 'bg-sky-100 text-blue-600' : 'bg-gray-50',
+        'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md p-3 text-sm font-medium hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:w-full md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3',
+        active ? 'bg-blue-50 text-blue-600' : 'bg-gray-50',
       )}
     >
       <ClockIcon className="w-6 shrink-0" />

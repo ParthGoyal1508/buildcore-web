@@ -35,6 +35,7 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
+import PageHeader from '@/app/ui/page-header';
 
 /** Manual forward transitions the board offers (mirrors the backend machine). */
 const NEXT_STAGE: Record<string, string | undefined> = {
@@ -95,12 +96,10 @@ function PipelineInner() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Pipeline</h1>
-          <p className="text-sm text-gray-500">
-            Candidates through Interviews, Selected and Joining Pending.
-          </p>
-        </div>
+        <PageHeader
+          title="Pipeline"
+          description="Candidates through Interviews, Selected and Joining Pending."
+        />
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-gray-200 p-0.5">
             <button

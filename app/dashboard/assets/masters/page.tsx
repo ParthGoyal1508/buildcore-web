@@ -23,13 +23,13 @@ import {
   DocTypeModal,
 } from '@/app/ui/assets/masters-modal';
 import { useAssetsCompanyId } from '@/app/ui/assets/use-asset-refs';
-import { lusitana } from '@/app/ui/fonts';
 import {
   FormError,
   RowAction,
   SecondaryButton,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 type Tab = 'categories' | 'doc-types' | 'grades';
 
@@ -185,7 +185,7 @@ export default function AssetMastersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Asset Masters</h1>
+        <PageHeader title="Asset Masters" />
         <SecondaryButton
           type="button"
           onClick={() => {

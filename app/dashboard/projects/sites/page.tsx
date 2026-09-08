@@ -12,7 +12,6 @@ import {
 } from '@/app/lib/api/projects';
 import { MESSAGES, SITE_STATUSES, projectsLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import SiteModal from '@/app/ui/projects/site-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import {
@@ -21,6 +20,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 /** The site master (spec US2). */
 export default function SitesPage() {
@@ -109,7 +109,7 @@ export default function SitesPage() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Sites</h1>
+        <PageHeader title="Sites" />
         <Button onClick={() => setIsAdding(true)}>Add site</Button>
       </div>
 

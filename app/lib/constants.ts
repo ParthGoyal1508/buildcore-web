@@ -1,3 +1,15 @@
+/**
+ * The timezone the business operates in.
+ *
+ * Every "today" and every calendar-day boundary in this app is this zone's, not the
+ * browser's and not UTC. The API is configured the same way (`APP_TIMEZONE`,
+ * defaulting to `Asia/Kolkata`), and the two must agree: at UTC+5:30 a UTC-derived
+ * "today" is the previous date for the first five and a half hours of every working
+ * day, so a client and a server disagreeing about it means a date the user picked
+ * being refused as being in the future.
+ */
+export const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+
 export const ROUTES = {
   login: '/login',
   dashboard: '/dashboard',
@@ -64,6 +76,13 @@ export const ROUTES = {
   // `app/dashboard/reminders/layout.tsx`, the same way HR and Settings gate their
   // own sections.
   reminders: '/dashboard/reminders',
+
+  // --- Dashboard: Activity Log, Site & Group dashboards (feature 004) ---
+  // Sub-pages of the Dashboard module, gated by DASHBOARD in their own layouts
+  // (the `dashboard` NAV_MODULES entry is guardsSubtree: false — see reminders).
+  activityLog: '/dashboard/activity-log',
+  siteDashboard: '/dashboard/site',
+  groupDashboard: '/dashboard/group',
 
   // --- Partners (feature 007) ---
   partnersVendors: '/dashboard/partners/vendors',
@@ -234,6 +253,31 @@ export const CAPTURE_JPEG_QUALITY = 0.85;
 export const REMINDER_SEVERITIES = ['overdue', 'warning', 'info'] as const;
 
 export type ReminderSeverity = (typeof REMINDER_SEVERITIES)[number];
+
+/** How often the dashboard widgets, notifications and badge re-poll (004 §5). A
+ * display cadence — every poll computes live on the server. */
+export const DASHBOARD_REFRESH_INTERVAL_MS = 30_000;
+
+/** Debounce before the Group Dashboard's employee search fires (004 FR-011). */
+export const EMPLOYEE_SEARCH_DEBOUNCE_MS = 300;
+
+/** The Activity Log's time-range filter options (004 FR-006). */
+export const ACTIVITY_TIME_RANGES = ['today', '7d', '30d', '90d'] as const;
+export type ActivityTimeRange = (typeof ACTIVITY_TIME_RANGES)[number];
+
+/** The Activity Log's module filter buckets (004 FR-006). */
+export const ACTIVITY_MODULES = [
+  'hr',
+  'settings',
+  'payroll',
+  'machinery',
+  'projects',
+  'inventory',
+  'partners',
+  'recruitment',
+  'labour',
+] as const;
+export type ActivityModule = (typeof ACTIVITY_MODULES)[number];
 
 /**
  * Copy for each severity band.

@@ -8,6 +8,7 @@ import { recruitmentLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { TextField } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function ResignationReportPage() {
   const [from, setFrom] = useState('');
@@ -22,7 +23,7 @@ export default function ResignationReportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-900">Resignation Report</h1>
+      <PageHeader title="Resignation Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <TextField id="rr-from" label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <TextField id="rr-to" label="To" type="date" value={to} onChange={(e) => setTo(e.target.value)} />

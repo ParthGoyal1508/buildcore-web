@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { lusitana } from '@/app/ui/fonts';
 import SalarySlipPanel from '@/app/ui/my/salary-slip';
+import PageHeader from '@/app/ui/page-header';
 
 export const metadata: Metadata = { title: 'Salary' };
 
 export default function MySalaryPage() {
   return (
     <main>
-      <h1 className={`${lusitana.className} mb-4 text-2xl`}>My Salary</h1>
+      <PageHeader title="My Salary" className="mb-4" />
       <SalarySlipPanel />
     </main>
   );

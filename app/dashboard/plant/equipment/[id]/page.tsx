@@ -20,7 +20,6 @@ import {
   plantLabel,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { lusitana } from '@/app/ui/fonts';
 import DocumentModal from '@/app/ui/plant/document-modal';
 import {
   FormError,
@@ -29,6 +28,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -173,9 +173,13 @@ export default function EquipmentDetailPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className={`${lusitana.className} text-2xl`}>
-            {data.code} · {data.name}
-          </h1>
+          <PageHeader
+            title={
+              <>
+                {data.code} · {data.name}
+              </>
+            }
+          />
           <div className="mt-2 flex items-center gap-2">
             <StatusBadge status={data.status} label={plantLabel(data.status)} />
             {data.openMaintenanceJobId && (

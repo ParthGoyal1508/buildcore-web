@@ -11,9 +11,9 @@ import {
 } from '@/app/lib/api/partners';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import VendorCategoryModal from '@/app/ui/partners/vendor-category-modal';
+import PageHeader from '@/app/ui/page-header';
 
 export default function VendorCategoriesPage() {
   const [editing, setEditing] = useState<VendorCategory | null>(null);
@@ -72,15 +72,10 @@ export default function VendorCategoriesPage() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className={`${lusitana.className} mb-2 text-2xl`}>
-            Vendor categories
-          </h1>
-          <p className="text-sm text-gray-600">
-            What a vendor deals in. Every company starts with six; a category can
-            only be deleted once no vendor is tagged with it.
-          </p>
-        </div>
+        <PageHeader
+          title="Vendor categories"
+          description="What a vendor deals in. Every company starts with six; a category can only be deleted once no vendor is tagged with it."
+        />
         <Button
           onClick={() => {
             setEditing(null);

@@ -1,5 +1,5 @@
-import { lusitana } from '@/app/ui/fonts';
 import LoginForm from '@/app/ui/login-form';
+import Logo from '@/app/ui/logo';
 
 export default async function LoginPage({
   searchParams,
@@ -11,10 +11,8 @@ export default async function LoginPage({
   return (
     <main className="flex items-center justify-center md:h-screen">
       <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
-        <div className="flex h-20 w-full items-end rounded-lg bg-blue-600 p-3 md:h-36">
-          <p className={`${lusitana.className} text-2xl text-white`}>
-            BuildCore
-          </p>
+        <div className="flex h-20 w-full items-center rounded-lg bg-blue-600 p-4 md:h-28">
+          <Logo knockout priority className="h-8 md:h-10" />
         </div>
         {activated === '1' && (
           <p className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">

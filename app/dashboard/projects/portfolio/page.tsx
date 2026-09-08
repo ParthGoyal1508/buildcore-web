@@ -12,13 +12,13 @@ import {
   ROUTES,
   projectsLabel,
 } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import ProjectListTable from '@/app/ui/projects/project-list-table';
 import {
   RowAction,
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
 
 /** The project portfolio (spec US3). */
 export default function PortfolioPage() {
@@ -61,7 +61,7 @@ export default function PortfolioPage() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Portfolio</h1>
+        <PageHeader title="Portfolio" />
         <Link
           href={ROUTES.projectsNewProject}
           className="flex h-10 items-center rounded-lg bg-blue-500 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"

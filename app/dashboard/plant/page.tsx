@@ -1,11 +1,21 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
+import {
+  BanknotesIcon,
+  BookOpenIcon,
+  ClipboardDocumentCheckIcon,
+  Cog6ToothIcon,
+  FireIcon,
+  Squares2X2Icon,
+  TruckIcon,
+  WrenchIcon,
+} from '@heroicons/react/24/outline';
 
 import { getCurrentUser } from '@/app/lib/api/users';
 import { PLANT_PERMISSIONS, ROUTES } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
+import PageHeader from '@/app/ui/page-header';
+import TileGrid from '@/app/ui/tile-grid';
 
 /**
  * The Plant & Machinery module index.
@@ -19,6 +29,7 @@ const SECTIONS = [
   {
     name: 'Asset Register',
     href: ROUTES.plantEquipment,
+    icon: TruckIcon,
     permission: PLANT_PERMISSIONS.equipment,
     description:
       'Every machine, where it is deployed, how hard it is working, and whose paperwork is about to lapse.',
@@ -26,6 +37,7 @@ const SECTIONS = [
   {
     name: 'Logbook',
     href: ROUTES.plantLogbook,
+    icon: BookOpenIcon,
     permission: PLANT_PERMISSIONS.logbook,
     description:
       'A day per machine: opening and closing readings, hours run, fuel burned and who operated it.',
@@ -33,6 +45,7 @@ const SECTIONS = [
   {
     name: 'Fuel',
     href: ROUTES.plantFuel,
+    icon: FireIcon,
     permission: PLANT_PERMISSIONS.fuel,
     description:
       'Fuel drawn, and where consumption ran past what the machine’s category expects.',
@@ -40,6 +53,7 @@ const SECTIONS = [
   {
     name: 'Maintenance',
     href: ROUTES.plantMaintenance,
+    icon: WrenchIcon,
     permission: PLANT_PERMISSIONS.maintenance,
     description:
       'Breakdowns and scheduled work, the parts each job consumed, and what it cost.',
@@ -47,6 +61,7 @@ const SECTIONS = [
   {
     name: 'Service Schedules',
     href: ROUTES.plantServices,
+    icon: ClipboardDocumentCheckIcon,
     permission: PLANT_PERMISSIONS.services,
     description:
       'What each machine is due for next, measured against the reading it is on now.',
@@ -54,6 +69,7 @@ const SECTIONS = [
   {
     name: 'Spare Parts',
     href: ROUTES.plantSpareParts,
+    icon: Cog6ToothIcon,
     permission: PLANT_PERMISSIONS.spareParts,
     description:
       'Workshop stock, its weighted average rate, and what has fallen below its reorder level.',
@@ -61,6 +77,7 @@ const SECTIONS = [
   {
     name: 'Hire Bills',
     href: ROUTES.plantHireBills,
+    icon: BanknotesIcon,
     permission: PLANT_PERMISSIONS.hireBills,
     description:
       'Rental invoices for hired machines, checked against the logbook before they are paid.',
@@ -68,6 +85,7 @@ const SECTIONS = [
   {
     name: 'Masters',
     href: ROUTES.plantMasters,
+    icon: Squares2X2Icon,
     permission: PLANT_PERMISSIONS.masters,
     description:
       'Equipment categories, document types, and the effective-dated hire rate history.',
@@ -87,21 +105,11 @@ export default function PlantPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={`${lusitana.className} text-2xl`}>Plant &amp; Machinery</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visible.map((section) => (
-          <Link
-            key={section.href}
-            href={section.href}
-            className="rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
-            <h2 className="text-sm font-semibold text-gray-900">
-              {section.name}
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">{section.description}</p>
-          </Link>
-        ))}
-      </div>
+      <PageHeader
+        title="Plant & Machinery"
+        description="Machines, their running record, and what they cost to keep working."
+      />
+      <TileGrid tiles={visible} />
     </div>
   );
 }

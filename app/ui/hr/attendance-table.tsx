@@ -154,16 +154,30 @@ function MarkAttendanceModal({
 }
 
 export default function AttendanceTable() {
-  const [date, setDate] = useState(todayIso());
+  // Recomputed on render rather than held in state: a tab left open overnight
+  // would otherwise keep yesterday as its ceiling and refuse the current day.
+  const today = todayIso();
+  const [date, setDate] = useState(today);
   const [siteId, setSiteId] = useState('');
   const [editing, setEditing] = useState<DailyAttendanceRow | null>(null);
+  const isToday = date >= today;
 
   const { data: sites } = useQuery({ queryKey: ['sites'], queryFn: listSites });
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['hr', 'attendance', date, siteId],
     queryFn: () => getDailyAttendance(date, siteId || undefined),
   });
+
+  // The API refuses a future date (backend FR-071). The controls below make that
+  // unreachable by clicking, but a restored URL or a tab left open past midnight
+  // still can, and "Could not load" would misdescribe a refusal the user can act
+  // on by picking another date.
+  const loadError = isError
+    ? error instanceof ApiError && error.status === 400
+      ? error.message
+      : MESSAGES.loadFailed
+    : null;
 
   const columns: Column<DailyAttendanceRow>[] = [
     { key: 'code', header: 'Code', sticky: true, render: (row) => row.employeeCode },
@@ -173,7 +187,7 @@ export default function AttendanceTable() {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <StatusBadge status={row.statusOverride ?? 'present'} />,
+      render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'flags',
@@ -222,14 +236,25 @@ export default function AttendanceTable() {
               id="attendance-date"
               type="date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              max={today}
+              // `max` is advisory in some browsers when the value is typed rather
+              // than picked, so the ceiling is applied here too — attendance is a
+              // record of what happened, and there is nothing to show for a day
+              // that has not.
+              onChange={(event) =>
+                setDate(
+                  event.target.value > today ? today : event.target.value,
+                )
+              }
               className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             />
             <button
               type="button"
               onClick={() => setDate((current) => shiftDate(current, 1))}
               aria-label="Next day"
-              className="rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              disabled={isToday}
+              title={isToday ? 'Today is the latest date with attendance' : undefined}
+              className="rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
             >
               ›
             </button>
@@ -256,7 +281,7 @@ export default function AttendanceTable() {
         rows={data ?? []}
         rowKey={(row) => row.employeeId}
         isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        error={loadError}
         emptyMessage={HR_MESSAGES.noAttendance}
         actions={(row) => (
           <RowAction type="button" onClick={() => setEditing(row)}>

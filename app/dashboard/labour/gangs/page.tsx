@@ -21,16 +21,22 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function GangsPage() {
+  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
+    queryKey: ['sites', 'all', companyId],
     queryFn: () => getSites({ pageSize: 200 }),
   });
-  const gangs = useQuery({ queryKey: ['gangs'], queryFn: () => getGangs() });
+  const gangs = useQuery({
+    queryKey: ['gangs', companyId],
+    queryFn: () => getGangs(companyId ? { companyId } : {}),
+  });
 
   const siteName = (id: string) =>
     sites.data?.items.find((s) => s.id === id)?.name ?? id;
@@ -48,12 +54,10 @@ export default function GangsPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Gangs</h1>
-          <p className="text-sm text-gray-500">
-            Group workers under a leader for faster muster capture.
-          </p>
-        </div>
+        <PageHeader
+          title="Gangs"
+          description="Group workers under a leader for faster muster capture."
+        />
         <Button onClick={() => setShowForm(true)}>New Gang</Button>
       </div>
 
@@ -89,6 +93,7 @@ function GangForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [name, setName] = useState('');
   const [siteId, setSiteId] = useState('');
   const [gangLeaderWorkerId, setGangLeaderWorkerId] = useState('');
@@ -96,14 +101,26 @@ function GangForm({
   const [error, setError] = useState<string | null>(null);
 
   const workers = useQuery({
-    queryKey: ['workers', 'gang', siteId],
-    queryFn: () => getWorkers({ siteId, status: 'active', pageSize: 200 }),
+    queryKey: ['workers', 'gang', siteId, companyId],
+    queryFn: () =>
+      getWorkers({
+        siteId,
+        status: 'active',
+        pageSize: 200,
+        ...(companyId ? { companyId } : {}),
+      }),
     enabled: !!siteId,
   });
 
   const mutation = useMutation({
     mutationFn: () =>
-      createGang({ name, siteId, gangLeaderWorkerId, memberWorkerIds }),
+      createGang({
+        ...(companyId ? { companyId } : {}),
+        name,
+        siteId,
+        gangLeaderWorkerId,
+        memberWorkerIds,
+      }),
     onSuccess: onSaved,
     onError: (e) =>
       setError(e instanceof ApiError ? e.message : 'Could not create the gang.'),

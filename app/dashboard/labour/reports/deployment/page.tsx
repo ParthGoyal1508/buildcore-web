@@ -7,8 +7,11 @@ import { getDeploymentReport } from '@/app/lib/api/labour';
 import { getProjects } from '@/app/lib/api/projects';
 import { Button } from '@/app/ui/button';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function DeploymentReportPage() {
+  const { companyId } = useCompanyContext();
   const [projectId, setProjectId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
@@ -16,11 +19,11 @@ export default function DeploymentReportPage() {
   const [submitted, setSubmitted] = useState(false);
 
   const projects = useQuery({
-    queryKey: ['projects', 'all'],
+    queryKey: ['projects', 'all', companyId],
     queryFn: () => getProjects({ pageSize: 200 }),
   });
   const report = useQuery({
-    queryKey: ['report-deployment', projectId, periodFrom, periodTo, groupBy],
+    queryKey: ['report-deployment', projectId, periodFrom, periodTo, groupBy, companyId],
     queryFn: () =>
       getDeploymentReport({ projectId, periodFrom, periodTo, groupBy }),
     enabled: submitted && !!projectId && !!periodFrom && !!periodTo,
@@ -28,7 +31,7 @@ export default function DeploymentReportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-900">Deployment Report</h1>
+      <PageHeader title="Deployment Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
         <SelectField
           id="dep-project"

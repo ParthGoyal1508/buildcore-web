@@ -22,6 +22,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function LettersPage() {
   const queryClient = useQueryClient();
@@ -58,10 +59,10 @@ export default function LettersPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Letters</h1>
-          <p className="text-sm text-gray-500">Generated letters with version history.</p>
-        </div>
+        <PageHeader
+          title="Letters"
+          description="Generated letters with version history."
+        />
         <Button onClick={() => setShowGenerate(true)}>Generate Letter</Button>
       </div>
 

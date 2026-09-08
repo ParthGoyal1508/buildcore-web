@@ -31,6 +31,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import PageHeader from '@/app/ui/page-header';
 
 interface Mark {
   attendanceType: string;
@@ -204,13 +205,14 @@ export default function MusterCapturePage() {
 
   if (submitted) {
     return (
-      <div className="space-y-4 text-center">
-        <h1 className="text-xl font-semibold text-gray-900">Muster submitted</h1>
-        <p className="text-sm text-gray-600">
-          {markedIds.length} workers marked for {date}.
-        </p>
+      <div className="space-y-4">
+        <PageHeader
+          title="Muster submitted"
+          description={`${markedIds.length} workers marked for ${date}.`}
+        />
+        {/* Left-aligned now that the heading above it is: the block used to be
+            `text-center`, which the shared PageHeader is not. */}
         <Button
-          className="mx-auto justify-center"
           onClick={() => {
             setStep(1);
             setMarks({});
@@ -226,10 +228,15 @@ export default function MusterCapturePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Muster Capture</h1>
-        <span className="text-xs text-gray-500">Step {step} of 3</span>
-      </div>
+      <PageHeader
+        title="Muster Capture"
+        description="Mark today's workers present on site, with a photo and a GPS fix."
+        actions={
+          <span className="text-sm font-medium text-gray-500">
+            Step {step} of 3
+          </span>
+        }
+      />
       {queuedCount > 0 && (
         <div className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
           {queuedCount} muster(s) queued offline — will sync automatically.

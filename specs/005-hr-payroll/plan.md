@@ -242,3 +242,31 @@ Principle VI — wide register tables scroll within their own container. PASS.
 
 - [ ] Mobile spot-check; `npx tsc --noEmit`
 - [ ] Confirm register / deduction report / challan reconciliation on screen (SC-A01)
+
+---
+
+## Plan Delta 2026-09-08 — Attendance Date Integrity
+
+Three files, no new dependency, no new route, no new component.
+
+| File | Change |
+|---|---|
+| `app/lib/format.ts` | `todayIso()` computed in the business timezone (FR-044) |
+| `app/lib/api/hr-payroll.ts` | `status` added to `dailyAttendanceRowSchema` |
+| `app/ui/hr/attendance-table.tsx` | Render the API status; `max` on the picker; disable `›` at today |
+
+**Why `todayIso()` changes rather than this one call site.** Four other screens seed a date field
+from the same helper — transfer, offboarding, loans, BOCW payment — and all four have the same
+half-day-wrong window at UTC+5:30. Fixing it locally would leave the helper wrong and give the
+codebase two notions of "today".
+
+**Why `status` is required in the zod schema, not optional.** An optional field would let a stale
+API deploy silently fall back to the very behaviour this amendment removes. The schema is the
+contract; if the field is missing the parse should fail loudly rather than render a fabricated
+`Present`. The API amendment of the same date lands first for that reason.
+
+**Constitution check.** Principle II (no inline styling) — the disabled forward control uses the
+existing utility classes and `disabled:` variants, no style attribute. Principle VI — attendance
+viewing is on the closed mobile-critical list, so the date row is re-checked at 320px; the disabled
+state is carried by the `disabled` attribute and not by colour alone. Principle V — the new field
+goes through the existing typed `hr-payroll` module with `zod`, per FR-041.

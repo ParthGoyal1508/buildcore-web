@@ -22,6 +22,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
+import PageHeader from '@/app/ui/page-header';
 
 /** Documented token set per letter type — mirrors the backend's LETTER_TOKENS so
  * unknown tokens are highlighted before save (spec FR-011). */
@@ -52,10 +53,10 @@ export default function LetterTemplatesPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Letter Templates</h1>
-          <p className="text-sm text-gray-500">One active template per type; tokens validated on save.</p>
-        </div>
+        <PageHeader
+          title="Letter Templates"
+          description="One active template per type; tokens validated on save."
+        />
         <Button onClick={() => setEditing('new')}>New Template</Button>
       </div>
 

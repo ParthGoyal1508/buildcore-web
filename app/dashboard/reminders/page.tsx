@@ -1,5 +1,5 @@
-import { lusitana } from '@/app/ui/fonts';
 import RemindersList from '@/app/ui/dashboard/reminders-list';
+import PageHeader from '@/app/ui/page-header';
 
 export const metadata = { title: 'Reminders' };
 
@@ -13,14 +13,10 @@ export const metadata = { title: 'Reminders' };
 export default function RemindersPage() {
   return (
     <main className="flex flex-col gap-6">
-      <div>
-        <h1 className={`${lusitana.className} text-xl md:text-2xl`}>
-          Reminders
-        </h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Everything falling due across every module, overdue first.
-        </p>
-      </div>
+      <PageHeader
+        title="Reminders"
+        description="Everything falling due across every module, overdue first."
+      />
       <RemindersList />
     </main>
   );

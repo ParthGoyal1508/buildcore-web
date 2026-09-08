@@ -12,10 +12,10 @@ import {
   partnersLabel,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import ContractorModal from '@/app/ui/partners/contractor-modal';
 import { Field, SelectInput } from '@/app/ui/partners/form-controls';
+import PageHeader from '@/app/ui/page-header';
 
 export default function ContractorsPage() {
   const [status, setStatus] = useState('');
@@ -67,14 +67,10 @@ export default function ContractorsPage() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className={`${lusitana.className} mb-2 text-2xl`}>Contractors</h1>
-          <p className="text-sm text-gray-600">
-            Compliance status reflects the most recently concluded month, not the
-            whole history — a contractor who stopped filing is not compliant today.
-            Contractors of deactivated vendors are not listed.
-          </p>
-        </div>
+        <PageHeader
+          title="Contractors"
+          description="Compliance status reflects the most recently concluded month, not the whole history — a contractor who stopped filing is not compliant today. Contractors of deactivated vendors are not listed."
+        />
         <Button onClick={() => setModalOpen(true)}>Add contractor</Button>
       </div>
 

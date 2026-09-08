@@ -13,7 +13,6 @@ import {
   inventoryLabel,
   overdueLabel,
 } from '@/app/lib/constants';
-import { lusitana } from '@/app/ui/fonts';
 import IndentForm from '@/app/ui/inventory/indent-form';
 import { useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
@@ -23,6 +22,7 @@ import {
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 export default function IndentsPage() {
   const sites = useSites();
@@ -106,7 +106,7 @@ export default function IndentsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Indents</h1>
+        <PageHeader title="Indents" />
         <div className="flex flex-wrap gap-2">
           {canApprove && (
             <Link

@@ -12,7 +12,6 @@ import {
 } from '@/app/lib/api/projects';
 import { CLIENT_STATUSES, MESSAGES, projectsLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { lusitana } from '@/app/ui/fonts';
 import ClientModal from '@/app/ui/projects/client-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import {
@@ -21,6 +20,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
+import PageHeader from '@/app/ui/page-header';
 
 /**
  * The client master (spec US1).
@@ -81,7 +81,7 @@ export default function ClientsPage() {
   return (
     <main>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className={`${lusitana.className} text-2xl`}>Clients</h1>
+        <PageHeader title="Clients" />
         <Button onClick={() => setIsAdding(true)}>Add client</Button>
       </div>
 

@@ -24,6 +24,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
 
 type Item = Onboarding['items'][number];
 
@@ -69,13 +70,17 @@ export default function OnboardingPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">Onboarding</h1>
-        <p className="text-sm text-gray-500">
-          {data.completedCount} of {data.totalCount} items complete
-          {data.onboardingComplete && data.completedAt
-            ? ` · completed ${data.completedAt.slice(0, 10)}`
-            : ''}
-        </p>
+        <PageHeader
+          title="Onboarding"
+          description={
+            <>
+              {data.completedCount} of {data.totalCount} items complete
+              {data.onboardingComplete && data.completedAt
+                ? ` · completed ${data.completedAt.slice(0, 10)}`
+                : ''}
+            </>
+          }
+        />
       </div>
 
       {data.onboardingComplete && (

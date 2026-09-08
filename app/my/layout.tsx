@@ -14,6 +14,7 @@ import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
 import { hasModuleAccess } from '@/app/lib/permissions';
 import AccessDenied from '@/app/ui/access-denied';
 import SideNav from '@/app/ui/dashboard/sidenav';
+import ShellHeader from '@/app/ui/shell-header';
 import { MY_SECTIONS } from '@/app/ui/my/sections';
 import SectionTabs from '@/app/ui/section-tabs';
 
@@ -132,42 +133,48 @@ export default function MyWorkspaceLayout({
         <SideNav />
       </div>
 
-      {/* `pb-24` clears the fixed bottom bar; at `md` that bar is gone, so the
-          padding goes with it and the column scrolls in place like the dashboard's. */}
-      <div className="flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
-        {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
-            sidebar beside it already covers moving between shells. */}
-        {pathname !== ROUTES.myWorkspace && (
-          <SectionTabs
-            label="My Workspace sections"
-            tabs={MY_SECTIONS}
-            className="mb-6 hidden md:block"
-          />
-        )}
-        {queued > 0 && (
-          <p
-            role="status"
-            className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
-          >
-            {MESSAGES.punchQueuedCount(queued)}
-          </p>
-        )}
-        {syncNotice && (
-          <p
-            role="status"
-            className="mb-4 flex items-start justify-between gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
-          >
-            <span>{syncNotice}</span>
-            <button
-              type="button"
-              onClick={() => setSyncNotice(null)}
-              className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      {/* A column of its own so the shell header can sit above a separately
+          scrolling body, the same shape `/dashboard` uses. */}
+      <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
+        <ShellHeader />
+
+        {/* `pb-24` clears the fixed bottom bar; at `md` that bar is gone, so the
+            padding goes with it and the column scrolls in place like the dashboard's. */}
+        <div className="flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
+          {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
+              sidebar beside it already covers moving between shells. */}
+          {pathname !== ROUTES.myWorkspace && (
+            <SectionTabs
+              label="My Workspace sections"
+              tabs={MY_SECTIONS}
+              className="mb-6 hidden md:block"
+            />
+          )}
+          {queued > 0 && (
+            <p
+              role="status"
+              className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
             >
-              Dismiss
-            </button>
-          </p>
-        )}
-        {children}
+              {MESSAGES.punchQueuedCount(queued)}
+            </p>
+          )}
+          {syncNotice && (
+            <p
+              role="status"
+              className="mb-4 flex items-start justify-between gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+            >
+              <span>{syncNotice}</span>
+              <button
+                type="button"
+                onClick={() => setSyncNotice(null)}
+                className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              >
+                Dismiss
+              </button>
+            </p>
+          )}
+          {children}
+        </div>
       </div>
 
       <nav

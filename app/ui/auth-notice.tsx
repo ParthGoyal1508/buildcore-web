@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { lusitana } from '@/app/ui/fonts';
 import { ROUTES } from '@/app/lib/constants';
+import Logo from '@/app/ui/logo';
 
 /**
  * Shared shell for the auth-adjacent pages that aren't built yet, so a user
@@ -19,8 +20,8 @@ export default function AuthNotice({
   return (
     <main className="flex items-center justify-center md:h-screen">
       <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
-        <div className="flex h-20 w-full items-end rounded-lg bg-blue-600 p-3 md:h-36">
-          <p className={`${lusitana.className} text-2xl text-white`}>BuildCore</p>
+        <div className="flex h-20 w-full items-center rounded-lg bg-blue-600 p-4 md:h-28">
+          <Logo knockout className="h-8 md:h-10" />
         </div>
         <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-6 pt-8">
           <h1 className={`${lusitana.className} mb-3 text-2xl`}>{title}</h1>

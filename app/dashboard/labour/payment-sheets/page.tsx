@@ -24,18 +24,21 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
+import PageHeader from '@/app/ui/page-header';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function PaymentSheetsPage() {
+  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
   const projects = useQuery({
-    queryKey: ['projects', 'all'],
+    queryKey: ['projects', 'all', companyId],
     queryFn: () => getProjects({ pageSize: 200 }),
   });
   const sheets = useQuery({
-    queryKey: ['payment-sheets'],
-    queryFn: () => getPaymentSheets(),
+    queryKey: ['payment-sheets', companyId],
+    queryFn: () => getPaymentSheets(companyId ? { companyId } : {}),
   });
 
   const projectName = (id: string) =>
@@ -66,12 +69,10 @@ export default function PaymentSheetsPage() {
   return (
     <div>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Payment Sheets</h1>
-          <p className="text-sm text-gray-500">
-            Generate, approve and disburse cash payment sheets per project.
-          </p>
-        </div>
+        <PageHeader
+          title="Payment Sheets"
+          description="Generate, approve and disburse cash payment sheets per project."
+        />
         <Button onClick={() => setShowForm(true)}>Generate Sheet</Button>
       </div>
 
@@ -112,6 +113,7 @@ function GenerateSheetForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { companyId } = useCompanyContext();
   const [projectId, setProjectId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
@@ -122,7 +124,13 @@ function GenerateSheetForm({
 
   const mutation = useMutation({
     mutationFn: () =>
-      generatePaymentSheet({ projectId, periodFrom, periodTo, engagementType }),
+      generatePaymentSheet({
+        ...(companyId ? { companyId } : {}),
+        projectId,
+        periodFrom,
+        periodTo,
+        engagementType,
+      }),
     onSuccess: onSaved,
     onError: (e) =>
       setError(

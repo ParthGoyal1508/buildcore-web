@@ -18,6 +18,34 @@ implementation and testing of each story. All paths are in this repo (`buildcore
 backend this feature consumes is a separate, already-fully-specced feature in the sibling
 `buildcore-api` repo (`specs/004-dashboard-backend`) and is not re-tasked here.
 
+---
+
+## Implementation status (2026-09-04)
+
+Built on branch `004-dashboard`, consuming the `004-dashboard-backend` endpoints. All seven user
+stories are implemented: the generic `WidgetRenderer` and `FilterField` (the architectural core),
+the rewritten company `/dashboard`, the Activity Log (feed + filters + CSV export), the
+notifications bell + panel (no dismiss control), the Site and Group dashboards (site selector,
+company cards, debounced cross-company employee search), and the Reports page (type list, generic
+filter form, run, and PDF/Excel export with a sync-download / async-poll flow). `tsc --noEmit` and
+`eslint` are clean.
+
+**Notes / small deviations:**
+- Every `/dashboard/*` call goes through `app/lib/api/dashboard.ts` with a `zod` schema at the
+  boundary (Principle IV). `WidgetResult.value` is parsed as `unknown` — the renderer switches on
+  `displayType`, keeping the wire type open so a new widget needs no schema change (spec SC-002).
+- The Activity Log, Site and Group pages are Dashboard sub-routes gated by a shared
+  `DashboardPermissionGuard` in their own layouts (the `dashboard` NAV entry is
+  `guardsSubtree: false`); Reports is gated by `ModuleGuard` via the existing `REPORTS` NAV module.
+- The notifications bell lives in the sidenav beside the reminders badge (this shell has no header),
+  with a neutral blue count distinct from the reminders badge's amber/red (spec FR-027).
+- `app/ui/dashboard/cards.tsx` (the old placeholder, T008) is no longer imported by `page.tsx`; it
+  was left in place rather than deleted to avoid touching unrelated skeleton imports.
+- No automated tests (repo has no test framework — the documented constitution gap); verification
+  is manual per `quickstart.md`.
+
+---
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)

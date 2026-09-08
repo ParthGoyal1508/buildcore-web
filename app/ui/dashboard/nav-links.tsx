@@ -58,7 +58,7 @@ const ICONS: Record<NavModuleId, ComponentType<SVGProps<SVGSVGElement>>> = {
  * `md:flex-none md:basis-auto`.
  */
 const ITEM =
-  'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3';
+  'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3';
 
 /** A full-width row inside the wrapping nav, for the states that are a message. */
 const NOTICE = 'basis-full rounded-md bg-gray-50 px-3 py-2 text-xs';

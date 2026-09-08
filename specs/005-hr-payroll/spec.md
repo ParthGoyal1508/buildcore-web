@@ -778,3 +778,48 @@ and sign-in). HR & Payroll administration is a **desktop surface** in full — e
   control's existence.
 
 **Review gate:** these screens are verified at desktop, then re-checked at 768px for breakage only.
+
+---
+
+## Amendment 2026-09-08 — Attendance Date Integrity
+
+The Daily Register (`app/ui/hr/attendance-table.tsx`) shows every employee as **Present** on any
+date for which no punches exist, and lets the user navigate to dates that have not happened yet.
+The two faults compound: on a future date the register renders a fully-staffed working day that
+does not exist.
+
+The status column reads `row.statusOverride ?? 'present'`. `statusOverride` is null unless an admin
+explicitly forced a status, so the fallback is what almost every row renders — including rows whose
+In and Out columns both show `—`. The backend amendment of the same date makes the API send an
+effective status; this side must render it and stop inventing one.
+
+The date control is unbounded in both directions: `<input type="date">` carries no `max`, and the
+`›` button calls `shiftDate(current, +1)` with no limit.
+
+`todayIso()` in `app/lib/format.ts` truncates a UTC instant, so between 00:00 and 05:30 IST the
+register opens on *yesterday* and any bound derived from it is a day out. Four other screens seed
+date fields from the same helper (transfer, offboarding, loans, BOCW payment), so the correction
+is made in the helper rather than at this one call site.
+
+### Additional Functional Requirements
+
+- **FR-042**: The Daily Register MUST render the effective status supplied by the API and MUST NOT
+  substitute a default status when one is absent. A row with no attendance data MUST NOT read
+  `Present`.
+- **FR-043**: The date control MUST NOT permit selecting a date after today: the picker MUST carry
+  a `max` of today, and the forward-day control MUST be disabled once today is reached, with the
+  disabled state conveyed to assistive technology rather than by colour alone.
+- **FR-044**: "Today" MUST be computed in the business timezone (`Asia/Kolkata`), not by UTC
+  truncation, for every consumer of the shared helper.
+- **FR-045**: Should the API refuse a date as future (backend FR-071), the register MUST surface
+  that refusal as an explanatory state, not as the generic load-failure message — the client bound
+  makes this unreachable through the UI, but a restored URL or a stale tab can still produce it.
+- **FR-046**: The Mark/Edit action MUST remain reachable for today and past dates; this amendment
+  restricts the calendar, not the ability to correct the record.
+
+### Additional Success Criteria
+
+- **SC-A06**: On a past date with no punches, the register shows each employee's real status
+  (`Absent`, `Weekly off`, `Holiday`, `On leave`) and no row reads `Present`.
+- **SC-A07**: With today selected, the `›` control is disabled and the picker refuses a later date.
+- **SC-A08**: Opening the register at 02:00 IST shows the current IST date, not the previous one.
