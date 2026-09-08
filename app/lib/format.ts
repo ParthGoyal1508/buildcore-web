@@ -1,3 +1,5 @@
+import { BUSINESS_TIME_ZONE } from '@/app/lib/constants';
+
 /**
  * Display formatting shared between My Workspace and HR & Payroll.
  *
@@ -65,9 +67,27 @@ export function dateTimeLabel(value: string | null | undefined): string {
   })}`;
 }
 
-/** Today as `YYYY-MM-DD`, the format every date input and API filter here uses. */
+/**
+ * Today as `YYYY-MM-DD`, the format every date input and API filter here uses.
+ *
+ * In the business timezone, not UTC. `toISOString().slice(0, 10)` truncates an
+ * instant in UTC, which at UTC+5:30 names *yesterday* between 00:00 and 05:30 IST —
+ * so the attendance register opened on the wrong day, and any "not after today"
+ * bound derived from it was a day out during the same window. Five screens seed a
+ * date field from this helper, which is why the correction is made here rather than
+ * at any one of them.
+ *
+ * `en-CA` because its short date format is already `YYYY-MM-DD`; the API's
+ * `zonedDateOnly` picks that locale for the same reason, so the two produce the
+ * same string.
+ */
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
 /** The current `YYYY-MM` period key. */

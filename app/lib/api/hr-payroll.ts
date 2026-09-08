@@ -395,6 +395,17 @@ export const dailyAttendanceRowSchema = z.object({
   siteId: z.string(),
   inTime: z.string().nullable(),
   outTime: z.string().nullable(),
+  /**
+   * The status to display: the admin's override where one was set, otherwise the
+   * status the API derives from punches, leave and the site calendar.
+   *
+   * Required, not optional. An optional field would let a deploy without the
+   * matching API silently fall back to whatever the client decided to render —
+   * which is exactly the defect this replaced, where the register substituted
+   * `present` for every row and reported employees who had never punched as
+   * present. A loud parse failure is the better outcome.
+   */
+  status: z.enum(['present', 'absent', 'on_leave', 'weekly_off', 'holiday']),
   statusOverride: z.string().nullable(),
   adminEdited: z.boolean(),
   remarks: z.string().nullable(),
