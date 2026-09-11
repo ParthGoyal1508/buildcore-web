@@ -6,6 +6,7 @@ import {
   clearSession,
   setSessionHint,
   clearSessionHint,
+  abandonRefresh,
 } from '@/app/lib/session';
 import { MESSAGES, formatLockoutMessage } from '@/app/lib/constants';
 
@@ -29,16 +30,18 @@ export type LoginResult = z.infer<typeof loginResponseSchema>;
 export async function login(
   identifier: string,
   password: string,
-  rememberMe: boolean,
 ): Promise<LoginResult> {
   try {
+    // No `rememberMe`: every session lasts the same 90 days now, so there is nothing
+    // to choose (015 FR-005). The API still accepts the field, so the two deployments
+    // may land in either order.
     const raw = await apiFetch<unknown>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ identifier, password, rememberMe }),
+      body: JSON.stringify({ identifier, password }),
     });
     const result = loginResponseSchema.parse(raw);
     setAccessToken(result.accessToken);
-    setSessionHint(rememberMe);
+    setSessionHint();
     return result;
   } catch (err) {
     if (err instanceof ApiError) {
@@ -72,6 +75,9 @@ export async function logout(): Promise<void> {
   } finally {
     clearSession();
     clearSessionHint();
+    // A renewal already on its way would otherwise resolve after this and repopulate
+    // the access token, quietly undoing the sign-out (015 FR-010).
+    abandonRefresh();
   }
 }
 
