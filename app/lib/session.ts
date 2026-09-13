@@ -1,4 +1,5 @@
 import { apiFetch, apiFetchBlob, ApiError } from './api/client';
+import { SESSION_COOKIE_MISSING, SESSION_EXPIRED, SESSION_REVOKED } from './session-codes';
 import { ROUTES } from './constants';
 
 /** The backend's code for "this account must change its password first"
@@ -8,13 +9,15 @@ export const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
 /**
  * Why the backend refused to renew a session (015 FR-011).
  *
- * Matched on the code, never the message. `SESSION_EXPIRED` is ordinary — nobody used
- * the app for ninety days. `SESSION_REVOKED` means replay protection destroyed the
- * session, which is either a security event or a false positive; telling that user
- * their session merely "expired" would be untrue.
+ * Defined in `session-codes.ts` — a leaf module with no imports — and re-exported here
+ * so existing callers are unaffected. The sign-in page is a Server Component and needs
+ * the same constants without dragging the fetch client along with them.
  */
-export const SESSION_EXPIRED = 'SESSION_EXPIRED';
-export const SESSION_REVOKED = 'SESSION_REVOKED';
+export {
+  SESSION_EXPIRED,
+  SESSION_REVOKED,
+  SESSION_COOKIE_MISSING,
+} from './session-codes';
 
 /** Carried to /login so the page can say why, rather than showing a bare form. */
 const SESSION_ENDED_REASON_KEY = 'reason';
@@ -210,7 +213,22 @@ async function withAuth<T>(
         // itself. A user returning after three months should be told their session
         // expired, not shown an unexplained form (015 FR-011).
         const reason =
-          refreshErr.code === SESSION_REVOKED ? SESSION_REVOKED : SESSION_EXPIRED;
+          refreshErr.code === SESSION_REVOKED ||
+          refreshErr.code === SESSION_COOKIE_MISSING
+            ? refreshErr.code
+            : SESSION_EXPIRED;
+        if (reason === SESSION_COOKIE_MISSING) {
+          // Loud on purpose, and in every environment. The browser cannot read an
+          // httpOnly cookie to check its attributes, so this is the only place the
+          // fault can be named at all — and its symptom (signed out on refresh) is
+          // precisely the one people spend an afternoon looking for in session code.
+          console.error(
+            '[session] The API received no refresh cookie. This is usually a cookie ' +
+              'Path that does not cover /bff/auth (set REFRESH_COOKIE_PATH=/bff/auth ' +
+              'on buildcore-api), or a Secure cookie on a plain-HTTP origin. Check ' +
+              'Application \u2192 Cookies in DevTools.',
+          );
+        }
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
       }

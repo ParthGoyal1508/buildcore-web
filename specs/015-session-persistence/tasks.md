@@ -203,3 +203,49 @@ production build, no API_ORIGIN → build fails with an explanatory error
 ```
 
 tsc clean, lint 0 errors, build 92 pages.
+
+---
+
+## Post-ship defect — 2026-09-13
+
+**The cross-repo dependency at the top of this file was never satisfied**, and the
+feature reproduced the exact bug it fixed. `REFRESH_COOKIE_PATH` was unset on the API, so
+the cookie was issued at `Path=/auth` while this app renews at `/bff/auth/refresh-token`.
+The browser kept the credential and never sent it; every session ended on the first page
+reload, landing on `/login?reason=SESSION_EXPIRED`.
+
+The warning in this file's header was correct, specific, and insufficient — it needed
+somebody to read it at the right moment, which is not a mechanism.
+
+### T012 was marked done but was only half-built
+
+`withAuth` put the reason in the URL and **nothing read it**. `app/login/page.tsx` took
+only `activated` from `searchParams`, so a user whose session had just been refused got
+the same unexplained sign-in form as anyone else. FR-011's requirement was satisfied on
+the sending side and invisible on the receiving one — the only side the user sees. The
+sign-in page now renders the reason, keyed on the code.
+
+That gap also cost diagnosis time: the URL said `SESSION_EXPIRED`, which was itself a
+misdiagnosis, because a missing cookie and a genuine expiry were the same bare 401.
+
+### Changed
+
+- `app/login/page.tsx` — reads `reason` and renders the matching message, `role="status"`
+  so it is announced rather than silently present. An unrecognised value renders nothing,
+  since the reason arrives in a URL anyone can type.
+- `app/lib/session-codes.ts` (NEW) — the three codes as a dependency-free leaf module.
+  The sign-in page is a Server Component; importing them from `session.ts` would pull the
+  fetch client and the in-memory access token into a server module graph with no use for
+  either. `session.ts` re-exports them, so no existing caller changed.
+- `app/lib/session.ts` — handles `SESSION_COOKIE_MISSING`, and `console.error`s the likely
+  cause. Loud in every environment on purpose: the browser cannot inspect an httpOnly
+  cookie, so this is the only place the fault can be named at all, and its symptom is
+  precisely the one people hunt for in session code that is working correctly.
+- `app/lib/constants.ts` — the three messages, per Principle III.
+
+`npx tsc --noEmit` clean; `npm run lint` 0 errors (2 pre-existing warnings);
+`npm run build` passes, `/login` now correctly dynamic since it reads `searchParams`.
+
+**T019 and T020 remain unchecked** — still no browser. Pass 2 (check the cookie's `Path`
+in DevTools) would have caught this defect in about thirty seconds, which is the strongest
+argument yet for working the manual passes rather than deferring them.
