@@ -19,9 +19,21 @@ Goal: free tier wherever possible.
 
 ## 3. Environment variables
 
-- [ ] Set `NEXT_PUBLIC_API_URL` in the platform's env var UI, pointing at the deployed **backend** URL (see `.env.local.example` — currently defaults to `http://localhost:3000`).
-- [ ] Set separate values per environment: Preview deployments → staging/dev API URL, Production → prod API URL.
-- [ ] Anything server-only (secrets) must **not** be prefixed `NEXT_PUBLIC_` — that prefix bundles the value into client JS. (Nothing server-only exists yet per `app/lib/api/client.ts`, but keep this in mind as auth/session logic grows.)
+- [ ] Set **`API_ORIGIN`** to the deployed backend URL (e.g. `https://buildcore-api.onrender.com`). No
+      `NEXT_PUBLIC_` prefix — the browser never talks to the API directly; it calls this app's own
+      origin at `/bff` and `next.config.ts` rewrites server-side.
+
+  > **This is read at BUILD time, not run time.** Next resolves `rewrites()` during the build and
+  > writes the destination into `.next/routes-manifest.json`. Set it only as a runtime variable and
+  > the proxy stays pointed at `localhost`, which presents as *"login works, nothing else does"*.
+  > Changing it later needs a **rebuild**, not a restart. `next.config.ts` throws on a production
+  > build without it, so this cannot ship silently.
+
+- [ ] Set separate values per environment: Preview → staging API, Production → prod API.
+- [ ] **`NEXT_PUBLIC_API_URL` is gone.** Delete it from the platform if present. It no longer does
+      anything, and repointing it is a tempting non-fix for a broken deployment.
+- [ ] Anything server-only must **not** be prefixed `NEXT_PUBLIC_` — that prefix bundles the value
+      into client JS.
 
 ## 4. Domains
 
@@ -33,11 +45,41 @@ Goal: free tier wherever possible.
 - [ ] Confirm auto-deploy on push to `main` (production) and preview deployments per PR are enabled — both are default on Vercel/Netlify.
 - [ ] Add `next lint` (and `tsc --noEmit` if not already covered) as a required GitHub check before merge.
 
-## 6. Backend connectivity (coordinate with buildcore-api checklist)
+## 6. Backend connectivity (coordinate with buildcore-api)
 
-- [ ] Confirm `NEXT_PUBLIC_API_URL` points to the deployed backend, not `localhost`.
-- [ ] Confirm the backend's CORS allowlist includes this frontend's deployed domain(s) — production domain **and** preview URLs (e.g. `*.vercel.app`) if you want preview deploys to hit the real API.
-- [ ] If/when auth uses cookies, verify `SameSite`/`Secure` settings work across the frontend/backend domains (they're on different origins unless you put both behind one custom domain).
+The frontend and API are no longer separate origins *as far as the browser is concerned*. Every
+API call goes to this app's origin under `/bff` and is proxied server-side, which is what makes the
+session cookie first-party. Two settings have to agree across the repos, and when they disagree
+**nothing errors** — users are just silently signed out on their first page refresh.
+
+- [ ] **On the API: `REFRESH_COOKIE_PATH=/bff/auth`.** Its default is `/auth`, which is not a prefix
+      of `/bff/auth`, so the browser stores the refresh cookie and never sends it back. This is the
+      single highest-risk setting in either deployment; it has already caused this exact outage once
+      in local development.
+- [ ] **On the API: leave `REFRESH_COOKIE_SECURE` unset.** It exists only so Safari can be tested
+      over `http://localhost`. The API refuses to start if it is disabled with
+      `NODE_ENV=production`.
+- [ ] CORS is no longer load-bearing for the browser — the proxy hop is server-to-server and not
+      subject to it. Keep `CORS_ORIGINS` set anyway unless you have confirmed nothing else calls the
+      API directly.
+
+### Deploy order — expect a one-time sign-out
+
+There is **no ordering that avoids signing everyone out**, because the cookie's path has to change
+on both sides at once:
+
+| Order | What breaks |
+|---|---|
+| API first | The still-deployed old frontend calls the API cross-origin, and the new API's `SameSite` default is `lax` rather than the old inferred `none` — so the cookie stops being sent on those cross-site requests. |
+| Frontend first | The new frontend renews at `/bff/auth/refresh-token` while the old API is still issuing the cookie at `/auth`. |
+
+So: set both env vars, deploy both, and accept that live sessions end once. The blast radius is
+small — production records showed only 15 of 89 sign-ins ever renewed successfully — and those
+users get a working 90-day session afterwards, most for the first time.
+
+Do **not** try to bridge it with `REFRESH_COOKIE_PATH=/`. It does cover both paths, but afterwards
+the browser holds two `refreshToken` cookies with different paths and sends both, and which one the
+server reads is not something worth depending on.
 
 ## 7. Observability
 
@@ -49,6 +91,13 @@ Goal: free tier wherever possible.
 - [ ] Load the deployed site and run through the key user flows against the deployed backend (not a local API).
 - [ ] Check Core Web Vitals / Lighthouse in the platform dashboard.
 - [ ] Confirm the login flow works end-to-end (frontend → deployed API → deployed DB).
+- [ ] **Sign in, then open DevTools → Application → Cookies and check `refreshToken` shows
+      `Path=/bff/auth`.** Thirty seconds, and it is the one check that catches the misconfiguration
+      above before your users do.
+- [ ] Reload the page. Staying signed in is the whole point of the change; being returned to
+      `/login` means the cookie path is wrong.
+- [ ] Repeat both in **Safari**, which refuses third-party cookies by default and is where this
+      class of defect is most visible.
 
 ## 9. Free-tier limits to watch
 
