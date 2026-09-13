@@ -11,13 +11,19 @@ function hasSessionHint(): boolean {
 }
 
 /**
- * Defense-in-depth against the browser back button after logout: proxy.ts
- * only runs when a request actually reaches the server, but the browser
- * (or Next's client Router Cache) can restore this page from a cached
- * render without one. Checks on mount, plus on `pageshow` — the one event
- * that also fires when a page is restored from the back/forward cache,
- * unlike DOMContentLoaded. A hard redirect (not router.replace) forces a
- * real server round-trip past any client-side cache.
+ * Defence-in-depth against the browser back button after a sign-out.
+ *
+ * Nothing server-side can cover this: the browser (or Next's client Router Cache) can
+ * restore an already-rendered dashboard from the back/forward cache without any
+ * request reaching a server at all. So this checks a readable marker instead — on
+ * mount, and on `pageshow`, the one event that also fires for a bfcache restore where
+ * DOMContentLoaded does not. A hard redirect rather than `router.replace` forces a real
+ * round-trip past every client-side cache.
+ *
+ * The marker's lifetime matters as much as its presence. It is written with the same
+ * 90-day life as the session it stands for (`setSessionHint`); when it was a
+ * browser-session cookie, this guard would evict a perfectly valid session the first
+ * time someone reopened their browser (015 FR-002).
  */
 export default function SessionGuard() {
   useEffect(() => {

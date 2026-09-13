@@ -24,7 +24,6 @@ import { markJustLoggedIn } from '@/app/lib/session';
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Enter your email or username'),
   password: z.string().min(1, 'Enter your password'),
-  rememberMe: z.boolean(),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -40,13 +39,12 @@ export default function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { rememberMe: false },
   });
 
   async function onSubmit(data: LoginValues) {
     setServerError(null);
     try {
-      const result = await login(data.identifier, data.password, data.rememberMe);
+      const result = await login(data.identifier, data.password);
       // replace, not push: once signed in, the login page shouldn't be a
       // step the back button can return to (research.md route-protection
       // intent extended to this direction too).
@@ -132,15 +130,11 @@ export default function LoginForm() {
               <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
             )}
           </div>
-          <div className="mt-4 flex items-center justify-between">
-            <label className="flex items-center gap-2 text-xs text-gray-900">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-gray-300"
-                {...register('rememberMe')}
-              />
-              Remember me
-            </label>
+          {/* "Remember me" is gone (015 FR-005). It was unexplained, defaulted to
+              unticked, and 74 of 89 sign-ins left it that way — which bought them a
+              session that ended when they closed the browser. Every session now lasts
+              the same 90 days, so there is nothing left to ask. */}
+          <div className="mt-4 flex items-center justify-end">
             <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline">
               Forgot Password?
             </Link>

@@ -348,6 +348,20 @@ export const MESSAGES = {
   lockoutFallback: 'Account temporarily locked. Try again later.',
   rateLimited: 'Too many attempts. Please try again later.',
 
+  // --- Why a session ended (feature 015 FR-011) ---
+  // Shown on the sign-in page when a renewal was refused, so someone returning after
+  // a long absence is told what happened instead of meeting an unexplained form.
+  // Keyed by the backend's code, never by its prose.
+  sessionExpired: 'Your session expired. Please sign in again.',
+  sessionRevoked:
+    'Your session was ended for security reasons. Please sign in again.',
+  // Deliberately the same sentence a user sees for an expiry: to them the two are the
+  // same event, and "the server did not receive your session cookie" is not something
+  // they can act on. The distinction is preserved in the URL and the console for
+  // whoever has to diagnose it, because this code almost always means a deployment
+  // fault rather than anything the user did.
+  sessionCookieMissing: 'Your session has ended. Please sign in again.',
+
   // --- Settings (feature 002) ---
   accessDeniedTitle: 'You do not have access to this page',
   accessDeniedBody:

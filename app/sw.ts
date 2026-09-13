@@ -51,9 +51,20 @@ declare const self: ServiceWorkerGlobalScope;
  * The app shell stays precached, which is the offline behaviour this worker exists
  * for — an employee with no signal can still open the Punch screen; what they
  * cannot do is read data the network never confirmed.
+ *
+ * `/bff` is matched explicitly as well, and that is now the rule carrying the weight
+ * (015 FR-015). The cross-origin test above worked only because the API *was* a
+ * different origin; routing it through this app's own origin to keep the session
+ * cookie first-party makes every API request same-origin, so that test stops matching
+ * and `defaultCache`'s catch-all would quietly start caching authenticated responses
+ * again — reinstating both problems above, leakage included, as a side effect of a
+ * change that has nothing to do with caching.
  */
 const runtimeCaching: RuntimeCaching[] = [
-  { matcher: ({ sameOrigin }) => !sameOrigin, handler: new NetworkOnly() },
+  {
+    matcher: ({ sameOrigin, url }) => !sameOrigin || url.pathname.startsWith('/bff'),
+    handler: new NetworkOnly(),
+  },
   ...defaultCache,
 ];
 const serwist = new Serwist({
