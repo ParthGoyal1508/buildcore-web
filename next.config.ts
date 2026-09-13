@@ -10,21 +10,54 @@ import type { NextConfig } from 'next';
  * goes somewhere else. It must be present in the build environment, and changing it
  * needs a rebuild rather than a restart.
  *
- * The throw below is what stops that shipping: an unset value in a production build is
- * a misconfiguration that would otherwise surface as "login works, nothing else does",
- * which is a bad afternoon.
+ * Validated rather than trusted. Every failure mode of this variable is silent — the
+ * build succeeds, the app loads, sign-in appears to work, and only session renewal is
+ * broken — so each one is turned into a build failure instead.
  */
-const API_ORIGIN =
-  process.env.API_ORIGIN ??
-  (process.env.NODE_ENV === 'production'
-    ? (() => {
-        throw new Error(
-          'API_ORIGIN must be set at build time. Next bakes rewrite destinations ' +
-            'into the build, so a runtime-only value silently leaves the API proxy ' +
-            'pointing at localhost.',
-        );
-      })()
-    : 'http://localhost:3000');
+function resolveApiOrigin(): string {
+  const raw = process.env.API_ORIGIN?.trim();
+
+  if (!raw) {
+    if (process.env.NODE_ENV !== 'production') return 'http://localhost:3000';
+    throw new Error(
+      'API_ORIGIN must be set at build time. Next bakes rewrite destinations into ' +
+        'the build, so a runtime-only value silently leaves the API proxy pointing ' +
+        'at localhost.\n\n' +
+        'Set it to the deployed API origin, e.g. https://your-api.onrender.com — ' +
+        'the same value NEXT_PUBLIC_API_URL used to hold.\n\n' +
+        'On Vercel: Settings -> Environment Variables. Enable it for EVERY ' +
+        'environment you build, Preview included — a Production-only value fails ' +
+        'every pull-request build with this same error.',
+    );
+  }
+
+  // A missing scheme is the quiet one. Next treats a destination with no protocol as
+  // a path rather than an external URL, so `/bff/x` would rewrite to something like
+  // `/api.example.com/x` on this origin — a 404 per API call, with a build that
+  // succeeded and a variable that looks right in the dashboard.
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(
+      `API_ORIGIN must be an absolute URL including the scheme; received "${raw}". ` +
+        'Use https://your-api.onrender.com, not your-api.onrender.com — without a ' +
+        'scheme Next treats the rewrite destination as a path on this origin and ' +
+        'every API call 404s.',
+    );
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `API_ORIGIN must use http or https; received "${parsed.protocol}".`,
+    );
+  }
+
+  // Trailing slashes produce `https://host//:path*`. Stripped rather than rejected:
+  // it is a harmless thing to type and there is no reason to fail a deploy over it.
+  return raw.replace(/\/+$/, '');
+}
+
+const API_ORIGIN = resolveApiOrigin();
 
 const nextConfig: NextConfig = {
   /**
