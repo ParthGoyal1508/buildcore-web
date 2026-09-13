@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **2 open, deliberately**
+- [X] No [NEEDS CLARIFICATION] markers remain — all resolved, session 2026-09-13
 - [X] Requirements are testable and unambiguous
 - [X] Success criteria are measurable
 - [X] Success criteria are technology-agnostic
@@ -45,10 +45,8 @@ rather than making the application mobile-first — "worked on" is read as reach
 Desktop surfaces are still designed desktop-first and the mobile-critical list is still closed.
 
 Note that no existing screen has ever been checked at 320px, because the previous gate did not
-ask. The floor is an obligation the codebase has not been measured against.
-
-The 2 open [NEEDS CLARIFICATION] markers are not oversights. Each names a decision that changes
-what gets built and that only the client can make.
+ask. All [NEEDS CLARIFICATION] markers were resolved on 2026-09-13 and are recorded in the spec's
+Clarifications section. This checklist now passes in full.
 
 No test framework is installed in this repository (`TODO(TESTING_STANDARD)`), so no test-file tasks
 may be generated from these specifications. Verification is `npm run lint`, `npx tsc --noEmit`,

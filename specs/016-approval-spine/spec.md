@@ -14,6 +14,25 @@
 the client asked for that are purely about the screen: a control that is the same everywhere, the
 name of whoever last acted shown on the record itself, and somewhere to find what is waiting for you.
 
+## Clarifications
+
+### Session 2026-09-13
+
+- Q: Which module gains the shared Action/Review control first? → A: **Attendance exceptions.**
+- Q: May one person decide at more than one level of the same chain? → A: No — forbidden once they
+  have decided on that item. *(Backend rule; this interface must show why a control is inert.)*
+- Q: Which actions require final Super Admin approval? → A: Payment release, payroll run approval,
+  money-committing letters (WO, LOI, PO), and final settlement on exit.
+- Q: How are the chain's roles defined? → A: Levels reference configurable **role slots** that each
+  company maps to its own roles. *(This interface names people and slots, never hardcoded roles.)*
+
+**What these mean for the interface.** Two of them change what the control must say. Because a
+person may not decide twice on the same item (backend FR-021a), a reviewer will meet items whose
+control is inert *for a reason that is not lack of permission* — they already decided earlier in the
+chain. "You do not have permission" would be untrue and would send them to an administrator for
+nothing. And because levels resolve through slots rather than roles, the waiting-on text must name
+the person or the slot as configured, never a role name this interface assumed.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - One control, everywhere, behaving identically (Priority: P1)
@@ -42,7 +61,10 @@ present, identically placed, and offers identical choices.
 5. **Given** a decision fails on the network, **When** the failure occurs, **Then** the reason the
    user typed is preserved and the action can be retried without retyping.
 6. **Given** the user lacks authority on the item, **When** it is displayed, **Then** no actionable
-   control is offered.
+   control is offered and the reason given is insufficient authority.
+7. **Given** the user already decided on this item at an earlier level, **When** it reaches a level
+   they also hold, **Then** the control is inert and says they have already decided — not that they
+   lack permission.
 
 ---
 
@@ -119,6 +141,12 @@ appear in one queue and can be acted on from it.
 - **FR-002**: The control MUST offer approve, reject and return when the item awaits the current user.
 - **FR-003**: The control MUST render inert, naming the awaited approver, when the item awaits
   somebody else.
+- **FR-003a**: The control MUST distinguish *why* it is inert. At minimum: awaiting another person,
+  already decided by this user at an earlier level, and insufficient authority are three different
+  states with three different remedies, and conflating them into "no permission" sends people to an
+  administrator who cannot help them.
+- **FR-003b**: Where a level's authority is described to the user, it MUST use the person's name or
+  the configured slot label supplied by the backend, and MUST NOT hardcode a role name.
 - **FR-004**: The control MUST require a reason for reject and return before submitting.
 - **FR-005**: The control MUST prevent double submission and MUST indicate work in progress.
 - **FR-006**: The control MUST preserve user-entered text when a submission fails, and MUST allow
@@ -201,5 +229,15 @@ appear in one queue and can be acted on from it.
 
 ### Needing the client's decision
 
-- **[NEEDS CLARIFICATION: which modules gain the control first?]** FR-001 makes it shared, but each
-  module must be migrated onto it. The order should follow the client's priority, not ours.
+Both markers raised when this specification was written are answered and recorded under
+Clarifications above. Nothing blocking remains.
+
+**Migration order**, settled: attendance exceptions first. It is the client's first note, the
+exceptions are already detected and already have a resolution path to replace, and each one is a
+paid or unpaid day — so the control earns its place immediately. It is also the smallest surface,
+which is the point: the shared component's shape gets settled on one screen before five more modules
+depend on it.
+
+The remaining modules follow in whatever order planning finds cheapest, except that **payroll runs
+should not be second**. It is the most complex chain and the one where a flaw in the shared component
+costs most; it should be migrated once the component has survived a simpler module.
