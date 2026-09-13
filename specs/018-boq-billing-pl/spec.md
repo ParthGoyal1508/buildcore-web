@@ -151,11 +151,15 @@ screen — the *"P&L Summary of total Project"* the sheet's Group Dashboard row 
   the product to measure against, and this is the single biggest interaction risk in this feature.
 - **NFR-002**: The project summary MUST render within 3 seconds for a project with 12 months of
   activity.
-- **NFR-003** *(Note 25)*: These are desktop surfaces under Principle VI and are **deliberately not**
-  claimed as mobile. Billing entry against hundreds of BOQ lines on a phone is not a reasonable
-  target, and pretending otherwise would produce a screen that is bad on both. The group board is a
-  candidate for mobile if the client wants a director to read it away from a desk — see the
-  clarification in `016-approval-spine`.
+- **NFR-003** *(Note 25)*: Desktop surfaces under Principle VI, which as of constitution v2.1.0
+  means they MUST be usable and unbroken at 320px — but are still *designed* for a desk and are
+  **deliberately not** phone-first. Billing entry against hundreds of BOQ lines on a phone is not a
+  reasonable target, and pretending otherwise would produce a screen bad at both sizes. For these
+  two sheets specifically, "unbroken at 320px" is satisfied by the BOQ grid scrolling inside its own
+  container with the totals reachable; it does not mean the sheet is a sensible way to bill from a
+  phone, and the specification does not claim it is. The group board is the one screen here a
+  director might genuinely read on a phone, and it should be built to be pleasant there rather than
+  merely unbroken.
 
 ### Key Entities
 

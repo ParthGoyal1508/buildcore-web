@@ -34,17 +34,18 @@
 - [X] Principle II (no inline styling) — stated as a requirement
 - [X] Principle III (centralized constants) — copy required to live in the constants module
 - [X] Principle V (API access boundary) — all access via typed API modules
-- [ ] **Principle VI (desktop-first, mobile-critical closed list) — see note below**
+- [X] Principle VI — resolved by constitution v2.1.0 (floor moved 768px → 320px)
 
 ## Notes
 
-**Principle VI is unresolved across all six web specs.** Client Note 25 asks for the whole admin
-site to work on Android and iPhone. Principle VI is NON-NEGOTIABLE, defines mobile-critical
-surfaces as a closed list (punch, attendance viewing, leave), and was narrowed to that position
-deliberately in a MAJOR version bump on the finding that mobile-first was "wrong about most of the
-product". These specifications do not resolve that conflict, because a feature specification cannot
-amend the constitution. It is recorded in `016-approval-spine` and must be settled before any of
-these features is planned.
+**Principle VI was amended for this work.** Client Note 25 asked for the admin site to work on
+Android and iPhone, which conflicted with a NON-NEGOTIABLE principle. Constitution v2.1.0
+(2026-09-13) resolved it by lowering the responsive floor for desktop surfaces from 768px to 320px,
+rather than making the application mobile-first — "worked on" is read as reachable, not optimised.
+Desktop surfaces are still designed desktop-first and the mobile-critical list is still closed.
+
+Note that no existing screen has ever been checked at 320px, because the previous gate did not
+ask. The floor is an obligation the codebase has not been measured against.
 
 The 1 open [NEEDS CLARIFICATION] markers are not oversights. Each names a decision that changes
 what gets built and that only the client can make.

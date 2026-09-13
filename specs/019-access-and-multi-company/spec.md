@@ -134,8 +134,8 @@ without them; reports and exports match. Turning it off restores the view.
 
 - **NFR-001** *(Note 25)*: The company switcher MUST be reachable and operable at 320px without
   obscuring page content. The switcher is part of the application shell, which is already present on
-  mobile-critical surfaces, so this is within Principle VI's existing scope — unlike the admin
-  screens discussed in `016-approval-spine`. **Not verified today.**
+  mobile-critical surfaces, so it was within Principle VI's scope before v2.1.0 and remains so.
+  **Not verified today.**
 - **NFR-002**: Switching company MUST complete within 2 seconds including the clearing of cached
   views.
 

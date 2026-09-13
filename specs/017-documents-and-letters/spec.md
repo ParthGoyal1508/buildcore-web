@@ -186,9 +186,11 @@ visible in the list.
 ### Non-Functional Requirements
 
 - **NFR-001** *(Note 25)*: Document upload MUST be operable on Android and iOS at 320px, because the
-  people photographing a licence are on site, not at a desk. **This requires the constitutional
-  decision recorded in `016-approval-spine` — Principle VI's closed list does not include these
-  screens.** Not verified today.
+  people photographing a licence are on site, not at a desk. **Settled by constitution v2.1.0**: the
+  responsive floor for desktop surfaces is now 320px, so these screens must be usable and unbroken
+  there without being redesigned phone-first. Upload in particular should be re-examined against
+  that floor, since a file picker and progress indicator on a narrow screen is exactly the kind of
+  thing the 768px gate never caught. Not verified today.
 - **NFR-002**: Upload of a 10 MB file MUST show continuous progress and MUST NOT appear frozen.
 
 ### Key Entities

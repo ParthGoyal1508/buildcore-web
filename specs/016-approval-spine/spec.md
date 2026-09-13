@@ -145,13 +145,16 @@ appear in one queue and can be acted on from it.
   Android and iOS phones at 320px width, with every decision reachable, targets no smaller than 44px,
   and no horizontal scrolling of the page body.
 
-  **This conflicts with a NON-NEGOTIABLE constitutional principle and cannot be adopted without
-  amending it.** Principle VI defines a *closed list* of mobile-critical surfaces — punch, attendance
-  viewing, leave — and states that every other screen targets desktop. That list was narrowed
-  deliberately in a MAJOR version bump, on the finding that mobile-first was "wrong about most of the
-  product". Note 25 asks for the opposite. See "Needing the client's decision".
+  **Resolved by constitution v2.1.0 (2026-09-13).** Principle VI's responsive floor for desktop
+  surfaces moved from 768px to 320px. Approval surfaces remain *designed* desktop-first and are not
+  added to the mobile-critical list — so the one-handed and 44px rules do not apply to them — but
+  they MUST be usable and unbroken at 320px, which is what this requirement now means.
 
-  **Not verified today** in any case: no admin surface has been tested on a real phone.
+  The 44px minimum stated above therefore applies only where an approval surface is reached from a
+  mobile-critical screen; elsewhere the obligation is reachability, not comfort.
+
+  **Not verified today**: no admin surface has ever been checked at 320px, because the previous gate
+  did not ask. The amendment describes an obligation the codebase has not been measured against.
 
 ### Key Entities
 
@@ -187,19 +190,16 @@ appear in one queue and can be acted on from it.
 - The pending count reuses the existing navigation badge mechanism introduced by the reminders
   feature rather than adding a second one.
 - Attribution shows the person's display name; a deactivated user's name still resolves.
+- **Note 25 was settled by constitution v2.1.0**, which lowered the responsive floor for desktop
+  surfaces from 768px to 320px rather than making the admin application mobile-first. The client's
+  "worked on Mobile Phone" is read as reachability, not optimisation. Approval surfaces are
+  therefore designed for a desk and must not break on a phone — a distinction that costs a
+  responsive pass rather than a redesign.
 - No test framework is installed in this repository (constitution `TODO(TESTING_STANDARD)`), so
   verification is lint, type-check, build and manual passes. **No test-file tasks may be generated
   from this specification.**
 
 ### Needing the client's decision
 
-- **[NEEDS CLARIFICATION: does Note 25 override constitutional Principle VI?]** The client asks for
-  the whole admin site to work on Android and iPhone. The constitution says the opposite, as a
-  NON-NEGOTIABLE principle, having been changed to that position deliberately. Three ways out: amend
-  the constitution and treat admin mobile support as in scope everywhere (large, and it re-opens a
-  decision already made once); widen the closed list to include approval surfaces only (narrow, and
-  it is where the client's need is most real, since approvals are what a director does away from a
-  desk); or record Note 25 as out of scope. **This cannot be resolved inside a feature specification**
-  — it is a constitutional amendment either way.
 - **[NEEDS CLARIFICATION: which modules gain the control first?]** FR-001 makes it shared, but each
   module must be migrated onto it. The order should follow the client's priority, not ours.

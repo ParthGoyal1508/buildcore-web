@@ -134,8 +134,8 @@ until each is resolved or deliberately waived.
 - **NFR-001**: Search results MUST appear within 1 second of typing stopping. **Not verified today** —
   nothing comparable exists to measure.
 - **NFR-002** *(Note 25)*: Dashboard search MUST be usable at 320px. Search is part of the
-  application shell rather than an admin screen, so this sits within Principle VI's existing scope.
-  **Not verified today.**
+  application shell rather than an admin screen, so it sat within Principle VI's scope before
+  v2.1.0 and remains so. **Not verified today.**
 - **NFR-003**: Search MUST NOT issue a request per keystroke.
 
 ### Key Entities
