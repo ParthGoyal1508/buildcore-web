@@ -1883,10 +1883,9 @@ export type ApprovalActionKey = (typeof APPROVAL_ACTIONS)[number]['action'];
  *
  * `slot_unmapped` is the only one describing a **fault** rather than a state, and the only
  * one that never resolves itself by waiting. It names the remedy because the person who
- * hits it is rarely the person who can apply it. Note that the settings screen it points
- * at is not built yet — the backend's `PUT /approvals/slot-mappings` exists, and until
- * there is a screen for it an administrator maps slots through the API. That is worth
- * saying plainly here rather than sending someone to look for a page that is not there.
+ * hits it is rarely the person who can apply it — and since the approval settings screen
+ * exists, it can name where. Anyone holding `SETTINGS` can fix it in about a minute; the
+ * reader who hits this message usually cannot, which is why it says who to ask.
  */
 export const APPROVAL_INERT_MESSAGES = {
   awaiting_other: (awaitingUserName: string | null, levelLabel: string | null) =>
@@ -1904,8 +1903,48 @@ export const APPROVAL_INERT_MESSAGES = {
   slot_unmapped: (_user: string | null, levelLabel: string | null) =>
     `Nobody can approve this yet: no role is mapped to ${
       levelLabel ?? 'this level'
-    } for your company. An administrator must map it before this can move.`,
+    } for your company. Someone with settings access must map it under ` +
+    `Settings → Approvals before this can move.`,
 } as const;
+
+/**
+ * The originator's side of a returned item (FR-005).
+ *
+ * Worth stating why this copy exists at all: `returned` holds the item's chain slot, so
+ * nothing else can be raised for the same record, and resubmitting is the only exit. A
+ * reader who is not told that sees an item that looks finished and is not.
+ */
+export const APPROVAL_RESUBMIT = {
+  /** Shown to the originator where the approve/reject/return buttons would be. */
+  prompt: 'This was returned to you for correction.',
+  action: 'Resubmit for approval',
+  inFlight: 'Resubmitting…',
+  /** After a successful resubmit, before the record's own state refreshes. */
+  done: 'Sent back for approval.',
+  failed: 'It could not be resubmitted. Please try again.',
+  /**
+   * Said once, next to the button. People resubmit without changing anything otherwise —
+   * the chain restarts from level one either way, and the approver who returned it is
+   * looking for a change.
+   */
+  hint: 'Make the correction first — this starts the chain again from the first approver.',
+} as const;
+
+/**
+ * How often the pending-approval count re-checks the server (FR-013, SC-005).
+ *
+ * The count is a badge on every screen, so this is the only thing in the app that
+ * notices a decision somebody *else* made. React Query is configured with
+ * `refetchOnWindowFocus: false` globally, so without an interval nothing refetches at
+ * all and the badge can sit on a stale number indefinitely — which matters because two
+ * approvers can hold the same level, and the second one's queue would still offer an
+ * item the first already decided.
+ *
+ * Sixty seconds: one small request per user per minute, against a count that is a
+ * single indexed query. Faster buys little — approvals are a human-paced queue, not a
+ * chat — and slower stops it being a live count in any useful sense.
+ */
+export const APPROVAL_COUNT_POLL_MS = 60_000;
 
 /**
  * When an item's age in the queue becomes visually distinguishable (spec US3 scenario 5).

@@ -380,7 +380,7 @@ web half creates and the backend cannot currently resolve.
       module (FR-015). Note that `ActionReviewState` has no notion of "you raised this and it came
       back" today — `inertReason` has four values and none of them is that — so the shared control
       needs a state for the originator, not just for approvers.
-- [ ] T041 **HIGH** Make the queue and count reflect decisions taken elsewhere per FR-013 and SC-005
+- [X] T041 **HIGH** Make the queue and count reflect decisions taken elsewhere per FR-013 and SC-005
       (partial). FR-013 says both "MUST reflect decisions taken elsewhere without a manual reload" and
       SC-005 says the count "matches the queue contents at all times". Today invalidation is wired at
       all three decision sites (`queue-table.tsx:76`, `exceptions-modal.tsx:81`,
@@ -394,3 +394,46 @@ web half creates and the backend cannot currently resolve.
       `refetchInterval` to the count query at minimum (the badge is cheap and mounted everywhere);
       decide separately whether the queue itself polls or refetches on focus, and record the interval
       in the constants module rather than inline.
+
+### Implementation note — T040, T041, 2026-09-14
+
+**T041 is done, and my finding overstated it.** I wrote that neither the badge nor the
+queue refetched. The queue does: `queue-table.tsx` sets `refetchOnWindowFocus: true`
+locally, overriding the global default, and a queue left open on a second monitor was
+already refreshing when the tab regained focus. The real gap was the **badge** alone, and
+it is the worse half — it is mounted on every screen, so the reader is usually *not*
+looking at approvals and focus would never fire while they worked elsewhere in the app.
+It now polls on `APPROVAL_COUNT_POLL_MS` (60s) and also refetches on focus.
+
+**T040 is only half done, and the half that is missing is a screen that does not exist.**
+
+Built and verified: `resubmitApproval()` in the typed module, `canResubmitNow` on the
+state schema, and the originator's branch in `ActionReview` — checked *before* the inert
+branch, because a returned item carries no `inertReason` and would otherwise fall through
+to `return null` and vanish. Copy is in the constants module. The exported function was
+run unmodified against a live API: a returned item came back `pending`, round 2, with
+`canActNow: true` for the caller, and a second call was refused `APPROVAL_NOT_PENDING`.
+
+What is missing is a **call site**, and not by oversight. `ActionReview` has two: the
+approvals queue and the HR exceptions modal. Neither can ever be the right home:
+
+- The queue lists items awaiting *you as an approver*. A returned item you raised is by
+  definition not one of those.
+- The exceptions modal is an administrator's screen. For the only module on the spine,
+  `punch.service.ts` sets `originatorUserId` to the **employee who punched** — so the
+  originator is a worker, and an administrator opening that modal is never the person who
+  can resubmit. The admin does still see what happened, via `<LastAction>` on the row.
+
+The employee's own workspace under `app/my/` has no approval surface at all — it never
+tells a worker their punch was flagged, let alone returned. That screen is the remaining
+work, and it is a new surface rather than a wiring change, which is why it is not folded
+into this note as done. Until it exists, an approver who returns an attendance exception
+is returning it to somebody who will never be shown it.
+
+- [ ] T042 Give the employee a view of their own flagged punches under `app/my/`, showing
+      each punch's approval state and the resubmit affordance when `canResubmitNow` is
+      true. The control, the typed call and the copy all exist; what is missing is a route,
+      a list, and a module endpoint the employee may call for their *own* punches (the
+      current `workspace-admin/attendance-exceptions` list is permission-guarded for
+      reviewers and returns the whole company). Without this, `return` remains a decision
+      nobody downstream can act on for the one module currently on the spine.

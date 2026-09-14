@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { getApprovalCount } from '@/app/lib/api/approvals';
-import { ROUTES } from '@/app/lib/constants';
+import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
 
 /**
  * The approvals shortcut and its pending count (spec FR-012).
@@ -34,6 +34,15 @@ export default function ApprovalBadge() {
   const { data } = useQuery({
     queryKey: ['approvalCount'],
     queryFn: getApprovalCount,
+    // FR-013. The queue already refetches on focus; this badge could not, because it is
+    // mounted on every screen and the reader is usually *not* looking at approvals — so
+    // focus alone would never fire while they worked elsewhere in the app. An interval is
+    // what makes the number on the nav mean something, and `refetchOnWindowFocus` is set
+    // here too because the global default is false and returning to the tab should not
+    // wait out the remainder of the interval.
+    refetchInterval: APPROVAL_COUNT_POLL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const count = data?.count ?? 0;

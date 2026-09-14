@@ -155,6 +155,18 @@ const approvalStateObjectSchema = z.object({
   awaitingHolderCount: z.number(),
 
   canActNow: z.boolean(),
+  /**
+   * True only for the originator of a *returned* item (FR-005).
+   *
+   * Not an `inertReason`: a returned item reports `canActNow: false` with a null reason,
+   * because nobody is being asked to decide — and the control renders that as nothing at
+   * all. Without this the item disappears from the screen of the only person who can move
+   * it, and `returned` holds the item's chain slot so no replacement can be raised.
+   *
+   * Defaulted rather than required so a module still parsing against an older API does
+   * not start throwing; the field is absent there, and absent means "no".
+   */
+  canResubmitNow: z.boolean().default(false),
   inertReason: inertReasonSchema.nullable(),
 
   latestDecision: decisionSchema.nullable(),
@@ -385,6 +397,27 @@ export async function decideApproval(
   const raw = await authFetch<unknown>(
     `/approvals/${encodeURIComponent(instanceId)}/decide`,
     { method: 'POST', body: JSON.stringify(input) },
+  );
+  return approvalStateObjectSchema.parse(raw);
+}
+
+/**
+ * Sends a returned item back up its chain, as a new round.
+ *
+ * Keyed by entity rather than by instance id, matching the endpoint: `returned` is a live
+ * state, so exactly one instance can be meant, and an entity lookup makes a stale instance
+ * id impossible to act on. Only the originator may call it — anyone else is refused with
+ * `APPROVAL_NOT_AUTHORISED`, and an item that is not returned with `APPROVAL_NOT_PENDING`.
+ */
+export async function resubmitApproval(
+  entityType: string,
+  entityId: string,
+): Promise<ApprovalState> {
+  const raw = await authFetch<unknown>(
+    `/approvals/${encodeURIComponent(entityType)}/${encodeURIComponent(
+      entityId,
+    )}/resubmit`,
+    { method: 'POST' },
   );
   return approvalStateObjectSchema.parse(raw);
 }

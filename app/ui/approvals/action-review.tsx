@@ -11,6 +11,7 @@ import type {
 import {
   APPROVAL_ACTIONS,
   APPROVAL_INERT_MESSAGES,
+  APPROVAL_RESUBMIT,
 } from '@/app/lib/constants';
 import { RowAction } from '@/app/ui/settings/form-fields';
 
@@ -57,6 +58,11 @@ export interface ActionReviewState {
   /** Both optional: a queue row knows its position but not the chain's length. */
   currentPosition?: number;
   totalLevels?: number;
+  /**
+   * True only for the originator of a returned item. Optional so a caller holding an
+   * older shape still satisfies this interface; absent means no.
+   */
+  canResubmitNow?: boolean;
 }
 
 export interface ActionReviewProps {
@@ -71,6 +77,14 @@ export interface ActionReviewProps {
     action: ApprovalDecisionAction,
     reason?: string,
   ) => Promise<unknown>;
+  /**
+   * Sends a returned item back up its chain. Throws on refusal, like `onDecide`.
+   *
+   * Optional: a module that has not wired resubmission yet simply does not pass it, and
+   * the originator is told the item was returned without being offered a button that
+   * cannot work. Omitting it is a smaller failure than a button that throws.
+   */
+  onResubmit?: () => Promise<unknown>;
   /** "this attendance correction" — used in the confirmation prompt. */
   entityLabel: string;
   /** `inline` for a table cell, `full` for a detail view. Layout only. */
@@ -80,6 +94,7 @@ export interface ActionReviewProps {
 export default function ActionReview({
   state,
   onDecide,
+  onResubmit,
   entityLabel,
   size = 'full',
 }: ActionReviewProps) {
@@ -103,6 +118,43 @@ export default function ActionReview({
   // established with `SESSION_EXPIRED`. The four states are four different sentences
   // because they have four different remedies.
   if (!state.canActNow) {
+    // ── Returned, and this reader is the one who raised it (FR-005) ──────────
+    //
+    // Checked before the inert branch below, because a returned item has no
+    // `inertReason` — nobody is being asked to decide — and would otherwise fall through
+    // to `return null` and vanish from the screen of the only person who can move it.
+    if (state.canResubmitNow && onResubmit) {
+      return (
+        <div className={clsx('space-y-2', inline ? 'min-w-[16rem]' : 'max-w-xl')}>
+          <p className="text-xs text-gray-700">{APPROVAL_RESUBMIT.prompt}</p>
+          <p className="text-xs text-gray-500">{APPROVAL_RESUBMIT.hint}</p>
+          {error && (
+            <p role="alert" className="text-xs text-red-700">
+              {error}
+            </p>
+          )}
+          <RowAction
+            onClick={() => {
+              setError(null);
+              setInFlight(true);
+              onResubmit()
+                .catch((e: unknown) =>
+                  setError(
+                    e instanceof Error
+                      ? e.message
+                      : APPROVAL_RESUBMIT.failed,
+                  ),
+                )
+                .finally(() => setInFlight(false));
+            }}
+            disabled={inFlight}
+          >
+            {inFlight ? APPROVAL_RESUBMIT.inFlight : APPROVAL_RESUBMIT.action}
+          </RowAction>
+        </div>
+      );
+    }
+
     if (!state.inertReason) {
       // The chain has finished, or nobody in particular is being addressed. Saying
       // nothing is correct: there is no action, and inventing a refusal message would
