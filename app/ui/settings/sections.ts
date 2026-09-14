@@ -1,5 +1,6 @@
 import {
   BuildingOffice2Icon,
+  CheckCircleIcon,
   IdentificationIcon,
   UsersIcon,
   WrenchScrewdriverIcon,
@@ -43,6 +44,14 @@ export const SETTINGS_SECTIONS: {
     title: 'Users',
     description: 'Administer existing accounts — role, status, removal.',
     icon: UsersIcon,
+  },
+  {
+    key: 'approvals',
+    href: ROUTES.settingsApprovals,
+    title: 'Approvals',
+    description:
+      'Which role decides at each level of an approval chain. Nothing can be approved until these are set.',
+    icon: CheckCircleIcon,
   },
   {
     key: 'employee-setup',

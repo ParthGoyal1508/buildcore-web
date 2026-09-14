@@ -19,6 +19,8 @@ export const ROUTES = {
   settingsRoles: '/dashboard/settings/roles',
   settingsUsers: '/dashboard/settings/users',
   settingsEmployeeSetup: '/dashboard/settings/employee-setup',
+  /** Who approves what (feature 016). Guarded by SETTINGS, matching the backend. */
+  settingsApprovals: '/dashboard/settings/approvals',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -694,6 +696,11 @@ export const SETTINGS_PERMISSIONS = {
   roles: 'USER_MANAGEMENT',
   users: 'USER_MANAGEMENT',
   'employee-setup': 'EMPLOYEES',
+  // Matches the backend's own guard on `/approvals/chains` and
+  // `/approvals/slot-mappings`. Defining a chain is a settings act; *approving*
+  // something is not, and has no permission at all — see
+  // app/dashboard/approvals/layout.tsx.
+  approvals: 'SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),

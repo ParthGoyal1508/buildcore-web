@@ -274,6 +274,101 @@ export interface DecideInput {
   reason?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Chain configuration (SETTINGS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * One slot and the role it resolves to for this company.
+ *
+ * The API returns **every canonical slot, mapped or not**, so an unmapped slot is a
+ * visible gap on the settings screen rather than an absent row nobody notices. That
+ * matters more than it sounds: an unmapped slot is the one failure mode of this feature
+ * that never resolves itself by waiting — until `first_approver` and `hr` are bound, no
+ * attendance exception can be decided by anybody.
+ *
+ * `roleId` and no role *name*. `Role` lives in the backend's `settings` schema and the
+ * approval spine may not read it (Constitution Principle I over there), so the name is
+ * resolved here against the roles list this screen already holds.
+ */
+const slotMappingSchema = z.object({
+  slotKey: z.string(),
+  label: z.string(),
+  roleId: z.string().nullable(),
+});
+
+const slotMappingListSchema = z.object({
+  slots: z.array(slotMappingSchema),
+});
+
+export type ApprovalSlotMapping = z.infer<typeof slotMappingSchema>;
+
+/** One level of a chain. */
+const chainLevelSchema = z.object({
+  id: z.string(),
+  position: z.number(),
+  slotKey: z.string(),
+  isFinalAuthority: z.boolean(),
+  label: z.string().nullable(),
+});
+
+/**
+ * A chain definition.
+ *
+ * Deactivated chains are included. An item already travelling one keeps the chain it
+ * entered — superseding a chain writes a new row rather than editing the old — so an
+ * administrator needs to be able to see what the old one was.
+ */
+const chainSchema = z.object({
+  id: z.string(),
+  companyId: z.string(),
+  actionType: openString,
+  isFinalAuthorityRequired: z.boolean(),
+  isActive: z.boolean(),
+  levels: z.array(chainLevelSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type ApprovalChain = z.infer<typeof chainSchema>;
+export type ApprovalChainLevel = z.infer<typeof chainLevelSchema>;
+
+/** Every chain defined for the caller's company. Requires `SETTINGS`. */
+export async function getApprovalChains(): Promise<ApprovalChain[]> {
+  const raw = await authFetch<unknown>('/approvals/chains');
+  return z.array(chainSchema).parse(raw);
+}
+
+/** Every canonical slot and the role it resolves to. Requires `SETTINGS`. */
+export async function getSlotMappings(): Promise<ApprovalSlotMapping[]> {
+  const raw = await authFetch<unknown>('/approvals/slot-mappings');
+  return slotMappingListSchema.parse(raw).slots;
+}
+
+/**
+ * Binds one slot to one role. Requires `SETTINGS`.
+ *
+ * **Refused with `APPROVAL_CHAIN_UNSATISFIABLE` when the mapping would leave an active
+ * chain unable to complete** — two of its levels resolving to the same role, which under
+ * the backend's FR-021a means nobody can decide both. The refusal names the conflicting
+ * levels, so the message is worth showing verbatim rather than replacing with a generic
+ * one; it is the only thing standing between a routine settings edit and a payroll run
+ * that silently stops moving.
+ *
+ * One slot per call rather than a whole map, matching the endpoint: a bulk write would
+ * either half-apply or have to report which member of the batch was the problem, which is
+ * the same single-slot message with extra steps.
+ */
+export async function putSlotMapping(input: {
+  slotKey: string;
+  roleId: string;
+}): Promise<unknown> {
+  return authFetch<unknown>('/approvals/slot-mappings', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
 /**
  * Records one decision and returns the item's updated state.
  *

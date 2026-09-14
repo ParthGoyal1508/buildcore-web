@@ -272,3 +272,91 @@ Verifying against a live API meant creating rows. They are still there:
 
 `prisma/seed.ts` clears punches, so a reseed removes the first. The rest are harmless and are what
 makes the approvals queue non-empty for whoever runs T033.
+
+---
+
+## Phase 6: Approval settings — added after the fact, 2026-09-14
+
+These were not in the original task list, and their absence was the gap the note above
+identified: the 33 tasks built every reviewer-facing surface and nothing that could
+**configure** one. Until the slots are mapped, none of those surfaces can do anything.
+
+- [X] T034 Add the chain and slot-mapping calls to `app/lib/api/approvals.ts` —
+      `getApprovalChains()`, `getSlotMappings()`, `putSlotMapping()`, with `zod` schemas
+      parsed at the boundary (Principle IV, Principle V)
+- [X] T035 Add `approvals` to `SETTINGS_PERMISSIONS` (`SETTINGS`, matching the backend's own
+      guard), `ROUTES.settingsApprovals` and `SETTINGS_SECTIONS`, so the section appears in
+      the index tiles and the tab strip through the one definition both already read
+- [X] T036 Create `app/dashboard/settings/approvals/page.tsx` and
+      `app/ui/settings/approval-settings.tsx`: one role dropdown per slot, saved on change
+- [X] T037 Show the count of unmapped levels before the form, not beside a row — somebody
+      arriving here after being told "nobody can approve this yet" needs the scale of what
+      is missing, not an empty dropdown to hunt for
+- [X] T038 Surface the `APPROVAL_CHAIN_UNSATISFIABLE` refusal **verbatim**. It names the two
+      conflicting levels, and that naming is the entire value of the guard
+- [X] T039 List the company's chains read-only, each level showing the role it currently
+      resolves to, with unmapped levels flagged
+
+## Implementation note — Phase 6, 2026-09-14
+
+`npx tsc --noEmit` clean, `npm run lint` 0 errors (the same two pre-existing warnings),
+`npm run build` clean with `/dashboard/settings/approvals` emitted.
+
+### Verified against a live system, and the loop closes
+
+The four exported approval calls were run **unmodified** against a running API — the real
+functions, the real schemas, the real responses. `getSlotMappings`, `getApprovalChains`,
+`getApprovalQueue` and `getApprovalCount` all parse.
+
+More useful than the parse: the state transition this whole feature was blocked on was
+driven through the endpoint this screen calls, and observed on a real flagged punch.
+
+| | before mapping | after mapping |
+|---|---|---|
+| `inertReason` | `slot_unmapped` | `insufficient_authority` |
+| `awaitingHolderCount` | 0 | 2 |
+
+Before, the control renders the amber fault: "Nobody can approve this yet: no role is
+mapped to Site / Employer for your company." After, it renders the ordinary grey state:
+"First approver decides this" — correct, because the signed-in account is a Super Admin
+mapped to `final`, not to level 1.
+
+The FR-021b guard was exercised too, by deliberately mapping `hr` to the same role as
+`final`:
+
+> Chain "attendance_exception" would become unsatisfiable: level 2 (HR) and level 3
+> (Director) would both resolve to the same role. One person cannot approve the same item
+> twice, so any item entering this chain would stall at level 3 whenever a single person
+> holds that role.
+
+That is shown verbatim. A generic "could not save" would throw away the only part of the
+message that says what to do about it.
+
+### Saved one slot at a time, deliberately
+
+The endpoint takes one slot per call, and the screen matches it rather than batching. A
+bulk save would either half-apply — a settings form that partly succeeded — or have to
+report which member of the batch was refused, which is the same single-slot message with
+extra steps. Saving on change rather than behind a Save button follows from the same
+thing: each write is independently valid or independently refused.
+
+There is no "unset" option in the dropdown. The backend has no delete for a mapping, and
+offering a control that silently did nothing would be worse than not offering it.
+
+### What is still not built
+
+**Chain definition is read-only here.** `POST`/`PUT`/`DELETE /approvals/chains` exist and
+are guarded, but this screen only lists chains. That is a deliberate scope call rather than
+an oversight: the *blocking* problem was that slots could not be mapped from the product,
+and chain editing is a larger surface — ordered levels, contiguity, final-authority
+placement, the unsatisfiability check running in both directions — that nothing currently
+needs. Every company gets working default chains from the backend's seeder, and the
+read-only list is enough to see what they are and whether they are staffed.
+
+Worth building when a company first wants a chain shape other than the default. Not before.
+
+### The manual passes are still not run
+
+T030–T033 remain unchecked, and this phase adds no browser verification of its own. The
+screen builds, its types check, and every call it makes has been proven against a live API
+— but nobody has looked at it.
