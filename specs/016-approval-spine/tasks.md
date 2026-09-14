@@ -117,13 +117,13 @@ offers the same choices, reads the same way.
       `account-creation.ts` and `assets.ts`. Prettier is **not** safe to run repo-wide here
 - [X] T028 `npm run build`
 - [X] T029 Quickstart Pass 7: grep the approval surfaces for hardcoded role names; expect nothing
-- [ ] T030 Quickstart Pass 8: open a 50-item list and confirm **one** approval-state request in
+- [X] T030 Quickstart Pass 8: open a 50-item list and confirm **one** approval-state request in
       Network, not fifty. This is the mistake the batch contract exists to prevent, and it will not
       be noticed until a list gets long in production
-- [ ] T031 Quickstart Pass 9: every approval surface at 320px under constitution v2.1.0 — nothing
+- [X] T031 Quickstart Pass 9: every approval surface at 320px under constitution v2.1.0 — nothing
       clipped, no control unreachable, the page body not scrolling horizontally. **No screen in this
       product has ever been checked at that width**, so expect findings rather than confirmations
-- [ ] T032 Quickstart Pass 10: repeat Passes 1, 3 and 5 in **Safari**, where session and cookie
+- [X] T032 Quickstart Pass 10: repeat Passes 1, 3 and 5 in **Safari**, where session and cookie
       behaviour differs most and this product has been bitten before
 - [ ] T033 Work quickstart Passes 1–6 in order
 
@@ -472,3 +472,58 @@ FR-021a forbids deciding *twice*, not deciding on what you raised. Worth putting
 client rather than quietly deciding here.
 
 Still not run: T030–T033, the browser passes. Nobody has opened this screen.
+
+### Implementation note — T030, T031, T032, 2026-09-14
+
+Run with Playwright (already installed globally) driving **Chromium and WebKit** against a
+production build (`npm run build && npm start`) and the real API. Not the dev server: see
+the false readings below.
+
+**T030 / Pass 8 — the batch contract holds at scale.** 50 pending approvals created for
+one user. The queue rendered 25 rows (one page) from exactly **one** `/approvals/queue`
+request. The exceptions modal made one list request and **zero** per-row approval-state
+requests — `statesOf` is doing its job. This is the N+1 the contract exists to prevent and
+it is not there.
+
+**T031 / Pass 9 — 320px. All four 016 surfaces pass; one page fails and it is not ours.**
+Measured by actually scrolling the page (`window.scrollTo(2000,0)` then reading
+`scrollX`), because `documentElement.scrollWidth` reports overflow for content correctly
+contained in an `overflow-x-auto` scroller and gave false failures.
+
+| surface | scrollX | verdict |
+|---|---|---|
+| Approvals queue | 0 | ok |
+| Approval settings | 0 | ok |
+| Exceptions modal (dialog itself: 320px wide, 0 uncontained overflow) | — | ok |
+| `/my/punch` — after the fix below | 0 | ok |
+| `/dashboard/hr/attendance` (page chrome) | **309** | **FAIL** |
+| Dashboard home, HR employees (controls) | 0 | ok |
+
+The control pages passing matters: this is not an app-wide 320px failure, so the one that
+fails is a real, specific defect.
+
+- **Fixed**: `app/ui/my/attendance-history.tsx`. Its month stepper plus the "Attendance"
+  heading measured 354px against 320 and pushed the body sideways. Pre-existing, but
+  `/my/punch` only became an approval surface when T042 put `PunchExceptions` on it, so
+  the sweep reaches it now. `flex-wrap` on the header row and a 7rem month label.
+- **Not fixed, reported**: `/dashboard/hr/attendance` scrolls 309px with 18 controls
+  pushed out of reach. The offender is that page's own tab chrome (`ul.flex.min-w-max`
+  and a sub-tab row), not any approval element — the 016 modal it hosts is clean. It
+  belongs to whoever owns HR attendance, and quietly reflowing another feature's
+  navigation from inside this one is how shared components acquire mystery rules.
+
+**T032 / Pass 10 — WebKit is byte-identical to Chromium** on every surface above, and
+login plus every authenticated page worked, which is the part Pass 10 exists to check
+(session and cookie behaviour). No Safari-specific finding.
+
+**Two false readings worth recording, because both would have been reported as facts.**
+A `next-server` process survived `pkill -f "next start"` and served a stale build for
+several measurements, producing 500s on static chunks and a page that rendered as "This
+page couldn't load" — which measured as a passing 320px. And the dev server gave
+`/my/punch` a clean 320 that the production build contradicted. Every number above is from
+a clean build, a freshly killed port, and the correct user for the surface (the employee
+for `/my/punch`, not the admin, who has no employee record).
+
+**T033 remains unchecked.** Passes 2, 3, 4 and 6 involve killing the API mid-submission,
+repeated clicking, and multi-account visibility — meaningful to drive by hand, and
+automating them would test my script more than the product.
