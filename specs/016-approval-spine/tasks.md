@@ -368,7 +368,7 @@ screen builds, its types check, and every call it makes has been proven against 
 Appended by `/speckit-converge` on 2026-09-14 against tip `326e849`. Two gaps, one of which the
 web half creates and the backend cannot currently resolve.
 
-- [ ] T040 **CRITICAL** Give the user a way out of `returned` (missing; traces to backend FR-005 via
+- [X] T040 **CRITICAL** Give the user a way out of `returned` (missing; traces to backend FR-005 via
       this spec's FR-002). `APPROVAL_ACTIONS` in `app/lib/constants.ts:1864` offers "Return for
       correction", and FR-002 requires it — so the product actively manufactures the `returned` state.
       But `app/lib/api/approvals.ts` exports no resubmit call, and the originator has no affordance
@@ -430,10 +430,45 @@ work, and it is a new surface rather than a wiring change, which is why it is no
 into this note as done. Until it exists, an approver who returns an attendance exception
 is returning it to somebody who will never be shown it.
 
-- [ ] T042 Give the employee a view of their own flagged punches under `app/my/`, showing
+- [X] T042 Give the employee a view of their own flagged punches under `app/my/`, showing
       each punch's approval state and the resubmit affordance when `canResubmitNow` is
       true. The control, the typed call and the copy all exist; what is missing is a route,
       a list, and a module endpoint the employee may call for their *own* punches (the
       current `workspace-admin/attendance-exceptions` list is permission-guarded for
       reviewers and returns the whole company). Without this, `return` remains a decision
       nobody downstream can act on for the one module currently on the spine.
+
+### Implementation note — T042, 2026-09-14
+
+T040 and T042 are both done; T040 was only ever waiting on a call site, and this is it.
+
+`GET /my/punch/exceptions` (buildcore-api, `PunchService.listMyExceptions`) and
+`PunchExceptions` on the existing **Punch** page. Not a new bottom-bar tab: that bar
+already carries six targets and its own comment notes they share the width of a phone, so
+a seventh would crowd it — and a flagged punch belongs in the worker's attendance section
+anyway. Placed above the month's history, because a section a worker has to scroll past
+the calendar to find is one they will not find.
+
+Verified live, with the real exported functions against a booted API, logged in as an
+actual employee rather than an admin:
+
+```
+rows parsed: 2
+target  → state: returned, canActNow: false, inertReason: null, canResubmitNow: true
+resubmit → state: pending, round 2
+after    → state: pending, canResubmitNow: false
+```
+
+That first line is the whole point: `canActNow: false` with a null `inertReason` is what
+used to render as nothing at all, so the punch was invisible to the only person who could
+move it.
+
+**One thing found and deliberately not changed.** `decide()` has no originator check, so
+an employee who happened to hold the first-approver role could approve their own flagged
+punch. That is pre-existing and independent of this screen — they could already do it
+through the admin exceptions modal with `ATTENDANCE` permission — and whether an
+originator may decide their own item is a policy question the spec does not answer.
+FR-021a forbids deciding *twice*, not deciding on what you raised. Worth putting to the
+client rather than quietly deciding here.
+
+Still not run: T030–T033, the browser passes. Nobody has opened this screen.

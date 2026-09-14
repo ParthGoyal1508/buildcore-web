@@ -1931,6 +1931,33 @@ export const APPROVAL_RESUBMIT = {
 } as const;
 
 /**
+ * The worker's own view of a punch that was flagged (016 T042).
+ *
+ * Written for somebody who did not choose to be in an approval chain and does not know
+ * the word "chain". "Being checked" rather than "pending approval"; "the office" rather
+ * than a level label they have no way to interpret. The one thing they must understand
+ * is when the item is waiting on *them*, which is what the resubmit copy says.
+ */
+export const MY_PUNCH_EXCEPTIONS = {
+  heading: 'Punches being checked',
+  /** Shown when the list is empty — the ordinary case, and good news. */
+  empty: 'None of your punches need checking.',
+  loadFailed: 'Your flagged punches could not be loaded.',
+  /** Why this punch was flagged, in the worker's words rather than the system's. */
+  reasons: {
+    geofence: 'Recorded away from your site',
+    face: 'Photo did not match',
+    both: 'Recorded away from your site, and the photo did not match',
+    unknown: 'Flagged for checking',
+  },
+  /** What a worker should take from the state, without naming a level. */
+  beingChecked: 'Being checked by the office.',
+  /** A punch that never entered a chain — visible, but not actionable by anyone here. */
+  notInChain:
+    'This punch is flagged but has not been sent for checking. Ask your supervisor.',
+} as const;
+
+/**
  * How often the pending-approval count re-checks the server (FR-013, SC-005).
  *
  * The count is a badge on every screen, so this is the only thing in the app that
