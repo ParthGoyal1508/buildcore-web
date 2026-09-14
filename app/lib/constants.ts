@@ -77,6 +77,12 @@ export const ROUTES = {
   // own sections.
   reminders: '/dashboard/reminders',
 
+  // Approvals (feature 016). Not a NAV_MODULES entry and deliberately not gated by a
+  // permission: authority to approve comes from the chain's slot mapping, not from a
+  // permission value, so anyone signed in may have a queue — see
+  // app/dashboard/approvals/layout.tsx.
+  approvals: '/dashboard/approvals',
+
   // --- Dashboard: Activity Log, Site & Group dashboards (feature 004) ---
   // Sub-pages of the Dashboard module, gated by DASHBOARD in their own layouts
   // (the `dashboard` NAV_MODULES entry is guardsSubtree: false — see reminders).
@@ -1827,4 +1833,105 @@ export function formatAssetQuantity(
     maximumFractionDigits: 3,
   });
   return unitOfMeasure ? `${number} ${unitOfMeasure}` : number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Approvals (feature 016)
+//
+// No approval copy may be written inline in a component. Every sentence a reviewer
+// reads about a chain is here, so the same decision reads the same way in every
+// module — which is the entire point of the feature (Principle III).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The three decisions, with their labels and whether a reason is required.
+ *
+ * Ordered approve-first because that is the common case and the one a reviewer reaches
+ * for; the two that need justification sit after it.
+ *
+ * `requiresReason` mirrors the backend's FR-006 rather than guessing at it: the server
+ * refuses a reject or return with no reason and answers `APPROVAL_REASON_REQUIRED`. This
+ * flag is what lets the control ask for the reason *before* sending, so a reviewer is not
+ * told off for something the form could have asked for.
+ */
+export const APPROVAL_ACTIONS = [
+  { action: 'approve', label: 'Approve', requiresReason: false },
+  { action: 'reject', label: 'Reject', requiresReason: true },
+  { action: 'return', label: 'Return for correction', requiresReason: true },
+] as const;
+
+export type ApprovalActionKey = (typeof APPROVAL_ACTIONS)[number]['action'];
+
+/**
+ * Why the control is inert — one message per `inertReason`, keyed by the backend's code.
+ *
+ * Four sentences rather than one, because they have four different remedies, and telling
+ * them apart is the difference between waiting, asking someone else, and opening a
+ * settings screen. Never branch on message text; branch on the code.
+ *
+ * `already_decided` is the one that matters most. A Super Admin holds every permission in
+ * the system, so "you do not have permission" said to one is simply untrue — and it sends
+ * the one person who *can* change permissions off to change permissions that were never
+ * the problem.
+ *
+ * `slot_unmapped` is the only one describing a **fault** rather than a state, and the only
+ * one that never resolves itself by waiting. It names the remedy because the person who
+ * hits it is rarely the person who can apply it. Note that the settings screen it points
+ * at is not built yet — the backend's `PUT /approvals/slot-mappings` exists, and until
+ * there is a screen for it an administrator maps slots through the API. That is worth
+ * saying plainly here rather than sending someone to look for a page that is not there.
+ */
+export const APPROVAL_INERT_MESSAGES = {
+  awaiting_other: (awaitingUserName: string | null, levelLabel: string | null) =>
+    awaitingUserName
+      ? `Waiting on ${awaitingUserName}`
+      : `Waiting on ${levelLabel ?? 'the next approver'}`,
+  already_decided: (_user: string | null, levelLabel: string | null) =>
+    levelLabel
+      ? `You already decided this at ${levelLabel}`
+      : 'You have already decided this',
+  insufficient_authority: (
+    _user: string | null,
+    levelLabel: string | null,
+  ) => `${levelLabel ?? 'Another level'} decides this`,
+  slot_unmapped: (_user: string | null, levelLabel: string | null) =>
+    `Nobody can approve this yet: no role is mapped to ${
+      levelLabel ?? 'this level'
+    } for your company. An administrator must map it before this can move.`,
+} as const;
+
+/**
+ * When an item's age in the queue becomes visually distinguishable (spec US3 scenario 5).
+ *
+ * Two working days. Short enough that a stalled decision is visible before somebody
+ * chases it, long enough that a normal overnight wait does not paint the whole queue
+ * amber — a warning everything triggers is a warning nobody reads.
+ */
+export const APPROVAL_QUEUE_AGE_WARNING_HOURS = 48;
+
+/**
+ * Human labels for the action types that exist today.
+ *
+ * A lookup with a fallback, **not** an exhaustive map. The backend's `actionType` is free
+ * text by design so a module can join the spine without a release on this side, so an
+ * unrecognised value is an expected input rather than a failure — `approvalActionTypeLabel`
+ * turns `letter_work_order` into "Letter work order" and moves on.
+ */
+export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
+  attendance_exception: 'Attendance exception',
+  attendance_exception_legacy: 'Attendance exception (historical)',
+  payroll_run: 'Payroll run',
+  payment_release: 'Payment release',
+  letter_work_order: 'Work order',
+  letter_loi: 'Letter of intent',
+  letter_purchase_order: 'Purchase order',
+  final_settlement: 'Final settlement',
+};
+
+/** The label for an action type, falling back to a readable form of the raw key. */
+export function approvalActionTypeLabel(actionType: string): string {
+  const known = APPROVAL_ACTION_TYPE_LABELS[actionType];
+  if (known) return known;
+  const words = actionType.replace(/_/g, ' ').trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : actionType;
 }

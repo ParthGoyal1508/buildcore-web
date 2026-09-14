@@ -7,6 +7,7 @@ import { PowerIcon } from '@heroicons/react/24/outline';
 import { logout } from '@/app/lib/api/auth';
 import CurrentUser from '@/app/ui/dashboard/current-user';
 import Logo from '@/app/ui/logo';
+import ApprovalBadge from '@/app/ui/dashboard/approval-badge';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
 
 export default function SideNav() {
@@ -65,6 +66,11 @@ export default function SideNav() {
               a user who holds DASHBOARD. It sits after the modules so it never pushes
               one out of the first mobile row. */}
           <ReminderBadge />
+          {/* Approvals, for the same reason and by the same mechanism — but with no
+              permission gate, because no permission grants the right to approve. It
+              hides itself when the queue is empty, so it never pushes a module out of
+              the first mobile row for somebody who has nothing waiting. */}
+          <ApprovalBadge />
           {/* The notifications bell was here too, and moved to the shell's top bar: a
               dropdown anchored to the bottom of this column could only open over the
               module links above it. See notification-bell.tsx. */}

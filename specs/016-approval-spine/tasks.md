@@ -19,12 +19,12 @@ task that adds a module-specific variant has failed even if it passes review.
 
 ## Phase 1: Foundational — the typed boundary
 
-- [ ] T001 Create `app/lib/api/approvals.ts` with `zod` schemas for `ApprovalState`,
+- [X] T001 Create `app/lib/api/approvals.ts` with `zod` schemas for `ApprovalState`,
       `DecisionHistoryEntry`, `ApprovalQueueEntry` and `ApprovalCount` per
       [data-model.md](./data-model.md), parsed at the boundary (Principle IV)
-- [ ] T002 (FR-014) Add the typed calls: `decide()`, `history()`, `queue()`, `queueCount()`. **All access to
+- [X] T002 (FR-014) Add the typed calls: `decide()`, `history()`, `queue()`, `queueCount()`. **All access to
       approvals goes through this module** (Principle V); no component may call `fetch`
-- [ ] T003 [P] (FR-015) Add `APPROVAL_ACTIONS`, `APPROVAL_INERT_MESSAGES` and
+- [X] T003 [P] (FR-015) Add `APPROVAL_ACTIONS`, `APPROVAL_INERT_MESSAGES` and
       `APPROVAL_QUEUE_AGE_WARNING_HOURS` to `app/lib/constants.ts` (Principle III). Four inert
       messages, keyed by code — the `slot_unmapped` one names the settings screen, because it
       describes a fault rather than a state
@@ -38,31 +38,31 @@ task that adds a module-specific variant has failed even if it passes review.
 **Independent test**: open a reviewable item in three modules; the control is in the same place,
 offers the same choices, reads the same way.
 
-- [ ] T004 [US1] (FR-001, FR-002) Create `app/ui/approvals/action-review.tsx` implementing
+- [X] T004 [US1] (FR-001, FR-002) Create `app/ui/approvals/action-review.tsx` implementing
       [contracts/action-review.md](./contracts/action-review.md). Props are `state`, `onDecide`,
       `entityLabel`, `size`. **Module identity is deliberately not a prop** — it is what would let
       one module diverge
-- [ ] T005 [US1] (FR-003, FR-003a) Render the four inert states as four distinct messages
+- [X] T005 [US1] (FR-003, FR-003a) Render the four inert states as four distinct messages
       (research.md §2). The states come from the backend's `inertReason`; this app computes none of
       them. A Super
       Admin who already decided must read "You approved this at {level}", **never** "you do not have
       permission" — that is untrue, and it sends the one person who can change permissions to go and
       change them
-- [ ] T006 [US1] Branch on `inertReason` and the backend's error codes, never on message text — the
+- [X] T006 [US1] Branch on `inertReason` and the backend's error codes, never on message text — the
       contract feature 015 established with `SESSION_EXPIRED`
-- [ ] T007 [US1] (FR-004) Require a reason inline for reject and return; do not send without one
-- [ ] T008 [US1] (FR-005) Disable during flight with visible progress, so repeated clicks produce
+- [X] T007 [US1] (FR-004) Require a reason inline for reject and return; do not send without one
+- [X] T008 [US1] (FR-005) Disable during flight with visible progress, so repeated clicks produce
       exactly one request
-- [ ] T009 [US1] **Preserve the typed reason across a failed submission** and allow retry without
+- [X] T009 [US1] **Preserve the typed reason across a failed submission** and allow retry without
       retyping (spec FR-006). Losing a paragraph of justification to a dropped connection is how
       people stop trusting a system
-- [ ] T010 [US1] (FR-007) Ensure a failed decision throws to the caller and never navigates away — only a 401
+- [X] T010 [US1] (FR-007) Ensure a failed decision throws to the caller and never navigates away — only a 401
       from renewal ends a session (feature 015; restated because losing a screen mid-review is
       exactly the regression worth guarding)
-- [ ] T011 [US1] (FR-003b) Use the server-supplied `levelLabel` and `awaitingUserName` everywhere
+- [X] T011 [US1] (FR-003b) Use the server-supplied `levelLabel` and `awaitingUserName` everywhere
       authority is described. **No role name may be written in this application** — the two companies may map the
       same slot differently, so a hardcoded name is right for one and silently wrong for the other
-- [ ] T012 [US1] Mount the control on attendance exceptions in `app/dashboard/hr/attendance/`, the
+- [X] T012 [US1] Mount the control on attendance exceptions in `app/dashboard/hr/attendance/`, the
       first and only consumer in this phase
 
 **Checkpoint**: quickstart Passes 1, 2, 3 and 4 hold. Pass 2 is the one worth doing twice.
@@ -71,18 +71,18 @@ offers the same choices, reads the same way.
 
 ## Phase 3: US2 — The record says who last touched it (P1)
 
-- [ ] T013 [US2] (FR-008) Create `app/ui/approvals/last-action.tsx` rendering the latest action,
+- [X] T013 [US2] (FR-008) Create `app/ui/approvals/last-action.tsx` rendering the latest action,
       actor and time from `state.latestAction`
-- [ ] T014 [US2] (FR-009) Create `app/ui/approvals/decision-history.tsx` as a **disclosure on the
+- [X] T014 [US2] (FR-009) Create `app/ui/approvals/decision-history.tsx` as a **disclosure on the
       record**,
       not a link to a separate page — the requirement is that the answer is in that place
       (research.md §6)
-- [ ] T015 [US2] Show a returned-and-resubmitted item's earlier decisions too, with `returnCount`
+- [X] T015 [US2] Show a returned-and-resubmitted item's earlier decisions too, with `returnCount`
       visible; the history must show that the item went round
-- [ ] T016 [US2] Render nothing that implies an action on an item never acted on — its state reads
+- [X] T016 [US2] Render nothing that implies an action on an item never acted on — its state reads
       as awaiting a first decision
-- [ ] T017 [P] [US2] Place `<LastAction>` in the attendance exception list and detail views
-- [ ] T018 [US2] Ensure the actor survives dense-table treatment at 320px: with the existing
+- [X] T017 [P] [US2] Place `<LastAction>` in the attendance exception list and detail views
+- [X] T018 [US2] Ensure the actor survives dense-table treatment at 320px: with the existing
       `ResponsiveList` card fallback or an `overflow-x` container, the actor must remain
       discoverable. Attribution truncated away entirely fails the requirement at exactly the width
       where it is most likely to be read in a hurry
@@ -91,17 +91,17 @@ offers the same choices, reads the same way.
 
 ## Phase 4: US3 — One place that shows what is waiting (P2)
 
-- [ ] T019 [US3] Create `app/dashboard/approvals/page.tsx` with a `layout.tsx` module guard,
+- [X] T019 [US3] Create `app/dashboard/approvals/page.tsx` with a `layout.tsx` module guard,
       following the feature 014 pattern
-- [ ] T020 [US3] (FR-010, FR-011) Create `app/ui/approvals/queue-table.tsx` showing module,
+- [X] T020 [US3] (FR-010, FR-011) Create `app/ui/approvals/queue-table.tsx` showing module,
       subject, requester and age, with the decision takeable from the row
-- [ ] T021 [US3] Distinguish items older than `APPROVAL_QUEUE_AGE_WARNING_HOURS` visually
-- [ ] T022 [US3] (FR-006) Say plainly when the queue is empty rather than rendering a blank screen
-- [ ] T023 [US3] (FR-013) Invalidate the queue and count on a successful decision so the item
+- [X] T021 [US3] Distinguish items older than `APPROVAL_QUEUE_AGE_WARNING_HOURS` visually
+- [X] T022 [US3] (FR-006) Say plainly when the queue is empty rather than rendering a blank screen
+- [X] T023 [US3] (FR-013) Invalidate the queue and count on a successful decision so the item
       leaves without a manual refresh; refetch on window focus (research.md §4)
-- [ ] T024 [US3] (FR-012) Add the pending count to `app/ui/dashboard/sidenav.tsx`, **reusing the existing
+- [X] T024 [US3] (FR-012) Add the pending count to `app/ui/dashboard/sidenav.tsx`, **reusing the existing
       reminder-badge mechanism** rather than adding a second one (Principle III)
-- [ ] T025 [US3] Back the badge with `queueCount()` only — it appears on every screen and must not
+- [X] T025 [US3] Back the badge with `queueCount()` only — it appears on every screen and must not
       pull the whole queue for a number
 
 **Checkpoint**: quickstart Passes 5 and 6.
@@ -110,13 +110,13 @@ offers the same choices, reads the same way.
 
 ## Phase 5: Verification
 
-- [ ] T025a (FR-016) Confirm no inline styling was introduced in any approval component
+- [X] T025a (FR-016) Confirm no inline styling was introduced in any approval component
       (Principle II) — a review item, not a lint rule, since nothing enforces it automatically
-- [ ] T026 [P] `npx tsc --noEmit`
-- [ ] T027 [P] `npm run lint` — expect 0 errors and the 2 pre-existing unused-var warnings in
+- [X] T026 [P] `npx tsc --noEmit`
+- [X] T027 [P] `npm run lint` — expect 0 errors and the 2 pre-existing unused-var warnings in
       `account-creation.ts` and `assets.ts`. Prettier is **not** safe to run repo-wide here
-- [ ] T028 `npm run build`
-- [ ] T029 Quickstart Pass 7: grep the approval surfaces for hardcoded role names; expect nothing
+- [X] T028 `npm run build`
+- [X] T029 Quickstart Pass 7: grep the approval surfaces for hardcoded role names; expect nothing
 - [ ] T030 Quickstart Pass 8: open a 50-item list and confirm **one** approval-state request in
       Network, not fifty. This is the mistake the batch contract exists to prevent, and it will not
       be noticed until a list gets long in production
@@ -164,3 +164,111 @@ There is no test framework, so every guarantee in this file rests on somebody ru
 passes. **T030 and T031 are the two most likely to be skipped and the two whose absence costs most**
 — an N+1 that only bites in production, and a responsive floor nothing in this codebase has ever been
 measured against.
+
+---
+
+## Implementation note — 2026-09-14
+
+**T001–T029 are done and committed. T030–T033 are not, and cannot be by me** — they require a
+browser, a 320px viewport and Safari. They are left unchecked rather than marked on the strength of
+reasoning, because the whole value of a manual pass is that somebody looked.
+
+Verification that did run: `npx tsc --noEmit` clean, `npm run lint` **0 errors** and exactly the two
+pre-existing unused-var warnings T027 predicts, `npm run build` clean with `/dashboard/approvals`
+emitted as a static route.
+
+### Every schema was checked against a live API, and four things had drifted
+
+`app/lib/api/approvals.ts` carries a comment saying its schemas were checked against live responses.
+That is literally true: the API was booted locally, fixtures were created, and every payload below
+was captured and parsed through the shipped schemas — queue page, count, attendance-exception rows
+(with an embedded approval state) and history. All four parse.
+
+Doing it found four places where this feature's own `data-model.md` and the shipped backend disagree.
+In every case the backend won, because the backend is what the browser receives:
+
+1. **`inertReason` is `insufficient_authority`, not `not_authorised`.** Branching on a value the
+   server never sends would have rendered every unauthorised control as a blank.
+2. **The latest act arrives as `latestDecision`, not `latestAction`.**
+3. **`levelLabel` is nullable** — null once the chain has finished. Typed as a bare string it parses
+   fine on a pending item and throws on the first approved one, which is the worst kind of schema
+   bug: it passes every test you thought to write.
+4. **`href` is nullable** on both the state and the queue row. A module with no screen for its item
+   supplies none.
+
+`data-model.md` was left as written. It is a design artifact recording what was intended; the code
+records what is true, and says where they differ.
+
+### The queue was fabricating data, and the fix was to narrow the prop
+
+The first version of `queue-table.tsx` built a full `ApprovalState` to hand to `<ActionReview>`,
+inventing `totalLevels`, `round` and `returnCount` to fill the shape. Every one of those was a number
+the browser did not know, presented as though it did — and the day the control started reading one,
+the queue would have lied quietly.
+
+`<ActionReview>` now takes `ActionReviewState`: a structural subset of exactly what it reads, with
+`currentPosition` and `totalLevels` **optional**. A module passes its full state unchanged; the queue
+passes the five fields it actually has. The "level 2 of 3" line renders only when both are present,
+because a queue row knows its position and not the chain's length.
+
+### `/dashboard/approvals` deliberately has no permission guard
+
+T019 says "with a `layout.tsx` module guard, following the feature 014 pattern". Following that
+literally would have been wrong, and the layout says why in place of doing it.
+
+**There is no permission that grants the right to approve.** Authority comes from holding the role a
+chain's level is mapped to — `buildcore-api`'s `/approvals/*` endpoints carry no
+`@RequirePermissions` for exactly that reason. A site engineer holding only `ATTENDANCE` may be the
+first approver on every attendance exception in the company, and a permission gate would hide their
+own queue from them. The queue is per-caller by construction: the server returns only what this user
+may act on, which is a better guard than a permission check because it cannot drift out of step with
+the chain configuration.
+
+`ApprovalBadge` follows the same rule — no `enabled:` gate, unlike `ReminderBadge`'s `DASHBOARD`
+check — and hides itself when the count is zero. Approvals is a queue, not a destination: a permanent
+"Approvals 0" trains people to read past it, and the week it says 3 they will read past that too.
+
+### What the attendance exceptions screen became
+
+It was read-only, on the stated reasoning that resolving an exception belonged on the punch itself.
+That reasoning was right for a single-step confirmation and is wrong for a chain: an exception now
+travels Site / Employer → HR → Director, and the people at levels two and three have no interest in
+the punch screen. It now lists each flagged punch with its level, its last action, a history
+disclosure, and the shared control.
+
+The endpoint moved with it — `/workspace-admin/attendance-exceptions` returns `{ punch, approval }`
+with the approval state resolved in one batch, so a fifty-row list costs one request rather than
+fifty. `approval` is nullable and the null case is real: a punch flagged before this feature shipped
+has no instance, and the row reads "Not in a chain" instead of an empty cell that looks like nothing
+to do.
+
+### What is not built, and it is the thing that blocks deployment
+
+**There is no settings screen for slot mappings, and no task in this file creates one.** The 33 tasks
+cover the reviewer-facing surfaces only; the spec names the settings screen in an inert message
+(T003) and nowhere else.
+
+This matters more than it looks. Until an administrator maps `first_approver`, `hr` and `final` to
+roles, **every attendance exception in every company is undecidable and no payroll run can produce a
+bank transfer sheet.** That is not a hypothetical: the local development company has all three slots
+unmapped right now, and the live capture used to verify these schemas shows
+`inertReason: "slot_unmapped"` on a real flagged punch.
+
+The backend endpoints exist — `GET`/`PUT /approvals/slot-mappings` and `GET`/`POST`/`PUT`/`DELETE
+/approvals/chains`, all guarded by `SETTINGS`. What is missing is a page that calls them. Until there
+is one, slots are mapped by calling the API directly, and `APPROVAL_INERT_MESSAGES.slot_unmapped`
+says so rather than pointing at a screen that does not exist.
+
+**This should be the next piece of work on this feature.**
+
+### Fixtures left in the local development database
+
+Verifying against a live API meant creating rows. They are still there:
+
+- one `PunchRecord` for a seeded employee, dated today, `geofenceResult: exception`,
+  `exceptionResolution: pending`, with its `attendance_exception` approval instance;
+- two `payment_release` approval instances (one `returned`, one `pending`);
+- a `final` → Super Admin slot mapping for the development company.
+
+`prisma/seed.ts` clears punches, so a reseed removes the first. The rest are harmless and are what
+makes the approvals queue non-empty for whoever runs T033.
