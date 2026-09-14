@@ -360,3 +360,37 @@ Worth building when a company first wants a chain shape other than the default. 
 T030–T033 remain unchecked, and this phase adds no browser verification of its own. The
 screen builds, its types check, and every call it makes has been proven against a live API
 — but nobody has looked at it.
+
+---
+
+## Phase 7: Convergence
+
+Appended by `/speckit-converge` on 2026-09-14 against tip `326e849`. Two gaps, one of which the
+web half creates and the backend cannot currently resolve.
+
+- [ ] T040 **CRITICAL** Give the user a way out of `returned` (missing; traces to backend FR-005 via
+      this spec's FR-002). `APPROVAL_ACTIONS` in `app/lib/constants.ts:1864` offers "Return for
+      correction", and FR-002 requires it — so the product actively manufactures the `returned` state.
+      But `app/lib/api/approvals.ts` exports no resubmit call, and the originator has no affordance
+      anywhere to send a returned item back up the chain. Returning an item is currently a one-way
+      trapdoor (see buildcore-api T061 for why: `returned` is a live state whose only exit is a service
+      method with no HTTP route). **This task is blocked on buildcore-api T061** — there is nothing to
+      call until that endpoint exists. When it does: add `resubmitApproval()` to the typed module
+      (Principle V), and surface it to the originator on the record, with its copy in the constants
+      module (FR-015). Note that `ActionReviewState` has no notion of "you raised this and it came
+      back" today — `inertReason` has four values and none of them is that — so the shared control
+      needs a state for the originator, not just for approvers.
+- [ ] T041 **HIGH** Make the queue and count reflect decisions taken elsewhere per FR-013 and SC-005
+      (partial). FR-013 says both "MUST reflect decisions taken elsewhere without a manual reload" and
+      SC-005 says the count "matches the queue contents at all times". Today invalidation is wired at
+      all three decision sites (`queue-table.tsx:76`, `exceptions-modal.tsx:81`,
+      `approval-settings.tsx:69`), which covers *the current user's own decision in the current tab* —
+      but nothing else. `app/providers.tsx:25` sets `refetchOnWindowFocus: false` globally and neither
+      `ApprovalBadge` nor the queue sets a `refetchInterval`, so a decision by another approver, in
+      another tab, or on another device never arrives; a manual reload is the only way. This collides
+      directly with FR-021 (two approvers at one level must not both decide): both see the item, the
+      first decides, and the second's queue still shows it — they click approve and get a refusal they
+      have no way to have anticipated, which is the exact confusion FR-013 exists to prevent. Add a
+      `refetchInterval` to the count query at minimum (the badge is cheap and mounted everywhere);
+      decide separately whether the queue itself polls or refetches on focus, and record the interval
+      in the constants module rather than inline.
