@@ -125,7 +125,7 @@ offers the same choices, reads the same way.
       product has ever been checked at that width**, so expect findings rather than confirmations
 - [X] T032 Quickstart Pass 10: repeat Passes 1, 3 and 5 in **Safari**, where session and cookie
       behaviour differs most and this product has been bitten before
-- [ ] T033 Work quickstart Passes 1–6 in order
+- [X] T033 Work quickstart Passes 1–6 in order
 
 ---
 
@@ -527,3 +527,61 @@ for `/my/punch`, not the admin, who has no employee record).
 **T033 remains unchecked.** Passes 2, 3, 4 and 6 involve killing the API mid-submission,
 repeated clicking, and multi-account visibility — meaningful to drive by hand, and
 automating them would test my script more than the product.
+
+### Implementation note — T033, 2026-09-15
+
+Passes 1–6 driven in Chromium against a production build and the real API. I had written
+that automating these "would test my script more than the product"; that was wrong for
+four of the six, and Pass 2 in particular turned out to be the most checkable thing in the
+feature.
+
+**Pass 2 — the three inert states. The one that matters most, and it holds.** One
+Super Admin, one exceptions modal, three rows, three genuinely different sentences:
+
+| row | control says |
+|---|---|
+| awaiting this user at Director | `Approve / Reject / Return for correction` |
+| this user already decided at level 1, now at Director | **`You already decided this at Director`** |
+| awaiting Site / Employer | `Site / Employer decides this` |
+| with `first_approver` unmapped | `Nobody can approve this yet: no role is mapped to Site / Employer for your company. Someone with settings access must map it under Settings → Approvals before this can move.` |
+
+Rows saying "permission" to a Super Admin: **0**. That is the untruth research.md §2 exists
+to prevent, and it does not occur. The `slot_unmapped` copy naming the settings screen is
+the correction made earlier this session — the message used to say the screen did not
+exist — now confirmed against a live unmapped slot rather than by reading the constant.
+
+**Pass 3 — a failed decision loses nothing.** Typed a 212-character reason, killed the API
+mid-flight (`pkill -f 'node dist/main'`), submitted. Reason still in the box: 212 chars.
+Failure shown. Still on the same screen, not signed out. All three hold.
+
+> **Finding, not fixed.** The message shown is `Internal Server Error`. It passes the
+> requirement — the failure is visible — but it is the wrong sentence for a supervisor who
+> just lost a connection, and the control's own fallback copy ("The decision could not be
+> recorded. Please try again.") is better than the message it actually displays, because
+> `ApiError.message` carries the proxy's 500 text and wins. Worth changing to prefer the
+> friendly copy when the error carries no `code`, but that is shared-control behaviour
+> affecting every module and not something to alter while verifying it.
+
+**Pass 4 — double submission is impossible.** Five clicks on Approve as fast as the driver
+allows: exactly **one** POST left the browser.
+
+**Pass 5 — the queue and the badge agree.** With 1 pending item: badge 1, queue 1. With 51:
+badge 51, queue 25. Not a disagreement — the badge counts everything pending and the queue
+pages at 25. The quickstart's wording ("same number of items") only holds below one page,
+which is worth saying explicitly so a future reader does not record a failure here.
+
+**Pass 6 — the queue never shows unactionable work.** An item this user decided at level 1,
+now sitting at a level they also hold, is **absent** from their queue; an item genuinely
+awaiting them is present.
+
+**Pass 1 — one control everywhere.** Confirmed across the two surfaces that have it, with
+identical actions and placement. Worth stating plainly that this is a weak pass today:
+attendance exceptions is the only business module on the spine, so "identical across
+modules" cannot really be tested until a second one migrates.
+
+**A measurement error worth recording.** Pass 4 first reported zero requests, which I
+nearly wrote up as a pass. The filter watched `POST /approvals/:id/decide`, but the
+exceptions modal calls its own module's `/workspace-admin/attendance-exceptions/:id/resolve`,
+which reaches `decide()` server-side. The item had in fact been approved exactly once. A
+request counter that watches the wrong URL reports perfect behaviour and an empty screen
+with equal confidence.
