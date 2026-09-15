@@ -585,3 +585,40 @@ exceptions modal calls its own module's `/workspace-admin/attendance-exceptions/
 which reaches `decide()` server-side. The item had in fact been approved exactly once. A
 request counter that watches the wrong URL reports perfect behaviour and an empty screen
 with equal confidence.
+
+### Implementation note — the Pass 3 error copy, 2026-09-15
+
+Changed, and **the new wording has not been seen in a browser.** Saying that plainly
+because the rest of this file records things that were observed.
+
+What changed: `ActionReview` showed the thrown error's own `message` whenever one existed.
+A refusal from the spine deserves that — its message names the level, or the already-decided
+state, or the unmapped slot. A transport failure does not: Pass 3 killed the API and the
+control faithfully displayed **"Internal Server Error"** to somebody who had just typed a
+paragraph of justification. A new `messageFor(e, fallback)` helper now shows the error's
+message only when it carries a machine-readable `code`, which is the mark of a deliberate
+refusal, and otherwise uses copy from the constants module. That also removes a real FR-015
+violation: the decision-failure sentence was hardcoded in the component.
+
+Verified: `tsc` clean, lint 0 errors, production build clean, and the branch is legible by
+reading — `code` is set only by the API client when the backend sends one.
+
+Not verified: that the new sentence appears. Two attempts to re-run Pass 3 against the
+changed control produced harness artifacts rather than results, and both are worth
+recording because each looked like a finding:
+
+1. **`pkill` mid-submission raced the request.** The item ended up `returned` — the
+   submission had *succeeded* — so the empty reason box and missing error I measured were a
+   successful save, not a failed one. Killing a process is not a way to make a request fail;
+   it is a way to make a request fail *sometimes*.
+2. **Aborting the request deterministically showed no error at all** — which looked much
+   worse, until a counter on the route handler showed **0 requests aborted**. The confirm
+   click had never landed: my locator matched the button that *opens* the reason box rather
+   than the one that submits it. A test that never presses the button reports a silent
+   failure with complete confidence.
+
+The original Pass 3 result stands as recorded above — reason preserved, failure visible, no
+navigation — and was taken against the code as it then was. What is untested is only whether
+the friendlier sentence renders in place of the proxy's. The path is short and the fallback
+is a plain string, but it is untested, and a shared control that every module depends on is
+exactly where that should be said out loud rather than assumed.

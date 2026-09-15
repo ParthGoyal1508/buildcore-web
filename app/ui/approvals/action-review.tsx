@@ -10,6 +10,7 @@ import type {
 } from '@/app/lib/api/approvals';
 import {
   APPROVAL_ACTIONS,
+  APPROVAL_DECISION_FAILED,
   APPROVAL_INERT_MESSAGES,
   APPROVAL_RESUBMIT,
 } from '@/app/lib/constants';
@@ -91,6 +92,22 @@ export interface ActionReviewProps {
   size?: 'inline' | 'full';
 }
 
+/**
+ * What to show the user when a decision call throws.
+ *
+ * The error's own message is shown **only** when it carries a machine-readable `code` —
+ * that is the mark of a deliberate refusal from the spine, whose wording names the level,
+ * the already-decided state, or the unmapped slot, and is the most useful sentence
+ * available. An error without a code came from the transport, and its message is whatever
+ * the proxy said: quickstart Pass 3 killed the API mid-submission and this control
+ * displayed "Internal Server Error" to somebody who had just typed a paragraph. Accurate
+ * and worthless — so the friendly copy wins there instead.
+ */
+function messageFor(e: unknown, fallback: string): string {
+  const code = (e as { code?: string } | null)?.code;
+  return code && e instanceof Error ? e.message : fallback;
+}
+
 export default function ActionReview({
   state,
   onDecide,
@@ -139,11 +156,7 @@ export default function ActionReview({
               setInFlight(true);
               onResubmit()
                 .catch((e: unknown) =>
-                  setError(
-                    e instanceof Error
-                      ? e.message
-                      : APPROVAL_RESUBMIT.failed,
-                  ),
+                  setError(messageFor(e, APPROVAL_RESUBMIT.failed)),
                 )
                 .finally(() => setInFlight(false));
             }}
@@ -199,11 +212,8 @@ export default function ActionReview({
       setReason('');
       setPending(null);
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'The decision could not be recorded. Please try again.',
-      );
+      // Copy lives in the constants module (FR-015); this line used to carry its own.
+      setError(messageFor(e, APPROVAL_DECISION_FAILED));
       // Deliberately no navigation and no sign-out. Only a 401 from renewal ends a
       // session (feature 015); losing a screen mid-review is exactly the regression
       // worth guarding against.

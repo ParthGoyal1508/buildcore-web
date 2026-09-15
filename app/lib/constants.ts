@@ -1914,6 +1914,21 @@ export const APPROVAL_INERT_MESSAGES = {
  * nothing else can be raised for the same record, and resubmitting is the only exit. A
  * reader who is not told that sees an item that looks finished and is not.
  */
+/**
+ * What the Action/Review control says when a decision could not be recorded (FR-006).
+ *
+ * Used **in place of** the error's own message whenever that error carries no
+ * machine-readable `code`. A refusal from the spine is worth quoting — it names the level,
+ * or says the slot is unmapped, and the reader can act on it. Anything without a code is a
+ * transport failure, and what reaches the browser then is the proxy's own words: quickstart
+ * Pass 3 kills the API mid-submission and the control faithfully displayed
+ * "Internal Server Error" to somebody who had just typed a paragraph of justification.
+ * True, and useless. The one thing that reader needs to know is that their words are safe.
+ */
+export const APPROVAL_DECISION_FAILED =
+  'The decision could not be recorded — the server could not be reached. ' +
+  'Your reason has been kept; try again.';
+
 export const APPROVAL_RESUBMIT = {
   /** Shown to the originator where the approve/reject/return buttons would be. */
   prompt: 'This was returned to you for correction.',
@@ -1921,7 +1936,8 @@ export const APPROVAL_RESUBMIT = {
   inFlight: 'Resubmitting…',
   /** After a successful resubmit, before the record's own state refreshes. */
   done: 'Sent back for approval.',
-  failed: 'It could not be resubmitted. Please try again.',
+  failed:
+    'It could not be resubmitted — the server could not be reached. Try again.',
   /**
    * Said once, next to the button. People resubmit without changing anything otherwise —
    * the chain restarts from level one either way, and the approver who returned it is
