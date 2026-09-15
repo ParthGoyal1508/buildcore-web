@@ -12,6 +12,14 @@
 **Scope**: The screens for filing documents, drafting templates, issuing letters and attaching
 payment proof. Storage, rendering and access rules belong to the backend spec.
 
+## Clarifications
+
+### Session 2026-09-15
+
+- Q: Is "digital signature" a signature image applied to the rendered document, or a legally recognised Digital Signature Certificate? → A: A signature **image**, applied at issue. There is no signing step, no credential prompt and no certificate journey to design; a signatory's graphic is uploaded once and stamped onto the document.
+- Q: Must issuing a work order, LOI or purchase order always go through the feature-016 approval chain? → A: **Always**, with no value threshold. The issue action is therefore gated, and this interface MUST show the approval state rather than offering an Issue button that the server will refuse.
+- Q: Does Aadhaar stay in the required company document set? → A: **Yes**, under stricter handling than the other kinds: retrieval is permission-restricted and audit-logged, and it is never rendered into a letter — so it MUST NOT appear in any template field picker or preview.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The company's papers, and what is missing (Priority: P1)
@@ -169,11 +177,19 @@ visible in the list.
 - **FR-009**: The letter composer MUST make only variable fields editable, showing fixed terms as
   non-editable.
 - **FR-010**: The composer MUST offer a preview identical to what will be issued.
+- **FR-010a**: For work orders, LOIs and purchase orders the composer MUST show the item's approval
+  state using the shared Action/Review control from feature 016, and MUST NOT present Issue as
+  available until the chain is complete. Every such letter is gated regardless of value
+  (Clarifications, 2026-09-15). Offering an Issue button the server will refuse is the specific
+  failure 016 FR-011 exists to prevent.
 - **FR-011**: The composer MUST warn before superseding an existing letter for the same recipient
   and kind.
 - **FR-012**: Users MUST be able to download an issued letter and upload a countersigned copy against
   it, with both distinguishable afterwards.
 - **FR-013**: Letter lists MUST distinguish issued from executed.
+- **FR-013a**: Aadhaar MUST NOT appear in any template field picker, preview or letter output, and
+  the interface MUST NOT display a stored Aadhaar document inline — it is retrievable only through an
+  explicit, permission-checked, audit-logged download (Clarifications, 2026-09-15).
 - **FR-014**: Administrators MUST be able to define a new letter kind, its variable fields and its
   fixed terms, without a developer.
 - **FR-015**: Template deletion MUST be refused while letters reference it, naming them.
@@ -220,8 +236,6 @@ visible in the list.
 - No test framework is installed (constitution `TODO(TESTING_STANDARD)`); verification is lint,
   type-check, build and manual passes. **No test-file tasks may be generated.**
 
-### Needing the client's decision
-
-- **[NEEDS CLARIFICATION: is "digital signature" an image or a legal DSC?]** Carried from the backend
-  spec because it changes this interface too: an image is applied at issue, whereas a legal
-  certificate requires a signing step, a credential and a different user journey.
+- Settled 2026-09-15: the signature is an image applied at issue, so this interface needs no signing
+  step, no credential prompt and no certificate management journey. Uploading a signatory's graphic
+  is an ordinary settings task.
