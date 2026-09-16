@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { authFetch, authFetchBlob } from '@/app/lib/session';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
+import { companyQuery } from '@/app/lib/api/company-query';
 
 /**
  * Every `/letters`, `/letter-kinds` and `/signatories` call (feature 017 US3–US6).
@@ -41,8 +42,10 @@ const letterKindSchema = z.object({
 });
 export type LetterKind = z.infer<typeof letterKindSchema>;
 
-export async function getLetterKinds(): Promise<LetterKind[]> {
-  const raw = await authFetch<unknown>('/letter-kinds');
+export async function getLetterKinds(
+  companyId?: string,
+): Promise<LetterKind[]> {
+  const raw = await authFetch<unknown>(`/letter-kinds${companyQuery(companyId)}`);
   return z.array(letterKindSchema).parse(raw);
 }
 
@@ -64,11 +67,13 @@ export interface UpsertLetterKindInput {
 export async function upsertLetterKind(
   input: UpsertLetterKindInput,
   id?: string,
+  companyId?: string,
 ): Promise<LetterKind> {
-  const raw = await authFetch<unknown>(
-    id ? `/letter-kinds/${encodeURIComponent(id)}` : '/letter-kinds',
-    { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) },
-  );
+  const path = id ? `/letter-kinds/${encodeURIComponent(id)}` : '/letter-kinds';
+  const raw = await authFetch<unknown>(`${path}${companyQuery(companyId)}`, {
+    method: id ? 'PUT' : 'POST',
+    body: JSON.stringify(input),
+  });
   return letterKindSchema.parse(raw);
 }
 
@@ -79,10 +84,14 @@ export async function upsertLetterKind(
  * shows that message verbatim — a generic "could not delete" throws away the only part
  * that says what to do instead.
  */
-export async function deleteLetterKind(id: string): Promise<void> {
-  await authFetch<unknown>(`/letter-kinds/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
+export async function deleteLetterKind(
+  id: string,
+  companyId?: string,
+): Promise<void> {
+  await authFetch<unknown>(
+    `/letter-kinds/${encodeURIComponent(id)}${companyQuery(companyId)}`,
+    { method: 'DELETE' },
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,8 +113,10 @@ export type Signatory = z.infer<typeof signatorySchema>;
  * applied server-side at issue; handing it to a browser would make forging a signed
  * letter a download away.
  */
-export async function getSignatories(): Promise<Signatory[]> {
-  const raw = await authFetch<unknown>('/signatories');
+export async function getSignatories(
+  companyId?: string,
+): Promise<Signatory[]> {
+  const raw = await authFetch<unknown>(`/signatories${companyQuery(companyId)}`);
   return z.array(signatorySchema).parse(raw);
 }
 
@@ -121,11 +132,13 @@ export interface UpsertSignatoryInput {
 export async function upsertSignatory(
   input: UpsertSignatoryInput,
   id?: string,
+  companyId?: string,
 ): Promise<Signatory> {
-  const raw = await authFetch<unknown>(
-    id ? `/signatories/${encodeURIComponent(id)}` : '/signatories',
-    { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) },
-  );
+  const path = id ? `/signatories/${encodeURIComponent(id)}` : '/signatories';
+  const raw = await authFetch<unknown>(`${path}${companyQuery(companyId)}`, {
+    method: id ? 'PUT' : 'POST',
+    body: JSON.stringify(input),
+  });
   return signatorySchema.parse(raw);
 }
 

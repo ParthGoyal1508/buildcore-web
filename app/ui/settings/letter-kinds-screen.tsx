@@ -10,6 +10,7 @@ import {
 } from '@/app/lib/api/letters';
 import { LETTER_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
   CheckboxField,
   FormError,
@@ -28,22 +29,33 @@ const QUERY_KEY = ['letter-kinds'];
  */
 export function LetterKindsScreen() {
   const queryClient = useQueryClient();
+  const { companyId } = useCompanyContext();
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
   const [requiresSignature, setRequiresSignature] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * The company is part of the key, not just the request (FR-021). Without it react-query
+   * answers a switch from its cache and shows the previous company's rows under the new
+   * company's name — the failure that looks exactly like success.
+   */
+  const queryKey = [...QUERY_KEY, companyId ?? 'own'];
+
   const { data, isPending, isError } = useQuery({
-    queryKey: QUERY_KEY,
-    queryFn: getLetterKinds,
+    queryKey,
+    queryFn: () => getLetterKinds(companyId ?? undefined),
   });
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey });
 
   const create = useMutation({
     mutationFn: () =>
-      upsertLetterKind({ key, label, requiresSignature }),
+      upsertLetterKind(
+        { key, label, requiresSignature },
+        undefined,
+        companyId ?? undefined,
+      ),
     onSuccess: () => {
       setKey('');
       setLabel('');
@@ -64,7 +76,7 @@ export function LetterKindsScreen() {
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => deleteLetterKind(id),
+    mutationFn: (id: string) => deleteLetterKind(id, companyId ?? undefined),
     onSuccess: () => {
       setError(null);
       void invalidate();

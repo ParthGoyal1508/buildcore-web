@@ -241,38 +241,46 @@ See `plan.md` § Amendment for W1–W3. No test-file tasks: this repo has no tes
 
 ### FR-019 — every defined kind is filable
 
-- [ ] T040 [US1] Add `supplementary` to `completenessSchema` in `app/lib/api/company-documents.ts`
+- [X] T040 [US1] Add `supplementary` to `completenessSchema` in `app/lib/api/company-documents.ts`
   with `.default([])`, so a client deployed ahead of the server degrades to today's behaviour
   instead of failing to parse.
-- [ ] T041 [US1] Build the upload control's `kinds` list from all three lists in
+- [X] T041 [US1] Build the upload control's `kinds` list from all three lists in
   `app/ui/documents/company-documents-screen.tsx`, and render supplementary documents in their own
   section beneath `CompletenessPanel`. **Do not merge them into `present`** — the panel's count
   measures the required eight and must not move when a trade licence is filed (W1).
 
 ### FR-020 — define the type in place
 
-- [ ] T042 [US1] Typed client call for `POST /company-documents/required-kinds/:code`.
-- [ ] T043 [US1] Replace `actionForMissing`'s `null` branch with a "Define and upload" action that
+- [X] T042 [US1] Typed client call for `POST /company-documents/required-kinds/:code`.
+- [X] T043 [US1] Replace `actionForMissing`'s `null` branch with a "Define and upload" action that
   calls T042, invalidates the query, and opens the upload form on the kind just materialised.
 
 ### FR-021 — the company selector
 
-- [ ] T044 Add an optional `companyId` to every function in `app/lib/api/company-documents.ts`,
+- [X] T044 Add an optional `companyId` to every function in `app/lib/api/company-documents.ts`,
   `app/lib/api/project-documents.ts` and `app/lib/api/letters.ts` (letters, letter kinds,
   signatories), appended as a query parameter.
-- [ ] T045 **Include the company id in every react-query key** on the four 017 screens. Without it
+- [X] T045 **Include the company id in every react-query key** on the four 017 screens. Without it
   the cache serves the previous company's documents on switch — FR-021 failing in the one way that
   looks like it is working (W3).
-- [ ] T046 [P] Wrap the four 017 pages' screens in `CompanyProvider` individually
+- [X] T046 [P] Wrap the four 017 pages' screens in `CompanyProvider` individually
   (`app/dashboard/settings/{company-documents,signatories,project-documents,letter-kinds}/page.tsx`).
   **Not** `app/dashboard/settings/layout.tsx`: it wraps every settings section and `employee-setup`
   already mounts its own provider, so hoisting renders two selectors there.
-- [ ] T047 Consume `useCompanyContext()` in the four screens and pass the id through to T044's calls.
+- [X] T047 Consume `useCompanyContext()` in the four screens and pass the id through to T044's calls.
 
 ### Verification
 
-- [ ] T048 `npx tsc --noEmit` and `npm run lint` — 0 errors, only the 2 known pre-existing warnings.
-- [ ] T049 `npm run build` clean.
+- [X] T048 `npx tsc --noEmit` and `npm run lint` — 0 errors, only the 2 known pre-existing warnings.
+- [X] T049 `npm run build` clean.
+**Not done, and deliberately so.** The letter **composer** surface (`POST /letters`,
+`/letters/:id/issue`, `/letters/:id/reissue`, `/letters/:id/countersigned`,
+`GET /letters`) still resolves its company from the caller. Its controller takes no
+`companyId` at all, so making it company-selectable is backend work this phase did not
+scope — and it is not one of the four settings pages FR-021 named. Feature 019's
+application-wide switcher reaches it; until then a cross-company caller composes letters
+for their home company only. Recorded here rather than left to be discovered.
+
 - [ ] T050 **Browser**: as Super Admin, switch company on the documents screen and confirm the list,
   the completeness count and a subsequent upload all follow the selection — including that switching
   back does not show the other company's rows from cache (T045's failure mode).

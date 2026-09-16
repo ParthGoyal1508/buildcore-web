@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { authFetch } from '@/app/lib/session';
+import { companyQuery } from '@/app/lib/api/company-query';
 
 /**
  * Every `/projects/document-requirements` call, plus project readiness (017 US2).
@@ -46,8 +47,12 @@ export const projectReadinessSchema = z.object({
 });
 export type ProjectDocumentReadiness = z.infer<typeof projectReadinessSchema>;
 
-export async function getDocumentRequirements(): Promise<ProjectDocumentRequirementSet> {
-  const raw = await authFetch<unknown>('/projects/document-requirements');
+export async function getDocumentRequirements(
+  companyId?: string,
+): Promise<ProjectDocumentRequirementSet> {
+  const raw = await authFetch<unknown>(
+    `/projects/document-requirements${companyQuery(companyId)}`,
+  );
   return requirementSetSchema.parse(raw);
 }
 
@@ -60,11 +65,15 @@ export async function getDocumentRequirements(): Promise<ProjectDocumentRequirem
  */
 export async function putDocumentRequirements(
   requirements: { documentTypeId: string; isMandatory?: boolean }[],
+  companyId?: string,
 ): Promise<ProjectDocumentRequirementSet> {
-  const raw = await authFetch<unknown>('/projects/document-requirements', {
-    method: 'PUT',
-    body: JSON.stringify({ requirements }),
-  });
+  const raw = await authFetch<unknown>(
+    `/projects/document-requirements${companyQuery(companyId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ requirements }),
+    },
+  );
   return requirementSetSchema.parse(raw);
 }
 

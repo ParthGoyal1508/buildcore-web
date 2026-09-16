@@ -2068,7 +2068,25 @@ export const DOCUMENT_COPY = {
    * A different sentence from "not uploaded", because it has a different next step:
    * somebody has to create the type before anything can be uploaded against it.
    */
-  typeNotDefined: 'No document type defined — create it in Employee Setup first',
+  /**
+   * Reworded 2026-09-16. It used to send the reader to Employee Setup, which is a
+   * different permission and a different screen — and the action beside this line now
+   * defines the type here, so the old sentence described a detour nobody has to take.
+   */
+  typeNotDefined: 'No document type defined for this kind yet',
+  defineAndUpload: 'Define and upload',
+  /**
+   * Documents outside the required eight (FR-019).
+   *
+   * "Also on file" rather than "Other" or "Supplementary": the reader is looking at a
+   * compliance screen, and the useful thing to say is that these are held too — not to
+   * name the category they fall into.
+   */
+  supplementaryHeading: 'Also on file',
+  supplementaryHint:
+    'Not part of the required set, so these do not change the figures above.',
+  defineFailed:
+    'The document type could not be defined. Please try again.',
   expiryRequired: 'This document expires, so an expiry date is required.',
   restrictedNotice:
     'Regulated personal data. It can be downloaded, and every download is recorded — there is no preview.',

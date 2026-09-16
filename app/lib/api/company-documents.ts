@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { authFetch, authFetchBlob } from '@/app/lib/session';
+import { companyQuery as scope } from '@/app/lib/api/company-query';
 
 /**
  * Every `/company-documents` call to `buildcore-api` (feature 017 US1).
@@ -52,6 +53,17 @@ const completenessSchema = z.object({
   present: z.array(companyDocumentSchema),
   missing: z.array(missingKindSchema),
   expiringSoon: z.array(companyDocumentSchema).default([]),
+  /**
+   * Documents filed against a kind outside the required set (backend FR-001a).
+   *
+   * `.default([])` rather than required: a client deployed ahead of the server should
+   * degrade to the old behaviour — no supplementary section — rather than fail to parse
+   * the whole response and render an error where a document list belongs.
+   *
+   * Never merged into `present`. `present` is what the completeness figure counts, and a
+   * trade licence must not be able to move a compliance number.
+   */
+  supplementary: z.array(companyDocumentSchema).default([]),
 });
 export type CompanyDocumentCompleteness = z.infer<typeof completenessSchema>;
 
@@ -62,9 +74,32 @@ export type CompanyDocumentCompleteness = z.infer<typeof completenessSchema>;
  * required set is company configuration and can change without a frontend release; a
  * browser computing it would be wrong the first time somebody changed it.
  */
-export async function getCompanyDocuments(): Promise<CompanyDocumentCompleteness> {
-  const raw = await authFetch<unknown>('/company-documents');
+export async function getCompanyDocuments(
+  companyId?: string,
+): Promise<CompanyDocumentCompleteness> {
+  const raw = await authFetch<unknown>(`/company-documents${scope(companyId)}`);
   return completenessSchema.parse(raw);
+}
+
+/**
+ * Brings a required kind's document type into existence (backend FR-003a).
+ *
+ * For the `documentTypeId: null` case above — the company never defined a type, so there
+ * is nothing to upload against. Only the **code** travels: the server takes the name,
+ * flags and restriction from its own configuration, which is what lets this route sit
+ * behind the same permission as the rest of this screen.
+ */
+export async function defineRequiredKind(
+  code: string,
+  companyId?: string,
+): Promise<{ documentTypeId: string; code: string; name: string }> {
+  const raw = await authFetch<unknown>(
+    `/company-documents/required-kinds/${encodeURIComponent(code)}${scope(companyId)}`,
+    { method: 'POST' },
+  );
+  return z
+    .object({ documentTypeId: z.string(), code: z.string(), name: z.string() })
+    .parse(raw);
 }
 
 export interface UploadCompanyDocumentInput {
@@ -85,11 +120,12 @@ export interface UploadCompanyDocumentInput {
  * delete verb for a statutory paper.
  */
 export async function uploadCompanyDocument(
-  input: UploadCompanyDocumentInput,
+  input: UploadCompanyDocumentInput & { companyId?: string },
 ): Promise<CompanyDocument> {
-  const raw = await authFetch<unknown>('/company-documents', {
+  const { companyId, ...body } = input;
+  const raw = await authFetch<unknown>(`/company-documents${scope(companyId)}`, {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify(body),
   });
   return companyDocumentSchema.parse(raw);
 }
@@ -106,9 +142,10 @@ export const supersedeCompanyDocument = uploadCompanyDocument;
 /** Every version of one kind, newest first — the history FR-006 preserves. */
 export async function getCompanyDocumentHistory(
   documentTypeId: string,
+  companyId?: string,
 ): Promise<CompanyDocument[]> {
   const raw = await authFetch<unknown>(
-    `/company-documents/${encodeURIComponent(documentTypeId)}/history`,
+    `/company-documents/${encodeURIComponent(documentTypeId)}/history${scope(companyId)}`,
   );
   return z.array(companyDocumentSchema).parse(raw);
 }
@@ -122,8 +159,11 @@ export async function getCompanyDocumentHistory(
  * a restricted kind has no inline preview — there is no way to look at one without the
  * look being recorded, and that is the point.
  */
-export async function downloadCompanyDocument(id: string): Promise<Blob> {
+export async function downloadCompanyDocument(
+  id: string,
+  companyId?: string,
+): Promise<Blob> {
   return authFetchBlob(
-    `/company-documents/${encodeURIComponent(id)}/download`,
+    `/company-documents/${encodeURIComponent(id)}/download${scope(companyId)}`,
   );
 }

@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 import { FormError } from '@/app/ui/settings/form-fields';
 
 /**
@@ -15,9 +16,16 @@ import { FormError } from '@/app/ui/settings/form-fields';
  * which is what FR-007 asks for and what the project list depends on.
  */
 export function ProjectDocumentsScreen() {
+  const { companyId } = useCompanyContext();
+
+  /**
+   * The company is part of the key, not just the request (FR-021). Without it react-query
+   * answers a switch from its cache and shows the previous company's rows under the new
+   * company's name — the failure that looks exactly like success.
+   */
   const { data, isPending, isError } = useQuery({
-    queryKey: ['project-document-requirements'],
-    queryFn: getDocumentRequirements,
+    queryKey: ['project-document-requirements', companyId ?? 'own'],
+    queryFn: () => getDocumentRequirements(companyId ?? undefined),
   });
 
   if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;

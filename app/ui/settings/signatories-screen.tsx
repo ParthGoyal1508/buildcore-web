@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { getSignatories, upsertSignatory } from '@/app/lib/api/letters';
 import { Button } from '@/app/ui/button';
+import { useCompanyContext } from '@/app/ui/settings/company-context';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
 
 const QUERY_KEY = ['signatories'];
@@ -35,32 +36,44 @@ function readAsBase64(file: File): Promise<string> {
  */
 export function SignatoriesScreen() {
   const queryClient = useQueryClient();
+  const { companyId } = useCompanyContext();
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * The company is part of the key, not just the request (FR-021). Without it react-query
+   * answers a switch from its cache and shows the previous company's rows under the new
+   * company's name — the failure that looks exactly like success.
+   */
+  const queryKey = [...QUERY_KEY, companyId ?? 'own'];
+
   const { data, isPending, isError } = useQuery({
-    queryKey: QUERY_KEY,
-    queryFn: getSignatories,
+    queryKey,
+    queryFn: () => getSignatories(companyId ?? undefined),
   });
 
   const create = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Choose a signature image.');
-      return upsertSignatory({
-        name,
-        title,
-        signature: await readAsBase64(file),
-        contentType: file.type || 'image/png',
-      });
+      return upsertSignatory(
+        {
+          name,
+          title,
+          signature: await readAsBase64(file),
+          contentType: file.type || 'image/png',
+        },
+        undefined,
+        companyId ?? undefined,
+      );
     },
     onSuccess: () => {
       setName('');
       setTitle('');
       setFile(null);
       setError(null);
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey });
     },
     onError: (err: unknown) => {
       const code = (err as { code?: string } | null)?.code;
