@@ -64,6 +64,29 @@ const completenessSchema = z.object({
    * trade licence must not be able to move a compliance number.
    */
   supplementary: z.array(companyDocumentSchema).default([]),
+  /**
+   * Every kind that may be uploaded against, held or not (backend FR-001a).
+   *
+   * A different question from `present` and `supplementary`, which say what the company
+   * holds. Building the upload control from those two means a newly defined kind can
+   * never receive its first document: it is in no list, so it is in no dropdown, so it
+   * never gets one.
+   *
+   * `.default([])` so an older server degrades to the previous behaviour rather than
+   * failing to parse.
+   */
+  availableKinds: z
+    .array(
+      z.object({
+        documentTypeId: z.string(),
+        code: z.string(),
+        name: z.string(),
+        hasExpiry: z.boolean().default(false),
+        isRestricted: z.boolean().default(false),
+        isRequired: z.boolean().default(false),
+      }),
+    )
+    .default([]),
 });
 export type CompanyDocumentCompleteness = z.infer<typeof completenessSchema>;
 

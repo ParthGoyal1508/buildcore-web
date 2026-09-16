@@ -9,7 +9,6 @@ import {
   getCompanyDocuments,
   uploadCompanyDocument,
   type CompanyDocument,
-  type MissingKind,
 } from '@/app/lib/api/company-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { CompletenessPanel } from '@/app/ui/documents/completeness-panel';
@@ -30,7 +29,18 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
  */
 export function CompanyDocumentsScreen() {
   const queryClient = useQueryClient();
-  const { companyId } = useCompanyContext();
+  const { companyId, canSwitch } = useCompanyContext();
+  /**
+   * Held until the company is settled, for a caller who can switch (FR-021).
+   *
+   * `CompanyProvider` resolves to `null` on first render and to a real id once the
+   * company list arrives. Firing in between asks the server for "my own company", which
+   * is either a different company's data shown for an instant under the selected
+   * company's name, or — for a cross-company account with no home company of its own —
+   * a refusal the screen would render as a load failure before recovering. A caller who
+   * cannot switch never waits: their `null` means "use my own", which is correct.
+   */
+  const scopeReady = !canSwitch || companyId !== null;
   const [uploadFor, setUploadFor] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [defineError, setDefineError] = useState<string | null>(null);
@@ -47,6 +57,7 @@ export function CompanyDocumentsScreen() {
   const { data, isPending, isError } = useQuery({
     queryKey,
     queryFn: () => getCompanyDocuments(companyId ?? undefined),
+    enabled: scopeReady,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
@@ -84,32 +95,22 @@ export function CompanyDocumentsScreen() {
   }
 
   /**
-   * What the upload control may offer.
+   * What the upload control may offer — the server's `availableKinds`, verbatim.
    *
-   * Every kind the company has actually defined a type for — required or not (FR-019).
-   * A required kind with a null `documentTypeId` is excluded because there is nothing to
-   * upload against yet; its row carries "Define and upload" instead, which creates the
-   * type and then opens this form on it.
+   * Built from that rather than assembled out of `present`, `missing` and
+   * `supplementary`, which is what the first cut of FR-019 did and which could only ever
+   * offer a kind that already held a document. A kind defined a minute ago belongs in
+   * none of those three lists, so it was impossible to file the first document against.
+   *
+   * `expires` comes from the kind, not from whether the document on file happens to have
+   * a date: an expiring kind with nothing filed yet still has to ask for one.
    */
-  const kinds: UploadKind[] = [
-    ...data.missing
-      .filter((m): m is MissingKind & { documentTypeId: string } =>
-        Boolean(m.documentTypeId),
-      )
-      .map((m) => ({
-        documentTypeId: m.documentTypeId,
-        name: m.label,
-        // The server decides; the client cannot know which kinds expire, and guessing
-        // would ask for a date the server does not want or skip one it does.
-        expires: true,
-      })),
-    ...[...data.present, ...data.supplementary].map((d) => ({
-      documentTypeId: d.documentTypeId,
-      name: d.name,
-      expires: d.expiresAt !== null,
-      isRestricted: d.isRestricted,
-    })),
-  ];
+  const kinds: UploadKind[] = data.availableKinds.map((k) => ({
+    documentTypeId: k.documentTypeId,
+    name: k.name,
+    expires: k.hasExpiry,
+    isRestricted: k.isRestricted,
+  }));
 
   const open = async (doc: CompanyDocument) => {
     setDownloadError(null);

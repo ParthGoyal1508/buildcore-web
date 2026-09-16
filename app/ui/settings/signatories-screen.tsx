@@ -36,7 +36,18 @@ function readAsBase64(file: File): Promise<string> {
  */
 export function SignatoriesScreen() {
   const queryClient = useQueryClient();
-  const { companyId } = useCompanyContext();
+  const { companyId, canSwitch } = useCompanyContext();
+  /**
+   * Held until the company is settled, for a caller who can switch (FR-021).
+   *
+   * `CompanyProvider` resolves to `null` on first render and to a real id once the
+   * company list arrives. Firing in between asks the server for "my own company", which
+   * is either a different company's data shown for an instant under the selected
+   * company's name, or — for a cross-company account with no home company of its own —
+   * a refusal the screen would render as a load failure before recovering. A caller who
+   * cannot switch never waits: their `null` means "use my own", which is correct.
+   */
+  const scopeReady = !canSwitch || companyId !== null;
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -52,6 +63,7 @@ export function SignatoriesScreen() {
   const { data, isPending, isError } = useQuery({
     queryKey,
     queryFn: () => getSignatories(companyId ?? undefined),
+    enabled: scopeReady,
   });
 
   const create = useMutation({

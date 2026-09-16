@@ -16,7 +16,18 @@ import { FormError } from '@/app/ui/settings/form-fields';
  * which is what FR-007 asks for and what the project list depends on.
  */
 export function ProjectDocumentsScreen() {
-  const { companyId } = useCompanyContext();
+  const { companyId, canSwitch } = useCompanyContext();
+  /**
+   * Held until the company is settled, for a caller who can switch (FR-021).
+   *
+   * `CompanyProvider` resolves to `null` on first render and to a real id once the
+   * company list arrives. Firing in between asks the server for "my own company", which
+   * is either a different company's data shown for an instant under the selected
+   * company's name, or — for a cross-company account with no home company of its own —
+   * a refusal the screen would render as a load failure before recovering. A caller who
+   * cannot switch never waits: their `null` means "use my own", which is correct.
+   */
+  const scopeReady = !canSwitch || companyId !== null;
 
   /**
    * The company is part of the key, not just the request (FR-021). Without it react-query
@@ -26,6 +37,7 @@ export function ProjectDocumentsScreen() {
   const { data, isPending, isError } = useQuery({
     queryKey: ['project-document-requirements', companyId ?? 'own'],
     queryFn: () => getDocumentRequirements(companyId ?? undefined),
+    enabled: scopeReady,
   });
 
   if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;
