@@ -20,14 +20,10 @@ import {
 import { RestrictedNotice } from '@/app/ui/documents/restricted-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
-  Button,
-} from '@/app/ui/button';
-import {
-  CheckboxField,
-  FormError,
-  RowAction,
-  TextField,
-} from '@/app/ui/settings/form-fields';
+  DocumentKindForm,
+  type DocumentKindInput,
+} from '@/app/ui/documents/document-kind-form';
+import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 
 /**
  * The company's statutory papers (017 US1).
@@ -53,9 +49,6 @@ export function CompanyDocumentsScreen() {
   const [uploadFor, setUploadFor] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [defineError, setDefineError] = useState<string | null>(null);
-  const [kindName, setKindName] = useState('');
-  const [kindExpires, setKindExpires] = useState(false);
-  const [kindNeedsNumber, setKindNeedsNumber] = useState(false);
 
   /**
    * The company is part of the key, not just the request (FR-021).
@@ -107,20 +100,10 @@ export function CompanyDocumentsScreen() {
    * certificate in their hand.
    */
   const addKind = useMutation({
-    mutationFn: () =>
-      createCompanyDocumentKind(
-        {
-          name: kindName,
-          hasExpiry: kindExpires,
-          needsNumber: kindNeedsNumber,
-        },
-        companyId ?? undefined,
-      ),
+    mutationFn: (input: DocumentKindInput) =>
+      createCompanyDocumentKind(input, companyId ?? undefined),
     onSuccess: async (created) => {
       setDefineError(null);
-      setKindName('');
-      setKindExpires(false);
-      setKindNeedsNumber(false);
       await invalidate();
       setUploadFor(created.documentTypeId);
     },
@@ -261,45 +244,11 @@ export function CompanyDocumentsScreen() {
         <h3 className="mb-1 text-sm font-medium text-gray-900">
           {DOCUMENT_COPY.addKindHeading}
         </h3>
-        <p className="mb-3 text-xs text-gray-500">
-          {DOCUMENT_COPY.addKindHint}
-        </p>
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addKind.mutate();
-          }}
-        >
-          <TextField
-            id="new-kind-name"
-            label={DOCUMENT_COPY.addKindNameLabel}
-            value={kindName}
-            onChange={(event) => setKindName(event.target.value)}
-            maxLength={120}
-            required
-          />
-          <CheckboxField
-            id="new-kind-expires"
-            label={DOCUMENT_COPY.addKindExpires}
-            checked={kindExpires}
-            onChange={(event) => setKindExpires(event.target.checked)}
-          />
-          <CheckboxField
-            id="new-kind-number"
-            label={DOCUMENT_COPY.addKindNeedsNumber}
-            checked={kindNeedsNumber}
-            onChange={(event) => setKindNeedsNumber(event.target.checked)}
-          />
-          <div>
-            <Button
-              type="submit"
-              disabled={addKind.isPending || kindName.trim().length < 2}
-            >
-              {DOCUMENT_COPY.addKindSubmit}
-            </Button>
-          </div>
-        </form>
+        <DocumentKindForm
+          idPrefix="company"
+          busy={addKind.isPending}
+          onCreate={(input) => addKind.mutateAsync(input)}
+        />
       </section>
 
       <section className="rounded-lg border border-gray-200 p-4">

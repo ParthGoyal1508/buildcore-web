@@ -18,6 +18,20 @@ const requirementSchema = z.object({
 });
 export type ProjectDocumentRequirement = z.infer<typeof requirementSchema>;
 
+/**
+ * A kind that may be required of a project, whether or not it currently is (FR-007a).
+ *
+ * `.default([])` so a client deployed ahead of the server degrades to the read-only list
+ * rather than failing to parse the whole response.
+ */
+const availableTypeSchema = z.object({
+  documentTypeId: z.string(),
+  code: z.string(),
+  name: z.string(),
+  isRequired: z.boolean().default(false),
+});
+export type AvailableDocumentType = z.infer<typeof availableTypeSchema>;
+
 const requirementSetSchema = z.object({
   requirements: z.array(requirementSchema),
   /**
@@ -34,6 +48,8 @@ const requirementSetSchema = z.object({
    * required set and nobody sees the sixth kind disappear.
    */
   undefinedCodes: z.array(z.string()).default([]),
+  /** What may be required — the list an editor picks from (FR-007a). */
+  availableTypes: z.array(availableTypeSchema).default([]),
 });
 export type ProjectDocumentRequirementSet = z.infer<
   typeof requirementSetSchema
@@ -46,6 +62,27 @@ export const projectReadinessSchema = z.object({
   missingTypeIds: z.array(z.string()).default([]),
 });
 export type ProjectDocumentReadiness = z.infer<typeof projectReadinessSchema>;
+
+
+/**
+ * Brings a declared project kind into existence (backend FR-007a).
+ *
+ * For a code `undefinedCodes` reports. Only the code travels — the server takes the
+ * name, flags and scope from its own configuration, and refuses any code outside the six
+ * FR-007 names, which is what keeps this from reaching the company's own kinds.
+ */
+export async function defineProjectDocumentKind(
+  code: string,
+  companyId?: string,
+): Promise<{ documentTypeId: string; code: string; name: string }> {
+  const raw = await authFetch<unknown>(
+    `/projects/document-requirements/kinds/${encodeURIComponent(code)}${companyQuery(companyId)}`,
+    { method: 'POST' },
+  );
+  return z
+    .object({ documentTypeId: z.string(), code: z.string(), name: z.string() })
+    .parse(raw);
+}
 
 export async function getDocumentRequirements(
   companyId?: string,

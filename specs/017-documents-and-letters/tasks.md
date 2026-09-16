@@ -291,24 +291,24 @@ for their home company only. Recorded here rather than left to be discovered.
 
 ### FR-022 — the project documents editor (2026-09-16, second amendment)
 
-- [ ] T053 Add `availableTypes` to the requirement-set schema in
+- [X] T053 Add `availableTypes` to the requirement-set schema in
   `app/lib/api/project-documents.ts` with `.default([])`, and a client call for
   `POST /projects/document-requirements/kinds/:code`.
-- [ ] T054 Extract the "Add a document kind" form from `company-documents-screen.tsx` into
+- [X] T054 Extract the "Add a document kind" form from `company-documents-screen.tsx` into
   `app/ui/documents/document-kind-form.tsx` and use it from both screens (plan W7). The extraction
   comes first so the second screen never has a copy to diverge from.
-- [ ] T055 Turn `project-documents-screen.tsx` into an editor: per-row Required/Optional and Remove,
+- [X] T055 Turn `project-documents-screen.tsx` into an editor: per-row Required/Optional and Remove,
   an "Add a requirement" picker built from `availableTypes` minus what is already required (W6 —
   offering an option that silently does nothing is its own bug), a single Save, and Discard.
-- [ ] T056 Save is inert until something changed, and Discard restores what the server last
+- [X] T056 Save is inert until something changed, and Discard restores what the server last
   returned. One PUT for the whole set, never one per toggle: the endpoint's unit is the set, and an
   interrupted third of three writes would leave a set nobody chose (W4).
-- [ ] T057 Say what `usingDefaults` means and adopt on save (W5): a line stating these six are what
+- [X] T057 Say what `usingDefaults` means and adopt on save (W5): a line stating these six are what
   the product ships and that saving makes them this company's own. Same rows either way — this is
   not a second screen.
-- [ ] T058 Give `undefinedCodes` the action it has always described: "Define it", calling T053's
+- [X] T058 Give `undefinedCodes` the action it has always described: "Define it", calling T053's
   route, then refetch so the kind becomes requirable (W6).
-- [ ] T059 `npx tsc --noEmit`, `npm run lint` (0 errors, 2 known pre-existing warnings),
+- [X] T059 `npx tsc --noEmit`, `npm run lint` (0 errors, 2 known pre-existing warnings),
   `npm run build`.
 - [ ] T060 **Browser**: as Super Admin on Parth Realcon, move a kind to Optional, add one, remove
   one, Save, reload and confirm it stuck. Then switch company and confirm the other company's set is

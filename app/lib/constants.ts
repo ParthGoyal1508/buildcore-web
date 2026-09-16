@@ -2093,6 +2093,37 @@ export const DOCUMENT_COPY = {
   addKindNeedsNumber: 'It carries a reference number',
   addKindSubmit: 'Add kind',
   addKindFailed: 'The document kind could not be added. Please try again.',
+
+  // ── Project document requirements (FR-022) ──────────────────────────────────
+  /**
+   * Said in the present tense and about what happens next, not about system state.
+   * "usingDefaults: true" is a fact about a column; what an administrator needs to know
+   * is that editing these makes them theirs.
+   */
+  requirementsDefaults:
+    'These are the documents BuildCore expects every project to hold. They become this company’s own set the moment you save.',
+  requirementsConfigured:
+    'This company’s own set. Every project is measured against it.',
+  requirementsAddHeading: 'Require another document',
+  requirementsAddPlaceholder: 'Choose a document kind…',
+  requirementsAddButton: 'Require it',
+  requirementsNoneToAdd:
+    'Every kind this company has defined is already on the list. Add a new kind below to require something else.',
+  requirementsSave: 'Save requirements',
+  requirementsDiscard: 'Discard changes',
+  requirementsSaved: 'Requirements saved.',
+  requirementsSaveFailed:
+    'The requirements could not be saved. Nothing was changed.',
+  requirementsEmpty:
+    'No documents are required. Every project will report itself fully papered.',
+  requirementsUndefinedHeading: 'Not available to require yet',
+  requirementsUndefinedHint:
+    'BuildCore expects these, but this company has no document type for them. Projects are not measured against a kind that does not exist.',
+  requirementsDefineIt: 'Define it',
+  requirementsDefineFailed:
+    'The document kind could not be defined. Please try again.',
+  requirementsKindHint:
+    'For a document BuildCore does not name — a site handover note, a client NOC. It becomes available to require immediately.',
   defineFailed:
     'The document type could not be defined. Please try again.',
   expiryRequired: 'This document expires, so an expiry date is required.',
