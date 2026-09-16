@@ -156,3 +156,37 @@ plumbing that should have been there at first write.
 Query keys gain the company id. Without it react-query serves the previous company's documents from
 cache on switch, which is FR-021's "every read carries the selected company" failing in the one way
 that looks like it works.
+
+---
+
+## Amendment — 2026-09-16 (second), FR-022
+
+### W4 — one editor, one Save, and a visible dirty state
+
+The set is edited locally and written with the single `PUT` the backend offers, which replaces
+rather than merges. Per-row autosave would mean one request per toggle against an endpoint whose
+unit is the whole set — three toggles would be three complete rewrites, and an interrupted third
+would leave a set nobody chose.
+
+So: local state, an explicit Save, and the button inert until something actually changed. Discard
+restores what the server last returned.
+
+### W5 — the defaults are shown, labelled, and adopted by saving
+
+`usingDefaults` from the server drives a line saying these six are what the product ships and that
+saving makes them this company's own. The rows are the same rows either way — the screen is not two
+screens — and the first save is an ordinary save that happens to write six rows where there were
+none (backend D7).
+
+### W6 — `undefinedCodes` gets the action it always described
+
+A required kind with no document type behind it renders a "Define it" action calling the new
+project-side route, rather than a sentence about a problem with nothing to do about it. Same shape as
+the fix Company Documents just got.
+
+### W7 — the kind form is extracted, not copied
+
+`app/ui/documents/document-kind-form.tsx`, lifted out of `company-documents-screen.tsx` and used by
+both. Two copies of a form that creates rows in one table is how the two drift into disagreeing about
+what a kind is — and the Company Documents copy is a week old, which is exactly when extracting is
+cheap.

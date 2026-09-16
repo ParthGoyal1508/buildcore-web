@@ -27,6 +27,8 @@ same date for the requirements these follow from (FR-001a, FR-003a, FR-025).
 
 - Q: The upload control offers only the required eight kinds. May an administrator file anything else? → A: **Yes.** The control offers every document kind the company has defined. The completeness panel continues to measure only the required eight; supplementary documents are listed beneath it and counted in neither column, because a count that moves when an unrelated certificate is filed answers a different question than the one asked.
 - Q: A required kind with no document type defined renders no action at all today. What should it offer? → A: **Defining the type, in place.** The typed client already carries the distinction; the screen discarded it.
+- Q: The Project Documents screen is read-only, so the required set cannot be configured from anywhere. → A: **Make it an editor.** Each requirement can be moved between required and optional, added or removed; a kind the company has not defined can be defined in place, the same form Company Documents carries. The blocker was never the write endpoint — it was that a picker had nothing to list until document kinds carried a scope.
+- Q: What does the editor show for a company that has configured nothing? → A: **The six shipped defaults, labelled as defaults**, with the first save adopting them as that company's own set. The screen shows what is about to be adopted rather than describing it.
 - Q: These screens show one company with no way to change it. → A: **Mount the existing company selector**, as the plant, recruitment and employee-setup sections already do. Feature 019 replaces it with a persistent application-wide switcher; this is consistency with what ships today, not an early draft of that.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -207,6 +209,11 @@ visible in the list.
 - **FR-017**: Payments MUST accept a proof attachment, and payment lists MUST show which lack one.
 - **FR-018**: All access MUST go through the typed API modules (Principle V); copy MUST live in the
   constants module (Principle III); no inline styling (Principle II).
+- **FR-022**: The project documents screen MUST let a user who may change settings configure the
+  required set: move a kind between required and optional, add one from the kinds available to this
+  company, remove one, and define a new kind in place (Clarifications, 2026-09-16). Where the company
+  has configured nothing, the screen MUST show the shipped defaults, MUST say they are defaults, and
+  MUST adopt them as the company's own set on the first save.
 - **FR-019**: The company documents screen MUST offer every document kind the company has defined, not
   only the required ones, and MUST list supplementary documents without letting them alter the
   completeness figure (Clarifications, 2026-09-16).
