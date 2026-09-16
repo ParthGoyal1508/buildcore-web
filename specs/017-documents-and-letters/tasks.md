@@ -231,3 +231,52 @@ beside it would be a screen where the only way to add a requirement is to know a
   `account-creation.ts` and `assets.ts`, exactly as T031 predicted
 - `npm run build` clean, all four new routes emitted
 - T039: `grep` for hardcoded role names across the new surfaces returns nothing
+
+---
+
+## Phase 10: Amendment of 2026-09-16 — FR-019, FR-020, FR-021
+
+See `plan.md` § Amendment for W1–W3. No test-file tasks: this repo has no test framework
+(TODO(TESTING_STANDARD)); verification is tsc, lint, build and the browser passes below.
+
+### FR-019 — every defined kind is filable
+
+- [ ] T040 [US1] Add `supplementary` to `completenessSchema` in `app/lib/api/company-documents.ts`
+  with `.default([])`, so a client deployed ahead of the server degrades to today's behaviour
+  instead of failing to parse.
+- [ ] T041 [US1] Build the upload control's `kinds` list from all three lists in
+  `app/ui/documents/company-documents-screen.tsx`, and render supplementary documents in their own
+  section beneath `CompletenessPanel`. **Do not merge them into `present`** — the panel's count
+  measures the required eight and must not move when a trade licence is filed (W1).
+
+### FR-020 — define the type in place
+
+- [ ] T042 [US1] Typed client call for `POST /company-documents/required-kinds/:code`.
+- [ ] T043 [US1] Replace `actionForMissing`'s `null` branch with a "Define and upload" action that
+  calls T042, invalidates the query, and opens the upload form on the kind just materialised.
+
+### FR-021 — the company selector
+
+- [ ] T044 Add an optional `companyId` to every function in `app/lib/api/company-documents.ts`,
+  `app/lib/api/project-documents.ts` and `app/lib/api/letters.ts` (letters, letter kinds,
+  signatories), appended as a query parameter.
+- [ ] T045 **Include the company id in every react-query key** on the four 017 screens. Without it
+  the cache serves the previous company's documents on switch — FR-021 failing in the one way that
+  looks like it is working (W3).
+- [ ] T046 [P] Wrap the four 017 pages' screens in `CompanyProvider` individually
+  (`app/dashboard/settings/{company-documents,signatories,project-documents,letter-kinds}/page.tsx`).
+  **Not** `app/dashboard/settings/layout.tsx`: it wraps every settings section and `employee-setup`
+  already mounts its own provider, so hoisting renders two selectors there.
+- [ ] T047 Consume `useCompanyContext()` in the four screens and pass the id through to T044's calls.
+
+### Verification
+
+- [ ] T048 `npx tsc --noEmit` and `npm run lint` — 0 errors, only the 2 known pre-existing warnings.
+- [ ] T049 `npm run build` clean.
+- [ ] T050 **Browser**: as Super Admin, switch company on the documents screen and confirm the list,
+  the completeness count and a subsequent upload all follow the selection — including that switching
+  back does not show the other company's rows from cache (T045's failure mode).
+- [ ] T051 **Browser**: file a document against a kind outside the required eight; confirm it appears
+  under supplementary and the completeness figure is unchanged.
+- [ ] T052 **Browser**: find a required kind with no type defined, use "Define and upload", and
+  confirm the kind becomes uploadable without leaving the screen.

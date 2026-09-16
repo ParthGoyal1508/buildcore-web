@@ -20,6 +20,15 @@ payment proof. Storage, rendering and access rules belong to the backend spec.
 - Q: Must issuing a work order, LOI or purchase order always go through the feature-016 approval chain? → A: **Always**, with no value threshold. The issue action is therefore gated, and this interface MUST show the approval state rather than offering an Issue button that the server will refuse.
 - Q: Does Aadhaar stay in the required company document set? → A: **Yes**, under stricter handling than the other kinds: retrieval is permission-restricted and audit-logged, and it is never rendered into a letter — so it MUST NOT appear in any template field picker or preview.
 
+### Session 2026-09-16
+
+Raised while the shipped screens were being verified by hand. See the backend spec's session of the
+same date for the requirements these follow from (FR-001a, FR-003a, FR-025).
+
+- Q: The upload control offers only the required eight kinds. May an administrator file anything else? → A: **Yes.** The control offers every document kind the company has defined. The completeness panel continues to measure only the required eight; supplementary documents are listed beneath it and counted in neither column, because a count that moves when an unrelated certificate is filed answers a different question than the one asked.
+- Q: A required kind with no document type defined renders no action at all today. What should it offer? → A: **Defining the type, in place.** The typed client already carries the distinction; the screen discarded it.
+- Q: These screens show one company with no way to change it. → A: **Mount the existing company selector**, as the plant, recruitment and employee-setup sections already do. Feature 019 replaces it with a persistent application-wide switcher; this is consistency with what ships today, not an early draft of that.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The company's papers, and what is missing (Priority: P1)
@@ -198,6 +207,14 @@ visible in the list.
 - **FR-017**: Payments MUST accept a proof attachment, and payment lists MUST show which lack one.
 - **FR-018**: All access MUST go through the typed API modules (Principle V); copy MUST live in the
   constants module (Principle III); no inline styling (Principle II).
+- **FR-019**: The company documents screen MUST offer every document kind the company has defined, not
+  only the required ones, and MUST list supplementary documents without letting them alter the
+  completeness figure (Clarifications, 2026-09-16).
+- **FR-020**: Where a required kind has no document type defined, the screen MUST offer to define it
+  in place rather than rendering no action (Clarifications, 2026-09-16).
+- **FR-021**: The 017 screens MUST mount the existing company selector for callers who may work
+  across companies, and every read and write from those screens MUST carry the selected company
+  (Clarifications, 2026-09-16). Superseded by feature 019's application-wide switcher.
 
 ### Non-Functional Requirements
 

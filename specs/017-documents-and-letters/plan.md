@@ -119,3 +119,40 @@ permission when the truth is that they already decided, or that a slot is unmapp
 
 **Next**: `/speckit-tasks` — but the backend contract must be real before much of this can be built,
 so the API half should lead.
+
+---
+
+## Amendment — 2026-09-16 (Clarifications session of the same date)
+
+Design for FR-019, FR-020 and FR-021. The backend plan's amendment of the same date carries the
+contract these depend on.
+
+### W1 — the upload control offers every defined kind; the panel still counts eight
+
+`getCompanyDocuments()` gains `supplementary` from the server. The upload control's `kinds` list is
+built from all three lists rather than from `missing` + `present`, so any kind the company has
+defined can be filed. `CompletenessPanel` is unchanged in what it counts: supplementary documents
+render in their own section beneath it. A count that moves when an unrelated certificate is filed
+answers a different question than the one on screen.
+
+### W2 — `actionForMissing` stops returning null
+
+Where a required kind has no type (`documentTypeId === null`) the row gains a "Define and upload"
+action that calls the new company-documents route, invalidates the query, and lands the
+administrator on the upload form for the kind they just materialised. The typed client already
+carried this distinction and documented the intent; only the screen discarded it.
+
+### W3 — `CompanyProvider` per page, and `companyId` through every 017 client
+
+Mounted on the four 017 pages individually, not on `app/dashboard/settings/layout.tsx`: that layout
+wraps every settings section and `employee-setup` already mounts its own provider, so hoisting would
+put two company selectors on that page.
+
+All four typed clients — `company-documents.ts`, `project-documents.ts`, `letters.ts` (letters,
+letter kinds, signatories) — take an optional `companyId` and append it as a query parameter. Two of
+the four backend controllers already accepted it and were being called without it, so this half is
+plumbing that should have been there at first write.
+
+Query keys gain the company id. Without it react-query serves the previous company's documents from
+cache on switch, which is FR-021's "every read carries the selected company" failing in the one way
+that looks like it works.
