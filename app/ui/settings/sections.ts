@@ -1,7 +1,10 @@
 import {
   BuildingOffice2Icon,
   CheckCircleIcon,
+  ClipboardDocumentCheckIcon,
+  DocumentTextIcon,
   IdentificationIcon,
+  PencilSquareIcon,
   UsersIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
@@ -52,6 +55,38 @@ export const SETTINGS_SECTIONS: {
     description:
       'Which role decides at each level of an approval chain. Nothing can be approved until these are set.',
     icon: CheckCircleIcon,
+  },
+  {
+    key: 'company-documents',
+    href: ROUTES.settingsCompanyDocuments,
+    title: 'Company Documents',
+    description:
+      'GST, PF, ESIC and the rest — the certificates behind the registration numbers, and which are missing.',
+    icon: DocumentTextIcon,
+  },
+  {
+    key: 'project-documents',
+    href: ROUTES.settingsProjectDocuments,
+    title: 'Project Documents',
+    description:
+      'Which documents every project must hold before it counts as fully papered.',
+    icon: ClipboardDocumentCheckIcon,
+  },
+  {
+    key: 'letter-kinds',
+    href: ROUTES.settingsLetterKinds,
+    title: 'Letter Kinds',
+    description:
+      'The kinds of letter this company issues. New kinds are added here, not in a release.',
+    icon: PencilSquareIcon,
+  },
+  {
+    key: 'signatories',
+    href: ROUTES.settingsSignatories,
+    title: 'Signatories',
+    description:
+      'Who signs letters, and the signature applied to them. Replacing a signature leaves issued letters untouched.',
+    icon: IdentificationIcon,
   },
   {
     key: 'employee-setup',

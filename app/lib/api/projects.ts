@@ -8,6 +8,7 @@ import {
   SITE_STATUSES,
 } from '@/app/lib/constants';
 import { authFetch } from '@/app/lib/session';
+import { projectReadinessSchema } from '@/app/lib/api/project-documents';
 
 /**
  * Every `/dashboard/projects/*` call to `buildcore-api` (feature 008).
@@ -254,6 +255,18 @@ export const projectListItemSchema = z.object({
   startDate: isoDate,
   expectedEndDate: nullableIsoDate,
   isLocked: z.boolean(),
+  /**
+   * How far the project is from fully papered (017 FR-008).
+   *
+   * Present only when the caller asked for `include=documentReadiness`, so it is
+   * optional here rather than nullable — a list that did not ask has no opinion, which
+   * is different from asking and being told nothing is required.
+   *
+   * It arrives **inside this response**, in one request for the whole page. Fetching it
+   * per row is the N+1 the backend's batch form exists to prevent, and quickstart Pass 7
+   * counts the requests in the Network tab expecting one.
+   */
+  documentReadiness: projectReadinessSchema.optional(),
 });
 export type ProjectListItem = z.infer<typeof projectListItemSchema>;
 
@@ -293,6 +306,12 @@ export interface ProjectQuery {
   clientId?: string;
   page?: number;
   pageSize?: number;
+  /**
+   * Comma-separated extras. Pass `INCLUDE_DOCUMENT_READINESS` to attach each project's
+   * document readiness to its row (017 FR-008). Opt-in because it costs the server two
+   * extra queries, and the screens that do not show it should not pay for them.
+   */
+  include?: string;
 }
 
 export async function getProjects(

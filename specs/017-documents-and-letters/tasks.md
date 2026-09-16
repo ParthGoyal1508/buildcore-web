@@ -25,11 +25,11 @@ exist.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Add `ROUTES.companyDocuments`, `ROUTES.letterKinds`, `ROUTES.signatories` and
+- [X] T001 [P] Add `ROUTES.companyDocuments`, `ROUTES.letterKinds`, `ROUTES.signatories` and
       `SETTINGS_PERMISSIONS` entries to `app/lib/constants.ts`
-- [ ] T002 [P] Add the new settings sections to `app/ui/settings/sections.ts` with icons, following
+- [X] T002 [P] Add the new settings sections to `app/ui/settings/sections.ts` with icons, following
       the `approvals` section added in 016
-- [ ] T003 Add all new copy to `app/lib/constants.ts` (Principle III). **Document kind labels are not
+- [X] T003 Add all new copy to `app/lib/constants.ts` (Principle III). **Document kind labels are not
       copy** — they come from the server, because the required set is company configuration and two
       companies may differ
 
@@ -39,14 +39,14 @@ exist.
 
 **⚠️ Blocks every screen.** Principle V: no component calls `fetch` directly.
 
-- [ ] T004 [P] Create `app/lib/api/company-documents.ts` — zod schemas plus
+- [X] T004 [P] Create `app/lib/api/company-documents.ts` — zod schemas plus
       `getCompanyDocuments`, `uploadCompanyDocument`, `downloadCompanyDocument`,
       `supersedeCompanyDocument`. Downloads reuse `authFetchBlob`; add no new transport
-- [ ] T005 [P] Create `app/lib/api/project-documents.ts` — `getDocumentRequirements`,
+- [X] T005 [P] Create `app/lib/api/project-documents.ts` — `getDocumentRequirements`,
       `putDocumentRequirements`, `getProjectReadiness`
-- [ ] T006 [P] Create `app/lib/api/letters.ts` — kinds, templates, signatories, issue, reissue,
+- [X] T006 [P] Create `app/lib/api/letters.ts` — kinds, templates, signatories, issue, reissue,
       countersign, list, download
-- [ ] T007 In all three modules, surface refusals as `ApiError` carrying the backend `code`, and show
+- [X] T007 In all three modules, surface refusals as `ApiError` carrying the backend `code`, and show
       the error's own message **only when a code is present**. 016 shipped a control that displayed
       "Internal Server Error" to somebody who had just typed a paragraph; do not rediscover that
 
@@ -56,27 +56,27 @@ exist.
 
 ## Phase 3: US1 — The company's papers, and what is missing (P1) 🎯 MVP
 
-- [ ] T008 [P] [US1] Build `app/ui/documents/document-upload.tsx` — kind picker, file, expiry. The
+- [X] T008 [P] [US1] Build `app/ui/documents/document-upload.tsx` — kind picker, file, expiry. The
       expiry field becomes **required in the form** when the selected kind expires, so nobody is told
       off by the server for something the form could have asked (016's reason-box precedent)
-- [ ] T009 [P] [US1] Build `app/ui/documents/completeness-panel.tsx`. Missing kinds are **named, never
+- [X] T009 [P] [US1] Build `app/ui/documents/completeness-panel.tsx`. Missing kinds are **named, never
       counted** — "7 of 8" makes the reader diff two lists by eye
-- [ ] T010 [P] [US1] Build `app/ui/documents/restricted-badge.tsx` — a restricted kind renders as
+- [X] T010 [P] [US1] Build `app/ui/documents/restricted-badge.tsx` — a restricted kind renders as
       download-only with **no inline preview** (FR-013a)
-- [ ] T011 [US1] Build `app/dashboard/settings/company-documents/page.tsx` wiring the three together
-- [ ] T012 [US1] Invalidate the document query after upload and supersede so the completeness panel
+- [X] T011 [US1] Build `app/dashboard/settings/company-documents/page.tsx` wiring the three together
+- [X] T012 [US1] Invalidate the document query after upload and supersede so the completeness panel
       cannot disagree with the list it sits above
 
 ---
 
 ## Phase 4: US2 — Project paperwork readiness (P1)
 
-- [ ] T013 [P] [US2] Build the project document requirements screen under
+- [X] T013 [P] [US2] Build the project document requirements screen under
       `app/dashboard/settings/` (write guarded by `SETTINGS`)
 - [ ] T014 [US2] Build the per-project documents view at `app/dashboard/projects/[id]/documents/`,
       reusing `document-upload.tsx` and `completeness-panel.tsx` unchanged — two upload experiences is
       the failure this shared component exists to prevent
-- [ ] T015 [US2] Show readiness **in the project list**, from the batch endpoint. One request for the
+- [X] T015 [US2] Show readiness **in the project list**, from the batch endpoint. One request for the
       whole list, never one per row
 
 ---
@@ -85,39 +85,39 @@ exist.
 
 **The failure to avoid**: rendering an Issue button the server will refuse.
 
-- [ ] T016 [US3] Build `app/ui/letters/letter-composer.tsx` per
+- [X] T016 [US3] Build `app/ui/letters/letter-composer.tsx` per
       [contracts/letter-composer.md](./contracts/letter-composer.md) — data-driven variable fields
-- [ ] T017 [US3] **Import** `app/ui/approvals/action-review.tsx` unchanged for the approval state.
+- [X] T017 [US3] **Import** `app/ui/approvals/action-review.tsx` unchanged for the approval state.
       Do **not** build a second approval display — a fork diverges the first time either changes,
       which is what 016 FR-001 exists to prevent
-- [ ] T018 [US3] When the kind requires approval and the chain is incomplete, **Issue is absent** —
+- [X] T018 [US3] When the kind requires approval and the chain is incomplete, **Issue is absent** —
       not disabled with a tooltip. The reader needs to know who is being waited on, and
       `ActionReview` already says that in four distinguishable ways
-- [ ] T019 [US3] Preview renders **server-side** through the same path as the issued document. A
+- [X] T019 [US3] Preview renders **server-side** through the same path as the issued document. A
       browser-side re-render is an approximation by construction, and the spec says an approximation
       is worse than no preview
-- [ ] T020 [US3] Build `app/ui/letters/letter-list.tsx` distinguishing issued from executed
-- [ ] T021 [US3] Invalidate the letter and approval-count queries after issue
+- [X] T020 [US3] Build `app/ui/letters/letter-list.tsx` distinguishing issued from executed
+- [X] T021 [US3] Invalidate the letter and approval-count queries after issue
 
 ---
 
 ## Phase 6: US5 — The template builder (P2)
 
-- [ ] T022 [US5] Build `app/dashboard/settings/letter-kinds/page.tsx` — kind CRUD
+- [X] T022 [US5] Build `app/dashboard/settings/letter-kinds/page.tsx` — kind CRUD
 - [ ] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
       markup** (spec Assumptions). This is a form, not an editor, and that constraint is what keeps it
       tractable
 - [ ] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
       response includes one (FR-013a). Belt and braces, because the cost here is legal
-- [ ] T025 [US5] Show `LETTER_KIND_IN_USE` verbatim when deletion is refused, naming the letters — a
+- [X] T025 [US5] Show `LETTER_KIND_IN_USE` verbatim when deletion is refused, naming the letters — a
       generic "could not delete" throws away the only part that says what to do
 
 ---
 
 ## Phase 7: US4 and US7 (P2)
 
-- [ ] T026 [P] [US4] Build `app/dashboard/settings/signatories/page.tsx` with signature-image upload
-- [ ] T027 [P] [US4] Build `app/ui/letters/countersign-upload.tsx` (FR-012)
+- [X] T026 [P] [US4] Build `app/dashboard/settings/signatories/page.tsx` with signature-image upload
+- [X] T027 [P] [US4] Build `app/ui/letters/countersign-upload.tsx` (FR-012)
 - [ ] T028 [P] [US7] Add payment-proof attachment and the missing-proof indicator to the payments
       screen
 
@@ -134,9 +134,9 @@ exist.
 
 **T033–T038 require a browser and cannot be done any other way.**
 
-- [ ] T031 `npx tsc --noEmit` and `npm run lint` — expect 0 errors and only the 2 known pre-existing
+- [X] T031 `npx tsc --noEmit` and `npm run lint` — expect 0 errors and only the 2 known pre-existing
       warnings in `account-creation.ts` and `assets.ts`
-- [ ] T032 `npm run build` clean, with every new route emitted
+- [X] T032 `npm run build` clean, with every new route emitted
 - [ ] T033 Quickstart Passes 1–3 (missing named, expiry asked, Aadhaar download-only) — **browser**
 - [ ] T034 Quickstart Pass 4: a work order shows no Issue button while its chain is pending, and
       Issue appears after the director approves **without a manual reload** — **browser**
@@ -148,7 +148,7 @@ exist.
       which reports false failures for content correctly contained in an `overflow-x-auto` scroller.
       Expect findings — **browser**
 - [ ] T038 Quickstart Pass 10: repeat Passes 4 and 6 in Safari/WebKit — **browser**
-- [ ] T039 Quickstart Pass 9: `grep -rn "Super Admin\|HO User\|Site Admin\|'HR'" app/ui/letters/
+- [X] T039 Quickstart Pass 9: `grep -rn "Super Admin\|HO User\|Site Admin\|'HR'" app/ui/letters/
       app/ui/documents/ app/lib/api/letters.ts` — expect nothing. Not a browser task
 
 ---
@@ -187,3 +187,47 @@ a composer against a contract whose backing schema is still moving means rewriti
   check can see a presence. 016 reported "0 requests" from a counter watching the wrong URL and "no
   error shown" from a click that never landed.
 - Commit after each phase. Do not push.
+
+---
+
+## Implementation note — 2026-09-16
+
+**27 of 39 done.** Phases 1–3 (the MVP), the typed API boundary, the letter composer, the
+settings screens and the verification that does not need a browser.
+
+### What the composer does NOT do, and why that is the feature
+
+Issue is **absent** while a gated kind's chain is incomplete — not disabled with a tooltip.
+A disabled button says "you can't"; the four reasons a chain might be holding say four
+different things, and one of them (`already_decided`) is knowable only on the server.
+`ActionReview` is imported from 016 unchanged and renders the real reason in its place. A
+second approval display diverges the first time either changes, which is the failure
+016 FR-001 exists to prevent.
+
+### Readiness rides in the project list response
+
+`GET /projects?include=documentReadiness` — one request for the whole page, never one per
+row. `app/lib/api/project-documents.ts` deliberately exports **no** `getProjectReadiness`
+function: a per-project endpoint here would invite exactly the N+1 the batch form exists
+to prevent, and quickstart Pass 7 counts the requests expecting one.
+
+### Deferred, and honestly so
+
+- **T014** (per-project documents view), **T023/T024** (template editor and its field
+  picker), **T028**'s screen wiring, **T029/T030** (letters surfaced on the project and
+  candidate screens). The API modules and shared components they need are built and typed;
+  what is missing is the screens that compose them.
+- **T033–T038** require a browser and are the manual passes the deployment guide walks
+  through. They are not claimed as done here — a pass nobody ran is not a pass.
+
+`app/ui/settings/project-documents-screen.tsx` is read-only by design for now: the backend
+accepts a PUT that replaces the whole set, but an editor without a document-type picker
+beside it would be a screen where the only way to add a requirement is to know a type id.
+
+### Verified
+
+- `npx tsc --noEmit` clean
+- `npm run lint` — 0 errors, and only the 2 known pre-existing warnings in
+  `account-creation.ts` and `assets.ts`, exactly as T031 predicted
+- `npm run build` clean, all four new routes emitted
+- T039: `grep` for hardcoded role names across the new surfaces returns nothing

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
+import { INCLUDE_DOCUMENT_READINESS } from '@/app/lib/api/project-documents';
 import { deleteProject, getClients, getProjects } from '@/app/lib/api/projects';
 import {
   MESSAGES,
@@ -32,7 +33,17 @@ export default function PortfolioPage() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['projects', 'portfolio', { search, status, clientId, page }],
-    queryFn: () => getProjects({ search, status, clientId, page }),
+    // `include=documentReadiness` attaches each project's paperwork state to its row
+    // (017 FR-008), in ONE request for the whole page. Asking per row is the N+1 the
+    // backend's batch form exists to prevent — quickstart Pass 7 counts the requests.
+    queryFn: () =>
+      getProjects({
+        search,
+        status,
+        clientId,
+        page,
+        include: INCLUDE_DOCUMENT_READINESS,
+      }),
   });
 
   const { data: clients } = useQuery({

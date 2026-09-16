@@ -81,6 +81,40 @@ export default function ProjectListTable({
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
+      key: 'documents',
+      header: 'Documents',
+      /**
+       * Paperwork readiness, visible without opening the project (017 FR-008).
+       *
+       * The gap this closes: missing project paperwork surfaces months later as an
+       * unbillable claim or an uninsured site, and the only way to find it was to open
+       * every project one at a time.
+       *
+       * Absent when the caller did not ask for it — "not asked" and "nothing required"
+       * are different answers and must not render the same.
+       */
+      render: (row) => {
+        const readiness = row.documentReadiness;
+        if (!readiness) return <span className="text-gray-400">—</span>;
+        if (readiness.required === 0) {
+          return <span className="text-xs text-gray-500">None required</span>;
+        }
+        const complete = readiness.present === readiness.required;
+        return (
+          <span
+            className={
+              complete
+                ? 'text-xs font-medium text-green-700'
+                : 'text-xs font-medium text-amber-800'
+            }
+          >
+            {readiness.present}/{readiness.required}
+            {complete ? '' : ' on file'}
+          </span>
+        );
+      },
+    },
+    {
       key: 'startDate',
       header: 'Start',
       render: (row) => formatDateToLocal(row.startDate),

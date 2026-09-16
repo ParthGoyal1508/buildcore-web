@@ -21,6 +21,18 @@ export const ROUTES = {
   settingsEmployeeSetup: '/dashboard/settings/employee-setup',
   /** Who approves what (feature 016). Guarded by SETTINGS, matching the backend. */
   settingsApprovals: '/dashboard/settings/approvals',
+  /**
+   * The company's statutory papers (017 US1). Guarded by COMPANY_SETTINGS, matching
+   * the backend: the same people who may edit the registration numbers are the people
+   * who may see the certificates behind them.
+   */
+  settingsCompanyDocuments: '/dashboard/settings/company-documents',
+  /** Which documents every project must hold (017 US2). Writes need SETTINGS. */
+  settingsProjectDocuments: '/dashboard/settings/project-documents',
+  /** Letter kinds as data — a new kind without a release (017 US5, FR-011). */
+  settingsLetterKinds: '/dashboard/settings/letter-kinds',
+  /** Named signatories and their signature graphics (017 US4). */
+  settingsSignatories: '/dashboard/settings/signatories',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -701,6 +713,15 @@ export const SETTINGS_PERMISSIONS = {
   // something is not, and has no permission at all — see
   // app/dashboard/approvals/layout.tsx.
   approvals: 'SETTINGS',
+  // 017. COMPANY_SETTINGS rather than SETTINGS: these are the documents behind the
+  // company's registration numbers, and the backend guards them with the same
+  // permission that guards those numbers.
+  'company-documents': 'COMPANY_SETTINGS',
+  // Reading requirements needs only PROJECTS; the screen that *changes* them is a
+  // settings act, so the section is gated on the write.
+  'project-documents': 'SETTINGS',
+  'letter-kinds': 'SETTINGS',
+  signatories: 'SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -2024,3 +2045,74 @@ export function approvalActionTypeLabel(actionType: string): string {
   const words = actionType.replace(/_/g, ' ').trim();
   return words ? words[0].toUpperCase() + words.slice(1) : actionType;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documents and letters (feature 017)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Copy for the document and letter surfaces (Principle III).
+ *
+ * **Document kind labels are deliberately absent.** The required set is company
+ * configuration and two companies may differ, so the names come from the server. A
+ * constant here would be wrong the first time somebody added a kind — and FR-011 exists
+ * precisely so they can.
+ */
+export const DOCUMENT_COPY = {
+  missingHeading: 'Still to be uploaded',
+  presentHeading: 'On file',
+  expiringHeading: 'Expiring soon',
+  /**
+   * Shown when a required kind has no document type defined at all.
+   *
+   * A different sentence from "not uploaded", because it has a different next step:
+   * somebody has to create the type before anything can be uploaded against it.
+   */
+  typeNotDefined: 'No document type defined — create it in Employee Setup first',
+  expiryRequired: 'This document expires, so an expiry date is required.',
+  restrictedNotice:
+    'Regulated personal data. It can be downloaded, and every download is recorded — there is no preview.',
+  uploadFailed: 'The document could not be uploaded. Please try again.',
+  supersedeHint: 'Uploading a new version keeps the old one on file.',
+} as const;
+
+/** Copy for the letters surfaces. */
+export const LETTER_COPY = {
+  awaitingApproval:
+    'This letter is waiting for approval and cannot be issued yet.',
+  issueFailed: 'The letter could not be issued.',
+  previewFailed: 'The preview could not be generated.',
+  composedBadge: 'Awaiting approval',
+  issuedBadge: 'Issued',
+  executedBadge: 'Executed',
+  /**
+   * Shown verbatim when deleting a kind is refused.
+   *
+   * The backend's message names what is in the way. A generic "could not delete" throws
+   * away the only part of the response that says what to do instead.
+   */
+  kindInUseFallback:
+    'This letter kind cannot be deleted while letters still reference it.',
+  signatoryRequired: 'This kind of letter carries a signature — choose a signatory.',
+} as const;
+
+/**
+ * How a letter's three states read.
+ *
+ * `composed` is not an error state and must not be styled as one: the letter exists and
+ * is waiting on a person, which `ActionReview` says in detail beside it.
+ */
+export const LETTER_STATUS_LABELS = {
+  composed: LETTER_COPY.composedBadge,
+  issued: LETTER_COPY.issuedBadge,
+  executed: LETTER_COPY.executedBadge,
+} as const;
+
+/** Copy for payment proof (017 US7). */
+export const PAYMENT_PROOF_COPY = {
+  missing: 'No proof attached',
+  attach: 'Attach proof',
+  replace: 'Replace proof',
+  view: 'View proof',
+  missingFilterLabel: 'Missing proof only',
+} as const;
