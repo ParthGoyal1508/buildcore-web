@@ -125,6 +125,27 @@ export async function defineRequiredKind(
     .parse(raw);
 }
 
+/**
+ * Defines a document kind this company invents for itself (backend FR-001b).
+ *
+ * No `code` and no `isRestricted`: the server derives the first and settles the second
+ * from configuration. The kind is created company-scoped, so it appears here and never
+ * in the employee document list — which is what lets this route sit behind the same
+ * permission as the rest of this screen rather than the one guarding Employee Setup.
+ */
+export async function createCompanyDocumentKind(
+  input: { name: string; hasExpiry?: boolean; needsNumber?: boolean },
+  companyId?: string,
+): Promise<{ documentTypeId: string; code: string; name: string }> {
+  const raw = await authFetch<unknown>(`/company-documents/types${scope(companyId)}`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return z
+    .object({ documentTypeId: z.string(), code: z.string(), name: z.string() })
+    .parse(raw);
+}
+
 export interface UploadCompanyDocumentInput {
   documentTypeId: string;
   /** The file, base64-encoded — the transport 015 established for punch photos. */

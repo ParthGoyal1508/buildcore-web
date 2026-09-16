@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
+  createCompanyDocumentKind,
   defineRequiredKind,
   downloadCompanyDocument,
   getCompanyDocuments,
@@ -18,7 +19,15 @@ import {
 } from '@/app/ui/documents/document-upload';
 import { RestrictedNotice } from '@/app/ui/documents/restricted-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
-import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import {
+  Button,
+} from '@/app/ui/button';
+import {
+  CheckboxField,
+  FormError,
+  RowAction,
+  TextField,
+} from '@/app/ui/settings/form-fields';
 
 /**
  * The company's statutory papers (017 US1).
@@ -44,6 +53,9 @@ export function CompanyDocumentsScreen() {
   const [uploadFor, setUploadFor] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [defineError, setDefineError] = useState<string | null>(null);
+  const [kindName, setKindName] = useState('');
+  const [kindExpires, setKindExpires] = useState(false);
+  const [kindNeedsNumber, setKindNeedsNumber] = useState(false);
 
   /**
    * The company is part of the key, not just the request (FR-021).
@@ -85,6 +97,34 @@ export function CompanyDocumentsScreen() {
       setUploadFor(created.documentTypeId);
     },
     onError: () => setDefineError(DOCUMENT_COPY.defineFailed),
+  });
+
+  /**
+   * A kind of the company's own (FR-001b) — an MSME certificate, a trade licence.
+   *
+   * Lands on the upload form for what was just added, for the same reason "Define and
+   * upload" does: nobody sets out to create a document type, they set out to file the
+   * certificate in their hand.
+   */
+  const addKind = useMutation({
+    mutationFn: () =>
+      createCompanyDocumentKind(
+        {
+          name: kindName,
+          hasExpiry: kindExpires,
+          needsNumber: kindNeedsNumber,
+        },
+        companyId ?? undefined,
+      ),
+    onSuccess: async (created) => {
+      setDefineError(null);
+      setKindName('');
+      setKindExpires(false);
+      setKindNeedsNumber(false);
+      await invalidate();
+      setUploadFor(created.documentTypeId);
+    },
+    onError: () => setDefineError(DOCUMENT_COPY.addKindFailed),
   });
 
   if (isPending) {
@@ -216,6 +256,51 @@ export function CompanyDocumentsScreen() {
           </ul>
         </section>
       )}
+
+      <section className="rounded-lg border border-gray-200 p-4">
+        <h3 className="mb-1 text-sm font-medium text-gray-900">
+          {DOCUMENT_COPY.addKindHeading}
+        </h3>
+        <p className="mb-3 text-xs text-gray-500">
+          {DOCUMENT_COPY.addKindHint}
+        </p>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            addKind.mutate();
+          }}
+        >
+          <TextField
+            id="new-kind-name"
+            label={DOCUMENT_COPY.addKindNameLabel}
+            value={kindName}
+            onChange={(event) => setKindName(event.target.value)}
+            maxLength={120}
+            required
+          />
+          <CheckboxField
+            id="new-kind-expires"
+            label={DOCUMENT_COPY.addKindExpires}
+            checked={kindExpires}
+            onChange={(event) => setKindExpires(event.target.checked)}
+          />
+          <CheckboxField
+            id="new-kind-number"
+            label={DOCUMENT_COPY.addKindNeedsNumber}
+            checked={kindNeedsNumber}
+            onChange={(event) => setKindNeedsNumber(event.target.checked)}
+          />
+          <div>
+            <Button
+              type="submit"
+              disabled={addKind.isPending || kindName.trim().length < 2}
+            >
+              {DOCUMENT_COPY.addKindSubmit}
+            </Button>
+          </div>
+        </form>
+      </section>
 
       <section className="rounded-lg border border-gray-200 p-4">
         <h3 className="mb-3 text-sm font-medium text-gray-900">

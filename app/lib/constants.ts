@@ -2085,6 +2085,14 @@ export const DOCUMENT_COPY = {
   supplementaryHeading: 'Also on file',
   supplementaryHint:
     'Not part of the required set, so these do not change the figures above.',
+  addKindHeading: 'Add a document kind',
+  addKindHint:
+    'For anything the required set does not cover — an MSME certificate, a trade licence, a rent agreement. It will be available to this company only, and will not appear in employee documents.',
+  addKindNameLabel: 'What is it called?',
+  addKindExpires: 'This document expires',
+  addKindNeedsNumber: 'It carries a reference number',
+  addKindSubmit: 'Add kind',
+  addKindFailed: 'The document kind could not be added. Please try again.',
   defineFailed:
     'The document type could not be defined. Please try again.',
   expiryRequired: 'This document expires, so an expiry date is required.',
