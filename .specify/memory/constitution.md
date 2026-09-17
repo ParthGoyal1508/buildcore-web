@@ -1,6 +1,37 @@
 <!--
 Sync Impact Report
-- Version change: 1.2.0 → 2.0.0
+- Version change: 2.0.0 → 2.1.0
+- Modified principles:
+  - VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE). The
+    responsive floor for desktop surfaces moves from 768px (tablet) to 320px (phone). MINOR, not
+    MAJOR: the article is not redefined and its default is unchanged — desktop surfaces are still
+    *designed* desktop-first, the mobile-critical list is still closed, and none of the one-handed,
+    44px or hover-gating rules extend beyond it. What is materially expanded is the breakage floor
+    every other screen must clear.
+    Rationale: the client requires that the administrative application be reachable from Android
+    and iOS phones ("All the Admin website has also worked on Mobile Phone also of Android and
+    Iphone", client notes item 25). Read literally as mobile-first everywhere, that would reverse
+    the v2.0.0 finding this constitution was amended to record — that designing dense back-office
+    screens phone-first imposes a card-layout tax on data that reads better as a table. Read as
+    *reachability*, which is what "worked on" asks for, it is satisfied by lowering the floor. That
+    is the reading adopted, deliberately and with the client's agreement, because it meets the
+    requirement without re-adopting a position already found to be wrong.
+    Cost: a responsive pass per admin screen, mostly moving wide content into `overflow-x: auto`
+    containers. Not a redesign.
+- Modified sections:
+  - Development Workflow & Quality Gates: the pre-merge check for non-mobile-critical screens moves
+    from 768px to 320px, for breakage only. The wording now says explicitly that a table scrolling
+    inside its own container passes and one that pushes the page body sideways does not, because
+    that was the recurring ambiguity in the 768px form of the gate.
+- Added sections: none
+- Removed sections: none
+- Templates requiring update: none. `plan-template.md`'s Constitution Check table references the
+  principle by name, which is unchanged.
+- Follow-up: no existing screen is known to meet the new floor, because none has been checked at
+  320px — the previous gate did not ask. This amendment therefore describes an obligation the
+  codebase has not yet been measured against, and the gap should be treated as a backlog of
+  responsive passes rather than as a claim that the product already complies.
+- Previous amendment (v2.0.0, for reference, unchanged):
 - Modified principles:
   - VI. Responsive & Mobile-First Design (NON-NEGOTIABLE) → VI. Responsive Design: Desktop-First,
     Mobile-Critical Surfaces (NON-NEGOTIABLE). REDEFINED, hence the MAJOR bump. The v1.1.0 article
@@ -135,13 +166,21 @@ at a 320px viewport before merge.
 
 **Desktop surfaces (everything else).** HR administration, payroll, masters, projects, inventory,
 dashboards, reports and registers are operated at a desk. These MUST be designed at desktop width
-first, and MUST additionally remain *usable and unbroken* down to a 768px tablet width: no content
-clipped, no control unreachable, and the page body MUST NOT scroll horizontally — wide content
-(tables, boards, wide forms) scrolls inside its own `overflow-x: auto` container instead. A
-card-layout phone fallback (the established `ResponsiveList` pattern) is OPTIONAL on these
-surfaces and MUST NOT be treated as a blanket requirement: for a dense back-office grid, a
-horizontally-scrolling table in its own container is an acceptable and frequently better answer
-than forcing twenty columns into stacked cards.
+first, and MUST additionally remain *usable and unbroken* down to **320px**: no content clipped, no
+control unreachable, and the page body MUST NOT scroll horizontally — wide content (tables, boards,
+wide forms) scrolls inside its own `overflow-x: auto` container instead. A card-layout phone
+fallback (the established `ResponsiveList` pattern) is OPTIONAL on these surfaces and MUST NOT be
+treated as a blanket requirement: for a dense back-office grid, a horizontally-scrolling table in
+its own container is an acceptable and frequently better answer than forcing twenty columns into
+stacked cards.
+
+**The distinction between the two lists is design target, not reachability.** A desktop surface is
+*designed* for a desk and *reachable* from a phone. It is not required to be comfortable there, to
+be one-handed, or to meet the 44px target rule — those remain obligations of the mobile-critical
+list alone. What it may not be is broken: a back-office user who opens a register on their phone to
+check one figure must be able to read it, not meet a layout that has collapsed. This is the floor,
+and it is deliberately low; meeting it is usually a matter of putting wide content in its own
+scroll container rather than redesigning anything.
 
 **Not scoped by viewport.** Keyboard operability applies everywhere: every interactive control on
 every screen, mobile-critical or desktop, MUST be reachable and operable by keyboard. Likewise,
@@ -194,9 +233,10 @@ matters, without taxing the 90% of the product that does not.
   them (browser dev tools device emulation, minimum):
   - a **mobile-critical** surface (punch, attendance viewing, leave) at 320px, and again at
     desktop;
-  - every **other** screen at desktop, and again at 768px for breakage only — the tablet check
-    is looking for clipped content, unreachable controls and a horizontally-scrolling page body,
-    not for a phone-optimised layout.
+  - every **other** screen at desktop, and again at 320px for breakage only — this check is
+    looking for clipped content, unreachable controls and a horizontally-scrolling page body, not
+    for a phone-optimised layout. A dense table that scrolls sideways inside its own container
+    passes; one that pushes the page body sideways does not.
   Until an automated test framework is adopted (see Known gap below), this is a manual review
   step, not an automated gate.
 - **Known gap**: no automated test framework is installed yet (see Sync Impact Report). Until one
@@ -218,4 +258,4 @@ Workflow & Quality Gates); a reviewer who approves a change that knowingly viola
 NON-NEGOTIABLE principle MUST record the justification in the PR description, and that
 justification MUST itself prompt a constitution amendment if the exception is expected to recur.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-09-02
+**Version**: 2.1.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-09-13

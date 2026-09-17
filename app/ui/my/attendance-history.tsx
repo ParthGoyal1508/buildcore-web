@@ -113,7 +113,13 @@ export default function AttendanceHistory() {
 
   return (
     <section className="mt-8">
-      <div className="mb-3 flex items-center justify-between gap-2">
+      {/*
+        `flex-wrap` and a narrower month label: at 320px (constitution v2.1.0) the
+        heading plus the month stepper measured 321px against 288px of usable width
+        and pushed the whole page sideways. Found by the 016 Pass 9 sweep, which
+        reaches this component because the punch page now carries an approval surface.
+      */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-medium text-gray-900">Attendance</h2>
         <div className="flex items-center gap-2">
           <SecondaryButton
@@ -123,7 +129,7 @@ export default function AttendanceHistory() {
           >
             ‹
           </SecondaryButton>
-          <span className="min-w-[8.5rem] text-center text-sm font-medium text-gray-700">
+          <span className="min-w-[7rem] text-center text-sm font-medium text-gray-700">
             {MONTH_NAMES[month - 1]} {year}
           </span>
           <SecondaryButton

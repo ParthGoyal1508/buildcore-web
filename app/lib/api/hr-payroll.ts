@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import { API_URL } from '@/app/lib/config';
 import { authFetch, getAccessToken } from '@/app/lib/session';
 import {
@@ -472,6 +473,86 @@ export async function getAttendanceExceptions() {
     ])
     .parse(data);
   return Array.isArray(parsed) ? parsed : parsed.rows;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attendance exceptions on the approval chain (feature 016)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A flagged punch as `/workspace-admin/attendance-exceptions` returns it.
+ *
+ * Only the fields the exceptions surface actually renders. The endpoint sends the whole
+ * `PunchRecord`, and listing all of it here would mean this schema had to be revised
+ * every time an unrelated column was added to a table this screen does not own.
+ *
+ * `latitude` and `longitude` are deliberately absent even though they arrive: they come
+ * over the wire as **strings** (Postgres `Decimal`), and nothing on this screen plots a
+ * point. Declaring them as numbers is the mistake this comment exists to prevent.
+ */
+const flaggedPunchSchema = z.object({
+  id: z.string(),
+  employeeId: z.string(),
+  type: z.string(),
+  capturedAt: z.string(),
+  punchDate: z.string(),
+  faceMatchResult: z.string().nullable(),
+  geofenceResult: z.string().nullable(),
+  exceptionResolution: z.string().nullable(),
+  resolvedByUserId: z.string().nullable(),
+  resolvedAt: z.string().nullable(),
+});
+
+/**
+ * One flagged punch with the state of its approval.
+ *
+ * `approval` is nullable, and the null case is real rather than defensive: a punch flagged
+ * before this feature shipped, or one whose company has no chain configured, has no
+ * instance to report. The interface must say something sensible for it instead of
+ * assuming a chain exists.
+ */
+const attendanceExceptionRowSchema = z.object({
+  punch: flaggedPunchSchema,
+  approval: approvalStateSchemaForModules.nullable(),
+});
+
+export type FlaggedPunch = z.infer<typeof flaggedPunchSchema>;
+export type AttendanceExceptionRow = z.infer<
+  typeof attendanceExceptionRowSchema
+>;
+
+/**
+ * Punches awaiting a decision, each with where its approval has got to.
+ *
+ * One request for the whole list, with the approval state embedded — the backend resolves
+ * it in a batch. The alternative, asking the spine per row, is the mistake the batch
+ * contract exists to prevent and would be one request per exception on every render.
+ */
+export async function getPendingAttendanceExceptions(): Promise<
+  AttendanceExceptionRow[]
+> {
+  const data = await authFetch<unknown>('/workspace-admin/attendance-exceptions');
+  return z.array(attendanceExceptionRowSchema).parse(data);
+}
+
+/**
+ * Records a decision on a flagged punch at the caller's level of the chain.
+ *
+ * The route is unchanged from before feature 016 so the interface changed once rather
+ * than twice — but a decision here is now **one level of a chain**, not the end of the
+ * matter. `confirmed` at level 1 of 3 advances the item; it does not confirm the punch.
+ */
+export async function resolveAttendanceException(
+  punchId: string,
+  input: { resolution: 'confirmed' | 'rejected' | 'returned'; reason?: string },
+): Promise<AttendanceExceptionRow> {
+  const data = await authFetch<unknown>(
+    `/workspace-admin/attendance-exceptions/${encodeURIComponent(
+      punchId,
+    )}/resolve`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return attendanceExceptionRowSchema.parse(data);
 }
 
 /**

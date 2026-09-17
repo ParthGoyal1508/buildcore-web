@@ -19,6 +19,20 @@ export const ROUTES = {
   settingsRoles: '/dashboard/settings/roles',
   settingsUsers: '/dashboard/settings/users',
   settingsEmployeeSetup: '/dashboard/settings/employee-setup',
+  /** Who approves what (feature 016). Guarded by SETTINGS, matching the backend. */
+  settingsApprovals: '/dashboard/settings/approvals',
+  /**
+   * The company's statutory papers (017 US1). Guarded by COMPANY_SETTINGS, matching
+   * the backend: the same people who may edit the registration numbers are the people
+   * who may see the certificates behind them.
+   */
+  settingsCompanyDocuments: '/dashboard/settings/company-documents',
+  /** Which documents every project must hold (017 US2). Writes need SETTINGS. */
+  settingsProjectDocuments: '/dashboard/settings/project-documents',
+  /** Letter kinds as data — a new kind without a release (017 US5, FR-011). */
+  settingsLetterKinds: '/dashboard/settings/letter-kinds',
+  /** Named signatories and their signature graphics (017 US4). */
+  settingsSignatories: '/dashboard/settings/signatories',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -76,6 +90,12 @@ export const ROUTES = {
   // `app/dashboard/reminders/layout.tsx`, the same way HR and Settings gate their
   // own sections.
   reminders: '/dashboard/reminders',
+
+  // Approvals (feature 016). Not a NAV_MODULES entry and deliberately not gated by a
+  // permission: authority to approve comes from the chain's slot mapping, not from a
+  // permission value, so anyone signed in may have a queue — see
+  // app/dashboard/approvals/layout.tsx.
+  approvals: '/dashboard/approvals',
 
   // --- Dashboard: Activity Log, Site & Group dashboards (feature 004) ---
   // Sub-pages of the Dashboard module, gated by DASHBOARD in their own layouts
@@ -688,6 +708,20 @@ export const SETTINGS_PERMISSIONS = {
   roles: 'USER_MANAGEMENT',
   users: 'USER_MANAGEMENT',
   'employee-setup': 'EMPLOYEES',
+  // Matches the backend's own guard on `/approvals/chains` and
+  // `/approvals/slot-mappings`. Defining a chain is a settings act; *approving*
+  // something is not, and has no permission at all — see
+  // app/dashboard/approvals/layout.tsx.
+  approvals: 'SETTINGS',
+  // 017. COMPANY_SETTINGS rather than SETTINGS: these are the documents behind the
+  // company's registration numbers, and the backend guards them with the same
+  // permission that guards those numbers.
+  'company-documents': 'COMPANY_SETTINGS',
+  // Reading requirements needs only PROJECTS; the screen that *changes* them is a
+  // settings act, so the section is gated on the write.
+  'project-documents': 'SETTINGS',
+  'letter-kinds': 'SETTINGS',
+  signatories: 'SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -1828,3 +1862,314 @@ export function formatAssetQuantity(
   });
   return unitOfMeasure ? `${number} ${unitOfMeasure}` : number;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Approvals (feature 016)
+//
+// No approval copy may be written inline in a component. Every sentence a reviewer
+// reads about a chain is here, so the same decision reads the same way in every
+// module — which is the entire point of the feature (Principle III).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The three decisions, with their labels and whether a reason is required.
+ *
+ * Ordered approve-first because that is the common case and the one a reviewer reaches
+ * for; the two that need justification sit after it.
+ *
+ * `requiresReason` mirrors the backend's FR-006 rather than guessing at it: the server
+ * refuses a reject or return with no reason and answers `APPROVAL_REASON_REQUIRED`. This
+ * flag is what lets the control ask for the reason *before* sending, so a reviewer is not
+ * told off for something the form could have asked for.
+ */
+export const APPROVAL_ACTIONS = [
+  { action: 'approve', label: 'Approve', requiresReason: false },
+  { action: 'reject', label: 'Reject', requiresReason: true },
+  { action: 'return', label: 'Return for correction', requiresReason: true },
+] as const;
+
+export type ApprovalActionKey = (typeof APPROVAL_ACTIONS)[number]['action'];
+
+/**
+ * Why the control is inert — one message per `inertReason`, keyed by the backend's code.
+ *
+ * Four sentences rather than one, because they have four different remedies, and telling
+ * them apart is the difference between waiting, asking someone else, and opening a
+ * settings screen. Never branch on message text; branch on the code.
+ *
+ * `already_decided` is the one that matters most. A Super Admin holds every permission in
+ * the system, so "you do not have permission" said to one is simply untrue — and it sends
+ * the one person who *can* change permissions off to change permissions that were never
+ * the problem.
+ *
+ * `slot_unmapped` is the only one describing a **fault** rather than a state, and the only
+ * one that never resolves itself by waiting. It names the remedy because the person who
+ * hits it is rarely the person who can apply it — and since the approval settings screen
+ * exists, it can name where. Anyone holding `SETTINGS` can fix it in about a minute; the
+ * reader who hits this message usually cannot, which is why it says who to ask.
+ */
+export const APPROVAL_INERT_MESSAGES = {
+  awaiting_other: (awaitingUserName: string | null, levelLabel: string | null) =>
+    awaitingUserName
+      ? `Waiting on ${awaitingUserName}`
+      : `Waiting on ${levelLabel ?? 'the next approver'}`,
+  already_decided: (_user: string | null, levelLabel: string | null) =>
+    levelLabel
+      ? `You already decided this at ${levelLabel}`
+      : 'You have already decided this',
+  insufficient_authority: (
+    _user: string | null,
+    levelLabel: string | null,
+  ) => `${levelLabel ?? 'Another level'} decides this`,
+  slot_unmapped: (_user: string | null, levelLabel: string | null) =>
+    `Nobody can approve this yet: no role is mapped to ${
+      levelLabel ?? 'this level'
+    } for your company. Someone with settings access must map it under ` +
+    `Settings → Approvals before this can move.`,
+} as const;
+
+/**
+ * The originator's side of a returned item (FR-005).
+ *
+ * Worth stating why this copy exists at all: `returned` holds the item's chain slot, so
+ * nothing else can be raised for the same record, and resubmitting is the only exit. A
+ * reader who is not told that sees an item that looks finished and is not.
+ */
+/**
+ * What the Action/Review control says when a decision could not be recorded (FR-006).
+ *
+ * Used **in place of** the error's own message whenever that error carries no
+ * machine-readable `code`. A refusal from the spine is worth quoting — it names the level,
+ * or says the slot is unmapped, and the reader can act on it. Anything without a code is a
+ * transport failure, and what reaches the browser then is the proxy's own words: quickstart
+ * Pass 3 kills the API mid-submission and the control faithfully displayed
+ * "Internal Server Error" to somebody who had just typed a paragraph of justification.
+ * True, and useless. The one thing that reader needs to know is that their words are safe.
+ */
+export const APPROVAL_DECISION_FAILED =
+  'The decision could not be recorded — the server could not be reached. ' +
+  'Your reason has been kept; try again.';
+
+export const APPROVAL_RESUBMIT = {
+  /** Shown to the originator where the approve/reject/return buttons would be. */
+  prompt: 'This was returned to you for correction.',
+  action: 'Resubmit for approval',
+  inFlight: 'Resubmitting…',
+  /** After a successful resubmit, before the record's own state refreshes. */
+  done: 'Sent back for approval.',
+  failed:
+    'It could not be resubmitted — the server could not be reached. Try again.',
+  /**
+   * Said once, next to the button. People resubmit without changing anything otherwise —
+   * the chain restarts from level one either way, and the approver who returned it is
+   * looking for a change.
+   */
+  hint: 'Make the correction first — this starts the chain again from the first approver.',
+} as const;
+
+/**
+ * The worker's own view of a punch that was flagged (016 T042).
+ *
+ * Written for somebody who did not choose to be in an approval chain and does not know
+ * the word "chain". "Being checked" rather than "pending approval"; "the office" rather
+ * than a level label they have no way to interpret. The one thing they must understand
+ * is when the item is waiting on *them*, which is what the resubmit copy says.
+ */
+export const MY_PUNCH_EXCEPTIONS = {
+  heading: 'Punches being checked',
+  /** Shown when the list is empty — the ordinary case, and good news. */
+  empty: 'None of your punches need checking.',
+  loadFailed: 'Your flagged punches could not be loaded.',
+  /** Why this punch was flagged, in the worker's words rather than the system's. */
+  reasons: {
+    geofence: 'Recorded away from your site',
+    face: 'Photo did not match',
+    both: 'Recorded away from your site, and the photo did not match',
+    unknown: 'Flagged for checking',
+  },
+  /** What a worker should take from the state, without naming a level. */
+  beingChecked: 'Being checked by the office.',
+  /** A punch that never entered a chain — visible, but not actionable by anyone here. */
+  notInChain:
+    'This punch is flagged but has not been sent for checking. Ask your supervisor.',
+} as const;
+
+/**
+ * How often the pending-approval count re-checks the server (FR-013, SC-005).
+ *
+ * The count is a badge on every screen, so this is the only thing in the app that
+ * notices a decision somebody *else* made. React Query is configured with
+ * `refetchOnWindowFocus: false` globally, so without an interval nothing refetches at
+ * all and the badge can sit on a stale number indefinitely — which matters because two
+ * approvers can hold the same level, and the second one's queue would still offer an
+ * item the first already decided.
+ *
+ * Sixty seconds: one small request per user per minute, against a count that is a
+ * single indexed query. Faster buys little — approvals are a human-paced queue, not a
+ * chat — and slower stops it being a live count in any useful sense.
+ */
+export const APPROVAL_COUNT_POLL_MS = 60_000;
+
+/**
+ * When an item's age in the queue becomes visually distinguishable (spec US3 scenario 5).
+ *
+ * Two working days. Short enough that a stalled decision is visible before somebody
+ * chases it, long enough that a normal overnight wait does not paint the whole queue
+ * amber — a warning everything triggers is a warning nobody reads.
+ */
+export const APPROVAL_QUEUE_AGE_WARNING_HOURS = 48;
+
+/**
+ * Human labels for the action types that exist today.
+ *
+ * A lookup with a fallback, **not** an exhaustive map. The backend's `actionType` is free
+ * text by design so a module can join the spine without a release on this side, so an
+ * unrecognised value is an expected input rather than a failure — `approvalActionTypeLabel`
+ * turns `letter_work_order` into "Letter work order" and moves on.
+ */
+export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
+  attendance_exception: 'Attendance exception',
+  attendance_exception_legacy: 'Attendance exception (historical)',
+  payroll_run: 'Payroll run',
+  payment_release: 'Payment release',
+  letter_work_order: 'Work order',
+  letter_loi: 'Letter of intent',
+  letter_purchase_order: 'Purchase order',
+  final_settlement: 'Final settlement',
+};
+
+/** The label for an action type, falling back to a readable form of the raw key. */
+export function approvalActionTypeLabel(actionType: string): string {
+  const known = APPROVAL_ACTION_TYPE_LABELS[actionType];
+  if (known) return known;
+  const words = actionType.replace(/_/g, ' ').trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : actionType;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documents and letters (feature 017)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Copy for the document and letter surfaces (Principle III).
+ *
+ * **Document kind labels are deliberately absent.** The required set is company
+ * configuration and two companies may differ, so the names come from the server. A
+ * constant here would be wrong the first time somebody added a kind — and FR-011 exists
+ * precisely so they can.
+ */
+export const DOCUMENT_COPY = {
+  missingHeading: 'Still to be uploaded',
+  presentHeading: 'On file',
+  expiringHeading: 'Expiring soon',
+  /**
+   * Shown when a required kind has no document type defined at all.
+   *
+   * A different sentence from "not uploaded", because it has a different next step:
+   * somebody has to create the type before anything can be uploaded against it.
+   */
+  /**
+   * Reworded 2026-09-16. It used to send the reader to Employee Setup, which is a
+   * different permission and a different screen — and the action beside this line now
+   * defines the type here, so the old sentence described a detour nobody has to take.
+   */
+  typeNotDefined: 'No document type defined for this kind yet',
+  defineAndUpload: 'Define and upload',
+  /**
+   * Documents outside the required eight (FR-019).
+   *
+   * "Also on file" rather than "Other" or "Supplementary": the reader is looking at a
+   * compliance screen, and the useful thing to say is that these are held too — not to
+   * name the category they fall into.
+   */
+  supplementaryHeading: 'Also on file',
+  supplementaryHint:
+    'Not part of the required set, so these do not change the figures above.',
+  addKindHeading: 'Add a document kind',
+  addKindHint:
+    'For anything the required set does not cover — an MSME certificate, a trade licence, a rent agreement. It will be available to this company only, and will not appear in employee documents.',
+  addKindNameLabel: 'What is it called?',
+  addKindExpires: 'This document expires',
+  addKindNeedsNumber: 'It carries a reference number',
+  addKindSubmit: 'Add kind',
+  addKindFailed: 'The document kind could not be added. Please try again.',
+
+  // ── Project document requirements (FR-022) ──────────────────────────────────
+  /**
+   * Said in the present tense and about what happens next, not about system state.
+   * "usingDefaults: true" is a fact about a column; what an administrator needs to know
+   * is that editing these makes them theirs.
+   */
+  requirementsDefaults:
+    'These are the documents BuildCore expects every project to hold. They become this company’s own set the moment you save.',
+  requirementsConfigured:
+    'This company’s own set. Every project is measured against it.',
+  requirementsAddHeading: 'Require another document',
+  requirementsAddPlaceholder: 'Choose a document kind…',
+  requirementsAddButton: 'Require it',
+  requirementsNoneToAdd:
+    'Every kind this company has defined is already on the list. Add a new kind below to require something else.',
+  requirementsSave: 'Save requirements',
+  requirementsDiscard: 'Discard changes',
+  requirementsSaved: 'Requirements saved.',
+  requirementsSaveFailed:
+    'The requirements could not be saved. Nothing was changed.',
+  requirementsEmpty:
+    'No documents are required. Every project will report itself fully papered.',
+  requirementsUndefinedHeading: 'Not available to require yet',
+  requirementsUndefinedHint:
+    'BuildCore expects these, but this company has no document type for them. Projects are not measured against a kind that does not exist.',
+  requirementsDefineIt: 'Define it',
+  requirementsDefineFailed:
+    'The document kind could not be defined. Please try again.',
+  requirementsKindHint:
+    'For a document BuildCore does not name — a site handover note, a client NOC. It becomes available to require immediately.',
+  defineFailed:
+    'The document type could not be defined. Please try again.',
+  expiryRequired: 'This document expires, so an expiry date is required.',
+  restrictedNotice:
+    'Regulated personal data. It can be downloaded, and every download is recorded — there is no preview.',
+  uploadFailed: 'The document could not be uploaded. Please try again.',
+  supersedeHint: 'Uploading a new version keeps the old one on file.',
+} as const;
+
+/** Copy for the letters surfaces. */
+export const LETTER_COPY = {
+  awaitingApproval:
+    'This letter is waiting for approval and cannot be issued yet.',
+  issueFailed: 'The letter could not be issued.',
+  previewFailed: 'The preview could not be generated.',
+  composedBadge: 'Awaiting approval',
+  issuedBadge: 'Issued',
+  executedBadge: 'Executed',
+  /**
+   * Shown verbatim when deleting a kind is refused.
+   *
+   * The backend's message names what is in the way. A generic "could not delete" throws
+   * away the only part of the response that says what to do instead.
+   */
+  kindInUseFallback:
+    'This letter kind cannot be deleted while letters still reference it.',
+  signatoryRequired: 'This kind of letter carries a signature — choose a signatory.',
+} as const;
+
+/**
+ * How a letter's three states read.
+ *
+ * `composed` is not an error state and must not be styled as one: the letter exists and
+ * is waiting on a person, which `ActionReview` says in detail beside it.
+ */
+export const LETTER_STATUS_LABELS = {
+  composed: LETTER_COPY.composedBadge,
+  issued: LETTER_COPY.issuedBadge,
+  executed: LETTER_COPY.executedBadge,
+} as const;
+
+/** Copy for payment proof (017 US7). */
+export const PAYMENT_PROOF_COPY = {
+  missing: 'No proof attached',
+  attach: 'Attach proof',
+  replace: 'Replace proof',
+  view: 'View proof',
+  missingFilterLabel: 'Missing proof only',
+} as const;

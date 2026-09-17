@@ -488,6 +488,14 @@ export const paymentSchema = z.object({
   allocatedAmount: decimal,
   unallocatedBalance: decimal,
   allocatedBillCount: z.number(),
+  /**
+   * Whether the RTGS advice is attached (017 US7, FR-021).
+   *
+   * A boolean, not the storage reference. The list needs to show which payments lack
+   * proof; putting an internal identifier on a screen serves no reader.
+   */
+  hasProof: z.boolean().default(false),
+  proofUploadedAt: z.coerce.date().nullable().default(null),
 });
 export type Payment = z.infer<typeof paymentSchema>;
 
@@ -506,6 +514,42 @@ export interface PaymentQuery {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+  /**
+   * 017 FR-021. `true` lists only payments with no proof attached.
+   *
+   * A filter rather than a count: "14 payments lack proof" makes somebody scroll
+   * looking for them.
+   */
+  missingProof?: boolean;
+}
+
+/**
+ * Attaches the transaction proof to a recorded payment (017 FR-020).
+ *
+ * Re-attaching replaces the current proof and does not delete the old one — the first
+ * advice is itself a record of what was believed at the time.
+ */
+export async function attachPaymentProof(
+  paymentId: string,
+  input: { data: string; contentType: string },
+): Promise<Payment> {
+  const raw = await authFetch<unknown>(
+    `/inventory/payments/${encodeURIComponent(paymentId)}/proof`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return paymentSchema.parse(raw);
+}
+
+/**
+ * The proof itself.
+ *
+ * Audit-logged server-side before the bytes are sent: a payment advice names an account
+ * number, and who looked at it is worth knowing.
+ */
+export async function downloadPaymentProof(paymentId: string): Promise<Blob> {
+  return authFetchBlob(
+    `/inventory/payments/${encodeURIComponent(paymentId)}/proof`,
+  );
 }
 
 export async function getPayments(

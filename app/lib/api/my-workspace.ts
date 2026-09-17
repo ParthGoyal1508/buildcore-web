@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import { API_URL } from '@/app/lib/config';
 import { getAccessToken, authFetch } from '@/app/lib/session';
 
@@ -419,4 +420,41 @@ export async function withdrawReimbursementClaim(
 
 export async function deleteReimbursementClaim(id: string): Promise<void> {
   await authFetch(`/my/reimbursements/${id}`, { method: 'DELETE' });
+}
+
+// ------------------------------------------- Attendance exceptions (016 T042)
+
+/**
+ * One of the caller's own flagged punches and where its approval has got to.
+ *
+ * The shape is narrower than the reviewer's row on purpose: the backend returns the
+ * fields a worker needs to recognise which punch this is, and nothing about how the
+ * face match was scored.
+ */
+const myPunchExceptionSchema = z.object({
+  punch: z.object({
+    id: z.string(),
+    capturedAt: z.string(),
+    punchDate: z.string(),
+    type: z.enum(['in', 'out']),
+    faceMatchResult: z.string().nullable(),
+    geofenceResult: z.string().nullable(),
+  }),
+  /** Null for a punch that never entered a chain — a pre-016 row, or a failed submit. */
+  approval: approvalStateSchemaForModules.nullable(),
+});
+
+export type MyPunchException = z.infer<typeof myPunchExceptionSchema>;
+
+/**
+ * The caller's own flagged punches.
+ *
+ * No employee parameter, like everything else in this file: the backend resolves the
+ * employee from the token, and an approver who reviews these same punches on the admin
+ * screen is refused here outright because they have no employee record of their own.
+ */
+export async function getMyPunchExceptions(): Promise<MyPunchException[]> {
+  return z
+    .array(myPunchExceptionSchema)
+    .parse(await authFetch('/my/punch/exceptions'));
 }
