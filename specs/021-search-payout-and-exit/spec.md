@@ -12,13 +12,24 @@
 **Scope**: Four small, independent surfaces. Grouped for economy, not because they share a
 mechanism — each ships alone.
 
+## Clarifications
+
+### Session 2026-09-16
+
+The client restated note 4 as *"Add a search bar on the dashboard to quickly find projects."*
+
+- Q: US1 and FR-001 are written around a *code* in hand. The client says "quickly find projects", which people do by name. Widen it? → A: **Yes — code and name, in every register.** Nobody at head office memorises project codes; they know the site by what it is called. The same argument covers a vendor's trading name and an employee's name, so the widening is not projects-only.
+- Q: Does a name match look different in the results? → A: **It says which field matched.** A row that appeared because of its name, when the user typed something that looks like a code, otherwise reads as a wrong result. An exact code match also sorts first (backend FR-001b).
+- Q: Results appear as the user types. Does that still hold when a two-letter name fragment matches thousands of rows? → A: **No — there is a minimum term length.** Below it the control says to keep typing rather than returning an empty result, because an empty result and "too short to search" mean different things to the person typing and look identical otherwise.
+
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - A search box that finds anything by its code (Priority: P1)
+### User Story 1 - A search box that finds anything by its code or its name (Priority: P1)
 
-Somebody with a code in hand — a vendor code, a vehicle number, an employee ID, a project code —
-types it into a box on the dashboard and reaches the record. They do not need to know which module
-owns it. The client asks for this twice: Note 4 for project codes, and the Dashboard row for
+Somebody with a code in hand — a vendor code, a vehicle number, an employee ID, a project code — or
+with nothing but the name of a site, a vendor or a person, types it into a box on the dashboard and
+reaches the record. They do not need to know which module owns it, and they do not need to know its
+code. The client asks for this twice: Note 4 for project codes, and the Dashboard row for
 *"every Vendor, Vehicle, Employee ID"*.
 
 **Why this priority**: There is no search of any kind in the product today, and this is the most
@@ -31,6 +42,14 @@ from another company returns nothing.
 
 1. **Given** a code, **When** it is typed into dashboard search, **Then** matching records appear
    grouped by what they are, each identifying itself.
+1a. **Given** a project's name or part of it, **When** it is typed, **Then** the project appears and
+   can be opened, with no knowledge of its code required.
+1b. **Given** a result matched by name, **When** it is shown, **Then** the row says it matched on the
+   name rather than the code — otherwise, to somebody who typed something code-shaped, it reads as a
+   wrong result.
+1c. **Given** a term shorter than the minimum, **When** it is typed, **Then** the control says to keep
+   typing rather than showing an empty result. "Nothing matched" and "too short to search" mean
+   different things and must not look identical.
 2. **Given** a result, **When** it is chosen, **Then** the full record opens.
 3. **Given** a partial code, **When** typed, **Then** matches appear as the user types, without
    submitting.
@@ -110,11 +129,19 @@ until each is resolved or deliberately waived.
 
 - **FR-001**: A search control MUST be present on the dashboard and MUST search employees, vendors,
   equipment and projects by code and name.
+- **FR-001a**: Search MUST match on **name** as well as code, across every register FR-001 names
+  (Clarifications, 2026-09-16). Finding a project by the site's name is the client's stated need, and
+  no register is exempt from it.
+- **FR-001b**: Each result MUST indicate whether it matched on code or on name, and an exact code
+  match MUST appear before results matched only by name.
+- **FR-001c**: Below a minimum term length the control MUST say so rather than render an empty result,
+  and MUST NOT issue a request.
 - **FR-002**: Results MUST be grouped by kind and MUST identify each record sufficiently to choose
   between them.
 - **FR-003**: Results MUST appear as the user types, without submitting.
 - **FR-004**: Results MUST be fully navigable by keyboard.
-- **FR-005**: An empty result MUST say so plainly and MUST NOT reveal that a code exists elsewhere.
+- **FR-005**: An empty result MUST say so plainly and MUST NOT reveal that a matching record — by
+  code or by name — exists in a company or register the user cannot see.
 - **FR-006**: Payroll delivery status MUST list delivered, failed and undeliverable employees.
 - **FR-007**: Retry MUST resend only failures.
 - **FR-008**: Transaction sheet upload MUST show matched lines, unmatched lines and differences

@@ -33,6 +33,18 @@ chain. "You do not have permission" would be untrue and would send them to an ad
 nothing. And because levels resolve through slots rather than roles, the waiting-on text must name
 the person or the slot as configured, never a role name this interface assumed.
 
+### Session 2026-09-16
+
+The client restated note 2 in two halves: block a punch that fails location or photo verification,
+and log every manual attendance modification so it reaches the affected employee. The first half is
+feature 020's; it changes what this feature's chain reviews.
+
+- Q: Feature 020 now refuses a failed punch and records nothing. This feature's approval chain was built to review those refusals. What does it review instead? → A: **The supervisor's manual attendance correction.** The screens are unchanged in shape — the same Action/Review control, the same queue, the same attribution — and what flows through them changes. The backend records this as its own FR-012.
+- Q: `POST /attendance` used to apply a correction immediately. It now returns a pending approval. What must the administrative screen do differently? → A: **Show it as awaiting approval, and not show the day as corrected.** This is the one behavioural change on an existing screen. An interface that reports success on submission is telling the administrator a decision has been taken that has not, and the day they were trying to fix still reads wrong to everyone else.
+- Q: "It should also reflect in the attendance of the affected employee" — a notification, or something on the record? → A: **On the record, permanently.** The employee's own attendance shows the modified day carrying who changed it, when, from what to what, and why. Not a notification: a notification is read once and cleared, and this is a property of the day for as long as the day exists.
+- Q: Is the employee-facing version held to the mobile standard? → A: **Yes — attendance viewing is on Principle VI's closed mobile-critical list.** It is not a desktop screen that must merely survive 320px; the person whose pay is affected by a change is the one most likely to be reading it on a phone.
+- Q: Does the employee see the reason the change was made? → A: **Yes, where one was stated.** Showing that something happened to their attendance while withholding why is worse than not showing it at all.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - One control, everywhere, behaving identically (Priority: P1)
@@ -91,6 +103,15 @@ and time are visible without navigating away.
 4. **Given** a long history, **When** it is opened, **Then** it is readable without leaving the record.
 5. **Given** attribution is shown in a dense table, **When** the table is viewed at 320px, **Then**
    the actor remains discoverable rather than being truncated away entirely.
+6. **Given** a day of the employee's attendance that was modified by an administrator, **When** that
+   **employee** opens their own attendance, **Then** the day shows that it was modified, by whom,
+   when, from what to what, and why where a reason was given.
+7. **Given** an employee's own attendance on a phone at 320px, **When** a modified day is viewed,
+   **Then** the modification is reachable rather than truncated away — attendance viewing is
+   mobile-critical under Principle VI.
+8. **Given** an administrator submits an attendance correction, **When** the response returns,
+   **Then** the screen shows it as **awaiting approval** rather than as applied, and the day does not
+   yet read as corrected.
 
 ---
 
@@ -155,6 +176,22 @@ appear in one queue and can be acted on from it.
 - **FR-008**: Every reviewable record MUST display its latest action, actor and time without
   navigation.
 - **FR-009**: Users MUST be able to open a record's full decision history from the record.
+- **FR-009a**: An employee's own attendance MUST show, for every modified day, that it was modified,
+  by whom, when, from what to what, and the stated reason where one was given
+  (Clarifications, 2026-09-16). This is the client's *"it should also reflect in the attendance of the
+  affected employee"*, and it is a property of the day rather than a notification — it MUST NOT be
+  dismissable or clearable.
+- **FR-009b**: The employee-facing modification display is **mobile-critical** under Principle VI —
+  attendance viewing is on the closed list — and MUST therefore be reachable at 320px rather than
+  merely not breaking there. The person most affected by a change to their attendance is the one most
+  likely to be looking at it on a phone.
+- **FR-009c**: An attendance correction submitted by an administrator MUST be presented as **awaiting
+  approval**, not as applied, and the corrected day MUST NOT read as corrected until the chain
+  completes. The correction now enters the approval chain (backend FR-012), and a screen that shows it
+  as done is telling the administrator a decision has been taken that has not.
+- **FR-009d**: The administrative attendance modifications view MUST allow filtering by the person who
+  made the change, not only by employee and date. An audit that cannot ask "what did this person
+  change" answers the wrong half of the question.
 - **FR-010**: The application MUST present one cross-module queue of items awaiting the current user.
 - **FR-011**: The queue MUST show module, subject, age and requester per item, and MUST allow the
   decision to be taken from it.
