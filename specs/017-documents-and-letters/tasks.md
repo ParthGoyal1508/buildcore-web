@@ -315,3 +315,97 @@ for their home company only. Recorded here rather than left to be discovered.
   independent.
 - [ ] T061 **Browser**: define a new kind from this screen and require it, without leaving for
   Company Documents.
+
+## Phase 11: Amendment of 2026-09-16 — bug 3's web half (FR-022, FR-022a, FR-022b, FR-023, FR-023a, FR-023b, FR-024)
+
+**Why this phase exists.** Phase 10 covers the 2026-09-16 amendment for FR-019, FR-020 and FR-021. A
+*second* amendment landed the same day from the client's bug review — FR-022 through FR-024, the
+project document gate — and never got tasks. Seven requirements, none of them reflected below until
+now.
+
+No test framework is installed (`TODO(TESTING_STANDARD)`). No task creates a test file. Verification is
+`npx tsc --noEmit`, `npm run lint`, `npm run build` and the browser passes named.
+
+**Backend dependency**: api 017 phase 13 (T106-T132, outstanding — 30 tasks). It supplies the
+configurable required set with per-kind mandatory/advisory strength, the staged upload path, and the
+transactional creation gate. Note that **no endpoint creates a `ProjectDocument` today** — the upload
+path this phase's forms post to does not yet exist.
+
+### The settings editor (FR-022, FR-022a, FR-022b)
+
+- [ ] T062 (FR-022) Extend `app/lib/api/project-documents.ts` with the required-set read and write,
+  zod-schemed, carrying each kind's **strength** — mandatory or advisory.
+- [ ] T063 (FR-022) Build the editor in `app/dashboard/settings/project-documents/`: move a kind between
+  mandatory and advisory, add one from the kinds available to this company, remove one.
+- [ ] T064 (FR-022) Support defining a **new kind in place**, without leaving for the document-types
+  screen. A gate that requires configuring a kind elsewhere before it can be required here is a gate
+  people route around.
+- [ ] T065 (FR-022) Where the company has configured nothing, show the **shipped defaults**, say plainly
+  that they are defaults, and distinguish that from a company having chosen exactly those kinds. An
+  unconfigured screen that looks configured is how somebody concludes the set was reviewed when nobody
+  has looked at it.
+- [ ] T066 (FR-022a) Name the two strengths **by their consequence** — a mandatory kind refuses project
+  creation, an advisory kind is reported outstanding. Do not label them "required" and "optional":
+  optional describes a kind by what it is not and hides that the two now differ in effect.
+- [ ] T067 (FR-022b) Do **not** offer the editor's controls to a user who may upload project documents
+  but may not change settings. Hidden, not disabled — showing a control that will be refused teaches the
+  person that the screen is broken.
+- [ ] T068 (FR-022b) Read the settings permission from `app/lib/permissions.ts`. It is `SETTINGS`, not
+  `COMPANY_SETTINGS` — the api spec's FR-007c was corrected to `SETTINGS` on 2026-09-16, and using the
+  wrong one here refuses the people who are supposed to hold this.
+
+### The project creation form (FR-023, FR-023a, FR-023b)
+
+- [ ] T069 (FR-023) Add an upload control per **mandatory** kind to the project creation form in
+  `app/dashboard/projects/portfolio/`, resolved from the company's configured set rather than a
+  hardcoded list.
+- [ ] T070 (FR-023) Refuse submission until every mandatory kind carries a file. Refuse in the form, and
+  do not rely on the server's refusal as the only gate — though the server's gate is authoritative
+  (api FR-009).
+- [ ] T071 (FR-023) Show advisory kinds as uploads that do **not** block submission, distinguished from
+  the mandatory ones by their stated consequence, per T066's wording rule.
+- [ ] T072 (FR-023a) On a server refusal for missing mandatory documents, name the missing kinds **on
+  the controls they refer to**, not only in a summary at the top. A message listing kind names the user
+  then has to match against controls is a message that makes them do the matching.
+- [ ] T073 (FR-023a) **Preserve every value and every file already supplied** across the refusal. This is
+  the task that matters most in this phase: a refusal that empties the form makes the gate punish the
+  person complying with it, and it is the behaviour most likely to be lost to a naive re-render.
+- [ ] T074 (FR-023b) Show upload progress and failure **per document**, as FR-006 already requires of the
+  company documents screen. Reuse that component rather than writing a second one.
+- [ ] T075 (FR-023b) Ensure a silently-failed upload cannot hold submission closed with no visible cause.
+  A form that refuses for a reason the user cannot see is indistinguishable from a broken form.
+- [ ] T076 (FR-023) Post to the staged-upload path api 017 phase 13 adds. Note here that this path does
+  not exist yet — **no endpoint creates a `ProjectDocument` today** — so this task is blocked on
+  T106-T132 rather than merely sequenced after them.
+
+### The project's own document list (FR-024)
+
+- [ ] T077 (FR-024) List **every** document filed against the project on the project screen — required
+  and supplementary alike — each openable from there.
+- [ ] T078 (FR-024) Do not make readiness status the only view of a project's papers. A screen that shows
+  "3 of 5 required" and nothing else cannot answer "what do we hold for this project", which is the
+  question the client's item 3 ends on.
+- [ ] T079 Copy in `app/lib/constants.ts` (Principle III), no inline styling (Principle II), all access
+  through `app/lib/api` (Principle V).
+- [ ] T080 Browser pass: configure a set with one mandatory and one advisory kind, then create a project.
+  Confirm submission is refused with the mandatory kind missing, that the advisory kind does not block,
+  and that **every field and file survives** the refusal.
+- [ ] T081 Browser pass: as a user who may upload project documents but not change settings, confirm the
+  editor's controls are absent from the settings screen and that uploading still works.
+- [ ] T082 Browser pass: file a supplementary document against a project and confirm it appears on the
+  project screen alongside the required ones.
+- [ ] T083 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+### Dependencies
+
+Blocked on api 017 phase 13 (T106-T132), not merely sequenced after it: T076's endpoint does not exist.
+T062-T068 (the settings editor) can be built against the required-set contract as soon as that half
+lands, independently of the creation form.
+
+Phase 11 is independent of Phase 10.
+
+### MVP for this amendment
+
+**T069-T073** — the creation form's mandatory uploads with values preserved across a refusal. That is
+bug 3's actual ask ("Project Managers cannot create a project without them"), and T073 is what keeps
+the gate from being the thing people complain about.

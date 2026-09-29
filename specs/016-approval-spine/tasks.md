@@ -622,3 +622,123 @@ navigation — and was taken against the code as it then was. What is untested i
 the friendlier sentence renders in place of the proxy's. The path is short and the fallback
 is a plain string, but it is untested, and a shared control that every module depends on is
 exactly where that should be said out loud rather than assumed.
+
+## Phase 8: Amendment of 2026-09-16 — bug 2's web half (FR-009a, FR-009b, FR-009c, FR-009d)
+
+**Why this phase exists and why it is unchecked.** Phases 1-7 above are complete and their 42 tasks
+are accurate for the requirements that existed when they were written. FR-009a to FR-009d were added
+to `spec.md` on 2026-09-16 and never got tasks, so this file has read "complete" while the
+specification carried four unbuilt requirements. The 42 stay as history; this phase is the work.
+
+No test framework is installed (`TODO(TESTING_STANDARD)`). No task below creates a test file.
+Verification is `npx tsc --noEmit`, `npm run lint`, `npm run build` and the browser passes named.
+
+**Backend dependency**: api 016 phase 8 tasks T064-T066 extend `AttendanceMonth`'s per-day shape with
+the modification fields and resolve the actor to a **name**, not an id. Those 20 tasks are outstanding.
+T043 below is a schema change that cannot be verified until they land — do it, and expect the browser
+passes to wait.
+
+- [ ] T043 (FR-009a) Extend `attendanceDaySchema` in `app/lib/api/my-workspace.ts` with the
+  modification fields the backend adds — modified flag, actor **name**, time, before, after, and the
+  reason where one was given. Parse them as optional so a day from an un-upgraded backend still
+  validates rather than throwing on every employee's history screen.
+- [ ] T044 (FR-009a) Render the modification on the day in `app/ui/my/attendance-history.tsx`. It is a
+  **property of the day**, so it renders inside the day's row or its expansion — not as a banner, a
+  toast or a notification list.
+- [ ] T045 (FR-009a) Make it **not dismissable and not clearable**. No close control, no "seen" state,
+  nothing persisted in local storage that hides it. The requirement says so explicitly because a
+  dismissable record of somebody else changing your attendance is a record that disappears the first
+  time it is inconvenient.
+- [ ] T046 (FR-009a) Show from-what-to-what, not only that a change occurred. A day reading "modified"
+  with no before value tells the employee something happened and nothing about what.
+- [ ] T047 (FR-009a) Where no reason was given, say so plainly rather than rendering an empty field.
+  The backend's `reason` is free text and optional; an empty string and "no reason given" must not look
+  the same.
+- [ ] T048 (FR-009a) Put every string in `app/lib/constants.ts` (Principle III), and use no inline
+  styling (Principle II).
+- [ ] T049 (FR-009b) **Mobile-critical under Principle VI.** Attendance viewing is on the closed list,
+  so this must be *reachable and usable* at 320px, not merely unbroken there. Verify the modification
+  detail is readable without horizontal scroll and without a hover-only affordance — the person whose
+  attendance was changed is the one most likely to be looking at it on a phone.
+- [ ] T050 (FR-009c) In `app/dashboard/hr/attendance/page.tsx`, present a submitted correction as
+  **awaiting approval**, never as applied. Use the existing `app/ui/approvals/action-review.tsx` and
+  `last-action.tsx` rather than new components — this is the same approval state the rest of the
+  application already renders.
+- [ ] T051 (FR-009c) Ensure the corrected day does **not** read as corrected until the chain completes.
+  The employee's view in T044 must show nothing for a pending correction. A day that reads corrected
+  while a decision is still pending tells the administrator a decision has been taken that has not, and
+  tells the employee their attendance changed when it did not.
+- [ ] T052 (FR-009c) Branch on the backend's approval state and error codes, never on message text —
+  the convention T006 established for this feature.
+- [ ] T053 (FR-009d) Add filtering by **the person who made the change** to the administrative
+  modifications view, alongside the existing employee and date filters. The backend adds `actorUserId`
+  to `ModificationsQueryDto` (api 016 T070).
+- [ ] T054 (FR-009d) Make the actor filter compose with the existing filters rather than replacing
+  them — an audit asking "what did this person change to this employee in September" is the question
+  worth answering.
+- [ ] T055 (FR-009d) Present the actor by name, resolved server-side. Do not render a user id, and do
+  not fetch names one per row.
+- [ ] T056 All access through the typed API modules in `app/lib/api` (Principle V). No direct `fetch`.
+- [ ] T057 Browser pass: as an employee, view a month containing an administrator-modified day and
+  confirm the actor's name, the time, before, after and the reason are all visible, that nothing
+  dismisses it, and that it reads correctly at 320px.
+- [ ] T058 Browser pass: as an administrator, submit a correction and confirm **both** views — it reads
+  awaiting approval on the admin screen, and the employee's day shows nothing yet. Then approve it and
+  confirm both change together.
+- [ ] T059 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+## Phase 9: Amendment of 2026-09-29 — item 7's web half (FR-017, FR-018, FR-019, FR-020)
+
+The backend answer to "every critical action requires Director approval" is a named, configurable set
+rather than a literal every-action gate. That answer only works if the client can see the set — which
+is what User Story 4 and these four requirements are for. `app/dashboard/settings/approvals` already
+exists from Phase 6 and is where this belongs.
+
+**Backend dependency**: api 016 phases 9-11 (T084-T107). `GET /settings/approvals/director-final`
+returns the **union** of registered action types, the config seed, and the stored rows — with three
+states per action type, not two.
+
+- [ ] T060 (FR-017) Add the director-final read to `app/lib/api/approvals.ts` with a zod schema
+  carrying all **three** states per action type: final; not final by decision; not final because
+  nothing configures it.
+- [ ] T061 (FR-017) Render the list in `app/dashboard/settings/approvals/`, listing every action type
+  the system reports rather than only those configured.
+- [ ] T062 (FR-017) Render the third state **distinctly**. An action type nothing configures must not
+  look like one somebody decided needs no director — collapsing those two hides exactly the gap item 7
+  is asking about, and it is the reason the backend reports three states.
+- [ ] T063 (FR-018) Present a change as **submitted for the director's approval**, never as saved. The
+  submit control's label must say so before it is pressed, not only after.
+- [ ] T064 (FR-018) Keep the mark **currently in force** displayed while a change is pending. The
+  screen shows what governs today and what has been proposed, as two readable things.
+- [ ] T065 (FR-019) Show a pending change to every reader of the surface, so two people do not submit
+  the same edit. Include who submitted it and when.
+- [ ] T066 (FR-020) For a user who may not configure approvals, render the list with **no control to
+  change a mark** — hidden, not disabled (the Principle-consistent behaviour, and what web 019's FR-004
+  requires generally).
+- [ ] T067 (FR-020) Read the permission from `app/lib/permissions.ts`. Note in the task that once
+  web 019 ships this becomes a level-aware check (`COMPANY_SETTINGS` at write); until then the existing
+  module-level value is correct and needs no change.
+- [ ] T068 Reuse `app/ui/approvals/action-review.tsx` for the pending change's own approval rather than
+  building a second control. A settings change that enters the chain is an ordinary chain item.
+- [ ] T069 Copy in `app/lib/constants.ts`, no inline styling, access through `app/lib/api`.
+- [ ] T070 Browser pass: open the settings surface, confirm all three states render distinctly, submit a
+  change removing payment release, confirm the list still shows it as final and the pending change is
+  visible, approve as Super Admin, confirm the list updates.
+- [ ] T071 Browser pass: as a user without approval-configuration permission, confirm the list is
+  readable and no change control appears anywhere on the screen.
+- [ ] T072 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+### Dependencies for phases 8-9
+
+Phase 8 needs api 016 phase 8 (T064-T083, outstanding). Phase 9 needs api 016 phases 9-11
+(T084-T107, not started). Both can be written before their backend lands; neither can be verified
+in a browser until it does.
+
+Phases 8 and 9 are independent of each other.
+
+### MVP for these amendments
+
+**Phase 8's T043-T049** — the employee seeing that their own attendance was changed, by whom, and from
+what to what. It is the client's own sentence in bug 2 ("it should also reflect in the attendance of
+the affected employee"), it is mobile-critical, and it is the half of bug 2 that no screen currently
+shows at all.
