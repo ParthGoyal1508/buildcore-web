@@ -22,6 +22,15 @@ The client restated note 4 as *"Add a search bar on the dashboard to quickly fin
 - Q: Does a name match look different in the results? → A: **It says which field matched.** A row that appeared because of its name, when the user typed something that looks like a code, otherwise reads as a wrong result. An exact code match also sorts first (backend FR-001b).
 - Q: Results appear as the user types. Does that still hold when a two-letter name fragment matches thousands of rows? → A: **No — there is a minimum term length.** Below it the control says to keep typing rather than returning an empty result, because an empty result and "too short to search" mean different things to the person typing and look identical otherwise.
 
+### Session 2026-09-29
+
+Raised against the client's re-stated requirement list, item 10: *"any assets assigned to the employee
+should appear in the F&F summary"*. The clearance screen listed kit, documents, advances,
+reimbursements and access, and nothing at all about assets held in the employee's custody.
+
+- Q: Do assets get their own section on the clearance screen, or join the existing outstanding list? → A: **Their own section, within the same list.** An asset is a different kind of obligation from an advance — it has a site, an expected return date and a condition on return — and the person clearing an exit needs to see at a glance what physical property is outstanding. Grouping it with money obscures that.
+- Q: Should the screen offer a way to return the asset? → A: **No — it links to the asset register instead.** The asset module owns returning an asset, with its condition grade and its own consequences. A second return control here would be a second way to close an allocation and the two would disagree. The clearance shows the obligation and takes the reader to where it is discharged.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A search box that finds anything by its code or its name (Priority: P1)
@@ -99,9 +108,9 @@ their own lines, so the person releasing payment can see why a figure differs fr
 
 ### User Story 4 - A leaver's clearance, on one screen (Priority: P2)
 
-When an employee exits, one screen shows everything outstanding — kit to return, documents to hand
-back, advances and loans, reimbursements, access to revoke — and final settlement is unavailable
-until each is resolved or deliberately waived.
+When an employee exits, one screen shows everything outstanding — kit to return, **company assets in
+their custody**, documents to hand back, advances and loans, reimbursements, access to revoke — and
+final settlement is unavailable until each is resolved or deliberately waived.
 
 **Acceptance Scenarios**:
 
@@ -113,6 +122,16 @@ until each is resolved or deliberately waived.
    waiver's author is shown.
 4. **Given** a completed clearance, **When** settlement is produced, **Then** pending salary, notice
    recovery, advances, reimbursements and deductions appear with the final payable.
+5. **Given** an employee holding an unreturned asset, **When** the clearance screen is opened, **Then**
+   the asset is listed in its own group with the site it was allocated at and the date it was due back,
+   and final settlement is unavailable naming it.
+6. **Given** an asset listed on the clearance, **When** the reader follows it, **Then** they arrive at
+   that allocation in the asset register, which is where a return is recorded — there is no return
+   control on this screen.
+7. **Given** an asset returned in the asset register, **When** the clearance screen is reopened,
+   **Then** the item reads satisfied without any action having been taken here.
+8. **Given** a completed clearance, **When** the settlement summary is produced, **Then** every asset
+   the employee held appears with its outcome, including ones that were waived.
 
 ### Edge Cases
 
@@ -122,6 +141,12 @@ until each is resolved or deliberately waived.
 - A transaction sheet whose columns do not match what is expected.
 - An exit for an employee with no outstanding anything — the screen must not look broken when empty.
 - A waiver attempted by somebody without authority.
+- An employee holding many assets — a site engineer with a laptop, a phone, instruments and a vehicle.
+  The group must stay readable rather than pushing the money obligations off the screen.
+- An asset returned in another tab while the clearance screen is open, so the screen is stale and
+  settlement is refused for something already resolved. The reader needs a way to refresh rather than
+  a dead end.
+- An asset with no expected return date, or one long past. Neither should render as an empty cell.
 
 ## Requirements *(mandatory)*
 
@@ -151,7 +176,15 @@ until each is resolved or deliberately waived.
 - **FR-010**: The bank payment sheet MUST show advance recoveries as named lines.
 - **FR-011**: Differences between the sheet and the payroll run MUST be explicable line by line.
 - **FR-012**: The exit clearance screen MUST list every outstanding item with its owner.
+- **FR-012a**: Assets in the employee's custody MUST appear as their own group within that list, each
+  showing the asset, the project or site it was allocated at, the quantity where more than one unit is
+  held, and the date its return was expected.
+- **FR-012b**: An asset item MUST link to that allocation in the asset register. This screen MUST NOT
+  offer a way to return an asset; returning one belongs to the asset module, which records the
+  condition it came back in.
 - **FR-013**: Final settlement MUST be unavailable while items are outstanding, naming them.
+- **FR-013a**: The settlement summary MUST list every asset the employee held at exit with its outcome
+  — returned, or waived with the waiver's author and reason — whether or not it blocked settlement.
 - **FR-014**: A waiver MUST require a reason and MUST display its author.
 - **FR-015**: All access MUST go through the typed API modules (Principle V); copy MUST live in the
   constants module (Principle III); no inline styling (Principle II).
@@ -183,6 +216,10 @@ until each is resolved or deliberately waived.
 - **SC-004**: Every difference between the bank sheet and the payroll run is explicable from the
   sheet itself.
 - **SC-005**: No final settlement is reachable while an unwaived item is outstanding.
+- **SC-005a**: An unreturned asset makes final settlement unreachable and is named as the reason,
+  verified from the clearance screen alone.
+- **SC-005b**: Every asset an exiting employee held is visible on the clearance screen and on the
+  settlement summary, with no figure or date retyped by the reader.
 
 ## Assumptions
 
@@ -192,6 +229,10 @@ until each is resolved or deliberately waived.
 - Slip delivery is triggered from the payroll run screen, and this specification assumes it is
   visible there rather than being a background process nobody can observe.
 - Exit clearance reuses the existing exit record screens rather than adding a parallel flow.
+- Asset custody is read from the asset register's existing surfaces (feature 012) and displayed here.
+  This specification adds no screen for allocating or returning an asset.
+- The value of an unreturned asset is not shown as a deduction, because the backend specification
+  deliberately does not compute one (021 backend FR-018b).
 - No test framework is installed (constitution `TODO(TESTING_STANDARD)`); verification is lint,
   type-check, build and manual passes. **No test-file tasks may be generated.**
 
