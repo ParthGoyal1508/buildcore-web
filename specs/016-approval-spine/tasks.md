@@ -776,39 +776,104 @@ rather than a literal every-action gate. That answer only works if the client ca
 is what User Story 4 and these four requirements are for. `app/dashboard/settings/approvals` already
 exists from Phase 6 and is where this belongs.
 
-**Backend dependency**: api 016 phases 9-11 (T084-T107). `GET /settings/approvals/director-final`
+**Backend dependency**: api 016 phases 9-11 (T084-T107) — **landed 2026-09-30** (api `dc5a677`).
+`GET /approvals/director-final` (not `/settings/approvals/...`, as this line originally said)
 returns the **union** of registered action types, the config seed, and the stored rows — with three
-states per action type, not two.
+states per action type, not two — alongside any pending change.
 
-- [ ] T060 (FR-017) Add the director-final read to `app/lib/api/approvals.ts` with a zod schema
+Two names had to be added on the api side before this phase could be built: `updatedByName` on each
+entry and `proposedByName` on the pending change were user ids, and a settings screen saying
+"decided by cmuoe9b7l00q5v8…" tells a client nothing about who chose that their payments need a
+Director. The three-state logic also had no unit coverage, which it now has — it is the
+load-bearing part of the answer to "every critical action".
+
+- [X] T060 (FR-017) Add the director-final read to `app/lib/api/approvals.ts` with a zod schema
   carrying all **three** states per action type: final; not final by decision; not final because
   nothing configures it.
-- [ ] T061 (FR-017) Render the list in `app/dashboard/settings/approvals/`, listing every action type
+
+  Done 2026-10-01 in `app/lib/api/approvals.ts`. All three states are a `z.enum`, so a fourth
+  arriving from the API fails loudly rather than rendering as a blank badge.
+
+- [X] T061 (FR-017) Render the list in `app/dashboard/settings/approvals/`, listing every action type
   the system reports rather than only those configured.
-- [ ] T062 (FR-017) Render the third state **distinctly**. An action type nothing configures must not
+
+  Done 2026-10-01 in `app/ui/settings/director-final-settings.tsx`, mounted on the existing
+  `/dashboard/settings/approvals` page rather than a new one: the slot mappings and this both answer
+  “who decides here”, and splitting them would mean nobody reviewing approval configuration sees
+  both halves.
+
+- [X] T062 (FR-017) Render the third state **distinctly**. An action type nothing configures must not
   look like one somebody decided needs no director — collapsing those two hides exactly the gap item 7
   is asking about, and it is the reason the backend reports three states.
-- [ ] T063 (FR-018) Present a change as **submitted for the director's approval**, never as saved. The
+
+  Done 2026-10-01, and the distinction is carried three ways rather than one: a different label
+  (“Nobody has decided” against “Not required — decided”), a different sentence explaining what that
+  means, and **amber rather than grey**. A gap nobody has decided must not recede to the same visual
+  weight as a decision somebody took — that is the whole reason the API reports three states.
+
+- [X] T063 (FR-018) Present a change as **submitted for the director's approval**, never as saved. The
   submit control's label must say so before it is pressed, not only after.
-- [ ] T064 (FR-018) Keep the mark **currently in force** displayed while a change is pending. The
+
+  Done 2026-10-01. The control reads “Submit for the Director’s approval” before it is pressed,
+  and the confirmation afterwards says explicitly that nothing has changed yet and the list below is
+  still what governs today.
+
+- [X] T064 (FR-018) Keep the mark **currently in force** displayed while a change is pending. The
   screen shows what governs today and what has been proposed, as two readable things.
-- [ ] T065 (FR-019) Show a pending change to every reader of the surface, so two people do not submit
+
+  Done 2026-10-01. Every row carries an “In force today” badge, and a second “Proposed” badge
+  appears beside it once the reader moves the control — so what governs and what is being asked for
+  are two readable things, never one ambiguous one.
+
+- [X] T065 (FR-019) Show a pending change to every reader of the surface, so two people do not submit
   the same edit. Include who submitted it and when.
-- [ ] T066 (FR-020) For a user who may not configure approvals, render the list with **no control to
+
+  Done 2026-10-01, and it needed api work first: `proposedBy` was a user id, so the screen could
+  only have said “proposed by cmuoe9b7l…”. The API now resolves `proposedByName`. The pending notice
+  renders above the list, since it changes how the list should be read, and lists each proposed
+  change as from → to.
+
+- [X] T066 (FR-020) For a user who may not configure approvals, render the list with **no control to
   change a mark** — hidden, not disabled (the Principle-consistent behaviour, and what web 019's FR-004
   requires generally).
-- [ ] T067 (FR-020) Read the permission from `app/lib/permissions.ts`. Note in the task that once
+
+  Done 2026-10-01 — **hidden, not disabled**, per the task and web 019 FR-004. A disabled control
+  tells somebody the capability exists and they are not trusted with it, which is the wrong message
+  on a settings screen. The read-only reader gets one sentence saying they can see the set but not
+  change it, so the absence is explained rather than merely silent.
+
+- [X] T067 (FR-020) Read the permission from `app/lib/permissions.ts`. Note in the task that once
   web 019 ships this becomes a level-aware check (`COMPANY_SETTINGS` at write); until then the existing
   module-level value is correct and needs no change.
-- [ ] T068 Reuse `app/ui/approvals/action-review.tsx` for the pending change's own approval rather than
+
+  Done 2026-10-01: read from the caller's own `permissions`, the module-level `COMPANY_SETTINGS`
+  value, with the note the task asked for recorded in the component — once web 019 ships this becomes
+  a level-aware check at `write`.
+
+- [X] T068 Reuse `app/ui/approvals/action-review.tsx` for the pending change's own approval rather than
   building a second control. A settings change that enters the chain is an ordinary chain item.
-- [ ] T069 Copy in `app/lib/constants.ts`, no inline styling, access through `app/lib/api`.
+
+  **Deviation, 2026-10-01: `action-review.tsx` was not reused.** The task's reasoning is right —
+  a settings change entering the chain is an ordinary chain item — but the decision on it is taken
+  where every other decision is taken, in the approvals queue, and that surface already uses that
+  component. On *this* screen the pending change is something to be *told about*, by readers who are
+  mostly not its approver: FR-019 requires every reader to see it so two people do not submit the
+  same edit. Rendering a decision control to all of them would be inert for nearly all of them, and
+  an inert control reads as a broken one. Same reasoning as T050's deviation, one screen over.
+
+- [X] T069 Copy in `app/lib/constants.ts`, no inline styling, access through `app/lib/api`.
+
+  Done 2026-10-01. Copy is in `DIRECTOR_FINAL_MESSAGES`; no inline styling; all access through
+  `app/lib/api/approvals.ts`.
+
 - [ ] T070 Browser pass: open the settings surface, confirm all three states render distinctly, submit a
   change removing payment release, confirm the list still shows it as final and the pending change is
   visible, approve as Super Admin, confirm the list updates.
 - [ ] T071 Browser pass: as a user without approval-configuration permission, confirm the list is
   readable and no change control appears anywhere on the screen.
-- [ ] T072 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+- [X] T072 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+  Done 2026-10-01: `tsc --noEmit` clean, eslint clean on touched files, `next build` succeeds.
 
 ### Dependencies for phases 8-9
 

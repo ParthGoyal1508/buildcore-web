@@ -2103,7 +2103,61 @@ export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
   letter_loi: 'Letter of intent',
   letter_purchase_order: 'Purchase order',
   final_settlement: 'Final settlement',
+  attendance_correction: 'Attendance correction',
+  director_final_set_change: 'Change to the Director approval set',
 };
+
+/**
+ * Copy for the Director approval set (016 FR-017 to FR-020).
+ *
+ * The three state labels are the load-bearing strings on that screen. "Not required" and "Not
+ * configured" must not be interchangeable in a reader's mind: the first is a decision somebody
+ * made and can be held to, the second is a question nobody has answered. Written as full phrases
+ * rather than badges for that reason.
+ */
+export const DIRECTOR_FINAL_MESSAGES = {
+  heading: 'Director approval',
+  intro:
+    'Which actions cannot take effect until the Director approves them. Changes here are themselves submitted for the Director’s approval — they do not take effect when you save.',
+  stateLabels: {
+    final: 'Director required',
+    not_final_by_decision: 'Not required — decided',
+    not_configured: 'Nobody has decided',
+  } as Record<string, string>,
+  stateHints: {
+    final: 'This cannot take effect until the Director approves it.',
+    not_final_by_decision:
+      'Somebody decided this needs no Director. The decision is recorded below.',
+    not_configured:
+      'Nothing says either way, so the shipped default governs. This is the gap worth reviewing.',
+  } as Record<string, string>,
+  decidedBy: (name: string, when: string) => `Decided by ${name} · ${when}`,
+  /** For a mark that is in force but that nobody is recorded as having set. */
+  decidedByNobody: 'No decision is recorded against this.',
+  /** The submit control's label, said before it is pressed rather than after (FR-018). */
+  submit: 'Submit for the Director’s approval',
+  submitting: 'Submitting…',
+  submitted:
+    'Submitted for the Director’s approval. Nothing has changed yet — the set below is still what governs today.',
+  noChanges: 'Nothing has been changed yet.',
+  pendingHeading: 'A change is awaiting the Director',
+  pendingBy: (name: string, when: string) => `Proposed by ${name} · ${when}`,
+  pendingChange: (action: string, from: string, to: string) =>
+    `${action}: ${from} → ${to}`,
+  /** FR-019. Shown to every reader so two people do not submit the same edit. */
+  pendingLocked:
+    'While this is outstanding, no further change can be submitted for this company.',
+  inForce: 'In force today',
+  proposed: 'Proposed',
+  /**
+   * The one entry that cannot be changed. Rendered as an explanation rather than a disabled
+   * control, because "why can I not change this" is the question it should answer.
+   */
+  selfChangeLocked:
+    'The approval requirement on changing this set cannot itself be changed — it is the gate that makes every other entry meaningful.',
+  readOnly:
+    'You can see which actions require the Director, but not change them.',
+} as const;
 
 /** The label for an action type, falling back to a readable form of the raw key. */
 export function approvalActionTypeLabel(actionType: string): string {

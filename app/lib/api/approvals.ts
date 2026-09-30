@@ -421,3 +421,89 @@ export async function resubmitApproval(
   );
   return approvalStateObjectSchema.parse(raw);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Which actions require the Director (016 FR-017 to FR-020)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The three states an action type can be in — and why there are three, not two.
+ *
+ * The client asked that "every critical action" require the Director. The product's answer is a
+ * named, configurable set, which is only a real answer if the client can *see* the set. That in
+ * turn only works if a type nothing configures reads differently from a type somebody decided
+ * needs no Director: collapsing those two hides exactly the gap the question is about. An action
+ * nobody has considered would look identical to one deliberately left open.
+ *
+ * - `final` — the Director's approval is required.
+ * - `not_final_by_decision` — somebody decided it is not, and that decision is recorded.
+ * - `not_configured` — nothing says either way. This is the gap.
+ */
+export const DIRECTOR_FINAL_STATES = [
+  'final',
+  'not_final_by_decision',
+  'not_configured',
+] as const;
+export type DirectorFinalState = (typeof DIRECTOR_FINAL_STATES)[number];
+
+export const directorFinalEntrySchema = z.object({
+  actionType: openString,
+  state: z.enum(DIRECTOR_FINAL_STATES),
+  isFinal: z.boolean(),
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string().nullable(),
+  /** Who decided, by name. Null for a state nobody set. */
+  updatedByName: z.string().nullable().optional(),
+});
+export type DirectorFinalEntry = z.infer<typeof directorFinalEntrySchema>;
+
+/**
+ * A proposed change, awaiting the Director.
+ *
+ * `before` holds every action type's mark as it stood; `after` holds **only** what the proposal
+ * would change. So the diff is driven by `after`'s keys, and `before` supplies each one's current
+ * value — which is also why the screen can show what is still in force alongside what is proposed.
+ */
+export const directorFinalPendingSchema = z.object({
+  instanceId: z.string(),
+  proposedBy: z.string(),
+  proposedByName: z.string().optional(),
+  before: z.record(z.boolean()).nullable().optional(),
+  after: z.record(z.boolean()).nullable().optional(),
+  createdAt: z.string(),
+});
+export type DirectorFinalPending = z.infer<typeof directorFinalPendingSchema>;
+
+const directorFinalSetSchema = z.object({
+  entries: z.array(directorFinalEntrySchema),
+  /** The mark in force and the change proposed arrive together, so no paint is right about one
+   * and wrong about the other. */
+  pending: directorFinalPendingSchema.nullable(),
+});
+export type DirectorFinalSet = z.infer<typeof directorFinalSetSchema>;
+
+export async function getDirectorFinalSet(): Promise<DirectorFinalSet> {
+  return directorFinalSetSchema.parse(
+    await authFetch<unknown>('/approvals/director-final'),
+  );
+}
+
+/**
+ * Proposes a change. **Submitted for the Director's approval, not saved.**
+ *
+ * The response is the pending approval item; the set in force is unchanged until the chain
+ * completes. Whoever could edit this set directly could remove payment release from it and then
+ * release a payment, which is why editing it is itself gated.
+ */
+export async function proposeDirectorFinalChange(
+  changes: { actionType: string; isFinal: boolean }[],
+): Promise<{ instanceId: string; state: string }> {
+  return z
+    .object({ instanceId: z.string(), state: z.string() })
+    .parse(
+      await authFetch<unknown>('/approvals/director-final', {
+        method: 'PATCH',
+        body: JSON.stringify({ changes }),
+      }),
+    );
+}
