@@ -634,9 +634,11 @@ No test framework is installed (`TODO(TESTING_STANDARD)`). No task below creates
 Verification is `npx tsc --noEmit`, `npm run lint`, `npm run build` and the browser passes named.
 
 **Backend dependency**: api 016 phase 8 tasks T064-T066 extend `AttendanceMonth`'s per-day shape with
-the modification fields and resolve the actor to a **name**, not an id. Those 20 tasks are outstanding.
-T043 below is a schema change that cannot be verified until they land — do it, and expect the browser
-passes to wait.
+the modification fields and resolve the actor to a **name**, not an id.
+
+**Landed 2026-09-30** (api `f121afe`), along with phase 8a's `pendingCorrection` on the daily row,
+which T077 should have caught and did not — the browser was the consumer nobody checked. So the
+browser passes below are now verifiable rather than blocked.
 
 - [ ] T043 (FR-009a) Extend `attendanceDaySchema` in `app/lib/api/my-workspace.ts` with the
   modification fields the backend adds — modified flag, actor **name**, time, before, after, and the
@@ -660,16 +662,36 @@ passes to wait.
   so this must be *reachable and usable* at 320px, not merely unbroken there. Verify the modification
   detail is readable without horizontal scroll and without a hover-only affordance — the person whose
   attendance was changed is the one most likely to be looking at it on a phone.
-- [ ] T050 (FR-009c) In `app/dashboard/hr/attendance/page.tsx`, present a submitted correction as
+- [X] T050 (FR-009c) In `app/dashboard/hr/attendance/page.tsx`, present a submitted correction as
   **awaiting approval**, never as applied. Use the existing `app/ui/approvals/action-review.tsx` and
   `last-action.tsx` rather than new components — this is the same approval state the rest of the
   application already renders.
+
+  Done in `app/ui/hr/attendance-table.tsx` (2026-10-01), and **neither component was used** — noting
+  the deviation because the task named them. Both are decision controls: they exist so a reviewer can
+  approve or return an item, and they need an `instanceId`, a `canActNow` and an inert reason. Nothing
+  on this screen decides anything. The administrator who submitted the correction is not its approver,
+  and rendering a control that is inert for every viewer would read as a broken button rather than as
+  a state. What the row needs is one fact — a correction is outstanding, and this level has it — which
+  is what `pendingCorrection` carries. The approval surface remains the place a decision is taken.
+
+  Three separate lies were removed along the way: the button said `Save`, the dialog said every edit
+  is recorded in the modifications trail, and the copy constant said `Attendance updated.` All three
+  were true before api 016 phase 8 and are now the wrong sentence.
 - [ ] T051 (FR-009c) Ensure the corrected day does **not** read as corrected until the chain completes.
   The employee's view in T044 must show nothing for a pending correction. A day that reads corrected
   while a decision is still pending tells the administrator a decision has been taken that has not, and
   tells the employee their attendance changed when it did not.
-- [ ] T052 (FR-009c) Branch on the backend's approval state and error codes, never on message text —
-  the convention T006 established for this feature.
+
+  **The administrator half is done** (2026-10-01): the row's times and status are the stored ones, and
+  the correction shows as awaiting a level beside them rather than in place of them. Left open for the
+  employee half, which cannot be checked until T044 renders anything at all. The API guarantee it rests
+  on is already in place and covered — `AttendanceModification` is written on apply, never on submit
+  (api T075), so a pending correction is invisible to the employee's history by construction.
+- [X] T052 (FR-009c) Branch on the backend's approval state and error codes, never on message text —
+  the convention T006 established for this feature. The row's marker branches on the presence of
+  `pendingCorrection` and on the chain's own `levelLabel`; the dialog branches on HTTP 423. No string
+  is matched.
 - [ ] T053 (FR-009d) Add filtering by **the person who made the change** to the administrative
   modifications view, alongside the existing employee and date filters. The backend adds `actorUserId`
   to `ModificationsQueryDto` (api 016 T070).

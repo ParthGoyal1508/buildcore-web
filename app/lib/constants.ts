@@ -1307,7 +1307,26 @@ export const HR_MESSAGES = {
   periodLocked:
     'That period is locked by a processed payroll run, so attendance for it can no longer be changed.',
   noAttendance: 'No attendance records for this date and site.',
+  /**
+   * Unused, and kept only so the next person looking for it finds this note rather than
+   * reintroducing it (016 FR-009c). A correction is not an update: it is submitted for
+   * approval, and the day does not change until the chain completes. "Attendance updated"
+   * was true before api 016 phase 8 and is now precisely the wrong sentence.
+   */
   attendanceSaved: 'Attendance updated.',
+  correctionSubmitted:
+    'Correction submitted for approval. The day will not change until it is approved.',
+  correctionAwaiting: (level: string) => `Correction awaiting ${level}`,
+  /** When the chain reports no level — it has finished, or nothing is mapped to decide it. */
+  correctionAwaitingUnknown: 'Correction awaiting approval',
+  correctionPendingHint:
+    'A correction for this day is already awaiting approval. Submitting another will raise a second one.',
+  correctionSubmit: 'Submit for approval',
+  correctionSubmitting: 'Submitting…',
+  correctionDialogHint: (date: string) =>
+    `Attendance for ${date}. This is submitted for approval rather than applied — the day changes only once the chain approves it, and the change is then recorded in the modifications trail with its before and after values.`,
+  correctionRemarksHint:
+    'Shown to the approvers, and kept in the modifications trail if the correction is approved.',
   importNothingValid:
     'Nothing in this file can be imported — every row failed validation. Fix the errors and upload again.',
   importPartial: (ok: number, bad: number) =>

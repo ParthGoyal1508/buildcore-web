@@ -411,6 +411,23 @@ export const dailyAttendanceRowSchema = z.object({
   adminEdited: z.boolean(),
   remarks: z.string().nullable(),
   hasException: z.boolean(),
+  /**
+   * A correction asked for on this day and not yet applied (016 FR-009c).
+   *
+   * **Optional, unlike `status` above, and for the opposite reason.** `status` is required
+   * because a missing value there let the client invent one. Here a missing value means the
+   * API predates this field, and the honest rendering of "this deploy cannot tell me whether
+   * a correction is outstanding" is to show nothing — not to fail the whole screen, which
+   * would take attendance viewing down during a staged rollout.
+   */
+  pendingCorrection: z
+    .object({
+      submittedAt: z.string(),
+      /** The level deciding now; null once the chain has finished. */
+      levelLabel: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type DailyAttendanceRow = z.infer<typeof dailyAttendanceRowSchema>;
@@ -436,11 +453,32 @@ export interface MarkAttendanceInput {
   remarks?: string;
 }
 
-export async function markAttendance(input: MarkAttendanceInput) {
-  return authFetch<unknown>('/hr/attendance', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+/**
+ * What `POST /hr/attendance` answers with (016 FR-009c).
+ *
+ * **It is an approval item, not an applied edit.** Since api 016 phase 8 this route raises the
+ * correction into a Site → HR → Director chain and the attendance is unchanged until that
+ * chain completes. The response was read as `unknown` before, which is how the screen came to
+ * close its dialog and refetch — showing the old figures with nothing to explain them, so a
+ * successful submission read as a save that had silently failed.
+ */
+export const attendanceCorrectionSubmissionSchema = z.object({
+  approvalInstanceId: z.string(),
+  state: z.string(),
+});
+export type AttendanceCorrectionSubmission = z.infer<
+  typeof attendanceCorrectionSubmissionSchema
+>;
+
+export async function markAttendance(
+  input: MarkAttendanceInput,
+): Promise<AttendanceCorrectionSubmission> {
+  return attendanceCorrectionSubmissionSchema.parse(
+    await authFetch<unknown>('/hr/attendance', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  );
 }
 
 /**
