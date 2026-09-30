@@ -1284,6 +1284,44 @@ export const TDS_SECTION_CEILINGS: Record<string, number> = {
 /** The sections the declaration form offers, in the order they are usually filed. */
 export const TDS_SECTIONS = ['80C', '80D', '80CCD1B', 'HRA'] as const;
 
+/**
+ * What an employee is told when somebody changed their attendance (016 FR-009a).
+ *
+ * Its own block rather than a few entries in `HR_MESSAGES`, because the reader is different: these
+ * sentences are read by the person whose day was changed, not by the administrator who changed it.
+ * Wording that is fine in an admin tool — "modified", "override" — is not fine here.
+ */
+export const MY_ATTENDANCE_MESSAGES = {
+  /** Singular and plural said separately: "1 changes" on somebody's pay record is careless. */
+  changedHeading: (count: number) =>
+    count === 1
+      ? 'This day was changed by an administrator'
+      : `This day was changed ${count} times by administrators`,
+  changedBy: (actor: string, when: string) => `${actor} · ${when}`,
+  /** The diff. Reads as a sentence so it survives being flattened onto one line at 320px. */
+  fieldChange: (field: string, from: string, to: string) =>
+    `${field}: ${from} → ${to}`,
+  fieldNames: {
+    inTime: 'In',
+    outTime: 'Out',
+    statusOverride: 'Status',
+  } as Record<string, string>,
+  /** For a side of the diff that held nothing — distinct from a value that is unknown. */
+  empty: 'not set',
+  reasonGiven: (reason: string) => `Reason: ${reason}`,
+  /**
+   * T047. An administrator is not obliged to give a reason, and an empty field would read as
+   * though the screen failed to load one. Saying so plainly is the requirement.
+   */
+  reasonMissing: 'No reason was given.',
+  /**
+   * Shown when a change is recorded but no field differs — which the data permits, because a
+   * correction resubmitting the same values still writes a row. Saying "changed" and then listing
+   * nothing would look like a rendering fault.
+   */
+  noFieldsChanged: 'No times or status were altered by this change.',
+} as const;
+
 export const HR_MESSAGES = {
   // Employees
   employeeSaved: 'Employee saved.',
@@ -1327,6 +1365,16 @@ export const HR_MESSAGES = {
     `Attendance for ${date}. This is submitted for approval rather than applied — the day changes only once the chain approves it, and the change is then recorded in the modifications trail with its before and after values.`,
   correctionRemarksHint:
     'Shown to the approvers, and kept in the modifications trail if the correction is approved.',
+
+  // The modification trail's filters (016 FR-012d)
+  modificationEmployeeFilter: 'Employee',
+  modificationAllEmployees: 'All employees',
+  modificationActorFilter: 'Changed by',
+  modificationAllActors: 'Anyone',
+  modificationFrom: 'From',
+  modificationTo: 'To',
+  /** Only reachable if a row carries neither a name nor an id — kept so the cell is never blank. */
+  modificationActorUnknown: 'Unknown',
   importNothingValid:
     'Nothing in this file can be imported — every row failed validation. Fix the errors and upload again.',
   importPartial: (ok: number, bad: number) =>

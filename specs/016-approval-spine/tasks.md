@@ -640,28 +640,66 @@ the modification fields and resolve the actor to a **name**, not an id.
 which T077 should have caught and did not — the browser was the consumer nobody checked. So the
 browser passes below are now verifiable rather than blocked.
 
-- [ ] T043 (FR-009a) Extend `attendanceDaySchema` in `app/lib/api/my-workspace.ts` with the
+- [X] T043 (FR-009a) Extend `attendanceDaySchema` in `app/lib/api/my-workspace.ts` with the
   modification fields the backend adds — modified flag, actor **name**, time, before, after, and the
   reason where one was given. Parse them as optional so a day from an un-upgraded backend still
   validates rather than throwing on every employee's history screen.
-- [ ] T044 (FR-009a) Render the modification on the day in `app/ui/my/attendance-history.tsx`. It is a
+
+  Done 2026-10-01. Parsed as optional **with a default of `[]`**, so no component has to decide
+  what a missing array means — and so a staged rollout renders a month without modification detail
+  rather than throwing on every employee's attendance screen.
+
+- [X] T044 (FR-009a) Render the modification on the day in `app/ui/my/attendance-history.tsx`. It is a
   **property of the day**, so it renders inside the day's row or its expansion — not as a banner, a
   toast or a notification list.
-- [ ] T045 (FR-009a) Make it **not dismissable and not clearable**. No close control, no "seen" state,
+
+  Done 2026-10-01 in `app/ui/my/attendance-history.tsx`, rendered through a new optional `detail`
+  slot on `ResponsiveList` — a full-width block beneath the day's own row, on both the desktop table
+  and the mobile card. A column was the alternative and was rejected: before/after/reason cannot be
+  read in a table cell at 320px.
+
+- [X] T045 (FR-009a) Make it **not dismissable and not clearable**. No close control, no "seen" state,
   nothing persisted in local storage that hides it. The requirement says so explicitly because a
   dismissable record of somebody else changing your attendance is a record that disappears the first
   time it is inconvenient.
-- [ ] T046 (FR-009a) Show from-what-to-what, not only that a change occurred. A day reading "modified"
+
+  Done 2026-10-01. There is no expander, no `seen` state and nothing in `localStorage`. The
+  `detail` slot on `ResponsiveList` is deliberately always-rendered for the same reason — a
+  component that *could* hide this would be one stored key away from hiding it permanently.
+
+- [X] T046 (FR-009a) Show from-what-to-what, not only that a change occurred. A day reading "modified"
   with no before value tells the employee something happened and nothing about what.
-- [ ] T047 (FR-009a) Where no reason was given, say so plainly rather than rendering an empty field.
+
+  Done 2026-10-01, and the trap here was not the diff but the **clock**. A snapshot's times are
+  `HH:mm` in UTC while the day's own times are ISO rendered in the reader's zone, so an employee in
+  IST would have read “In: 03:35 → 03:40” directly beneath a row saying 09:05 — every figure
+  correct, the pair incomprehensible. `snapshotTime` converts using the day's date. Only fields
+  that actually moved are listed.
+
+- [X] T047 (FR-009a) Where no reason was given, say so plainly rather than rendering an empty field.
   The backend's `reason` is free text and optional; an empty string and "no reason given" must not look
   the same.
-- [ ] T048 (FR-009a) Put every string in `app/lib/constants.ts` (Principle III), and use no inline
+
+  Done 2026-10-01. `No reason was given.` where the field is null, and a separate sentence again
+  for a change where no field differs at all — which the data permits, and which would otherwise
+  render as a heading with nothing under it.
+
+- [X] T048 (FR-009a) Put every string in `app/lib/constants.ts` (Principle III), and use no inline
   styling (Principle II).
+
+  Done 2026-10-01. Copy is in `MY_ATTENDANCE_MESSAGES`, its own block rather than entries in
+  `HR_MESSAGES`, because the reader is the employee whose day was changed and not the administrator
+  who changed it. No inline styles.
+
 - [ ] T049 (FR-009b) **Mobile-critical under Principle VI.** Attendance viewing is on the closed list,
   so this must be *reachable and usable* at 320px, not merely unbroken there. Verify the modification
   detail is readable without horizontal scroll and without a hover-only affordance — the person whose
   attendance was changed is the one most likely to be looking at it on a phone.
+
+  Built for it 2026-10-01: the detail wraps rather than scrolls, every line `break-words`, and
+  nothing is behind a hover. Left unticked — the requirement is a measured 320px pass in a browser,
+  and that is the browser task below, not something code review can assert.
+
 - [X] T050 (FR-009c) In `app/dashboard/hr/attendance/page.tsx`, present a submitted correction as
   **awaiting approval**, never as applied. Use the existing `app/ui/approvals/action-review.tsx` and
   `last-action.tsx` rather than new components — this is the same approval state the rest of the
@@ -692,22 +730,44 @@ browser passes below are now verifiable rather than blocked.
   the convention T006 established for this feature. The row's marker branches on the presence of
   `pendingCorrection` and on the chain's own `levelLabel`; the dialog branches on HTTP 423. No string
   is matched.
-- [ ] T053 (FR-009d) Add filtering by **the person who made the change** to the administrative
+- [X] T053 (FR-009d) Add filtering by **the person who made the change** to the administrative
   modifications view, alongside the existing employee and date filters. The backend adds `actorUserId`
   to `ModificationsQueryDto` (api 016 T070).
-- [ ] T054 (FR-009d) Make the actor filter compose with the existing filters rather than replacing
+
+  Done 2026-10-01 in `app/ui/hr/modifications-modal.tsx`. The filter needed api work first: T070
+  added the query input and nothing returned the list of people to offer, so the endpoint now sends
+  `actors` — the distinct actors in scope, **not** narrowed by the actor filter, since options
+  derived from filtered rows collapse to the one already chosen (api T083f).
+
+- [X] T054 (FR-009d) Make the actor filter compose with the existing filters rather than replacing
   them — an audit asking "what did this person change to this employee in September" is the question
   worth answering.
-- [ ] T055 (FR-009d) Present the actor by name, resolved server-side. Do not render a user id, and do
+
+  Done 2026-10-01 — and the employee and date filters this was meant to compose with **did not
+  exist** on this screen; it fetched 100 rows unfiltered. All four now compose, because the question
+  an audit is actually asked is “what did this person change to this employee in September”, and no
+  one filter alone answers it.
+
+- [X] T055 (FR-009d) Present the actor by name, resolved server-side. Do not render a user id, and do
   not fetch names one per row.
-- [ ] T056 All access through the typed API modules in `app/lib/api` (Principle V). No direct `fetch`.
+
+  Done 2026-10-01. `actorName` is resolved server-side in one query per page (api T083e); the
+  column falls back to the id only for a row from an API predating the field, never by design.
+
+- [X] T056 All access through the typed API modules in `app/lib/api` (Principle V). No direct `fetch`.
+
+  Done 2026-10-01. Everything goes through `app/lib/api/hr-payroll.ts` and
+  `app/lib/api/my-workspace.ts`; no `fetch` was added.
+
 - [ ] T057 Browser pass: as an employee, view a month containing an administrator-modified day and
   confirm the actor's name, the time, before, after and the reason are all visible, that nothing
   dismisses it, and that it reads correctly at 320px.
 - [ ] T058 Browser pass: as an administrator, submit a correction and confirm **both** views — it reads
   awaiting approval on the admin screen, and the employee's day shows nothing yet. Then approve it and
   confirm both change together.
-- [ ] T059 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+- [X] T059 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+  Done 2026-10-01: `tsc --noEmit` clean, eslint clean on touched files, `next build` succeeds.
 
 ## Phase 9: Amendment of 2026-09-29 — item 7's web half (FR-017, FR-018, FR-019, FR-020)
 

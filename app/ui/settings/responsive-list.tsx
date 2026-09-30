@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import { Fragment } from 'react';
 
 /**
  * One column definition, rendered twice: as a `<td>` on desktop and as a labelled
@@ -28,6 +29,7 @@ export default function ResponsiveList<T>({
   rows,
   rowKey,
   actions,
+  detail,
   emptyMessage = 'Nothing here yet.',
   isLoading = false,
   error,
@@ -36,6 +38,17 @@ export default function ResponsiveList<T>({
   rows: T[];
   rowKey: (row: T) => string;
   actions?: (row: T) => React.ReactNode;
+  /**
+   * Extra content belonging to one row, given the full width beneath it (016 FR-009a).
+   *
+   * **Always rendered, never toggled.** There is no expander and no stored open/closed state, and
+   * that is the point rather than an omission: the first caller is the employee's own attendance,
+   * where an administrator's change to their day must not be dismissable or clearable. A component
+   * that could hide it would be one `localStorage` key away from hiding it permanently.
+   *
+   * Return `null` for a row with nothing to add and no space is taken.
+   */
+  detail?: (row: T) => React.ReactNode;
   emptyMessage?: string;
   isLoading?: boolean;
   error?: string | null;
@@ -76,6 +89,11 @@ export default function ResponsiveList<T>({
                   </div>
                 ))}
             </dl>
+            {detail?.(row) && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                {detail(row)}
+              </div>
+            )}
             {actions && (
               <div className="mt-3 flex justify-end gap-2 border-t border-gray-100 pt-3">
                 {actions(row)}
@@ -106,23 +124,47 @@ export default function ResponsiveList<T>({
           </tr>
         </thead>
         <tbody className="bg-white">
-          {rows.map((row) => (
-            <tr
-              key={rowKey(row)}
-              className="w-full border-b py-3 text-sm last-of-type:border-none"
-            >
-              {columns.map((column) => (
-                <td key={column.key} className={clsx('px-3 py-3', column.className)}>
-                  {column.render(row)}
-                </td>
-              ))}
-              {actions && (
-                <td className="px-3 py-3">
-                  <div className="flex justify-end gap-2">{actions(row)}</div>
-                </td>
-              )}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const rowDetail = detail?.(row);
+            return (
+              // Fragment keyed rather than the `<tr>`: a row with detail is two sibling rows, and
+              // a table body admits nothing between them to group with.
+              <Fragment key={rowKey(row)}>
+                <tr
+                  className={clsx(
+                    'w-full py-3 text-sm',
+                    // The border moves to the detail row when there is one, so the pair reads as
+                    // one row rather than as a row and an orphan beneath it.
+                    rowDetail ? 'border-none' : 'border-b last-of-type:border-none',
+                  )}
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={clsx('px-3 py-3', column.className)}
+                    >
+                      {column.render(row)}
+                    </td>
+                  ))}
+                  {actions && (
+                    <td className="px-3 py-3">
+                      <div className="flex justify-end gap-2">{actions(row)}</div>
+                    </td>
+                  )}
+                </tr>
+                {rowDetail && (
+                  <tr className="border-b text-sm last-of-type:border-none">
+                    <td
+                      colSpan={columns.length + (actions ? 1 : 0)}
+                      className="px-3 pb-3"
+                    >
+                      {rowDetail}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

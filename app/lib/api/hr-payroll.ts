@@ -607,14 +607,40 @@ export const attendanceModificationSchema = z.object({
   employeeId: z.string(),
   date: isoDate,
   actorUserId: z.string().nullable().optional(),
+  /**
+   * Who made the change, by name, resolved server-side (016 FR-012d).
+   *
+   * Optional so an API predating it still parses; `actorUserId` remains the fallback, and an
+   * audit column is the last place to render a cuid — which is why the resolution is the
+   * server's job and not one request per row from here.
+   */
+  actorName: z.string().nullable().optional(),
   before: z.unknown().nullable().optional(),
   after: z.unknown().nullable().optional(),
   reason: z.string().nullable().optional(),
   createdAt: isoDate,
 });
 
+/**
+ * The modification trail, plus who the actor filter may name.
+ *
+ * `actors` comes back alongside the page and is **not** narrowed by the actor filter — otherwise
+ * selecting somebody would leave the dropdown holding only them, with no way back. `paginated` is
+ * extended rather than replaced so the page shape stays the one every other list here speaks.
+ */
+const attendanceModificationsSchema = paginated(
+  attendanceModificationSchema,
+).extend({
+  actors: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .optional()
+    .default([]),
+});
+
 export async function getAttendanceModifications(filters: {
   employeeId?: string;
+  /** 016 FR-012d. Composes with the others rather than replacing them. */
+  actorUserId?: string;
   from?: string;
   to?: string;
   page?: number;
@@ -623,7 +649,7 @@ export async function getAttendanceModifications(filters: {
   const data = await authFetch<unknown>(
     `/hr/attendance/modifications${qs({ ...filters })}`,
   );
-  return paginated(attendanceModificationSchema).parse(data);
+  return attendanceModificationsSchema.parse(data);
 }
 
 /**

@@ -45,5 +45,21 @@ export function useEmployeeNames() {
         : `${found.code} · ${found.name}`;
     },
     code: (employeeId: string) => byId.get(employeeId)?.code ?? employeeId,
+    /**
+     * The roster as select options, sorted by the label a reader sees (016 T054).
+     *
+     * Sorted by label rather than by employee code, because the person choosing is looking for a
+     * name. Exposed here rather than rebuilt by each caller so the ordering cannot differ between
+     * two filters on the same screen.
+     */
+    options: [...byId.entries()]
+      .map(([id, found]) => ({
+        id,
+        label:
+          found.name === found.code
+            ? found.code
+            : `${found.code} · ${found.name}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
   };
 }
