@@ -17,6 +17,34 @@ permission and guards routes against direct access. This feature extends that me
 permission model and adds a company dimension to it. It does not replace it, and the existing
 `NAV_MODULES` structure and module guard remain the mechanism.
 
+## Clarifications
+
+### Session 2026-10-01
+
+Raised while planning this feature's web half, against the backend's **shipped** cash-visibility
+code rather than against its specification. Both markers this spec carried under "Needing the
+client's decision" were already answered in `buildcore-api`, and neither needed the client.
+
+- Q: With cash hiding on, may cash still be entered? → A: **Yes, entry is untouched.**
+  `CashVisibilityInterceptor` "shapes the response; never touches a query or a row" — hiding is a
+  display control, as FR-017 of the backend spec requires. So this never becomes the permission
+  feature the marker feared: no entry control disappears, and a cash payment recorded while hiding
+  is on is stored normally and simply comes back hidden. FR-012 therefore governs **who may change
+  the setting**, not who may enter cash.
+
+- Q: Which screens count as "cash"? → A: **No screen does — it is decided per row.**
+  The question assumed a screen list, and the backend does not hold one. A figure is hidden when
+  its row's `paymentMode` is a cash mode, plus a named list of unconditionally-cash fields; the
+  response then carries `amount: null` with `amountHidden: true` beside it, **never zero**, so a
+  reader or a spreadsheet summing a column can tell a hidden amount from a real one. The list is
+  kept honest by `cash-surfaces.spec.ts`, which parses `schema.prisma` and fails when an enum grows
+  a `cash` value the constant does not name — the staleness this marker worried about is a failing
+  test rather than a silent leak. Consequently the web holds no screen list either, which is why it
+  cannot drift from the backend's.
+  **What survives the question**: the marker's real worry — "hiding its amounts may leave a screen
+  nobody can use" — is genuine, and is FR-014's job. It is a rendering requirement, not a client
+  decision.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Working in either company, and never in doubt which (Priority: P1)
@@ -177,9 +205,5 @@ without them; reports and exports match. Turning it off restores the view.
 
 ### Needing the client's decision
 
-- **[NEEDS CLARIFICATION: with cash hiding on, may cash still be entered?]** Carried from the backend
-  spec. If hiding also blocks entry, this becomes a permission feature and the interface differs
-  substantially — controls disappear rather than figures.
-- **[NEEDS CLARIFICATION: which screens count as cash?]** A labour payment sheet is cash by nature.
-  Hiding its amounts may leave a screen nobody can use, so the client should say what must disappear
-  and what may remain.
+None outstanding. Both markers previously recorded here were answered by the backend's shipped
+behaviour and are resolved in the Clarifications session of 2026-10-01 above.
