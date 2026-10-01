@@ -231,6 +231,52 @@ export const MAX_GPS_ACCURACY_METERS = Number(
  * punch lands inside the geofence and exercises the in-range path rather than the
  * exception path. Point both at your own coordinates to test somewhere real.
  */
+/**
+ * Dashboard search (021 US1). Register labels are copy here, unlike document kinds:
+ * the four are fixed by the backend's own union rather than being company configuration,
+ * so there is nothing for a company to rename.
+ */
+export const SEARCH_COPY = {
+  label: 'Search',
+  placeholder: 'Code or name — employee, vendor, equipment, project',
+  /**
+   * Shown below the minimum term length instead of an empty result.
+   *
+   * FR-001c: "nothing matched" and "too short to search" are different facts to the
+   * person typing, and they look identical if you let them.
+   */
+  keepTyping: (min: number) =>
+    `Keep typing — at least ${min} characters to search.`,
+  searching: 'Searching…',
+  /**
+   * The **one** empty state, used for every case.
+   *
+   * Never varied by register. A per-register message would let somebody infer which
+   * registers exist by watching which message appears, which is the disclosure FR-005
+   * forbids — see `dashboard-search.tsx`.
+   */
+  empty: 'Nothing matched.',
+  failed: 'Search could not be completed.',
+  /** FR-001b — why a row the reader did not expect is in the list. */
+  matchedOnName: 'matched on name',
+  truncated: 'More matches exist than are shown. Narrow the term to see them.',
+  /**
+   * A register the caller may search that could not be asked. Never a permission
+   * problem — the backend omits those entirely — so naming it discloses nothing.
+   */
+  unavailable: (names: string) =>
+    `${names} could not be searched just now, so matches there are missing.`,
+  registers: {
+    employee: 'Employees',
+    vendor: 'Vendors',
+    equipment: 'Equipment',
+    project: 'Projects',
+  },
+} as const;
+
+/** Debounce for dashboard search (021 NFR-001): typing must not be a request per keystroke. */
+export const SEARCH_DEBOUNCE_MS = 250;
+
 export const DEV_FALLBACK_POSITION = {
   latitude: Number(process.env.NEXT_PUBLIC_DEV_FALLBACK_LATITUDE ?? 19.076),
   longitude: Number(process.env.NEXT_PUBLIC_DEV_FALLBACK_LONGITUDE ?? 72.8777),

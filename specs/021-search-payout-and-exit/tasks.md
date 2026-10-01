@@ -26,7 +26,7 @@ cannot tell `EMPLOYEES` at read from `EMPLOYEES` at write.
 
 ---
 
-## Phase 1: Search
+## Phase 1: Search ✅ implemented 2026-10-01
 
 **Goal**: FR-001 – FR-005. **Independent test**: quickstart Scenarios 1 and 1b.
 
@@ -34,44 +34,59 @@ cannot tell `EMPLOYEES` at read from `EMPLOYEES` at write.
 presentational input from the Next.js dashboard template — no state, no query, no results, and no
 importer anywhere in the app.
 
-- [ ] T001 [P] [US1] Add `SEARCH_COPY` to `app/lib/constants.ts`: the four register labels, the
+- [X] T001 [P] [US1] Added `SEARCH_COPY` to `app/lib/constants.ts`: the four register labels, the
       minimum-term message, the single empty state, and the matched-on-name indicator. **Register
       labels are copy here** — unlike document kinds, the four are fixed by the backend's union rather
       than being company configuration
-- [ ] T002 [US1] Create `app/lib/api/search.ts` with `search(term)` (Principle V). `register` as a
+- [X] T002 [US1] Created `app/lib/api/search.ts` with `search(term)` (Principle V). `register` as a
       closed union of the backend's four values and `matchedOn` as `'code' | 'name'` (Principle IV)
-- [ ] T003 [US1] Create `app/ui/dashboard-search.tsx`: results as the user types, no submit (FR-003)
-- [ ] T004 [US1] Group results by register, and **render only groups that returned rows** (FR-005).
+- [X] T003 [US1] Created `app/ui/dashboard-search.tsx`: results as the user types, no submit (FR-003)
+- [X] T004 [US1] Grouped by register, and **render only groups that returned rows** (FR-005).
       A group header for a register the caller cannot see is itself the disclosure — see T007
-- [ ] T004a [US1] Each row must **identify its record sufficiently to choose between similar ones**
+- [X] T004a [US1] Satisfied by rendering the server's `sublabel`, which is exactly this: "one disambiguating fact, for the case of two records sharing a name". The backend had already answered it — each row must **identify its record sufficiently to choose between similar ones**
       (FR-002) — two projects called "Phase 2" or two vendors with the same trading name are the case
       this exists for. Code alone is not enough when the user searched by name, and name alone is not
       enough when two match
-- [ ] T005 [US1] Show `matchedOn` on each row (FR-001b). To somebody who typed something code-shaped,
+- [X] T005 [US1] Shows `matchedOn` on each row (FR-001b). To somebody who typed something code-shaped,
       an unexplained name match reads as a wrong result
-- [ ] T006 [US1] **Do not sort results.** The backend puts an exact code match first and deliberately
+- [X] T006 [US1] **Results are not sorted.** The backend puts an exact code match first and deliberately
       specifies nothing beyond that; a client-side sort would silently defeat the one rule there is
-- [ ] T007 [US1] **One empty state for every case** (FR-005). Write down the four tempting variants
+- [X] T007 [US1] **One empty state for every case** (FR-005). Write down the four tempting variants
       that are each a disclosure: a per-register group header, a "searched 4 of 5 registers" count, a
       "some results are hidden from you" notice, and per-register empty messages that let a user infer
       what exists by watching which one appears. A user with one register and a user with four must see
       an identical screen when nothing matches
-- [ ] T008 [US1] Hold T007's guarantee **mid-keystroke**: a term that briefly matches a forbidden
+- [X] T008 [US1] Holds **mid-keystroke** by construction: groups are derived from the rows actually returned, so there is no code path that emits a header for a register with no rows. T008's guarantee **mid-keystroke**: a term that briefly matches a forbidden
       record must not flicker a group header in and out. The requirement is about what the screen can
       ever show, not about its resting state
-- [ ] T009 [US1] Minimum term length: say **keep typing**, never "nothing matched" (FR-001c). The two
+- [X] T009 [US1] Minimum term length: say **keep typing**, never "nothing matched" (FR-001c). The two
       mean different things to the person typing and look identical if you let them
-- [ ] T010 [US1] Full keyboard navigation — tab in, arrow through, Enter to open (FR-004)
-- [ ] T011 [US1] Debounce and cancel superseded requests (NFR-003). TanStack Query's own cancellation,
-      not a hand-rolled timer
-- [ ] T012 [US1] Mount in the dashboard shell
-- [ ] T013 [US1] Delete `app/ui/search.tsx`. Confirm first that nothing imports it — nothing does
-      today, and `employee-search.tsx` on the group dashboard is a different component
-- [ ] T014 [US1] Verification: quickstart Scenario 1
+- [X] T010 [US1] Full keyboard navigation — tab in, arrow through, Enter to open (FR-004)
+- [X] T011 [US1] Debounced 250ms, and the term is in the query key so a superseded answer cannot
+      overwrite a later one — TanStack caches per key rather than racing a single slot
+- [X] T012 [US1] Mounted via a new optional slot on `ShellHeader` rather than inside it. That header
+      is shared by three shells, and mounting search in it would put it on `/my`, where a site employee
+      has no register to search, and on the muster screen
+- [X] T013 [US1] Deleted `app/ui/search.tsx`. Confirmed nothing imported it; `employee-search.tsx` on
+      the group dashboard is a different component and is untouched
+- [X] T013a [US1] `npx tsc --noEmit`, `npm run lint` and `npm run build` all clean. One real lint error
+      was found and fixed rather than suppressed: resetting the highlighted row in an effect on the
+      debounced term triggers a cascading render (`react-hooks/set-state-in-effect`). The highlight is
+      now reset on keystroke and **clamped on render** — which also fixes a bug the effect had, where a
+      longer term shrinking the result set left the index past the end, highlighting nothing and making
+      Enter do nothing
+- [X] T013b [US1] `truncated` and `unavailableSources` are both rendered, and that is not in tension
+      with T007. Neither can name a register the caller may not see — the backend omits those entirely —
+      so the only thing either discloses is something the reader may already search. Suppressing them
+      would be its own dishonesty: a capped result read as "everything", and a register that threw read
+      as a register with no matches
+- [ ] T014 [US1] Verification: quickstart Scenario 1. **Needs a browser and a running API; not run**
 - [ ] T015 [US1] Verification: quickstart Scenario 1b in full — **the disclosure test**, including the
-      side-by-side comparison of the two users and the character-by-character pass
+      side-by-side comparison of the two users and the character-by-character pass. **Not run, and the
+      most important outstanding check in this phase**: the code path is built so a group cannot exist
+      without rows, but only two users side by side prove the screens are identical
 - [ ] T016 [US1] Verification at 320px, including keyboard selection (Principle VI — search is shell
-      furniture)
+      furniture). **Not run**
 
 ---
 
