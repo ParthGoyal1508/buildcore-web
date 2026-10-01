@@ -495,6 +495,14 @@ export const COMPANY_SWITCHER = {
     `Switching company will discard unsaved changes on: ${screens}. Continue?`,
   switchFailed:
     'Could not switch company. You are still working in the previous one.',
+  /**
+   * What a cross-company caller sees before they have chosen (019 FR-010).
+   *
+   * Not a prompt - a description. In this state the backend scopes nothing, so every
+   * list genuinely is showing every company at once, and naming one company here would
+   * caption three companies' figures with one company's name.
+   */
+  allCompanies: 'All companies',
 } as const;
 
 export const MESSAGES = {

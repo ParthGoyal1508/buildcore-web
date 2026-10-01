@@ -28,7 +28,6 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import PageHeader from '@/app/ui/page-header';
 
 export default function RequisitionsPage() {
@@ -44,14 +43,13 @@ export default function RequisitionsPage() {
   // Super Admin sees every tenant's departments at once and can file a requisition
   // against one company using another's department — the requisition itself already
   // carries the selected `companyId`, so the two would disagree.
-  const { companyId } = useCompanyContext();
   const departments = useQuery({
-    queryKey: ['departments', companyId],
-    queryFn: () => listDepartments(companyId ?? undefined),
+    queryKey: ['departments'],
+    queryFn: () => listDepartments(),
   });
   const designations = useQuery({
-    queryKey: ['designations', companyId],
-    queryFn: () => listDesignations(companyId ?? undefined),
+    queryKey: ['designations'],
+    queryFn: () => listDesignations(),
   });
   const requisitions = useQuery({
     queryKey: ['requisitions', status],
@@ -187,7 +185,6 @@ function RequisitionForm({
 }) {
   // The company a cross-company Super Admin has selected; null for everyone else,
   // who is pinned to their own company by the backend anyway.
-  const { companyId } = useCompanyContext();
   const [form, setForm] = useState({
     departmentId: '',
     designationId: '',
@@ -215,7 +212,6 @@ function RequisitionForm({
         budgetedCtcMin: Number(form.budgetedCtcMin),
         budgetedCtcMax: Number(form.budgetedCtcMax),
         justification: form.justification,
-        ...(companyId ? { companyId } : {}),
       }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not create.'),

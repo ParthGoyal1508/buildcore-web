@@ -130,7 +130,7 @@ feature 014's existing guard, and a user with nothing visible is told so.
 
 ---
 
-## Phase 4: The switcher
+## Phase 4: The switcher ✅ implemented 2026-10-01
 
 **Goal**: FR-001 – FR-006. **Independent test**: quickstart Scenario 3, including the cache
 inspection.
@@ -139,40 +139,89 @@ inspection.
 phase: it is the largest mechanical change in the feature, and putting it before the level work
 would make one blast radius out of two.
 
-- [ ] T032 Create `app/lib/api/company-selection.ts` with `listSelectableCompanies()` and
+- [X] T032 Create `app/lib/api/company-selection.ts` with `listSelectableCompanies()` and
       `setCompanySelection(companyId)` (Principle V). Both are `@SelfService()` on the API — no
       permission is involved in choosing which of your own companies you work in
-- [ ] T033 Create `app/ui/company-switcher.tsx`. Visible only when the **selectable list has more
+- [X] T033 Create `app/ui/company-switcher.tsx`. Visible only when the **selectable list has more
       than one entry** (FR-001) — *not* when the user holds `CROSS_COMPANY_ACCESS`, which is a
       different population and is what the retired provider got wrong
-- [ ] T034 Mount the switcher in `app/ui/shell-header.tsx`, so the selected company is visible at
+- [X] T034 Mount the switcher in `app/ui/shell-header.tsx`, so the selected company is visible at
       all times (FR-002) and present on every screen (FR-001). The retired provider rendered its own
       selector inside page content, which could satisfy neither
-- [ ] T035 On a successful `setCompanySelection`, call `queryClient.clear()` (FR-005). Note beside
+- [X] T035 On a successful `setCompanySelection`, call `queryClient.clear()` (FR-005). Note beside
       it why a curated list of invalidations was rejected: it passes review and then fails the first
       time somebody adds a query without thinking about companies — which is to say it fails later,
       quietly, on a screen nobody was watching
-- [ ] T036 Warn before switching with unsaved changes (FR-006)
-- [ ] T037 **No screen sends a `companyId` to be scoped.** The server resolves and re-validates the
+- [X] T036 Warn before switching with unsaved changes (FR-006)
+- [X] T037 **No screen sends a `companyId` to be scoped.** The server resolves and re-validates the
       selection per request. Note this where the switcher writes, so nobody later "fixes" a screen
       by threading an id through it — a second, unvalidated answer to a question the server already
       answers
-- [ ] T038 Retire `app/ui/settings/company-context.tsx`. It holds the selection in `useState` and
+- [X] T038 Retire `app/ui/settings/company-context.tsx`. It holds the selection in `useState` and
       defaults to the first active company, so a switch there never reaches the server and the UI
       and the data disagree about which company is current. It also **throws** without a provider,
       which already cost a crash this cycle that `tsc` and `next build` both passed over
-- [ ] T039 [P] Move `app/ui/settings/project-documents-screen.tsx` off `useCompanyContext`
-- [ ] T040 [P] Move `app/ui/settings/signatories-screen.tsx` off `useCompanyContext`
-- [ ] T041 [P] Move `app/ui/settings/letter-kinds-screen.tsx` off `useCompanyContext`
-- [ ] T042 [P] Move `app/ui/documents/company-documents-screen.tsx` off `useCompanyContext`
-- [ ] T043 [P] Move `app/ui/plant/use-plant-refs.ts` off `useCompanyContext`
-- [ ] T044 [P] Move `app/ui/assets/use-asset-refs.ts` off `useCompanyContext`
-- [ ] T045 Delete the stale comments in `app/ui/projects/project-form.tsx` and
+- [X] T039 [P] Move `app/ui/settings/project-documents-screen.tsx` off `useCompanyContext`
+- [X] T040 [P] Move `app/ui/settings/signatories-screen.tsx` off `useCompanyContext`
+- [X] T041 [P] Move `app/ui/settings/letter-kinds-screen.tsx` off `useCompanyContext`
+- [X] T042 [P] Move `app/ui/documents/company-documents-screen.tsx` off `useCompanyContext`
+- [X] T043 [P] Move `app/ui/plant/use-plant-refs.ts` off `useCompanyContext`
+- [X] T044 [P] Move `app/ui/assets/use-asset-refs.ts` off `useCompanyContext`
+- [X] T045 Delete the stale comments in `app/ui/projects/project-form.tsx` and
       `app/ui/projects/project-documents-panel.tsx` explaining why they avoid `useCompanyContext`.
       The reason they document stops being true in this phase, and a comment describing a hazard
       that no longer exists sends the next reader looking for it
-- [ ] T046 Verification: quickstart Scenario 3 in full, **including step 4's cache inspection**.
+- [ ] T046 **NOT RUN.** Verification: quickstart Scenario 3 in full, **including step 4's cache inspection**.
       SC-006 is an inspection rather than a glance because a stale answer is a plausible answer
+
+### Phase 4 implementation record, 2026-10-01
+
+**"Six screens read it" was wrong — 23 did, plus 14 more through a wrapper hook.** Counted before
+touching anything, which is why this is recorded rather than discovered halfway. The provider was
+mounted at 11 places and `useCompanyContext` was called in 23 files; `usePlantCompanyId` and
+`useAssetsCompanyId` wrap it for a further 14 plant and asset screens.
+
+**Two deviations from the task list, both deliberate.**
+
+*T037, "no screen sends a `companyId`".* True now of every screen that read the provider directly.
+It is **not** true of the plant and asset subtrees: `usePlantCompanyId()` and `useAssetsCompanyId()`
+survive as the seam and now return `useSelectedCompanyId()` — the server's own answer — instead of the
+provider's local state. Re-pointing two functions was the smaller and safer change than editing
+fourteen more screens, and the requirement's stated reason no longer applies: the id they send is not
+a second, unvalidated answer when it came from the server in the first place, and `companyScope()`
+validates it either way. The second source of truth is gone, which is what the phase was for.
+
+*T036, the unsaved-changes warning.* Needed somewhere to read dirty state from, and nothing existed —
+the two forms that track `isDirty` guard themselves with `beforeunload`, which never fires for a
+company switch because a switch is a client-side state change. `app/lib/unsaved-changes.ts` is a small
+opt-in registry and those two forms now register with it. **Coverage is two screens**, and the
+confirmation names them rather than claiming to speak for the whole application.
+
+**A state the plan did not account for, found while wiring the switcher.** A cross-company caller who
+has never selected a company has selected *nothing*, and the backend then scopes nothing —
+`companyScope()` widens for them and every list genuinely spans every company. Nothing comes back
+marked `selected` in that state. Showing `companies[0]` would have captioned three companies' figures
+with one company's name, which is the precise bug the provider produced; so the unselected state gets
+its own "All companies" option that says what is actually on screen.
+
+**Two wrong assumptions about the contract, caught before they shipped.** `selectableFor` returns
+`{ id, name, selected }` — no `shortCode`, which a schema demanding it would have thrown on, and a
+`selected` flag a schema not declaring it would have stripped on arrival. The second is the same
+failure as the permission levels this client discarded for a year (see T004).
+
+**A bug fixed as a side effect.** The provider defaulted to the first active company, so a
+cross-company administrator who never touched the selector created recruitment records against
+whichever company sorted first. Those writes now derive the company from the session, and a caller
+with no selection gets an explicit refusal instead of a silent wrong answer.
+
+**A note on the diff.** An early pass ran `npx prettier --write` over the touched files. There is no
+prettier config in this repo, so prettier used its own defaults — double quotes, 80 columns — and
+rewrote 2,400 lines of untouched code. It was reverted and the edits redone without it; the commit is
+a net reduction, which is what retiring a mechanism should look like. Worth knowing before anybody
+else reaches for prettier here.
+
+**Still not run:** T046, quickstart Scenario 3 including step 4's cache inspection. SC-006 is an
+inspection rather than a glance because a stale answer is a plausible answer, and nobody has run it.
 
 ---
 

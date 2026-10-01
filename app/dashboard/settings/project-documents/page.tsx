@@ -1,11 +1,10 @@
 import PageHeader from '@/app/ui/page-header';
-import { CompanyProvider } from '@/app/ui/settings/company-context';
 import { ProjectDocumentsScreen } from '@/app/ui/settings/project-documents-screen';
 
 export const metadata = { title: 'Project documents' };
 
 /**
- * Wrapped in `CompanyProvider` (017 FR-021).
+ * Company scope comes from the session (019 FR-004); the screen sends nothing.
  *
  * Per page rather than on `app/dashboard/settings/layout.tsx`: that layout wraps every
  * settings section, and `employee-setup` already mounts its own provider — hoisting would
@@ -19,9 +18,7 @@ export default function ProjectDocumentsPage() {
         title="Project Documents"
         description="Which documents a project must hold before it counts as fully papered."
       />
-      <CompanyProvider>
-        <ProjectDocumentsScreen />
-      </CompanyProvider>
+      <ProjectDocumentsScreen />
     </main>
   );
 }

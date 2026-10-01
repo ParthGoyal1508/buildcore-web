@@ -103,10 +103,15 @@ export interface RequisitionInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   departmentId: string;
@@ -223,10 +228,15 @@ export interface CandidateInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   requisitionId: string;
@@ -517,10 +527,15 @@ export interface LetterTemplateInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   letterType: string;
@@ -602,10 +617,15 @@ export interface ResignationInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   employeeId: string;

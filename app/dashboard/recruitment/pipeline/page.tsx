@@ -35,7 +35,6 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import SubjectLetters from '@/app/ui/letters/subject-letters';
 import StatusBadge from '@/app/ui/status-badge';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import PageHeader from '@/app/ui/page-header';
 
 /** Manual forward transitions the board offers (mirrors the backend machine). */
@@ -201,7 +200,6 @@ function PipelineInner() {
 function CandidateForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   // The company a cross-company Super Admin has selected; null for everyone else,
   // who is pinned to their own company by the backend anyway.
-  const { companyId } = useCompanyContext();
   const requisitions = useQuery({
     queryKey: ['requisitions', 'open'],
     queryFn: () => getRequisitions({ status: 'open', pageSize: 200 }),
@@ -232,7 +230,6 @@ function CandidateForm({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         currentCtc: form.currentCtc ? Number(form.currentCtc) : undefined,
         expectedCtc: form.expectedCtc ? Number(form.expectedCtc) : undefined,
         source: form.source,
-        ...(companyId ? { companyId } : {}),
       }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not add the candidate.'),

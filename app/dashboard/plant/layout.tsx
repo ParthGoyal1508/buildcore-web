@@ -7,7 +7,6 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, PLANT_PERMISSIONS, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import PlantNav from '@/app/ui/plant/plant-nav';
-import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 /**
  * The per-section permission check `/dashboard/plant/*` needs beyond the module tier.
@@ -78,10 +77,7 @@ export default function PlantLayout({
     return <AccessDenied detail={MESSAGES.loadFailed} />;
   }
 
-  if (
-    required &&
-    !user.permissions.includes(required.permission as never)
-  ) {
+  if (required && !user.permissions.includes(required.permission as never)) {
     return (
       <AccessDenied detail="This part of Plant & Machinery needs a permission your role does not carry. The sections you can open are in the tabs above." />
     );
@@ -95,7 +91,7 @@ export default function PlantLayout({
         all for everyone else. Without it their lists show every tenant's rows at
         once — see `usePlantRefs` for what that looks like on the masters screen.
       */}
-      <CompanyProvider>{children}</CompanyProvider>
+      {children}
     </div>
   );
 }

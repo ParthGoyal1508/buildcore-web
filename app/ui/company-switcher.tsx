@@ -73,14 +73,18 @@ export default function CompanySwitcher() {
   if (!companies || companies.length < 2) return null;
 
   /**
-   * The server's answer, not a default.
+   * The server's answer, or the honest absence of one.
    *
-   * The fallback to the first element is for the impossible case only — the server marks exactly one
-   * element `selected` — and it is a fallback rather than the primary path on purpose. Treating
-   * `companies[0]` as the selection is what the retired provider did, and it is how an interface
-   * comes to disagree with the data it is showing.
+   * **A cross-company caller who has never used this control has selected nothing**, and the backend
+   * then scopes nothing: `companyScope()` widens for them, so every list really does show every
+   * company's rows. No element comes back marked `selected` in that state.
+   *
+   * Showing `companies[0]` here would be a lie with consequences — the control would name one
+   * company while the figures beside it were three companies added together, which is precisely the
+   * class of bug the retired provider produced. So the unselected state gets its own option, saying
+   * what is actually on screen, and picking a real company is the action that narrows it.
    */
-  const selectedId = (companies.find((c) => c.selected) ?? companies[0]).id;
+  const selectedId = companies.find((company) => company.selected)?.id ?? '';
 
   const handleChange = (companyId: string) => {
     /**
@@ -116,6 +120,14 @@ export default function CompanySwitcher() {
         onChange={(event) => handleChange(event.target.value)}
         className={inlineSelectClass}
       >
+        {/* Only while nothing is selected, and deliberately not re-selectable: there is no
+            "unchoose" on the API, and offering one would imply a caller can widen their own scope
+            back out, which the backend does not allow once a selection exists. */}
+        {selectedId === '' && (
+          <option value="" disabled>
+            {COMPANY_SWITCHER.allCompanies}
+          </option>
+        )}
         {companies.map((company) => (
           <option key={company.id} value={company.id}>
             {company.name}

@@ -1,11 +1,10 @@
 import { LetterKindsScreen } from '@/app/ui/settings/letter-kinds-screen';
 import PageHeader from '@/app/ui/page-header';
-import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 export const metadata = { title: 'Letter kinds' };
 
 /**
- * Wrapped in `CompanyProvider` (017 FR-021).
+ * Company scope comes from the session (019 FR-004); the screen sends nothing.
  *
  * Per page rather than on `app/dashboard/settings/layout.tsx`: that layout wraps every
  * settings section, and `employee-setup` already mounts its own provider — hoisting would
@@ -19,9 +18,7 @@ export default function LetterKindsPage() {
         title="Letter Kinds"
         description="The kinds of letter this company issues. Adding one needs no release."
       />
-      <CompanyProvider>
-        <LetterKindsScreen />
-      </CompanyProvider>
+      <LetterKindsScreen />
     </main>
   );
 }

@@ -43,15 +43,14 @@ export default function ProjectDocumentsPanel({
 }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-/**
- * No `companyId` is passed, and that is deliberate.
- *
- * Nothing else in the projects tree mounts `CompanyProvider`, so `useCompanyContext` would throw on
- * render — a crash a type-check and a build both pass straight over. The server resolves the company
- * from the caller (and, since 019, narrows it to their selected company), which is how every other
- * screen under `/dashboard/projects` already behaves. Introducing the provider here would make this
- * subtree the only one with a company selector, for no requirement that asked for one.
- */
+  /**
+   * No `companyId` is passed, and that is deliberate.
+   *
+   * The server resolves the company from the caller's session and narrows it to their selected company
+   * (019 FR-004), so there is nothing for a screen to send. This was already how every screen under
+   * `/dashboard/projects` behaved; as of 019 Phase 4 it is how the whole application behaves, and the
+   * provider that made it unusual here no longer exists.
+   */
   const documents = useQuery({
     queryKey: ['project', projectId, 'documents'],
     queryFn: () => getProjectDocuments(projectId),

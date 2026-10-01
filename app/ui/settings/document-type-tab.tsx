@@ -14,7 +14,6 @@ import { computeDocumentTypeFlag } from '@/app/lib/settings-utils';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
   CheckboxField,
   FormError,
@@ -44,7 +43,6 @@ const EMPTY: FormState = {
 };
 
 export default function DocumentTypeTab() {
-  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<DocumentType | null>(null);
@@ -53,15 +51,15 @@ export default function DocumentTypeTab() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['document-types', companyId],
-    queryFn: () => listDocumentTypes(companyId ?? undefined),
+    queryKey: ['document-types'],
+    queryFn: () => listDocumentTypes(),
   });
 
   const save = useMutation({
     mutationFn: () =>
       editing
         ? updateDocumentType(editing.id, form)
-        : createDocumentType({ ...(companyId ? { companyId } : {}), ...form }),
+        : createDocumentType({ ...form }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['document-types'] });
       close();

@@ -1,3 +1,6 @@
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { authFetch } from '@/app/lib/session';
@@ -59,4 +62,26 @@ export async function setCompanySelection(companyId: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ companyId }),
   });
+}
+
+/**
+ * The company the caller is working in, as the **server** reports it (019 FR-004).
+ *
+ * The single replacement for `useCompanyContext().companyId`, and the point of the whole phase: the
+ * authority is the session, not a `useState` in a provider that never told the server anything.
+ *
+ * `null` means no company is selected. For a cross-company caller that is a real state with real
+ * consequences — the backend scopes nothing and every list spans every company — so callers must
+ * treat it as "all companies", never as "not loaded yet".
+ *
+ * Why a hook over a context: there is no provider to mount and no tree to be inside. React Query's
+ * cache is the shared state, so every caller of this reads one request's answer, and a company switch
+ * clears that cache and they all re-read it together.
+ */
+export function useSelectedCompanyId(): string | null {
+  const { data } = useQuery({
+    queryKey: ['companies', 'selectable'],
+    queryFn: listSelectableCompanies,
+  });
+  return data?.find((company) => company.selected)?.id ?? null;
 }
