@@ -23,46 +23,45 @@ blocked on the backend. One field is already on the wire and merely unparsed —
 
 ---
 
-## Phase 1: Read the levels
+## Phase 1: Read the levels ✅ implemented 2026-10-01
 
 **⚠️ Blocks Phases 2 and 3.** Inert by design: nothing changes on screen. The point is to make the
 level visible to the code before anything acts on it.
 
-- [ ] T001 [P] Add `COMPANY_COPY`, `ACCESS_COPY` and `CASH_COPY` blocks to `app/lib/constants.ts`
-      (Principle III). Company **names** are not copy — they come from the server
-- [ ] T002 [P] Add `ROUTES.cashVisibility` to `app/lib/constants.ts`
-- [ ] T003 Add `AccessLevel` as a closed union (`'read' | 'write'`) to `app/lib/permissions.ts`.
-      A string would make every comparison below a typo waiting to happen (Principle IV)
-- [ ] T004 Parse `grants` in `currentUserSchema` in `app/lib/api/users.ts`, as
-      `z.array(z.object({ permission: z.string(), level: z.enum(['read','write']) })).default([])`.
-      **The server already sends this field** — `user-response.dto.ts` declares it and
-      `users.service.ts` returns it. A zod object strips unknown keys, so it is currently discarded
-      on arrival. Use `.default([])` so a login response cached from before this change parses
-      instead of signing the user out
-- [ ] T005 Note beside T004's schema that this is the third instance of *the server sends it, the
-      client discards it* this cycle — after `ApiError.details` and the project-document
-      `missingTypeIds`. The web's zod schemas are a silent filter, and a field nobody parsed is
-      indistinguishable from a field nobody sent. This is the comment that tells the next person to
-      check the raw response before concluding the API lacks something
-- [ ] T006 Add `writePermissions?: readonly string[]` to the `NavModule` type in
-      `app/lib/constants.ts`. **Optional**, so every existing entry keeps its current meaning and
-      `visibleModules` is untouched — FR-016 is extension, not replacement
-- [ ] T007 Populate `writePermissions` on the `NAV_MODULES` entries whose modules have write
-      controls. An entry that omits it is treated as writable by anyone who can see it, which is
-      today's behaviour and therefore the safe default for a module nobody has reviewed yet
-- [ ] T008 Add `canWrite(grants, permissions, navModule): boolean` to `app/lib/permissions.ts`,
-      beside `visibleModules` and `moduleAccess` so the three cannot disagree (Principle I)
-- [ ] T009 **The level-meaningless values.** `canWrite` MUST answer from `permissions` for
-      `CROSS_COMPANY_ACCESS`, `DATA_EXPORT` and the four `_APPROVE` permissions: the API's migration
-      doubled every array entry, so these appear in `grants` at **both** levels and asking their
-      level is meaningless rather than false. Name them in one exported constant and explain why
-      beside it
-- [ ] T010 Add `hasWrite(grants, permission): boolean` for the per-permission case Phase 5's
-      settings control needs (`COMPANY_SETTINGS` at write), separate from the per-module `canWrite`
-- [ ] T011 Verification: `npx tsc --noEmit && npm run lint && npm run build`, then confirm via
-      React Query Devtools that `['currentUser']` now carries `grants` — quickstart Scenario 1.
-      Compare the parsed cache entry against the raw Network response, which is what makes the
-      before/after visible
+- [~] T001 [P] ~~Add `COMPANY_COPY`, `ACCESS_COPY` and `CASH_COPY`~~ — **deferred to Phases 4 and 5**,
+      where their screens are. Nothing in this phase renders anything, so this copy would have no
+      consumer, and unused constants in `constants.ts` are how that file becomes unreadable
+- [~] T002 [P] ~~Add `ROUTES.cashVisibility`~~ — **deferred to Phase 5** for the same reason
+- [X] T003 `AccessLevel` as a closed union, in `app/lib/api/users.ts` beside `grantSchema` rather than
+      in `permissions.ts`. It is derived from the zod schema (`Grant['level']`), so the type and the
+      parser cannot disagree — two declarations of the same union is how one of them goes stale
+- [X] T004 `grants` parsed in `currentUserSchema`, `.default([])` so a session cached from before this
+      change parses rather than signing the user out
+- [X] T005 The note is there, and says what to do rather than only what happened: when a field seems
+      missing from the API, read the raw response first, because these schemas are a filter and a field
+      nobody parsed looks exactly like a field nobody sent
+- [~] T006 ~~`writePermissions` on `NavModule`~~ — **deferred to Phase 2.** `NavModule` is derived
+      (`(typeof NAV_MODULES)[number]`), so adding an optional property to some entries makes the
+      derived type a union where only some members carry it, and every read needs narrowing. Worth
+      doing **with** its consumer so the shape is chosen against real call sites rather than guessed
+- [~] T007 ~~Populate `writePermissions`~~ — **deferred to Phase 2**, with T006
+- [~] T008 ~~`canWrite(…, navModule)`~~ — **deferred to Phase 2.** Nothing in this phase or in the
+      three screens built on it is per-module; the waiver gate is per-permission. A helper with no
+      caller cannot be checked against reality
+- [X] T009 `LEVEL_AGNOSTIC_PERMISSIONS` exported from `app/lib/api/users.ts`, with the six values
+      listed rather than derived — a rule inferred here ("anything ending `_APPROVE`") would quietly
+      disagree the day the backend adds one that does not fit the pattern
+- [X] T010 `hasWrite(user, permission)`. **Fails closed**: an area absent from `grants` is not
+      writable, which is what makes `.default([])` safe — a user on a pre-change cached session is
+      offered no write control rather than all of them. Of the two possible mistakes, hiding a control
+      somebody holds is the recoverable one
+- [X] T011 `npx tsc --noEmit`, `npm run lint` and `npm run build` all clean (2 pre-existing lint
+      warnings, in files this phase does not touch)
+- [ ] T011a Verification: confirm via React Query Devtools that `['currentUser']` carries `grants`,
+      and compare it against the raw Network response — quickstart Scenario 1. **Needs a browser and a
+      running API; not run.** The field's presence in the response is confirmed statically
+      (`metadata.ts` records `grants: { required: true }` on `UserResponseDto`), but that is not the
+      same as seeing it parsed
 
 ---
 
