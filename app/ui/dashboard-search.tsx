@@ -9,6 +9,7 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   SEARCH_MIN_TERM_LENGTH,
   SEARCH_REGISTERS,
+  resultHref,
   search,
   type SearchRegister,
   type SearchResult,
@@ -125,9 +126,9 @@ export default function DashboardSearch() {
     setOpen(false);
     setTerm('');
     setDebounced('');
-    // The server's own `href`. Composing one here from `register` and `id` would be a
-    // second place that knows where a vendor lives, and it would drift silently.
-    router.push(result.href);
+    // `resultHref`, not `result.href`: the server's value is an API resource path and
+    // sends every row to a 404 — see the note on `href` in `app/lib/api/search.ts`.
+    router.push(resultHref(result));
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -266,6 +267,13 @@ export default function DashboardSearch() {
                             {row.matchedOn === 'name' && (
                               <span className="text-xs text-gray-500">
                                 {SEARCH_COPY.matchedOnName}
+                              </span>
+                            )}
+                            {/* Said on the row, because landing on a list when you
+                                picked a named record is otherwise just confusing. */}
+                            {row.register === 'vendor' && (
+                              <span className="text-xs text-gray-500">
+                                {SEARCH_COPY.opensList}
                               </span>
                             )}
                           </span>

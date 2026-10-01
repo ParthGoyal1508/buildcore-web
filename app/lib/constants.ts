@@ -319,6 +319,12 @@ export const SEARCH_COPY = {
   failed: 'Search could not be completed.',
   /** FR-001b — why a row the reader did not expect is in the list. */
   matchedOnName: 'matched on name',
+  /**
+   * Shown on a vendor row. Vendors are edited in a modal on their list, so there is no
+   * per-vendor screen to open — and a reader who picked a named record and arrived at a
+   * list deserves to have been told, not surprised.
+   */
+  opensList: 'opens the vendor list',
   truncated: 'More matches exist than are shown. Narrow the term to see them.',
   /**
    * A register the caller may search that could not be asked. Never a permission

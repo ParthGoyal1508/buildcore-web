@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ROUTES } from '@/app/lib/constants';
 import { authFetch } from '@/app/lib/session';
 
 /**
@@ -48,12 +49,19 @@ const searchResultSchema = z.object({
    */
   matchedOn: z.enum(['code', 'name']),
   /**
-   * Where the full record lives.
+   * Where the record lives **on the backend** — e.g. `/hr/employees/:id`.
    *
-   * **Built by the server, never here.** A route composed in this app from `register`
-   * and `id` would be a second place that knows where a vendor lives, and it would
-   * drift from the real one silently — the link would simply 404 for whichever register
-   * moved.
+   * Deliberately **not** used for navigation. I originally wired the result rows straight
+   * to this, reasoning that composing a route here would be a second place that knows
+   * where a vendor lives. That was backwards, and it shipped a 404: these are API resource
+   * paths, and the backend cannot know this app's routing — every screen here sits under
+   * `/dashboard`, a project's record is at `/projects/portfolio/:id/edit`, and a vendor has
+   * no detail page at all. The server was never in a position to be right about any of
+   * that.
+   *
+   * Kept on the type because it is genuinely useful — it identifies the resource, and a
+   * different client with different routes would map it differently — but navigation goes
+   * through `resultHref` below, which reads this app's own `ROUTES`.
    */
   href: z.string(),
 });
@@ -105,4 +113,34 @@ export async function search(term: string): Promise<SearchResponse> {
   return searchResponseSchema.parse(
     await authFetch(`/search?q=${encodeURIComponent(term)}`),
   );
+}
+
+/**
+ * Where a result goes **in this app**.
+ *
+ * `ROUTES` is the single source of truth for this app's URLs, so the mapping belongs here
+ * rather than on the server — see the note on `href` above for the 404 that proved it.
+ *
+ * Two registers have no detail screen, and this returns the closest honest destination
+ * rather than a URL that does not resolve:
+ *
+ * - **Vendor** → the vendors list. Vendors are edited in a modal on that list, so there is
+ *   no per-vendor route to send anyone to. The reader lands where the vendor is findable.
+ * - **Project** → the project's edit screen. `/dashboard/projects/portfolio/[id]` has no
+ *   page of its own; only `edit` and `documents` exist beneath it.
+ *
+ * Both are worth closing properly with real detail screens, and neither is this feature's
+ * work. Until then a search result reaches something that loads.
+ */
+export function resultHref(result: SearchResult): string {
+  switch (result.register) {
+    case 'employee':
+      return ROUTES.hrEmployee(result.id);
+    case 'equipment':
+      return ROUTES.plantEquipmentDetail(result.id);
+    case 'project':
+      return ROUTES.projectsEditProject(result.id);
+    case 'vendor':
+      return ROUTES.partnersVendors;
+  }
 }

@@ -80,7 +80,24 @@ importer anywhere in the app.
       so the only thing either discloses is something the reader may already search. Suppressing them
       would be its own dishonesty: a capped result read as "everything", and a register that threw read
       as a register with no matches
-- [ ] T014 [US1] Verification: quickstart Scenario 1. **Needs a browser and a running API; not run**
+- [X] T013c [US1] **Defect found in use and fixed: every result led to a 404.** Rows navigated to the
+      server's `href`, which is an **API resource path** (`/hr/employees/:id`) and not a route in this
+      app. My own comment had argued for using it — that composing a route here would be "a second
+      place that knows where a vendor lives" — and that was backwards: the server was never in a
+      position to know this app's routing. Navigation now goes through `resultHref` in
+      `app/lib/api/search.ts`, reading `ROUTES`, which is the single source of truth for these URLs.
+      `href` is kept on the type, since it does identify the resource, with the reasoning recorded
+      beside it
+- [X] T013d [US1] Two registers have **no detail screen**, and the fix sends each to the closest thing
+      that loads rather than a URL that does not resolve: a vendor to the vendors list, because
+      vendors are edited in a modal there and no per-vendor route exists; a project to its edit screen,
+      because `/dashboard/projects/portfolio/[id]` has no page of its own — only `edit` and `documents`
+      beneath it. A vendor row **says** it opens the list, since arriving at a list after picking a
+      named record is otherwise just confusing
+- [ ] T013e [US1] Both of those deserve real detail screens, and neither is this feature's work. Until
+      they exist a search result reaches something that loads but not always the record itself
+- [ ] T014 [US1] Verification: quickstart Scenario 1. **Needs a browser and a running API; partially
+      done — the navigation path is now confirmed against a running server, the rest is not run**
 - [ ] T015 [US1] Verification: quickstart Scenario 1b in full — **the disclosure test**, including the
       side-by-side comparison of the two users and the character-by-character pass. **Not run, and the
       most important outstanding check in this phase**: the code path is built so a group cannot exist
