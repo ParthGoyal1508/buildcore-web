@@ -115,8 +115,37 @@ exist.
 - [ ] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
       markup** (spec Assumptions). This is a form, not an editor, and that constraint is what keeps it
       tractable
+
+  **Blocked on backend work, and the 2026-09-16 note above was wrong about why** (investigated
+  2026-10-01). That note said "the API modules and shared components they need are built and typed;
+  what is missing is the screens that compose them". A template editor already exists at
+  `/dashboard/recruitment/letter-templates` — fixed text with a validated token picker, which *is*
+  the structure this task asks for. What it cannot do is serve 017.
+
+  Its token catalogue is a **hardcoded map in the client**, keyed by feature 011's five `letterType`
+  values, mirroring an equally hardcoded map in the api. 017 replaced that enum with `LetterKind`
+  rows and FR-010 names fifteen kinds. `LetterKind` declares **no variable fields of its own** — the
+  model has `key`, `label`, signature and approval flags, and nothing about what a template for it
+  may interpolate.
+
+  So a kind defined through 017's letter-kinds screen gets an empty token list, every token its
+  author writes is flagged unknown, and saving is refused. FR-014 — "define a new letter kind, its
+  variable fields and its fixed terms, **without a developer**" — is not reachable from this editor
+  at all, and no amount of screen work changes that.
+
+  What it needs first: the api declaring a per-kind field catalogue (on `LetterKind`, or a sibling
+  table) and serving it. That is not in api 017's tasks or its spec, so it is a gap in both halves
+  rather than a sequencing problem. Left open and unstarted rather than half-built.
+
 - [ ] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
       response includes one (FR-013a). Belt and braces, because the cost here is legal
+
+  **Not currently violated, and not yet meaningful.** The picker is fed by the hardcoded list
+  described under T023, which contains no Aadhaar and no document type at all — so FR-013a holds by
+  construction today. The guard this task asks for is a guard against a *server-supplied* field
+  list, which is exactly what T023 is blocked on. It becomes implementable, and necessary, the moment
+  that catalogue exists — and the task's instinct is right: belt and braces, because the cost is
+  legal rather than cosmetic.
 - [X] T025 [US5] Show `LETTER_KIND_IN_USE` verbatim when deletion is refused, naming the letters — a
       generic "could not delete" throws away the only part that says what to do
 
@@ -126,17 +155,46 @@ exist.
 
 - [X] T026 [P] [US4] Build `app/dashboard/settings/signatories/page.tsx` with signature-image upload
 - [X] T027 [P] [US4] Build `app/ui/letters/countersign-upload.tsx` (FR-012)
-- [ ] T028 [P] [US7] Add payment-proof attachment and the missing-proof indicator to the payments
+- [X] T028 [P] [US7] Add payment-proof attachment and the missing-proof indicator to the payments
       screen
 
 ---
 
+  Done 2026-10-01 in `app/ui/inventory/payment-proof-cell.tsx`, on
+  `/dashboard/inventory/payments`. The api side was already complete — `hasProof`,
+  `proofUploadedAt`, a `missingProof` filter, upload and audit-logged download — so this was screen
+  wiring only.
+
+  Two judgements worth recording. **Absence is a fact, not an error**: a payment with no proof
+  renders as a plain statement and an action, because a payment is often recorded before the advice
+  arrives and nobody did anything wrong. The amber is on the *filter* instead. And FR-021 is a
+  **filter rather than a count**, per the api's own reasoning — "14 payments lack proof" makes
+  somebody scroll looking for them; the filter hands them the fourteen. A line above the list says
+  so when it is narrowing, because a list that silently excludes rows is one somebody reads as the
+  whole set.
+
 ## Phase 8: US6 — Letters where the work is (P3)
 
-- [ ] T029 [P] [US6] Surface project letters on the project screen
-- [ ] T030 [P] [US6] Surface candidate and employee letters on theirs
+- [X] T029 [P] [US6] Surface project letters on the project screen
+
+  Done 2026-10-01 on the project documents screen, through a new shared
+  `app/ui/letters/subject-letters.tsx`. Same screen as the project's documents rather than a tab of
+  its own: both answer "what paperwork exists for this project". `LetterList` is reused unchanged —
+  it already distinguishes issued from executed, which is the whole of FR-013, and a second list
+  component would be a second place for that distinction to drift.
+
+- [X] T030 [P] [US6] Surface candidate and employee letters on theirs
 
 ---
+
+  Done 2026-10-01. Employees get a **Letters** tab on the detail screen, deliberately separate
+  from Documents: a document is something filed *about* a person, a letter is something the company
+  *issued to* them, and an appointment letter in a list of Aadhaar scans loses that. Candidates get
+  theirs in the pipeline drawer, where a reader already has one candidate in front of them.
+
+  Note `/dashboard/recruitment/letters` already existed and stays: it lists feature 011's letters
+  across every candidate, answering "what have we issued lately" rather than "what has this person
+  been sent". Two surfaces, two questions.
 
 ## Phase 9: Verification
 

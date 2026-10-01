@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getProject } from '@/app/lib/api/projects';
 import { ROUTES } from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
+import SubjectLetters from '@/app/ui/letters/subject-letters';
 import ProjectDocumentsPanel from '@/app/ui/projects/project-documents-panel';
 
 /**
@@ -44,7 +45,17 @@ export default function ProjectDocumentsPage() {
         className="mb-6"
       />
 
-      <ProjectDocumentsPanel projectId={id} />
+      <div className="flex flex-col gap-8">
+        <ProjectDocumentsPanel projectId={id} />
+        {/*
+          017 US6 (T029). On the same screen as the project's documents rather than a tab of its
+          own: both answer "what paperwork exists for this project", and the client's item 18 asks
+          for letters to be reachable from the project module. The subject pair is how a letter
+          names a project — `project`/`:id` — and this app never resolves it, which is why the
+          heading above belongs to the page and not to the panel.
+        */}
+        <SubjectLetters query={{ subjectType: 'project', subjectId: id }} />
+      </div>
     </main>
   );
 }

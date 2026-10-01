@@ -2322,10 +2322,47 @@ export const DOCUMENT_COPY = {
     count === 1
       ? 'One required document is still missing.'
       : `${count} required documents are still missing.`,
+
+  // ── Payment transfer proof (FR-020, FR-021 — bugs.md item 23) ───────────────
+  /**
+   * The gap item 23 names: a payment carried a reference number somebody typed and nothing
+   * behind it. So the absence is stated as a fact about the payment, not as an error — nobody
+   * did anything wrong by recording a payment before the advice arrived.
+   */
+  proofMissing: 'No proof attached',
+  proofAttached: 'Proof attached',
+  proofAttachedOn: (when: string) => `Proof attached ${when}`,
+  proofAttach: 'Attach proof',
+  proofReplace: 'Replace proof',
+  proofOpen: 'Open proof',
+  proofUploading: 'Attaching…',
+  proofAttachFailed: 'The proof could not be attached. Please try again.',
+  proofDownloadFailed: 'The proof could not be opened. Please try again.',
+  /** FR-021 as a filter, not a count — "14 payments lack proof" makes somebody scroll. */
+  proofFilterLabel: 'Proof',
+  proofFilterAll: 'All payments',
+  proofFilterMissing: 'Missing proof',
+  proofFilterPresent: 'Proof attached',
+  /**
+   * Said once above the list when the filter is on, because a list that silently excludes rows
+   * is a list somebody will read as the whole set.
+   */
+  proofFilterActive:
+    'Showing only payments with no proof attached.',
 } as const;
 
 /** Copy for the letters surfaces. */
 export const LETTER_COPY = {
+  // ── Letters on a subject's own screen (017 US6 — bugs.md item 18) ───────────
+  /**
+   * A letter is always *about* something, and the person who wants it is on that thing's screen.
+   * So the heading says whose letters these are relative to where the reader already is, rather
+   * than naming the subject again — the screen above has already named it.
+   */
+  subjectHeading: 'Letters',
+  subjectEmpty: 'No letters have been issued for this yet.',
+  subjectOpen: 'Open',
+
   awaitingApproval:
     'This letter is waiting for approval and cannot be issued yet.',
   issueFailed: 'The letter could not be issued.',

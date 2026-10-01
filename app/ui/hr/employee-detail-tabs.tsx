@@ -21,6 +21,7 @@ import { dateLabel, money, rupees } from '@/app/lib/format';
 import AttendanceCalendar from '@/app/ui/hr/attendance-calendar';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
+import SubjectLetters from '@/app/ui/letters/subject-letters';
 import MaskedField from '@/app/ui/hr/masked-field';
 import OffboardingPanel from '@/app/ui/hr/offboarding-panel';
 import TransferModal from '@/app/ui/hr/transfer-modal';
@@ -38,6 +39,10 @@ const TABS = [
   { id: 'attendance', label: 'Attendance' },
   { id: 'leave', label: 'Leave' },
   { id: 'documents', label: 'Documents' },
+  // 017 US6 (T030). Separate from Documents, because the two are different things: a document is
+  // something filed *about* this person, a letter is something this company *issued to* them, and
+  // an appointment letter sitting in a list of Aadhaar scans loses that distinction.
+  { id: 'letters', label: 'Letters' },
   { id: 'loans', label: 'Loans' },
 ] as const;
 
@@ -393,6 +398,10 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
 
       <TabPanel id="documents" idPrefix="employee-detail" active={tab}>
         <DocumentsTab employeeId={employee.id} />
+      </TabPanel>
+
+      <TabPanel id="letters" idPrefix="employee-detail" active={tab}>
+        <SubjectLetters query={{ employeeId: employee.id }} />
       </TabPanel>
 
       <TabPanel id="loans" idPrefix="employee-detail" active={tab}>
