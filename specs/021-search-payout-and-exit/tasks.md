@@ -43,6 +43,10 @@ importer anywhere in the app.
 - [ ] T003 [US1] Create `app/ui/dashboard-search.tsx`: results as the user types, no submit (FR-003)
 - [ ] T004 [US1] Group results by register, and **render only groups that returned rows** (FR-005).
       A group header for a register the caller cannot see is itself the disclosure — see T007
+- [ ] T004a [US1] Each row must **identify its record sufficiently to choose between similar ones**
+      (FR-002) — two projects called "Phase 2" or two vendors with the same trading name are the case
+      this exists for. Code alone is not enough when the user searched by name, and name alone is not
+      enough when two match
 - [ ] T005 [US1] Show `matchedOn` on each row (FR-001b). To somebody who typed something code-shaped,
       an unexplained name match reads as a wrong result
 - [ ] T006 [US1] **Do not sort results.** The backend puts an exact code match first and deliberately
@@ -96,6 +100,12 @@ importer anywhere in the app.
       employee has
 - [ ] T025 [US4] Final settlement unavailable while items are outstanding, **naming them** (FR-013).
       Naming is the requirement — "cannot settle yet" with no list is an instruction nobody can act on
+- [ ] T025a [US4] **FR-013a — the settlement summary lists every asset the employee held at exit,
+      with its outcome.** Distinct from T020's outstanding list and previously uncovered: the
+      clearance screen shows what is *still* outstanding, while the settlement summary is the record of
+      how each asset ended — returned, waived, or still held. An asset returned last week vanishes from
+      the first and must still appear in the second, which is the whole point of the client's
+      "any assets assigned to the employee should appear in the F&F summary"
 - [ ] T026 [US4] **Show no recovery value for an unreturned asset.** The backend deliberately computes
       none: that needs a valuation rule the client has not chosen. Note it here so nobody adds one
       from the asset's purchase cost, which would be a guess presented as a figure
@@ -131,6 +141,10 @@ importer anywhere in the app.
 the backend builds against one seeded mapping profile so theirs becomes a second profile.
 
 - [ ] T036 [US3] Add the bank sheet and reconciliation reads to `app/lib/api/hr-payroll.ts`
+- [ ] T036a [US3] **FR-008 — the transaction sheet upload itself**, showing matched lines, unmatched
+      lines and differences. Previously implied by the display tasks below without anything actually
+      uploading a file. A validated multipart upload (Principle II on the backend's side; a typed
+      client on this one)
 - [ ] T037 [US3] Show advance recoveries as **named lines** (FR-010), not a netted figure
 - [ ] T038 [US3] Explain differences between the sheet and the run **line by line** (FR-011)
 - [ ] T039 [US3] An unparseable row **uploads and is reported**; the file does not fail. A parser that
@@ -141,10 +155,21 @@ the backend builds against one seeded mapping profile so theirs becomes a second
 
 ## Phase 5: Verification
 
-- [ ] T041 SC-001 to SC-003 for search, including the cross-company check
-- [ ] T042 The clearance passes for US4
-- [ ] T043 320px for dashboard search (Principle VI)
-- [ ] T044 Record each pass in this file beside its task
+- [ ] T041 SC-001: a code of each supported kind reaches its record
+- [ ] T042 SC-002 and FR-001a: a name fragment reaches a project with no code known, and name matching
+      works in **all four** registers — employee, vendor, equipment, project. The backend widened every
+      register rather than projects only, and verifying one would leave three untested
+- [ ] SC-003 covered by T015's disclosure pass — a record the viewer may not see is never revealed,
+      by result, by group header, by count or by empty state. Cross-reference rather than repeat
+- [ ] T043 SC-004 and SC-005: the clearance names outstanding items and refuses settlement while any
+      remain
+- [ ] T044 SC-005a and SC-005b: every asset held at exit appears on the clearance **and** on the
+      settlement summary with its outcome (T020, T025a)
+- [ ] T045 NFR-001: search responds as the user types without a request per keystroke (measured, T011)
+- [ ] T046 NFR-002: dashboard search usable at 320px including keyboard selection (Principle VI)
+- [ ] T047 FR-015: every read goes through a typed API module and no component calls `fetch`; all copy
+      in `constants.ts`. A sweep, recorded — this is the requirement that decays silently
+- [ ] T048 Record each pass in this file beside its task
 
 ---
 
@@ -171,7 +196,7 @@ depends on nothing.
 
 ## Notes
 
-- 44 tasks. 27 are buildable now (Phases 1–2, with T022 waiting on 019 Phase 1); 13 are gated on
-  backend Phases 4–6; 4 are verification.
+- 51 tasks. 30 are buildable now (Phases 1–2, with T022 waiting on 019 Phase 1); 14 are gated on
+  backend Phases 4–6; 7 are verification.
 - Both [NEEDS CLARIFICATION] markers were closed on 2026-10-01 — slips send on an explicit action,
   and waiver authority has a working default.

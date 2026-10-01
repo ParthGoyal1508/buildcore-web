@@ -70,6 +70,11 @@ success that was not one.
 - [ ] T009 [US3] **Keep the muster store.** `drainMusters` and `MusterQueueEntry` are feature 013's,
       serve a different act, and were a separate object store for exactly this reason. Note it beside
       the removal so a later tidy-up does not take both
+- [ ] T009a [US3] **Coordinate the `DB_VERSION` change with feature 018's Phase 2a**, which adds a
+      bill-draft store to this same file and this same database. Whichever lands second must not treat
+      the other's version bump as a conflict to resolve by reverting. 018's T021 carries the matching
+      note; this one exists so the dependency is visible from both sides rather than only from the one
+      that happened to be written second
 - [ ] T010 [US3] Decide and record what happens to punches **already queued** on a device when this
       ships. They were captured under the old promise; draining them once on upgrade and then
       retiring the path is the only option that does not silently discard a worker's day
@@ -190,10 +195,28 @@ Its own tasks say: *"Nothing in Phase 3 should be built until that conversation 
 
 ## Phase 7: Verification
 
-- [ ] T049 SC checks for US1 and US2 once their phases are unblocked
-- [ ] T050 Every punch surface at 320px (Principle VI, FR-014c) — a gate, not a polish pass
-- [ ] T051 Record each pass in this file beside its task. A verification whose result lives only in
-      a closed terminal is not a verification
+- [ ] T049 **SC-005b, verifiable today**: every punch request carries the device's reported accuracy
+      where the browser supplies it, and omits it where the browser does not. This is Phase 1, and the
+      one success criterion in this feature that waits on nothing
+- [ ] T050 **NFR-003, measured**: a refusal reaches the worker within 2 seconds of the attempt. A
+      figure, not an impression — a worker who thinks nothing happened punches again, and under the
+      block every retry is another refusal
+- [ ] T051 SC-001 and SC-002: a reviewer raises a hire deduction and an operator recovery, and each
+      reaches its destination with its evidence (gated on Phases 5–6)
+- [ ] T052 SC-003 and SC-004: an employee's assigned location and its history are visible, and a site's
+      staff can be assigned in bulk without opening each employee (gated on Phase 5)
+- [ ] T053 **SC-005 and SC-005a**: a refused punch appears nowhere as a day — checked in the employee's
+      own attendance view, the administrator's attendance screen, and any absence or leave-balance
+      figure derived from them. The backend's guarantee is structural; this verifies the interface did
+      not reintroduce what the storage prevents
+- [ ] T054 SC-006: a worker refused at 8am can find that refusal at 5pm, in a list of attempts
+- [ ] T055 NFR-001: every punch surface at 320px (Principle VI, FR-014c) — a gate, not a polish pass.
+      NFR-002 records the opposite, and is worth stating: the fuel review is a desktop surface and is
+      not claimed as mobile
+- [ ] T056 FR-015: every read through a typed API module, no component calling `fetch`, all copy in
+      `constants.ts`. A recorded sweep — this is the requirement that decays silently
+- [ ] T057 Record each pass in this file beside its task. A verification whose result lives only in a
+      closed terminal is not a verification
 
 ---
 
@@ -226,7 +249,7 @@ anything.
 
 ## Notes
 
-- 51 tasks. 14 are buildable today (Phases 1–2); 37 are gated on backend work, and 10 of those on a
-  client conversation rather than on code.
+- 58 tasks. 17 are buildable today (Phases 1–2 plus the two checks that cover them); 41 are gated on
+  backend work, and 10 of those on a client conversation rather than on code.
 - The spec was amended on 2026-10-01: US3 scenario 7, one assumption and one edge case all assumed
   offline punching and were reversed.

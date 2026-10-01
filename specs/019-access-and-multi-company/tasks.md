@@ -114,7 +114,20 @@ feature 014's existing guard, and a user with nothing visible is told so.
 - [ ] T027 Render the no-visible-modules message (FR-011) when `visibleModules` is empty. Plainly,
       and naming who to ask — a user seeing an empty shell with no explanation assumes the product
       is broken rather than that their access is pending
-- [ ] T028 Verification: direct-URL entry to a refused route, and a user with no modules
+- [ ] T028 **FR-010 — a permission change reaches the holder on their next load, with no cache
+      clear.** Uncovered until now, and it fails in the direction that matters: a user whose write
+      access was revoked keeps being offered write controls, and a user newly granted access keeps
+      being refused. `['currentUser']` must not be served stale across a reload — refetch it on mount
+      rather than trusting a cached entry
+- [ ] T029 **The service worker is the other half of FR-010** (spec edge case: "navigation cached by
+      the service worker from before a permission change"). `app/sw.ts` exists and caches navigation.
+      Confirm it does not serve a cached shell whose menu reflects permissions the user no longer has,
+      and that a permission change does not require the user to clear site data — which is a thing no
+      site worker will ever do and an administrator cannot do for them
+- [ ] T030 Verification for FR-010: revoke a permission on a signed-in user, reload, and confirm the
+      change is reflected without clearing anything. Then grant one back. Both directions, because
+      only one of them is the security-relevant one and only the other is the one users complain about
+- [ ] T031 Verification: direct-URL entry to a refused route, and a user with no modules
 
 ---
 
@@ -127,39 +140,39 @@ inspection.
 phase: it is the largest mechanical change in the feature, and putting it before the level work
 would make one blast radius out of two.
 
-- [ ] T029 Create `app/lib/api/company-selection.ts` with `listSelectableCompanies()` and
+- [ ] T032 Create `app/lib/api/company-selection.ts` with `listSelectableCompanies()` and
       `setCompanySelection(companyId)` (Principle V). Both are `@SelfService()` on the API — no
       permission is involved in choosing which of your own companies you work in
-- [ ] T030 Create `app/ui/company-switcher.tsx`. Visible only when the **selectable list has more
+- [ ] T033 Create `app/ui/company-switcher.tsx`. Visible only when the **selectable list has more
       than one entry** (FR-001) — *not* when the user holds `CROSS_COMPANY_ACCESS`, which is a
       different population and is what the retired provider got wrong
-- [ ] T031 Mount the switcher in `app/ui/shell-header.tsx`, so the selected company is visible at
+- [ ] T034 Mount the switcher in `app/ui/shell-header.tsx`, so the selected company is visible at
       all times (FR-002) and present on every screen (FR-001). The retired provider rendered its own
       selector inside page content, which could satisfy neither
-- [ ] T032 On a successful `setCompanySelection`, call `queryClient.clear()` (FR-005). Note beside
+- [ ] T035 On a successful `setCompanySelection`, call `queryClient.clear()` (FR-005). Note beside
       it why a curated list of invalidations was rejected: it passes review and then fails the first
       time somebody adds a query without thinking about companies — which is to say it fails later,
       quietly, on a screen nobody was watching
-- [ ] T033 Warn before switching with unsaved changes (FR-006)
-- [ ] T034 **No screen sends a `companyId` to be scoped.** The server resolves and re-validates the
+- [ ] T036 Warn before switching with unsaved changes (FR-006)
+- [ ] T037 **No screen sends a `companyId` to be scoped.** The server resolves and re-validates the
       selection per request. Note this where the switcher writes, so nobody later "fixes" a screen
       by threading an id through it — a second, unvalidated answer to a question the server already
       answers
-- [ ] T035 Retire `app/ui/settings/company-context.tsx`. It holds the selection in `useState` and
+- [ ] T038 Retire `app/ui/settings/company-context.tsx`. It holds the selection in `useState` and
       defaults to the first active company, so a switch there never reaches the server and the UI
       and the data disagree about which company is current. It also **throws** without a provider,
       which already cost a crash this cycle that `tsc` and `next build` both passed over
-- [ ] T036 [P] Move `app/ui/settings/project-documents-screen.tsx` off `useCompanyContext`
-- [ ] T037 [P] Move `app/ui/settings/signatories-screen.tsx` off `useCompanyContext`
-- [ ] T038 [P] Move `app/ui/settings/letter-kinds-screen.tsx` off `useCompanyContext`
-- [ ] T039 [P] Move `app/ui/documents/company-documents-screen.tsx` off `useCompanyContext`
-- [ ] T040 [P] Move `app/ui/plant/use-plant-refs.ts` off `useCompanyContext`
-- [ ] T041 [P] Move `app/ui/assets/use-asset-refs.ts` off `useCompanyContext`
-- [ ] T042 Delete the stale comments in `app/ui/projects/project-form.tsx` and
+- [ ] T039 [P] Move `app/ui/settings/project-documents-screen.tsx` off `useCompanyContext`
+- [ ] T040 [P] Move `app/ui/settings/signatories-screen.tsx` off `useCompanyContext`
+- [ ] T041 [P] Move `app/ui/settings/letter-kinds-screen.tsx` off `useCompanyContext`
+- [ ] T042 [P] Move `app/ui/documents/company-documents-screen.tsx` off `useCompanyContext`
+- [ ] T043 [P] Move `app/ui/plant/use-plant-refs.ts` off `useCompanyContext`
+- [ ] T044 [P] Move `app/ui/assets/use-asset-refs.ts` off `useCompanyContext`
+- [ ] T045 Delete the stale comments in `app/ui/projects/project-form.tsx` and
       `app/ui/projects/project-documents-panel.tsx` explaining why they avoid `useCompanyContext`.
       The reason they document stops being true in this phase, and a comment describing a hazard
       that no longer exists sends the next reader looking for it
-- [ ] T043 Verification: quickstart Scenario 3 in full, **including step 4's cache inspection**.
+- [ ] T046 Verification: quickstart Scenario 3 in full, **including step 4's cache inspection**.
       SC-006 is an inspection rather than a glance because a stale answer is a plausible answer
 
 ---
@@ -172,24 +185,24 @@ The hiding itself is the API's. `CashVisibilityInterceptor` already shapes respo
 FR-013 covers exports without separate work: an export built from the same response carries the
 same nulls.
 
-- [ ] T044 Add `getCashVisibility()` and `setCashVisibility(hide)` to `app/lib/api/settings.ts`
-- [ ] T045 Create `app/ui/settings/cash-visibility.tsx`, present only for `COMPANY_SETTINGS` at
+- [ ] T047 Add `getCashVisibility()` and `setCashVisibility(hide)` to `app/lib/api/settings.ts`
+- [ ] T048 Create `app/ui/settings/cash-visibility.tsx`, present only for `COMPANY_SETTINGS` at
       **write** level (FR-012) — the first real consumer of Phase 1's `hasWrite`. Absent, not
       disabled
-- [ ] T046 Create `app/ui/hidden-amount.tsx` rendering a field where `amountHidden` is true. A
+- [ ] T049 Create `app/ui/hidden-amount.tsx` rendering a field where `amountHidden` is true. A
       stated absence, **never a blank cell and never `0`** — the API returns null rather than zero
       precisely so the two can be told apart, and rendering it as empty throws that away
-- [ ] T047 Render `amountHidden` wherever a cash amount can appear. Audit by field, not by screen:
+- [ ] T050 Render `amountHidden` wherever a cash amount can appear. Audit by field, not by screen:
       the API decides per row from `paymentMode`, holds no screen list, and the web holding one is
       how the two drift
-- [ ] T048 **Any total spanning a hidden row must say it is incomplete** (FR-014), rather than
+- [ ] T051 **Any total spanning a hidden row must say it is incomplete** (FR-014), rather than
       present a figure that is quietly short by the value of every hidden row in it. This is the
       requirement the retired spec marker was really about
-- [ ] T049 On a successful setting change, invalidate the affected queries so open screens update
+- [ ] T052 On a successful setting change, invalidate the affected queries so open screens update
       without a manual reload (FR-015)
-- [ ] T050 Note that cash **entry** is unaffected — the interceptor "never touches a query or a
+- [ ] T053 Note that cash **entry** is unaffected — the interceptor "never touches a query or a
       row". No entry control is gated by this setting (Clarifications, 2026-10-01)
-- [ ] T051 Verification: quickstart Scenario 4 module by module (SC-005), the export, and recording
+- [ ] T054 Verification: quickstart Scenario 4 module by module (SC-005), the export, and recording
       a cash payment with hiding on
 
 ---
@@ -198,19 +211,22 @@ same nulls.
 
 Recorded, not asserted. Each of these is a measurement or a pass somebody performed.
 
-- [ ] T052 NFR-001: the switcher at 320px with the longest company name — reachable, operable, and
+- [ ] T055 NFR-001: the switcher at 320px with the longest company name — reachable, operable, and
       not obscuring page content (quickstart Scenario 5). Principle VI applies because the shell is
       a mobile-critical surface
-- [ ] T053 NFR-002: measure switch-to-usable, including the cache clear, against the 2-second
+- [ ] T056 NFR-002: measure switch-to-usable, including the cache clear, against the 2-second
       budget. A figure, not an impression — `clear()` costs a visible refetch and this is what makes
       that acceptable rather than regrettable
-- [ ] T054 SC-001: records created after a switch belong to the selected company
-- [ ] T055 SC-003: the Note 22 example role sees logbook entry and no other part of machinery, in
+- [ ] T057 SC-001: records created after a switch belong to the selected company
+- [ ] T058 SC-003: the Note 22 example role sees logbook entry and no other part of machinery, in
       navigation **and** by direct access
-- [ ] T056 SC-004: no write control visible to a read-only role, across every module in T012's list
-- [ ] T057 SC-005: no cash figure on any screen or export with hiding on, module by module
-- [ ] T058 SC-006: no previous-company data in the cache after a switch
-- [ ] T059 Record every measurement and pass in this file, beside its task. A verification whose
+- [ ] T059 SC-004: no write control visible to a read-only role, across every module in T015's list
+- [ ] T060 SC-005: no cash figure on any screen or export with hiding on, module by module
+- [ ] T061 SC-006: no previous-company data in the cache after a switch
+- [ ] T062 FR-017: every read through a typed API module, no component calling `fetch`, no inline
+      styling, all copy in `constants.ts`. A recorded sweep — this is the requirement that decays
+      silently, and this feature touches more files than any other in the wave
+- [ ] T063 Record every measurement and pass in this file, beside its task. A verification whose
       result lives only in a terminal somebody has closed is not a verification
 
 ---
@@ -221,15 +237,15 @@ Recorded, not asserted. Each of these is a measurement or a pass somebody perfor
 Phase 1 (levels) ─┬─> Phase 2 (hide writes)
                   └─> Phase 3 (guard)
 Phase 4 (switcher) — independent of 1–3; sequenced after to limit blast radius
-Phase 1 (T010) ────> Phase 5 (settings control gating)
+Phase 1 (T013) ────> Phase 5 (settings control gating)
 All ──────────────> Phase 6
 ```
 
 ### Parallel opportunities
 
-- T001, T002 together
-- T013–T021 are one module each, all `[P]`
-- T036–T041 are one consumer each, all `[P]`
+- T004, T005 together
+- T016–T024 are one module each, all `[P]`
+- T039–T044 are one consumer each, all `[P]`
 
 ## MVP scope
 
@@ -239,6 +255,6 @@ over work the API has already done.
 
 ## Notes
 
-- 51 implementation tasks, 8 verification tasks, 59 total. None creates a test file.
-- The whole feature is additive except T035, which removes a mechanism that now contradicts the
+- 54 implementation tasks, 9 verification tasks, 63 total. None creates a test file.
+- The whole feature is additive except T038, which removes a mechanism that now contradicts the
   server.

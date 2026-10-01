@@ -180,7 +180,18 @@ connectivity.
 - [ ] T048 NFR-002 measured: summary under 3s for 12 months
 - [ ] T049 NFR-003: both billing sheets unbroken at 320px — grid scrolling in its own container with
       totals reachable. **Not** a claim that billing from a phone is sensible; the spec is explicit
-- [ ] T050 Record every measurement in this file beside its task
+- [ ] T050 SC-001 and SC-002: a client bill and an RA bill are entered down a real BOQ and submitted,
+      each showing the rates it was billed at
+- [ ] T051 SC-003 and SC-004: the project summary reconciles to its underlying records, and every figure
+      opens to them
+- [ ] T052 SC-005: the monthly labour view answers "what did we pay this worker in September" without
+      opening several wage sheets and adding up — the question the 2026-09-29 clarification was raised
+      for
+- [ ] T053 SC-006 and SC-007: the group board totals only projects the viewer may see, and the monthly
+      export carries the same figures as the screen plus its production date
+- [ ] T054 FR-015: every read through a typed API module, no component calling `fetch`, all copy in
+      `constants.ts`. A recorded sweep — the requirement that decays silently
+- [ ] T055 Record every measurement in this file beside its task
 
 ---
 
@@ -214,7 +225,7 @@ client's item 11.
 
 ## Notes
 
-- 50 tasks. **9 are buildable today** (Phase 1); 41 wait on a backend that is 0 of 74.
+- 55 tasks. **9 are buildable today** (Phase 1); 46 wait on a backend that is 0 of 74.
 - T017 is conditional on the client's BOQ template and is the only task that answer touches.
 - Both [NEEDS CLARIFICATION] markers were addressed on 2026-10-01: draft recovery was decided, and
   the sizing question was reduced from a blocker to one conditional task.
