@@ -31,6 +31,17 @@ reimbursements and access, and nothing at all about assets held in the employee'
 - Q: Do assets get their own section on the clearance screen, or join the existing outstanding list? → A: **Their own section, within the same list.** An asset is a different kind of obligation from an advance — it has a site, an expected return date and a condition on return — and the person clearing an exit needs to see at a glance what physical property is outstanding. Grouping it with money obscures that.
 - Q: Should the screen offer a way to return the asset? → A: **No — it links to the asset register instead.** The asset module owns returning an asset, with its condition grade and its own consequences. A second return control here would be a second way to close an allocation and the two would disagree. The clearance shows the obligation and takes the reader to where it is discharged.
 
+### Session 2026-10-01
+
+Raised while planning the web half. One client decision, and one marker the backend had already
+settled in code.
+
+- Q: Should salary slips send automatically when a run is marked paid, or on an explicit action? → A: **An explicit action.** The client was asked directly. This is also what the backend's own T042 prescribes, and the asymmetry is the whole argument: an explicit send can be automated later, whereas an automatic send that was wrong has already emailed 500 people their salary slips. So US2's screen carries a send control rather than only a status view, and FR-006's retry sits beside it rather than standing in for it.
+
+- Q: Who may waive a clearance item? → A: **`EMPLOYEES` at write level, as a working default.** The backend shipped the waiver behind the same permission as the rest of the clearance screen and recorded in its controller that the authority question remains open with the client. Under 019's level model the read and the write separate on the verb, which is what makes this defensible in the meantime — waiving writes off company money, so it is at least not available to a reader. **This creates a dependency**: the waiver control cannot be gated correctly until the web parses the `grants` field, which is feature 019's web Phase 1.
+
+- Q: `app/ui/search.tsx` already exists. Is search half-built? → A: **No — it is dead code.** Eighteen lines of presentational input left over from the Next.js dashboard template, with no state, no query, no results and no importer anywhere in the app. Nothing of it is reusable beyond the icon. Recorded because the file's existence suggests otherwise, and growing this feature inside a tutorial's stub would inherit a shape nobody chose.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A search box that finds anything by its code or its name (Priority: P1)
@@ -238,8 +249,13 @@ final settlement is unavailable until each is resolved or deliberately waived.
 
 ### Needing the client's decision
 
-- **[NEEDS CLARIFICATION: should salary slips send automatically or on an explicit action?]** Carried
-  from the backend spec. It decides whether this screen has a send control or only a status view.
-- **[NEEDS CLARIFICATION: who may waive a clearance item?]** A waiver writes off company money. It
-  most likely belongs with the final approval authority — Super Admin, per the client's answer on
-  Director — but the client should confirm rather than have it assumed.
+- **Waiver authority, to confirm rather than to unblock.** Resolved for now as `EMPLOYEES` at write
+  level, which is what the backend shipped and which its controller records as a working default
+  pending the client's answer. Tightening it later — to the final approval authority, say — changes a
+  permission constant rather than a design, so nothing here waits on it.
+- **The bank and its transaction sheet format.** US3's reconciliation cannot be verified against a
+  real file until the client supplies one. The backend's Phase 6 builds against one seeded mapping
+  profile so that their file becomes a second profile rather than a rewrite; this spec inherits that
+  approach.
+
+Both markers previously listed here are resolved in the Clarifications session of 2026-10-01 above.
