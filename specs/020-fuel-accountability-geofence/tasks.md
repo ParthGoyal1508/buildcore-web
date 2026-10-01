@@ -26,7 +26,7 @@ Principle VI. 320px is a gate on every punch task, not a later pass.
 
 ---
 
-## Phase 1: Send the accuracy — SHIPPABLE TODAY
+## Phase 1: Send the accuracy — SHIPPABLE TODAY ✅ implemented 2026-10-01
 
 **Goal**: FR-014a, FR-014b. **Independent test**: quickstart Scenario 1.
 
@@ -36,23 +36,47 @@ moment the hard refusal lands it costs people their pay — every punch judged o
 honest workers on site with a bad fix refused. The spec calls this "a prerequisite of the block being
 fair, not a refinement of it".
 
-- [ ] T001 [P] [US3] Add `PUNCH_COPY` to `app/lib/constants.ts` — the offline notice and the
-      accuracy-unavailable wording (Principle III)
-- [ ] T002 [US3] Add `accuracyMeters?: number` to the punch request type in
-      `app/lib/api/my-workspace.ts`. **`accuracyMeters`, American and singular** — the muster
-      endpoint and `offline-queue.ts` both use `accuracyMetres`, and both are correct where they are
-- [ ] T003 [US3] Note beside T002 that a misspelt key fails **silently**: `@IsOptional()` on the
-      server ignores an unrecognised field, the punch returns 201, and it is judged on its raw point
-      exactly as if accuracy had never been sent. Nothing errors and nothing logs. This comment is
-      what stops somebody "tidying" the spelling to match the muster endpoint
-- [ ] T004 [US3] Capture `GeolocationPosition.coords.accuracy` in `app/ui/my/punch-clock.tsx` and
-      send it. The browser already reports it; the screen currently discards it
-- [ ] T005 [US3] Where the device reports no accuracy, **omit the field** (FR-014b). Do not send `0`
-      — zero asserts a perfect fix, which is the opposite of "unknown", and under the hard refusal it
-      would deny the worker the allowance they are entitled to
+- [~] T001 [P] [US3] ~~Add `PUNCH_COPY` to `app/lib/constants.ts`~~ — **nothing to add in this
+      phase.** Sending accuracy is silent: there is no message, and FR-014b's "still permit the
+      attempt" is discharged by omitting a field rather than by saying anything. The offline notice
+      this task anticipated belongs to Phase 2. Deferred rather than ticked, because adding unused
+      constants to satisfy a task is worse than leaving the task open
+- [X] T002 [US3] Added `accuracyMeters?: number` to `PunchInput` in `app/lib/api/my-workspace.ts`
+- [X] T003 [US3] The silent-failure note is on the request body in `submitPunch`, where somebody
+      tidying spellings would actually be looking — not on the interface
+- [X] T004 [US3] `position.coords.accuracy` captured in `app/ui/my/punch-clock.tsx`
+- [X] T005 [US3] `?? undefined`, so the field is omitted and never zeroed (FR-014b)
+- [X] T005a [US3] **Not in the plan, and necessary**: the offline punch queue stores the accuracy at
+      capture time, and the drain in `app/my/layout.tsx` sends it. A queued punch replayed without it
+      would be judged on its raw point — the exact unfairness this phase removes, displaced by however
+      long the phone was offline. No `DB_VERSION` bump: an object store holds no column list, so
+      entries written before this field drain without one
+- [X] T005b [US3] The development stand-in position sends **no** accuracy. It is a pair of
+      coordinates somebody configured, not a fix any device reported, and inventing one would hand the
+      backend a number with nothing behind it
 - [ ] T006 [US3] Verification: read the request body in the Network tab and confirm the exact key and
-      a plausible value (quickstart Scenario 1). A 201 proves nothing here — that is the point of T003
-- [ ] T007 [US3] Verification at 320px (Principle VI)
+      a plausible value (quickstart Scenario 1). A 201 proves nothing here — that is the point of T003.
+      **Needs a browser and a device position; not run**
+- [ ] T007 [US3] Verification at 320px (Principle VI). **Not run**
+
+### Two defects this phase deliberately leaves, decided 2026-10-01
+
+The browser has its **own** accuracy gate — `MAX_GPS_ACCURACY_METERS`, 100m, env-overridable — and
+`assertAccurate` in `app/lib/location.ts` **throws before the request is sent**. It was kept, because
+it genuinely serves the worker: "wait a moment for a better fix" beats a round trip that produces an
+exception for an administrator to resolve by hand. Keeping it has two costs, recorded here rather than
+discovered later:
+
+- [ ] T007a [US3] **The company setting is capped at 100m by the browser.** The backend made
+      `punchAccuracyMaxMetres` a per-company Super Admin setting precisely so the number could differ
+      between an open site and a basement slab — and a Super Admin raising it above 100m currently has
+      no effect, because the punch never leaves the device. Closing this means the punch screen reading
+      the company's own threshold, which needs a backend read that exists in no plan yet
+- [ ] T007b [US3] **The refusal-rate figure understates.** Backend Phase 2 measures how often the hard
+      block *would* fire, and that measurement is what the client's decision rests on. Punches the
+      browser rejects never reach it, so the figure is short by the count of worse-than-100m fixes —
+      which are among the most likely to be refused as unlocatable. **State this alongside the figure
+      when it is put to the client**, rather than presenting it as a complete count
 
 ---
 

@@ -163,13 +163,26 @@ export default function PunchClock() {
       const capturedAt = new Date().toISOString();
 
       setPhase('locating');
-      let coords: { latitude: number; longitude: number };
+      let coords: {
+        latitude: number;
+        longitude: number;
+        accuracyMeters?: number;
+      };
       let usedFallback = false;
       try {
         const position = await getPosition();
         coords = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          // Sent so the backend can apply its accuracy allowance (020 FR-014a):
+          // a punch counts as inside its fence when the distance falls within
+          // `radius + accuracy`, which is what stops a worker standing on site
+          // with a poor fix being refused for the device's uncertainty.
+          //
+          // `?? undefined` rather than a default: where the browser reports no
+          // accuracy the field is **omitted**, never zeroed (FR-014b). Zero
+          // asserts a perfect fix and would deny the worker the allowance.
+          accuracyMeters: position.coords.accuracy ?? undefined,
         };
       } catch (locationError) {
         // In production a punch without a real location is worthless — the whole
@@ -180,6 +193,9 @@ export default function PunchClock() {
         if (process.env.NODE_ENV === 'production') {
           throw locationError;
         }
+        // No `accuracyMeters`, deliberately. The stand-in is a pair of coordinates
+        // somebody configured, not a fix any device reported, and inventing an
+        // accuracy for it would hand the backend a number with nothing behind it.
         coords = DEV_FALLBACK_POSITION;
         usedFallback = true;
       }

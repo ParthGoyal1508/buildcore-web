@@ -75,6 +75,10 @@ export default function MyWorkspaceLayout({
           photo: entry.photo,
           latitude: entry.latitude,
           longitude: entry.longitude,
+          // The accuracy from when the worker punched, not from now. Undefined for
+          // an entry queued before this field existed, which the backend treats as
+          // "no accuracy reported" — today's behaviour, unchanged.
+          accuracyMeters: entry.accuracyMeters,
           capturedAt: entry.capturedAt,
         }),
       );

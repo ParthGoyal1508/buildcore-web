@@ -289,6 +289,22 @@ export interface PunchInput {
   photo: Blob;
   latitude: number;
   longitude: number;
+  /**
+   * The GPS accuracy radius the device reported, in metres (020 FR-014a).
+   *
+   * The backend judges a punch inside its fence when the distance falls within
+   * `radius + accuracy`, so a worker standing legitimately at a site with a poor
+   * fix is not refused for the device's uncertainty. Without this the allowance
+   * cannot be applied and every punch is judged on its raw point — which costs
+   * nothing today, because a failing check still records a reviewable exception,
+   * and costs people their pay the day 020's hard refusal lands.
+   *
+   * **Optional, and omitted rather than zeroed** when the device reports no
+   * accuracy (FR-014b). A `0` asserts a perfect fix, which is the opposite of
+   * "unknown", and would deny the worker the very allowance this field exists to
+   * give them.
+   */
+  accuracyMeters?: number;
   capturedAt: string;
 }
 
@@ -301,6 +317,17 @@ export async function submitPunch(input: PunchInput): Promise<PunchResult> {
         photo: await blobToBase64(input.photo),
         latitude: input.latitude,
         longitude: input.longitude,
+        // `accuracyMeters` — American and singular, which is the backend's spelling
+        // on this endpoint only. The muster endpoint and `offline-queue.ts` both use
+        // `accuracyMetres`, and both are correct where they are.
+        //
+        // Do not "tidy" these to match each other. The backend validates this field
+        // with `@IsOptional()`, so a misspelt key is **ignored without error**: the
+        // punch still returns 201 and is still judged on its raw point, exactly as
+        // though accuracy had never been sent. Nothing logs and nothing fails, and
+        // the bug would only become visible once the hard refusal exists — as honest
+        // workers being refused.
+        accuracyMeters: input.accuracyMeters,
         capturedAt: input.capturedAt,
       }),
     }),
