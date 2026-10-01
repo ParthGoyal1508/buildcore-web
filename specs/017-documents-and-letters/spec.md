@@ -29,6 +29,10 @@ same date for the requirements these follow from (FR-001a, FR-003a, FR-025).
 - Q: A required kind with no document type defined renders no action at all today. What should it offer? → A: **Defining the type, in place.** The typed client already carries the distinction; the screen discarded it.
 - Q: The Project Documents screen is read-only, so the required set cannot be configured from anywhere. → A: **Make it an editor.** Each requirement can be moved between required and optional, added or removed; a kind the company has not defined can be defined in place, the same form Company Documents carries. The blocker was never the write endpoint — it was that a picker had nothing to list until document kinds carried a scope.
 - Q: What does the editor show for a company that has configured nothing? → A: **The six shipped defaults, labelled as defaults**, with the first save adopting them as that company's own set. The screen shows what is about to be adopted rather than describing it.
+- Q: The required-set editor moves kinds between "required" and "optional". The client now asks that some documents **block project creation**. What does the editor offer? → A: **Mandatory or advisory, named as what they do.** "Optional" describes a kind by what it is not; the two strengths now have different consequences — a mandatory kind refuses the creation, an advisory one is reported outstanding — and the editor must say which it is setting. The backend's FR-007b is the same decision.
+- Q: If mandatory documents block creation, the project creation form must carry documents. Where do they go? → A: **Into the form, uploaded before the project exists.** Each mandatory kind appears in the creation form with an upload control, and the form cannot be submitted until each has a file. The backend stages the uploads (its FR-009) and the form holds references, which is invisible to the person using it — they attach papers to a new project, which is what the client described.
+- Q: What does the creator see when the server refuses the creation? → A: **The missing kinds by name, against the fields that are missing them.** A refusal rendered as a banner saying "documents missing" makes the person hunt; the names come back from the server (backend FR-009) and belong on the controls they refer to.
+- Q: The client asks that "all uploaded documents" be visible on the project page. The screen shows required-kind status. → A: **List the documents themselves, supplementary included.** Status answers what is missing; the client wants the filed papers reachable where the project is. This is the same gap that made supplementary *company* documents invisible one screen over, and the same fix.
 - Q: These screens show one company with no way to change it. → A: **Mount the existing company selector**, as the plant, recruitment and employee-setup sections already do. Feature 019 replaces it with a persistent application-wide switcher; this is consistency with what ships today, not an early draft of that.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -73,14 +77,25 @@ per-project detail alone still requires somebody to go looking.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project, **When** its documents are opened, **Then** the six required kinds appear with
-   their status.
+1. **Given** a project, **When** its documents are opened, **Then** every kind in the company's
+   required set appears with its status and whether it is mandatory or advisory.
 2. **Given** the portfolio list, **When** it is viewed, **Then** each project's document readiness is
    visible in the row.
 3. **Given** a document is uploaded, **When** the portfolio is next viewed, **Then** readiness reflects
    it.
 4. **Given** a supplementary document, **When** it is uploaded, **Then** it appears without affecting
    required-set readiness.
+5. **Given** a required set containing a mandatory kind, **When** the project creation form is opened,
+   **Then** that kind appears as an upload control and the form cannot be submitted without a file
+   against it.
+6. **Given** a creation refused by the server for missing mandatory documents, **When** the refusal is
+   shown, **Then** the missing kinds are named on the controls they refer to, and the form keeps every
+   value and file already supplied.
+7. **Given** a project with required and supplementary documents filed, **When** the project is
+   opened, **Then** all of them are listed there and each can be opened from that screen.
+8. **Given** a user who may upload project documents but may not change settings, **When** they open
+   the project documents screen, **Then** the required set is shown and its editing controls are not
+   offered.
 
 ---
 
@@ -210,10 +225,27 @@ visible in the list.
 - **FR-018**: All access MUST go through the typed API modules (Principle V); copy MUST live in the
   constants module (Principle III); no inline styling (Principle II).
 - **FR-022**: The project documents screen MUST let a user who may change settings configure the
-  required set: move a kind between required and optional, add one from the kinds available to this
+  required set: move a kind between **mandatory and advisory**, add one from the kinds available to this
   company, remove one, and define a new kind in place (Clarifications, 2026-09-16). Where the company
   has configured nothing, the screen MUST show the shipped defaults, MUST say they are defaults, and
   MUST adopt them as the company's own set on the first save.
+- **FR-022a**: The editor MUST name the two strengths by their consequence — a mandatory kind refuses
+  project creation, an advisory kind is reported outstanding — rather than as "required" and
+  "optional", which describe a kind by what it is not and hide that the two now differ in effect.
+- **FR-022b**: The editor's controls MUST NOT be offered to a user who may upload project documents
+  but may not change settings. Showing a control that will be refused teaches the person that the
+  screen is broken.
+- **FR-023**: The project creation form MUST present each mandatory kind as an upload control and MUST
+  NOT permit submission until every one carries a file.
+- **FR-023a**: Where the server refuses a creation for missing mandatory documents, the form MUST name
+  the missing kinds **on the controls they refer to**, and MUST preserve every value and file already
+  supplied. A refusal that empties the form makes the gate punish the person complying with it.
+- **FR-023b**: Upload progress and failure MUST be visible per document in the creation form, as
+  FR-006 already requires of the company documents screen. A creation form that silently holds a
+  failed upload refuses submission for a reason the user cannot see.
+- **FR-024**: The project screen MUST list every document filed against the project — required and
+  supplementary alike — each openable from there. Readiness status MUST NOT be the only view of a
+  project's papers.
 - **FR-019**: The company documents screen MUST offer every document kind the company has defined, not
   only the required ones, and MUST list supplementary documents without letting them alter the
   completeness figure (Clarifications, 2026-09-16).

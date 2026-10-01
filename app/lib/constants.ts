@@ -79,6 +79,9 @@ export const ROUTES = {
   projectsNewProject: '/dashboard/projects/portfolio/new',
   projectsEditProject: (id: string) =>
     `/dashboard/projects/portfolio/${id}/edit`,
+  /** What a project holds, and what it still owes (017 FR-024). */
+  projectsProjectDocuments: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/documents`,
   projectsClients: '/dashboard/projects/clients',
   projectsSites: '/dashboard/projects/sites',
 
@@ -228,6 +231,118 @@ export const MAX_GPS_ACCURACY_METERS = Number(
  * punch lands inside the geofence and exercises the in-range path rather than the
  * exception path. Point both at your own coordinates to test somewhere real.
  */
+/**
+ * Exit clearance (021 US4) — what a leaver still owes.
+ *
+ * Kinds are grouped by **consequence**, not by module: an asset has a site and a due date
+ * and physically exists somewhere, which is a different kind of obligation from money, and
+ * grouping them together obscures what is actually outstanding.
+ */
+export const CLEARANCE_COPY = {
+  heading: 'Exit clearance',
+  hint: 'Derived from each module on every read, so returning an asset in the asset register clears it here with no second action.',
+  loading: 'Loading…',
+  noExit: 'No exit has been initiated for this employee.',
+  groups: {
+    asset_custody: 'Assets in custody',
+    recoverable_kit: 'Recoverable kit',
+    salary_advance: 'Outstanding advances',
+    account_access: 'Account access',
+  },
+  /** Nothing outstanding at all. Distinct from "we could not check" below. */
+  allClear: 'Nothing outstanding.',
+  openAllocation: 'Open in asset register',
+  /**
+   * Said where an asset appears. The asset module owns returning — with its condition
+   * grade and its own consequences — so a return control here would be a second way to
+   * close an allocation, and the two would disagree.
+   */
+  returnElsewhere: 'Returned in the asset register, not here.',
+  cancel: 'Cancel',
+  waive: 'Waive',
+  waiveHeading: 'Stop pursuing this',
+  /** FR-014: the reason is required, and the backend enforces a real minimum. */
+  waiveReasonLabel: 'Why the company is not pursuing this',
+  waiveReasonShort: (min: number) =>
+    `A reason of at least ${min} characters is required — this writes off company money.`,
+  waiveSubmit: 'Record waiver',
+  waiveFailed: 'The waiver could not be recorded.',
+  /**
+   * A waiver is **not** a discharge. The backend is explicit: an asset waived here stays
+   * open in the asset register, because marking it returned would put a false fact in the
+   * register that owns the truth.
+   */
+  waivedBy: (name: string, at: string) => `Waived by ${name} on ${at}`,
+  waivedNotReturned: 'Waived — not returned. The obligation stands on the record.',
+  settleBlocked: 'Final settlement is unavailable while anything above is outstanding.',
+  settleReady: 'Nothing is outstanding. Final settlement may proceed.',
+  /**
+   * "Could not ask" is not "nothing held", and the difference is somebody leaving with a
+   * laptop. Styled as a warning for that reason, where an ordinary outstanding item is not.
+   */
+  unavailable: (names: string) =>
+    `${names} could not be checked, so this clearance may be incomplete. Settlement stays blocked until it can be.`,
+  /**
+   * Said once, where somebody would otherwise look for a figure. The backend deliberately
+   * computes no recovery value for an unreturned asset: that needs a valuation rule —
+   * original cost, depreciated, or replacement — and the client has not chosen one.
+   */
+  noAssetValuation:
+    'No recovery amount is shown for an unreturned asset: a valuation rule has not been agreed.',
+} as const;
+
+/**
+ * Dashboard search (021 US1). Register labels are copy here, unlike document kinds:
+ * the four are fixed by the backend's own union rather than being company configuration,
+ * so there is nothing for a company to rename.
+ */
+export const SEARCH_COPY = {
+  label: 'Search',
+  placeholder: 'Code or name — employee, vendor, equipment, project',
+  /**
+   * Shown below the minimum term length instead of an empty result.
+   *
+   * FR-001c: "nothing matched" and "too short to search" are different facts to the
+   * person typing, and they look identical if you let them.
+   */
+  keepTyping: (min: number) =>
+    `Keep typing — at least ${min} characters to search.`,
+  searching: 'Searching…',
+  /**
+   * The **one** empty state, used for every case.
+   *
+   * Never varied by register. A per-register message would let somebody infer which
+   * registers exist by watching which message appears, which is the disclosure FR-005
+   * forbids — see `dashboard-search.tsx`.
+   */
+  empty: 'Nothing matched.',
+  failed: 'Search could not be completed.',
+  /** FR-001b — why a row the reader did not expect is in the list. */
+  matchedOnName: 'matched on name',
+  /**
+   * Shown on a vendor row. Vendors are edited in a modal on their list, so there is no
+   * per-vendor screen to open — and a reader who picked a named record and arrived at a
+   * list deserves to have been told, not surprised.
+   */
+  opensList: 'opens the vendor list',
+  truncated: 'More matches exist than are shown. Narrow the term to see them.',
+  /**
+   * A register the caller may search that could not be asked. Never a permission
+   * problem — the backend omits those entirely — so naming it discloses nothing.
+   */
+  unavailable: (names: string) =>
+    `${names} could not be searched just now, so matches there are missing.`,
+  registers: {
+    employee: 'Employees',
+    vendor: 'Vendors',
+    equipment: 'Equipment',
+    project: 'Projects',
+  },
+} as const;
+
+/** Debounce for dashboard search (021 NFR-001): typing must not be a request per keystroke. */
+export const SEARCH_DEBOUNCE_MS = 250;
+
 export const DEV_FALLBACK_POSITION = {
   latitude: Number(process.env.NEXT_PUBLIC_DEV_FALLBACK_LATITUDE ?? 19.076),
   longitude: Number(process.env.NEXT_PUBLIC_DEV_FALLBACK_LONGITUDE ?? 72.8777),
@@ -1284,6 +1399,44 @@ export const TDS_SECTION_CEILINGS: Record<string, number> = {
 /** The sections the declaration form offers, in the order they are usually filed. */
 export const TDS_SECTIONS = ['80C', '80D', '80CCD1B', 'HRA'] as const;
 
+/**
+ * What an employee is told when somebody changed their attendance (016 FR-009a).
+ *
+ * Its own block rather than a few entries in `HR_MESSAGES`, because the reader is different: these
+ * sentences are read by the person whose day was changed, not by the administrator who changed it.
+ * Wording that is fine in an admin tool — "modified", "override" — is not fine here.
+ */
+export const MY_ATTENDANCE_MESSAGES = {
+  /** Singular and plural said separately: "1 changes" on somebody's pay record is careless. */
+  changedHeading: (count: number) =>
+    count === 1
+      ? 'This day was changed by an administrator'
+      : `This day was changed ${count} times by administrators`,
+  changedBy: (actor: string, when: string) => `${actor} · ${when}`,
+  /** The diff. Reads as a sentence so it survives being flattened onto one line at 320px. */
+  fieldChange: (field: string, from: string, to: string) =>
+    `${field}: ${from} → ${to}`,
+  fieldNames: {
+    inTime: 'In',
+    outTime: 'Out',
+    statusOverride: 'Status',
+  } as Record<string, string>,
+  /** For a side of the diff that held nothing — distinct from a value that is unknown. */
+  empty: 'not set',
+  reasonGiven: (reason: string) => `Reason: ${reason}`,
+  /**
+   * T047. An administrator is not obliged to give a reason, and an empty field would read as
+   * though the screen failed to load one. Saying so plainly is the requirement.
+   */
+  reasonMissing: 'No reason was given.',
+  /**
+   * Shown when a change is recorded but no field differs — which the data permits, because a
+   * correction resubmitting the same values still writes a row. Saying "changed" and then listing
+   * nothing would look like a rendering fault.
+   */
+  noFieldsChanged: 'No times or status were altered by this change.',
+} as const;
+
 export const HR_MESSAGES = {
   // Employees
   employeeSaved: 'Employee saved.',
@@ -1307,7 +1460,36 @@ export const HR_MESSAGES = {
   periodLocked:
     'That period is locked by a processed payroll run, so attendance for it can no longer be changed.',
   noAttendance: 'No attendance records for this date and site.',
+  /**
+   * Unused, and kept only so the next person looking for it finds this note rather than
+   * reintroducing it (016 FR-009c). A correction is not an update: it is submitted for
+   * approval, and the day does not change until the chain completes. "Attendance updated"
+   * was true before api 016 phase 8 and is now precisely the wrong sentence.
+   */
   attendanceSaved: 'Attendance updated.',
+  correctionSubmitted:
+    'Correction submitted for approval. The day will not change until it is approved.',
+  correctionAwaiting: (level: string) => `Correction awaiting ${level}`,
+  /** When the chain reports no level — it has finished, or nothing is mapped to decide it. */
+  correctionAwaitingUnknown: 'Correction awaiting approval',
+  correctionPendingHint:
+    'A correction for this day is already awaiting approval. Submitting another will raise a second one.',
+  correctionSubmit: 'Submit for approval',
+  correctionSubmitting: 'Submitting…',
+  correctionDialogHint: (date: string) =>
+    `Attendance for ${date}. This is submitted for approval rather than applied — the day changes only once the chain approves it, and the change is then recorded in the modifications trail with its before and after values.`,
+  correctionRemarksHint:
+    'Shown to the approvers, and kept in the modifications trail if the correction is approved.',
+
+  // The modification trail's filters (016 FR-012d)
+  modificationEmployeeFilter: 'Employee',
+  modificationAllEmployees: 'All employees',
+  modificationActorFilter: 'Changed by',
+  modificationAllActors: 'Anyone',
+  modificationFrom: 'From',
+  modificationTo: 'To',
+  /** Only reachable if a row carries neither a name nor an id — kept so the cell is never blank. */
+  modificationActorUnknown: 'Unknown',
   importNothingValid:
     'Nothing in this file can be imported — every row failed validation. Fix the errors and upload again.',
   importPartial: (ok: number, bad: number) =>
@@ -2036,7 +2218,61 @@ export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
   letter_loi: 'Letter of intent',
   letter_purchase_order: 'Purchase order',
   final_settlement: 'Final settlement',
+  attendance_correction: 'Attendance correction',
+  director_final_set_change: 'Change to the Director approval set',
 };
+
+/**
+ * Copy for the Director approval set (016 FR-017 to FR-020).
+ *
+ * The three state labels are the load-bearing strings on that screen. "Not required" and "Not
+ * configured" must not be interchangeable in a reader's mind: the first is a decision somebody
+ * made and can be held to, the second is a question nobody has answered. Written as full phrases
+ * rather than badges for that reason.
+ */
+export const DIRECTOR_FINAL_MESSAGES = {
+  heading: 'Director approval',
+  intro:
+    'Which actions cannot take effect until the Director approves them. Changes here are themselves submitted for the Director’s approval — they do not take effect when you save.',
+  stateLabels: {
+    final: 'Director required',
+    not_final_by_decision: 'Not required — decided',
+    not_configured: 'Nobody has decided',
+  } as Record<string, string>,
+  stateHints: {
+    final: 'This cannot take effect until the Director approves it.',
+    not_final_by_decision:
+      'Somebody decided this needs no Director. The decision is recorded below.',
+    not_configured:
+      'Nothing says either way, so the shipped default governs. This is the gap worth reviewing.',
+  } as Record<string, string>,
+  decidedBy: (name: string, when: string) => `Decided by ${name} · ${when}`,
+  /** For a mark that is in force but that nobody is recorded as having set. */
+  decidedByNobody: 'No decision is recorded against this.',
+  /** The submit control's label, said before it is pressed rather than after (FR-018). */
+  submit: 'Submit for the Director’s approval',
+  submitting: 'Submitting…',
+  submitted:
+    'Submitted for the Director’s approval. Nothing has changed yet — the set below is still what governs today.',
+  noChanges: 'Nothing has been changed yet.',
+  pendingHeading: 'A change is awaiting the Director',
+  pendingBy: (name: string, when: string) => `Proposed by ${name} · ${when}`,
+  pendingChange: (action: string, from: string, to: string) =>
+    `${action}: ${from} → ${to}`,
+  /** FR-019. Shown to every reader so two people do not submit the same edit. */
+  pendingLocked:
+    'While this is outstanding, no further change can be submitted for this company.',
+  inForce: 'In force today',
+  proposed: 'Proposed',
+  /**
+   * The one entry that cannot be changed. Rendered as an explanation rather than a disabled
+   * control, because "why can I not change this" is the question it should answer.
+   */
+  selfChangeLocked:
+    'The approval requirement on changing this set cannot itself be changed — it is the gate that makes every other entry meaningful.',
+  readOnly:
+    'You can see which actions require the Director, but not change them.',
+} as const;
 
 /** The label for an action type, falling back to a readable form of the raw key. */
 export function approvalActionTypeLabel(actionType: string): string {
@@ -2131,10 +2367,114 @@ export const DOCUMENT_COPY = {
     'Regulated personal data. It can be downloaded, and every download is recorded — there is no preview.',
   uploadFailed: 'The document could not be uploaded. Please try again.',
   supersedeHint: 'Uploading a new version keeps the old one on file.',
+
+  // ── A kind's strength, named by its consequence (FR-022a, T066) ─────────────
+  /**
+   * **Not "Required" and "Optional".**
+   *
+   * Those were the labels until 2026-10-01 and the task forbids them, for a reason worth keeping:
+   * "optional" describes a kind by what it is not, and since the 2026-09-16 amendment the two
+   * strengths differ in *effect* — one refuses the creation of a project, the other is reported
+   * outstanding and blocks nothing. A reader choosing between "Required" and "Optional" cannot
+   * tell that, and the person who most needs to is the one deciding whether to make a kind
+   * mandatory.
+   */
+  strengthMandatory: 'Blocks project creation',
+  strengthAdvisory: 'Reported as outstanding',
+  strengthMandatoryHint:
+    'A project cannot be created until a document of this kind is attached.',
+  strengthAdvisoryHint:
+    'A project can be created without it. It is reported as outstanding until it is filed.',
+  strengthLegend: 'What happens without it',
+
+  // ── A project's own papers (FR-024) ─────────────────────────────────────────
+  projectDocumentsHeading: 'Documents on file',
+  /**
+   * T078. Readiness is one view of a project's papers and must not be the only one — "3 of 5
+   * required" cannot answer "what do we hold for this project", which is where the client's
+   * item 3 ends.
+   */
+  projectDocumentsHint:
+    'Everything filed against this project, required and supplementary alike.',
+  projectDocumentsEmpty: 'Nothing has been filed against this project yet.',
+  projectDocumentRequiredBadge: 'Answers a required kind',
+  projectDocumentSupplementaryBadge: 'Supplementary',
+  projectDocumentFiledBy: (name: string, when: string) =>
+    `Filed by ${name} · ${when}`,
+  /** When the uploader's account has gone; the document and its date are still the point. */
+  projectDocumentFiledAt: (when: string) => `Filed ${when}`,
+  projectDocumentOpen: 'Open',
+  projectDocumentDownloadFailed:
+    'The document could not be downloaded. Please try again.',
+  projectDocumentsOutstandingHeading: 'Still outstanding',
+  projectDocumentsOutstandingMandatory: (name: string) =>
+    `${name} — blocks project creation`,
+  projectDocumentsOutstandingAdvisory: (name: string) =>
+    `${name} — reported as outstanding`,
+
+  // ── Documents on the project creation form (FR-023, FR-023a, FR-023b) ───────
+  creationHeading: 'Project documents',
+  creationHint:
+    'These are uploaded as you choose them, so a refused submission never loses a file you have already attached.',
+  creationNoneRequired: 'This company requires no documents of a new project.',
+  creationMandatoryHeading: 'Needed to create the project',
+  creationAdvisoryHeading: 'Can follow later',
+  creationAttached: (fileName: string) => `Attached: ${fileName}`,
+  creationReplace: 'Replace',
+  creationUploading: (fileName: string) => `Uploading ${fileName}…`,
+  creationUploadFailed: (fileName: string, reason: string) =>
+    `${fileName} could not be uploaded. ${reason}`,
+  /** T072: the server's refusal, said on the control it refers to. */
+  creationRefusedHere: 'The server refused the project without this document.',
+  /**
+   * The summary beside the submit control. Names the count, not the kinds — the kinds are named on
+   * their own controls, and repeating them here is the matching exercise T072 exists to remove.
+   */
+  creationBlocked: (count: number) =>
+    count === 1
+      ? 'One required document is still missing.'
+      : `${count} required documents are still missing.`,
+
+  // ── Payment transfer proof (FR-020, FR-021 — bugs.md item 23) ───────────────
+  /**
+   * The gap item 23 names: a payment carried a reference number somebody typed and nothing
+   * behind it. So the absence is stated as a fact about the payment, not as an error — nobody
+   * did anything wrong by recording a payment before the advice arrived.
+   */
+  proofMissing: 'No proof attached',
+  proofAttached: 'Proof attached',
+  proofAttachedOn: (when: string) => `Proof attached ${when}`,
+  proofAttach: 'Attach proof',
+  proofReplace: 'Replace proof',
+  proofOpen: 'Open proof',
+  proofUploading: 'Attaching…',
+  proofAttachFailed: 'The proof could not be attached. Please try again.',
+  proofDownloadFailed: 'The proof could not be opened. Please try again.',
+  /** FR-021 as a filter, not a count — "14 payments lack proof" makes somebody scroll. */
+  proofFilterLabel: 'Proof',
+  proofFilterAll: 'All payments',
+  proofFilterMissing: 'Missing proof',
+  proofFilterPresent: 'Proof attached',
+  /**
+   * Said once above the list when the filter is on, because a list that silently excludes rows
+   * is a list somebody will read as the whole set.
+   */
+  proofFilterActive:
+    'Showing only payments with no proof attached.',
 } as const;
 
 /** Copy for the letters surfaces. */
 export const LETTER_COPY = {
+  // ── Letters on a subject's own screen (017 US6 — bugs.md item 18) ───────────
+  /**
+   * A letter is always *about* something, and the person who wants it is on that thing's screen.
+   * So the heading says whose letters these are relative to where the reader already is, rather
+   * than naming the subject again — the screen above has already named it.
+   */
+  subjectHeading: 'Letters',
+  subjectEmpty: 'No letters have been issued for this yet.',
+  subjectOpen: 'Open',
+
   awaitingApproval:
     'This letter is waiting for approval and cannot be issued yet.',
   issueFailed: 'The letter could not be issued.',

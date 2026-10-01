@@ -43,15 +43,26 @@ function shiftDate(iso: string, days: number): string {
  * a locked payroll period (423) and missing mandatory documents (400). Both are
  * things the admin can act on, and both are indistinguishable from "something
  * broke" if shown as a bare message.
+ *
+ * **This dialog submits a correction for approval; it does not save an edit** (016 FR-009c).
+ * Since api 016 phase 8 the day is unchanged until a Site → HR → Director chain completes, so
+ * every word here that promised an immediate change has been corrected. The version that said
+ * "Save" and then closed on success was the worst available outcome: the table refetched,
+ * showed the old figures, and offered no reason — which reads as a save that failed silently.
+ *
+ * `onSubmitted` rather than `onClose` on success, so the caller can say what happened. Closing
+ * a dialog is not an explanation.
  */
 function MarkAttendanceModal({
   row,
   date,
   onClose,
+  onSubmitted,
 }: {
   row: DailyAttendanceRow;
   date: string;
   onClose: () => void;
+  onSubmitted: () => void;
 }) {
   const queryClient = useQueryClient();
   const [inTime, setInTime] = useState(row.inTime ?? '');
@@ -75,8 +86,10 @@ function MarkAttendanceModal({
       return markAttendance(input);
     },
     onSuccess: () => {
+      // Refetched because the row now carries an outstanding-correction marker, which is the
+      // one thing about the day that *did* change. The times and status deliberately have not.
       queryClient.invalidateQueries({ queryKey: ['hr', 'attendance'] });
-      onClose();
+      onSubmitted();
     },
     onError: (err: Error) => {
       if (err instanceof ApiError && err.status === 423) {
@@ -101,7 +114,9 @@ function MarkAttendanceModal({
             onClick={() => save.mutate()}
             disabled={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Save'}
+            {save.isPending
+              ? HR_MESSAGES.correctionSubmitting
+              : HR_MESSAGES.correctionSubmit}
           </Button>
         </>
       }
@@ -109,9 +124,13 @@ function MarkAttendanceModal({
       <div className="flex flex-col gap-4">
         <FormError message={error} />
         <p className="text-sm text-gray-600">
-          Attendance for <strong>{date}</strong>. Every edit is recorded in the
-          modifications trail with its before and after values.
+          {HR_MESSAGES.correctionDialogHint(date)}
         </p>
+        {row.pendingCorrection && (
+          <p className="text-sm text-amber-800">
+            {HR_MESSAGES.correctionPendingHint}
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             id="mark-in"
@@ -146,7 +165,7 @@ function MarkAttendanceModal({
           label="Remarks"
           value={remarks}
           onChange={(event) => setRemarks(event.target.value)}
-          hint="Shown in the modifications trail alongside the change."
+          hint={HR_MESSAGES.correctionRemarksHint}
         />
       </div>
     </Modal>
@@ -160,7 +179,22 @@ export default function AttendanceTable() {
   const [date, setDate] = useState(today);
   const [siteId, setSiteId] = useState('');
   const [editing, setEditing] = useState<DailyAttendanceRow | null>(null);
+  /**
+   * What the last submission did, shown until the administrator moves on.
+   *
+   * Not a toast. A correction that will be decided by three other people over the next days is
+   * not a transient acknowledgement, and the marker on the row (below) is what carries it once
+   * this clears — so the two together mean the screen never again implies the day changed.
+   */
+  const [submitted, setSubmitted] = useState(false);
   const isToday = date >= today;
+
+  // Cleared when the view moves: the notice is about the submission just made, and leaving it
+  // up over a different date or site would attach it to rows it has nothing to do with.
+  const changeView = (apply: () => void) => {
+    setSubmitted(false);
+    apply();
+  };
 
   const { data: sites } = useQuery({ queryKey: ['sites'], queryFn: listSites });
 
@@ -204,7 +238,16 @@ export default function AttendanceTable() {
               Exception
             </span>
           )}
-          {!row.adminEdited && !row.hasException && (
+          {row.pendingCorrection && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+              {row.pendingCorrection.levelLabel
+                ? HR_MESSAGES.correctionAwaiting(
+                    row.pendingCorrection.levelLabel,
+                  )
+                : HR_MESSAGES.correctionAwaitingUnknown}
+            </span>
+          )}
+          {!row.adminEdited && !row.hasException && !row.pendingCorrection && (
             <span className="text-gray-400">—</span>
           )}
         </span>
@@ -226,7 +269,9 @@ export default function AttendanceTable() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setDate((current) => shiftDate(current, -1))}
+              onClick={() =>
+                changeView(() => setDate((current) => shiftDate(current, -1)))
+              }
               aria-label="Previous day"
               className="rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
@@ -242,15 +287,19 @@ export default function AttendanceTable() {
               // record of what happened, and there is nothing to show for a day
               // that has not.
               onChange={(event) =>
-                setDate(
-                  event.target.value > today ? today : event.target.value,
+                changeView(() =>
+                  setDate(
+                    event.target.value > today ? today : event.target.value,
+                  ),
                 )
               }
               className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             />
             <button
               type="button"
-              onClick={() => setDate((current) => shiftDate(current, 1))}
+              onClick={() =>
+                changeView(() => setDate((current) => shiftDate(current, 1)))
+              }
               aria-label="Next day"
               disabled={isToday}
               title={isToday ? 'Today is the latest date with attendance' : undefined}
@@ -264,7 +313,7 @@ export default function AttendanceTable() {
           id="attendance-site"
           label="Site"
           value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
+          onChange={(event) => changeView(() => setSiteId(event.target.value))}
         >
           <option value="">All sites</option>
           {sites?.map((site) => (
@@ -274,6 +323,15 @@ export default function AttendanceTable() {
           ))}
         </SelectField>
       </div>
+
+      {submitted && (
+        <p
+          role="status"
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          {HR_MESSAGES.correctionSubmitted}
+        </p>
+      )}
 
       <DataTable
         caption="Daily attendance"
@@ -295,6 +353,10 @@ export default function AttendanceTable() {
           row={editing}
           date={date}
           onClose={() => setEditing(null)}
+          onSubmitted={() => {
+            setEditing(null);
+            setSubmitted(true);
+          }}
         />
       )}
     </div>

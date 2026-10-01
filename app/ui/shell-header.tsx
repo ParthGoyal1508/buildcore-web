@@ -34,7 +34,19 @@ import Logo from '@/app/ui/logo';
  * them — the dead link feature 014 exists to prevent. A user with no module at all
  * gets plain text rather than a link to nowhere.
  */
-export default function ShellHeader() {
+export default function ShellHeader({
+  /**
+   * Shell-specific furniture for the middle of the bar — dashboard search, today.
+   *
+   * A slot rather than the control itself, because this header is shared by three
+   * shells and only one of them wants it. Mounting search here unconditionally would
+   * put it on `/my`, where a site employee has no register to search, and on the muster
+   * capture screen, where a supervisor is standing in front of a queue of workers.
+   */
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -48,7 +60,7 @@ export default function ShellHeader() {
   const wordmark = <Logo className="h-7" />;
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 flex-none items-center justify-between gap-2 border-b border-gray-100 bg-white px-6 md:justify-end md:px-12">
+    <header className="sticky top-0 z-30 flex h-14 flex-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-6 md:px-12">
       <div className="md:hidden">
         {home ? (
           <Link
@@ -60,6 +72,12 @@ export default function ShellHeader() {
         ) : (
           wordmark
         )}
+      </div>
+      {/* `justify-between` on the header no longer ends in the bell on desktop, so the
+          slot takes the slack and keeps the bell at the right edge. An empty slot
+          collapses, which is what leaves `/my` and the muster shell as they were. */}
+      <div className="flex min-w-0 flex-grow justify-end md:justify-start">
+        {children}
       </div>
       <NotificationBell />
     </header>

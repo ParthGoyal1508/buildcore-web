@@ -33,6 +33,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import SubjectLetters from '@/app/ui/letters/subject-letters';
 import StatusBadge from '@/app/ui/status-badge';
 import { useCompanyContext } from '@/app/ui/settings/company-context';
 import PageHeader from '@/app/ui/page-header';
@@ -376,6 +377,15 @@ function CandidateDrawer({
             <SecondaryButton onClick={() => reject.mutate()}>Reject</SecondaryButton>
           )}
         </div>
+
+        {/*
+          017 US6 (T030). The candidate's own letters, on the candidate's own surface.
+          `/dashboard/recruitment/letters` already exists and lists feature 011's letters across
+          every candidate — a different surface answering a different question ("what have we
+          issued lately" rather than "what has this person been sent"). This is the second, and the
+          drawer is where a reader already has one candidate in front of them.
+        */}
+        <SubjectLetters query={{ candidateId: candidate.id }} />
       </div>
     </Modal>
   );

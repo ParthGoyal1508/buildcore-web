@@ -1,4 +1,5 @@
 import ApprovalSettings from '@/app/ui/settings/approval-settings';
+import DirectorFinalSettings from '@/app/ui/settings/director-final-settings';
 import PageHeader from '@/app/ui/page-header';
 
 export const metadata = { title: 'Approval settings' };
@@ -20,6 +21,13 @@ export default function ApprovalSettingsPage() {
         description="Which of your roles decides at each level of an approval chain."
       />
       <ApprovalSettings />
+      {/*
+        Same screen as the slot mappings, deliberately (016 FR-017). Both answer "who decides
+        here": the mappings say which role fills a level, this says which actions the Director
+        must be one of. Splitting them across two pages would mean nobody reviewing approval
+        configuration sees both halves of it.
+      */}
+      <DirectorFinalSettings />
     </main>
   );
 }

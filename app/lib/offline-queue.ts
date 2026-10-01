@@ -37,6 +37,24 @@ export interface OfflineQueueEntry {
   /** ISO 8601, captured at the moment the worker punched — not at sync time. This
    * is the value that makes the whole queue worth having. */
   capturedAt: string;
+  /**
+   * The accuracy the device reported **at capture time** (020 FR-014a).
+   *
+   * Stored for the same reason `capturedAt` is: the fix that matters is the one the
+   * worker punched on, and a queued punch replayed without it would be judged on its
+   * raw point — the exact unfairness this field exists to prevent, displaced by
+   * however long the phone was offline.
+   *
+   * **Spelled `accuracyMeters`, unlike `MusterQueueEntry.accuracyMetres` below.**
+   * Both spellings in one file is deliberate, not an oversight: each entry mirrors
+   * the payload of the endpoint it drains to, and the punch and muster endpoints
+   * genuinely differ. Unifying them would move the mismatch into the drain, which is
+   * the one place a wrong key is silently accepted and ignored.
+   *
+   * Optional, and no `DB_VERSION` bump: an object store holds no column list, so
+   * entries written before this field simply lack it and drain without one.
+   */
+  accuracyMeters?: number;
 }
 
 /** One worker's marking within a queued muster; the photo is held as a Blob. */

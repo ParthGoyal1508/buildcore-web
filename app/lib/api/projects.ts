@@ -351,6 +351,18 @@ export interface ProjectInput {
   cgstApplicable?: boolean;
   description?: string;
   isLocked?: boolean;
+  /**
+   * Documents staged before this project existed (017 FR-009, FR-009b).
+   *
+   * FR-009 refuses to create a project while a mandatory kind has no document attached — so the
+   * documents must exist before the project does. Each id comes from
+   * `stageProjectDocument`, and creation converts them into the project's own documents inside
+   * the same transaction: if the creation is refused, nothing was filed and nothing was created.
+   *
+   * Creation-only. There is no equivalent on update, because by then the project exists and
+   * `POST /projects/:id/documents` is the ordinary path.
+   */
+  stagedDocumentIds?: string[];
 }
 
 export async function createProject(input: ProjectInput): Promise<Project> {

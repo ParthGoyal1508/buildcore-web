@@ -33,6 +33,28 @@ chain. "You do not have permission" would be untrue and would send them to an ad
 nothing. And because levels resolve through slots rather than roles, the waiting-on text must name
 the person or the slot as configured, never a role name this interface assumed.
 
+### Session 2026-09-16
+
+The client restated note 2 in two halves: block a punch that fails location or photo verification,
+and log every manual attendance modification so it reaches the affected employee. The first half is
+feature 020's; it changes what this feature's chain reviews.
+
+- Q: Feature 020 now refuses a failed punch and records nothing. This feature's approval chain was built to review those refusals. What does it review instead? → A: **The supervisor's manual attendance correction.** The screens are unchanged in shape — the same Action/Review control, the same queue, the same attribution — and what flows through them changes. The backend records this as its own FR-012.
+- Q: `POST /attendance` used to apply a correction immediately. It now returns a pending approval. What must the administrative screen do differently? → A: **Show it as awaiting approval, and not show the day as corrected.** This is the one behavioural change on an existing screen. An interface that reports success on submission is telling the administrator a decision has been taken that has not, and the day they were trying to fix still reads wrong to everyone else.
+- Q: "It should also reflect in the attendance of the affected employee" — a notification, or something on the record? → A: **On the record, permanently.** The employee's own attendance shows the modified day carrying who changed it, when, from what to what, and why. Not a notification: a notification is read once and cleared, and this is a property of the day for as long as the day exists.
+- Q: Is the employee-facing version held to the mobile standard? → A: **Yes — attendance viewing is on Principle VI's closed mobile-critical list.** It is not a desktop screen that must merely survive 320px; the person whose pay is affected by a change is the one most likely to be reading it on a phone.
+- Q: Does the employee see the reason the change was made? → A: **Yes, where one was stated.** Showing that something happened to their attendance while withholding why is worse than not showing it at all.
+
+### Session 2026-09-29
+
+Raised against the client's re-stated requirement list, item 7: *"Every critical action across the
+system requires Director-level approval before execution."* The backend answer (016 backend FR-018,
+FR-018a–c) is a named, configurable set rather than a literal every-action gate, decided on
+2026-09-29. That answer only works if somebody can see the set, and nothing on this side showed it.
+
+- Q: Where does the director-final set live in the interface? → A: **A settings surface of its own, listing every action type the system knows of.** The client asked for "every critical action" and is getting a list instead. They are entitled to read that list and say what is missing from it, and an answer they cannot see is indistinguishable from no answer.
+- Q: Should editing the set behave like any other setting? → A: **No — it is itself an approval.** Backend FR-018b makes changing the set director-final, because whoever can remove payment release from the list can then release a payment. The screen must present the edit as submitted for approval, not as saved.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - One control, everywhere, behaving identically (Priority: P1)
@@ -91,6 +113,15 @@ and time are visible without navigating away.
 4. **Given** a long history, **When** it is opened, **Then** it is readable without leaving the record.
 5. **Given** attribution is shown in a dense table, **When** the table is viewed at 320px, **Then**
    the actor remains discoverable rather than being truncated away entirely.
+6. **Given** a day of the employee's attendance that was modified by an administrator, **When** that
+   **employee** opens their own attendance, **Then** the day shows that it was modified, by whom,
+   when, from what to what, and why where a reason was given.
+7. **Given** an employee's own attendance on a phone at 320px, **When** a modified day is viewed,
+   **Then** the modification is reachable rather than truncated away — attendance viewing is
+   mobile-critical under Principle VI.
+8. **Given** an administrator submits an attendance correction, **When** the response returns,
+   **Then** the screen shows it as **awaiting approval** rather than as applied, and the day does not
+   yet read as corrected.
 
 ---
 
@@ -120,6 +151,35 @@ appear in one queue and can be acted on from it.
 6. **Given** pending items exist, **When** any screen is shown, **Then** a count is visible in the
    navigation.
 
+---
+
+### User Story 4 - Seeing which actions the director must sign (Priority: P3)
+
+An administrator opens a settings screen and reads every action type the system knows of, each marked
+as needing the director's final approval or not. Changing a mark is submitted for the director's
+approval rather than saved, and the screen says so before anything is submitted.
+
+**Why this priority**: P3, matching the backend's US5. The set is buildable and configurable without
+this screen; what the screen adds is the client being able to answer item 7 for themselves rather than
+being told what the answer is. It depends on US1's control, since an edit here enters a chain.
+
+**Independent Test**: Open the screen, change one action type's mark, and confirm the change is shown
+as awaiting the director rather than applied, with the previous state still in force.
+
+**Acceptance Scenarios**:
+
+1. **Given** the settings screen, **When** it is opened, **Then** every action type the system knows of
+   is listed, each showing whether it needs the director's final approval.
+2. **Given** an action type, **When** its mark is changed, **Then** the change is presented as
+   submitted for the director's approval, and the list still shows the mark currently in force.
+3. **Given** a submitted change, **When** the director approves it, **Then** the list shows the new
+   mark and who approved it.
+4. **Given** a user who may not configure approvals, **When** the screen is opened, **Then** the list
+   is readable and no control to change a mark is rendered (Principle-consistent with hiding rather
+   than disabling).
+5. **Given** a pending change, **When** the screen is opened by anybody, **Then** the pending change is
+   visible alongside the mark in force, so two people do not submit the same edit.
+
 ### Edge Cases
 
 - A decision is taken by somebody else while the current user has the item open.
@@ -131,6 +191,10 @@ appear in one queue and can be acted on from it.
 - The record is restored from the back/forward cache after a decision was taken.
 - Attribution for an action taken by a user who has since been deactivated — the name must still
   resolve.
+- The director-final list is long enough that the action types a reader cares about are hard to find.
+- A change to the list is pending while a second person opens the same screen.
+- An action type the system knows of that no chain is configured for at all — it must not read as
+  "not director-final" when the truth is that nothing approves it.
 
 ## Requirements *(mandatory)*
 
@@ -155,6 +219,22 @@ appear in one queue and can be acted on from it.
 - **FR-008**: Every reviewable record MUST display its latest action, actor and time without
   navigation.
 - **FR-009**: Users MUST be able to open a record's full decision history from the record.
+- **FR-009a**: An employee's own attendance MUST show, for every modified day, that it was modified,
+  by whom, when, from what to what, and the stated reason where one was given
+  (Clarifications, 2026-09-16). This is the client's *"it should also reflect in the attendance of the
+  affected employee"*, and it is a property of the day rather than a notification — it MUST NOT be
+  dismissable or clearable.
+- **FR-009b**: The employee-facing modification display is **mobile-critical** under Principle VI —
+  attendance viewing is on the closed list — and MUST therefore be reachable at 320px rather than
+  merely not breaking there. The person most affected by a change to their attendance is the one most
+  likely to be looking at it on a phone.
+- **FR-009c**: An attendance correction submitted by an administrator MUST be presented as **awaiting
+  approval**, not as applied, and the corrected day MUST NOT read as corrected until the chain
+  completes. The correction now enters the approval chain (backend FR-012), and a screen that shows it
+  as done is telling the administrator a decision has been taken that has not.
+- **FR-009d**: The administrative attendance modifications view MUST allow filtering by the person who
+  made the change, not only by employee and date. An audit that cannot ask "what did this person
+  change" answers the wrong half of the question.
 - **FR-010**: The application MUST present one cross-module queue of items awaiting the current user.
 - **FR-011**: The queue MUST show module, subject, age and requester per item, and MUST allow the
   decision to be taken from it.
@@ -166,6 +246,16 @@ appear in one queue and can be acted on from it.
 - **FR-015**: All copy introduced by this feature MUST live in the central constants module
   (Principle III).
 - **FR-016**: The control and the attribution display MUST use no inline styling (Principle II).
+- **FR-017**: A settings surface MUST list every action type the system reports, each showing whether
+  it requires the director's final approval, and MUST show an action type that has no chain configured
+  as such rather than as not-final.
+- **FR-018**: A change to an action type's mark MUST be presented as submitted for the director's
+  approval, never as saved, and the mark currently in force MUST remain displayed until the change is
+  approved.
+- **FR-019**: A pending change to the set MUST be visible to every reader of the surface, alongside the
+  mark in force.
+- **FR-020**: For a user who may not configure approvals, the surface MUST render the list without any
+  control to change a mark, hidden rather than disabled.
 
 ### Non-Functional Requirements
 
@@ -207,6 +297,10 @@ appear in one queue and can be acted on from it.
   failures.
 - **SC-005**: The pending count matches the queue contents at all times, verified after decisions
   taken in another session.
+- **SC-006**: An administrator can state, from one screen and without asking a developer, exactly which
+  action types require the director's final approval and which do not.
+- **SC-007**: No change to the director-final set takes effect from this interface without the
+  director's approval, verified by attempting one and confirming the previous mark still governs.
 
 ## Assumptions
 
@@ -230,7 +324,18 @@ appear in one queue and can be acted on from it.
 ### Needing the client's decision
 
 Both markers raised when this specification was written are answered and recorded under
-Clarifications above. Nothing blocking remains.
+Clarifications above. The client's re-stated requirement list re-opened two, reviewed on 2026-09-29:
+
+- **[NEEDS CLARIFICATION: which action types are director-final?]** *(item 7)* The backend names four
+  as a proposal, not as the client's answer. User Story 4 exists so the client can read the full list
+  and amend it. **Not blocking** — the screen is buildable whatever the list contains.
+- **[NEEDS CLARIFICATION: is Principle VI to be amended?]** *(item 22)* The client asks that the whole
+  admin portal be fully functional on Android and iOS. Principle VI is NON-NEGOTIABLE and closes the
+  mobile-critical list to punch, attendance viewing and leave; constitution v2.1.0 already moved every
+  other screen's breakage floor to 320px, which may or may not be what "fully functional" means to the
+  client. Reviewed on 2026-09-29 and **deliberately left for a separate decision**: widening the
+  principle is a MAJOR version bump affecting every web feature shipped and unshipped, and no feature
+  specification may amend a constitution. NFR-001 here states the 320px floor and nothing stronger.
 
 **Migration order**, settled: attendance exceptions first. It is the client's first note, the
 exceptions are already detected and already have a resolution path to replace, and each one is a

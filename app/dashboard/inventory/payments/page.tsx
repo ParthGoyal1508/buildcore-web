@@ -5,9 +5,15 @@ import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import { deletePayment, getPayments, type Payment } from '@/app/lib/api/inventory';
-import { MESSAGES, PAYMENT_MODES, inventoryLabel } from '@/app/lib/constants';
+import {
+  DOCUMENT_COPY,
+  MESSAGES,
+  PAYMENT_MODES,
+  inventoryLabel,
+} from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import PaymentModal from '@/app/ui/inventory/payment-modal';
+import PaymentProofCell from '@/app/ui/inventory/payment-proof-cell';
 import { useVendors } from '@/app/ui/inventory/use-inventory-refs';
 import {
   FormError,
@@ -29,6 +35,13 @@ export default function PaymentsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+  /**
+   * FR-021 as a **filter**, not a count.
+   *
+   * "14 payments lack proof" makes somebody scroll a list looking for them; a filter hands them the
+   * fourteen. `''` is all payments, so the absence of a choice is not a choice.
+   */
+  const [proof, setProof] = useState<'' | 'missing' | 'present'>('');
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +51,8 @@ export default function PaymentsPage() {
     ...(paymentMode ? { paymentMode } : {}),
     ...(dateFrom ? { dateFrom } : {}),
     ...(dateTo ? { dateTo } : {}),
+    ...(proof === 'missing' ? { missingProof: true } : {}),
+    ...(proof === 'present' ? { missingProof: false } : {}),
   };
 
   const { data, isPending, isError } = useQuery({
@@ -80,6 +95,13 @@ export default function PaymentsPage() {
       key: 'bills',
       header: 'Bills settled',
       render: (row) => row.allocatedBillCount,
+    },
+    {
+      key: 'proof',
+      header: 'Proof',
+      // 017 FR-020. The evidence behind the reference number, which until now was a number
+      // somebody typed and nothing else.
+      render: (row) => <PaymentProofCell payment={row} />,
     },
     {
       key: 'unallocated',
@@ -144,6 +166,20 @@ export default function PaymentsPage() {
           ))}
         </SelectField>
 
+        <SelectField
+          id="payments-proof"
+          label={DOCUMENT_COPY.proofFilterLabel}
+          value={proof}
+          onChange={(event) => {
+            setProof(event.target.value as '' | 'missing' | 'present');
+            setPage(1);
+          }}
+        >
+          <option value="">{DOCUMENT_COPY.proofFilterAll}</option>
+          <option value="missing">{DOCUMENT_COPY.proofFilterMissing}</option>
+          <option value="present">{DOCUMENT_COPY.proofFilterPresent}</option>
+        </SelectField>
+
         <TextField
           id="payments-from"
           label="From"
@@ -171,6 +207,14 @@ export default function PaymentsPage() {
       </div>
 
       <FormError message={error} />
+
+      {/* Said once, because a list that silently excludes rows is one somebody reads as the
+          whole set. */}
+      {proof === 'missing' && (
+        <p className="text-sm text-amber-800">
+          {DOCUMENT_COPY.proofFilterActive}
+        </p>
+      )}
 
       <ResponsiveList
         columns={columns}

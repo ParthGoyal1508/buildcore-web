@@ -1,3 +1,4 @@
+import DashboardSearch from '@/app/ui/dashboard-search';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import SessionGuard from '@/app/ui/dashboard/session-guard';
 import ModuleGuard from '@/app/ui/dashboard/module-guard';
@@ -32,7 +33,12 @@ export default function DashboardLayout({
           and would otherwise be forced wide by a table or a long unbroken string
           instead of scrolling inside itself. */}
       <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
-        <ShellHeader />
+        {/* Search is mounted here and not inside `ShellHeader`, which three shells
+            share: FR-001 puts it on the dashboard, and a site employee in My Workspace
+            has no register to search. */}
+        <ShellHeader>
+          <DashboardSearch />
+        </ShellHeader>
         <div className="flex-grow p-6 md:overflow-y-auto md:px-12 md:pb-12 md:pt-8">
           <ModuleGuard>{children}</ModuleGuard>
         </div>

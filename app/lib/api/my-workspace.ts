@@ -47,6 +47,48 @@ export const punchResultSchema = z.object({
 });
 export type PunchResult = z.infer<typeof punchResultSchema>;
 
+/**
+ * One side of a modification — what the day held before, or what it holds after (016 FR-009a).
+ *
+ * **These times are `HH:mm` in UTC**, not the ISO timestamps `inTime`/`outTime` below carry. The
+ * API builds them with `toISOString().slice(11, 16)`, so a punch made at 09:05 IST arrives here
+ * as `03:35` while the row beside it renders 09:05 in the reader's own zone. Rendering the two
+ * the same way without converting would show an employee "In changed from 03:35 to 03:40" next
+ * to a row reading 09:05 — every figure correct, the pair of them incomprehensible. The day's
+ * date is needed to convert, which is why the component does it rather than this schema.
+ *
+ * Every field optional: an administrator who changed only the out time leaves the others as they
+ * were, and the diff is worth showing for what moved rather than for all three.
+ */
+export const attendanceSnapshotSchema = z
+  .object({
+    inTime: z.string().nullable().optional(),
+    outTime: z.string().nullable().optional(),
+    statusOverride: z.string().nullable().optional(),
+  })
+  // Tolerant: this is a JSON column, and a future field appearing in it must not take an
+  // employee's attendance screen down.
+  .passthrough();
+export type AttendanceSnapshot = z.infer<typeof attendanceSnapshotSchema>;
+
+/** One administrative change to one day, as the affected employee sees it (016 FR-009a). */
+export const attendanceModificationSchema = z.object({
+  /** The actor's **name**. The requirement is that the employee can see who changed their day. */
+  actorName: z.string(),
+  at: z.string(),
+  before: attendanceSnapshotSchema,
+  after: attendanceSnapshotSchema,
+  /**
+   * Free text, written by an administrator who did not necessarily know the employee would read
+   * it — and genuinely absent on plenty of rows. Distinguished from an empty string in the
+   * component, because "no reason given" and a blank must not look the same (T047).
+   */
+  reason: z.string().nullable(),
+});
+export type AttendanceModification = z.infer<
+  typeof attendanceModificationSchema
+>;
+
 export const attendanceDaySchema = z.object({
   date: z.string(),
   dayOfWeek: z.number(),
@@ -54,6 +96,15 @@ export const attendanceDaySchema = z.object({
   outTime: z.string().nullable(),
   otHours: z.number().nullable(),
   status: z.enum(['present', 'absent', 'on_leave', 'weekly_off', 'holiday']),
+  /**
+   * Administrative changes to this day, oldest first (016 FR-009a).
+   *
+   * **Optional, so a day from an API that predates this field still validates.** The alternative
+   * — required — would throw on every employee's attendance screen during a staged rollout, which
+   * is a worse failure than a month rendering without modification detail it does not have.
+   * Defaulted to empty so no component has to decide what a missing array means.
+   */
+  modifications: z.array(attendanceModificationSchema).optional().default([]),
 });
 export type AttendanceDay = z.infer<typeof attendanceDaySchema>;
 
@@ -238,6 +289,22 @@ export interface PunchInput {
   photo: Blob;
   latitude: number;
   longitude: number;
+  /**
+   * The GPS accuracy radius the device reported, in metres (020 FR-014a).
+   *
+   * The backend judges a punch inside its fence when the distance falls within
+   * `radius + accuracy`, so a worker standing legitimately at a site with a poor
+   * fix is not refused for the device's uncertainty. Without this the allowance
+   * cannot be applied and every punch is judged on its raw point — which costs
+   * nothing today, because a failing check still records a reviewable exception,
+   * and costs people their pay the day 020's hard refusal lands.
+   *
+   * **Optional, and omitted rather than zeroed** when the device reports no
+   * accuracy (FR-014b). A `0` asserts a perfect fix, which is the opposite of
+   * "unknown", and would deny the worker the very allowance this field exists to
+   * give them.
+   */
+  accuracyMeters?: number;
   capturedAt: string;
 }
 
@@ -250,6 +317,17 @@ export async function submitPunch(input: PunchInput): Promise<PunchResult> {
         photo: await blobToBase64(input.photo),
         latitude: input.latitude,
         longitude: input.longitude,
+        // `accuracyMeters` — American and singular, which is the backend's spelling
+        // on this endpoint only. The muster endpoint and `offline-queue.ts` both use
+        // `accuracyMetres`, and both are correct where they are.
+        //
+        // Do not "tidy" these to match each other. The backend validates this field
+        // with `@IsOptional()`, so a misspelt key is **ignored without error**: the
+        // punch still returns 201 and is still judged on its raw point, exactly as
+        // though accuracy had never been sent. Nothing logs and nothing fails, and
+        // the bug would only become visible once the hard refusal exists — as honest
+        // workers being refused.
+        accuracyMeters: input.accuracyMeters,
         capturedAt: input.capturedAt,
       }),
     }),

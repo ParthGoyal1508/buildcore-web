@@ -12,6 +12,19 @@ export class ApiError extends Error {
      * client. Used today by `PASSWORD_CHANGE_REQUIRED` (010 FR-017a).
      */
     public code?: string,
+    /**
+     * The refusal's whole body, for the structured half a message cannot carry.
+     *
+     * Added 2026-10-01 because it was being thrown away. 017's mandatory-document refusal names the
+     * missing kinds twice — as labels for a person to read, and as type ids for a form to put each
+     * message *on the control it refers to* — and the second was unreachable from here, which left
+     * matching controls by display name as the only option. Two kinds may legitimately share a
+     * name, and a rename breaks that silently.
+     *
+     * `unknown` rather than a typed shape: this is one class for every endpoint, and each refusal
+     * carries what it carries. Callers narrow what they came for.
+     */
+    public details?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -35,7 +48,12 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message || res.statusText, res.status, body.code);
+    throw new ApiError(
+      body.message || res.statusText,
+      res.status,
+      body.code,
+      body,
+    );
   }
 
   const text = await res.text();
@@ -62,7 +80,12 @@ export async function apiFetchBlob(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message || res.statusText, res.status, body.code);
+    throw new ApiError(
+      body.message || res.statusText,
+      res.status,
+      body.code,
+      body,
+    );
   }
 
   return res.blob();

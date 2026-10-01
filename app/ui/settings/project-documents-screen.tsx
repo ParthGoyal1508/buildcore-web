@@ -9,6 +9,7 @@ import {
   putDocumentRequirements,
 } from '@/app/lib/api/project-documents';
 import { createCompanyDocumentKind } from '@/app/lib/api/company-documents';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import {
@@ -87,6 +88,11 @@ export function ProjectDocumentsScreen() {
     enabled: scopeReady,
   });
 
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
 
   const save = useMutation({
@@ -137,6 +143,20 @@ export function ProjectDocumentsScreen() {
     },
     onError: () => setError(DOCUMENT_COPY.addKindFailed),
   });
+
+  /**
+   * FR-022b, T067/T068: **hidden, not disabled.**
+   *
+   * Read and write are different authorities here. Anyone with `PROJECTS` may see what every
+   * project owes; changing what every project owes is a `SETTINGS` decision, and the backend
+   * draws exactly that line — `GET` requires `PROJECTS`, `PUT` requires `SETTINGS`. Until
+   * 2026-10-01 this screen offered every control to everybody and let the server refuse the save,
+   * which teaches the reader that the screen is broken rather than that they lack the authority.
+   *
+   * **`SETTINGS`, not `COMPANY_SETTINGS`.** The api spec's FR-007c was corrected to `SETTINGS` on
+   * 2026-09-16; using the other one here would refuse the people who are supposed to hold this.
+   */
+  const mayConfigure = !!user?.permissions.includes('SETTINGS');
 
   if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;
   if (isError || !data) {
@@ -192,64 +212,92 @@ export function ProjectDocumentsScreen() {
                 {requirement.name}
               </span>
               <div className="flex shrink-0 items-center gap-3">
+                {/* A reader without `SETTINGS` sees the strength as a sentence, not a control:
+                    the fact is theirs to know, the decision is not theirs to take. */}
+                {!mayConfigure && (
+                  <span className="text-xs text-gray-600">
+                    {requirement.isMandatory
+                      ? DOCUMENT_COPY.strengthMandatory
+                      : DOCUMENT_COPY.strengthAdvisory}
+                  </span>
+                )}
+                {mayConfigure && (
                 <label className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="sr-only">
-                    Is {requirement.name} required?
+                    {DOCUMENT_COPY.strengthLegend} — {requirement.name}
                   </span>
                   <select
                     className={inlineSelectClass}
-                    value={requirement.isMandatory ? 'required' : 'optional'}
+                    value={requirement.isMandatory ? 'mandatory' : 'advisory'}
                     onChange={(event) =>
                       edit(
                         rows.map((r) =>
                           r.documentTypeId === requirement.documentTypeId
                             ? {
                                 ...r,
-                                isMandatory: event.target.value === 'required',
+                                isMandatory: event.target.value === 'mandatory',
                               }
                             : r,
                         ),
                       )
                     }
                   >
-                    <option value="required">Required</option>
-                    <option value="optional">Optional</option>
+                    {/*
+                      Named by consequence, not by "Required"/"Optional" (FR-022a, T066). Those
+                      were the labels until 2026-10-01; "optional" says what a kind is not, and
+                      since the 2026-09-16 amendment the two differ in *effect* — one refuses the
+                      creation of a project outright. A reader choosing between "Required" and
+                      "Optional" cannot see that, and the person who most needs to is the one
+                      deciding whether to make a kind mandatory.
+                    */}
+                    <option value="mandatory">
+                      {DOCUMENT_COPY.strengthMandatory}
+                    </option>
+                    <option value="advisory">
+                      {DOCUMENT_COPY.strengthAdvisory}
+                    </option>
                   </select>
                 </label>
-                <RowAction
-                  type="button"
-                  onClick={() =>
-                    edit(
-                      rows.filter(
-                        (r) =>
-                          r.documentTypeId !== requirement.documentTypeId,
-                      ),
-                    )
-                  }
-                >
-                  Remove
-                </RowAction>
+                )}
+                {mayConfigure && (
+                  <RowAction
+                    type="button"
+                    onClick={() =>
+                      edit(
+                        rows.filter(
+                          (r) =>
+                            r.documentTypeId !== requirement.documentTypeId,
+                        ),
+                      )
+                    }
+                  >
+                    Remove
+                  </RowAction>
+                )}
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          disabled={!dirty || save.isPending}
-          onClick={() => save.mutate(rows)}
-        >
-          {DOCUMENT_COPY.requirementsSave}
-        </Button>
-        {dirty && (
-          <RowAction type="button" onClick={() => setDraft(null)}>
-            {DOCUMENT_COPY.requirementsDiscard}
-          </RowAction>
-        )}
-      </div>
+      {mayConfigure && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            disabled={!dirty || save.isPending}
+            onClick={() => save.mutate(rows)}
+          >
+            {DOCUMENT_COPY.requirementsSave}
+          </Button>
+          {dirty && (
+            <RowAction type="button" onClick={() => setDraft(null)}>
+              {DOCUMENT_COPY.requirementsDiscard}
+            </RowAction>
+          )}
+        </div>
+      )}
 
+      {mayConfigure && (
       <section className="rounded-lg border border-gray-200 p-4">
         <h3 className="mb-2 text-sm font-medium text-gray-900">
           {DOCUMENT_COPY.requirementsAddHeading}
@@ -301,6 +349,7 @@ export function ProjectDocumentsScreen() {
           </div>
         )}
       </section>
+      )}
 
       {data.undefinedCodes.length > 0 && (
         <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
@@ -322,30 +371,37 @@ export function ProjectDocumentsScreen() {
                 className="flex flex-wrap items-center justify-between gap-2"
               >
                 <span className="text-sm text-amber-900">{code}</span>
-                <RowAction
-                  type="button"
-                  disabled={defineDeclared.isPending}
-                  onClick={() => defineDeclared.mutate(code)}
-                >
-                  {DOCUMENT_COPY.requirementsDefineIt}
-                </RowAction>
+                {mayConfigure && (
+                  <RowAction
+                    type="button"
+                    disabled={defineDeclared.isPending}
+                    onClick={() => defineDeclared.mutate(code)}
+                  >
+                    {DOCUMENT_COPY.requirementsDefineIt}
+                  </RowAction>
+                )}
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      <section className="rounded-lg border border-gray-200 p-4">
-        <h3 className="mb-1 text-sm font-medium text-gray-900">
-          {DOCUMENT_COPY.addKindHeading}
-        </h3>
-        <DocumentKindForm
-          idPrefix="project"
-          hint={DOCUMENT_COPY.requirementsKindHint}
-          busy={addKind.isPending}
-          onCreate={(input) => addKind.mutateAsync(input)}
-        />
-      </section>
+      {/* T064's in-place definition — a write, so it is absent for a reader who may not
+          configure. A gate that requires configuring a kind elsewhere before it can be required
+          here is a gate people route around, which is why it lives on this screen at all. */}
+      {mayConfigure && (
+        <section className="rounded-lg border border-gray-200 p-4">
+          <h3 className="mb-1 text-sm font-medium text-gray-900">
+            {DOCUMENT_COPY.addKindHeading}
+          </h3>
+          <DocumentKindForm
+            idPrefix="project"
+            hint={DOCUMENT_COPY.requirementsKindHint}
+            busy={addKind.isPending}
+            onCreate={(input) => addKind.mutateAsync(input)}
+          />
+        </section>
+      )}
     </div>
   );
 }

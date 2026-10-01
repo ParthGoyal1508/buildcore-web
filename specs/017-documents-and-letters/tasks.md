@@ -73,9 +73,17 @@ exist.
 
 - [X] T013 [P] [US2] Build the project document requirements screen under
       `app/dashboard/settings/` (write guarded by `SETTINGS`)
-- [ ] T014 [US2] Build the per-project documents view at `app/dashboard/projects/[id]/documents/`,
+- [X] T014 [US2] Build the per-project documents view at `app/dashboard/projects/[id]/documents/`,
       reusing `document-upload.tsx` and `completeness-panel.tsx` unchanged — two upload experiences is
       the failure this shared component exists to prevent
+
+  Done 2026-10-01 as `app/dashboard/projects/portfolio/[id]/documents/` (the task said
+  `app/dashboard/projects/[id]/documents/`; the portfolio segment is where project routes actually
+  live). A screen of its own rather than a section of the edit form: reading what a project holds and
+  changing what the project *is* are different jobs, and the edit form sits behind the project lock,
+  which has nothing to do with whether somebody may look at a filed document. Linked from the
+  portfolio list's row actions, since T077's "openable from there" needs somewhere to open from.
+
 - [X] T015 [US2] Show readiness **in the project list**, from the batch endpoint. One request for the
       whole list, never one per row
 
@@ -107,8 +115,37 @@ exist.
 - [ ] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
       markup** (spec Assumptions). This is a form, not an editor, and that constraint is what keeps it
       tractable
+
+  **Blocked on backend work, and the 2026-09-16 note above was wrong about why** (investigated
+  2026-10-01). That note said "the API modules and shared components they need are built and typed;
+  what is missing is the screens that compose them". A template editor already exists at
+  `/dashboard/recruitment/letter-templates` — fixed text with a validated token picker, which *is*
+  the structure this task asks for. What it cannot do is serve 017.
+
+  Its token catalogue is a **hardcoded map in the client**, keyed by feature 011's five `letterType`
+  values, mirroring an equally hardcoded map in the api. 017 replaced that enum with `LetterKind`
+  rows and FR-010 names fifteen kinds. `LetterKind` declares **no variable fields of its own** — the
+  model has `key`, `label`, signature and approval flags, and nothing about what a template for it
+  may interpolate.
+
+  So a kind defined through 017's letter-kinds screen gets an empty token list, every token its
+  author writes is flagged unknown, and saving is refused. FR-014 — "define a new letter kind, its
+  variable fields and its fixed terms, **without a developer**" — is not reachable from this editor
+  at all, and no amount of screen work changes that.
+
+  What it needs first: the api declaring a per-kind field catalogue (on `LetterKind`, or a sibling
+  table) and serving it. That is not in api 017's tasks or its spec, so it is a gap in both halves
+  rather than a sequencing problem. Left open and unstarted rather than half-built.
+
 - [ ] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
       response includes one (FR-013a). Belt and braces, because the cost here is legal
+
+  **Not currently violated, and not yet meaningful.** The picker is fed by the hardcoded list
+  described under T023, which contains no Aadhaar and no document type at all — so FR-013a holds by
+  construction today. The guard this task asks for is a guard against a *server-supplied* field
+  list, which is exactly what T023 is blocked on. It becomes implementable, and necessary, the moment
+  that catalogue exists — and the task's instinct is right: belt and braces, because the cost is
+  legal rather than cosmetic.
 - [X] T025 [US5] Show `LETTER_KIND_IN_USE` verbatim when deletion is refused, naming the letters — a
       generic "could not delete" throws away the only part that says what to do
 
@@ -118,17 +155,46 @@ exist.
 
 - [X] T026 [P] [US4] Build `app/dashboard/settings/signatories/page.tsx` with signature-image upload
 - [X] T027 [P] [US4] Build `app/ui/letters/countersign-upload.tsx` (FR-012)
-- [ ] T028 [P] [US7] Add payment-proof attachment and the missing-proof indicator to the payments
+- [X] T028 [P] [US7] Add payment-proof attachment and the missing-proof indicator to the payments
       screen
 
 ---
 
+  Done 2026-10-01 in `app/ui/inventory/payment-proof-cell.tsx`, on
+  `/dashboard/inventory/payments`. The api side was already complete — `hasProof`,
+  `proofUploadedAt`, a `missingProof` filter, upload and audit-logged download — so this was screen
+  wiring only.
+
+  Two judgements worth recording. **Absence is a fact, not an error**: a payment with no proof
+  renders as a plain statement and an action, because a payment is often recorded before the advice
+  arrives and nobody did anything wrong. The amber is on the *filter* instead. And FR-021 is a
+  **filter rather than a count**, per the api's own reasoning — "14 payments lack proof" makes
+  somebody scroll looking for them; the filter hands them the fourteen. A line above the list says
+  so when it is narrowing, because a list that silently excludes rows is one somebody reads as the
+  whole set.
+
 ## Phase 8: US6 — Letters where the work is (P3)
 
-- [ ] T029 [P] [US6] Surface project letters on the project screen
-- [ ] T030 [P] [US6] Surface candidate and employee letters on theirs
+- [X] T029 [P] [US6] Surface project letters on the project screen
+
+  Done 2026-10-01 on the project documents screen, through a new shared
+  `app/ui/letters/subject-letters.tsx`. Same screen as the project's documents rather than a tab of
+  its own: both answer "what paperwork exists for this project". `LetterList` is reused unchanged —
+  it already distinguishes issued from executed, which is the whole of FR-013, and a second list
+  component would be a second place for that distinction to drift.
+
+- [X] T030 [P] [US6] Surface candidate and employee letters on theirs
 
 ---
+
+  Done 2026-10-01. Employees get a **Letters** tab on the detail screen, deliberately separate
+  from Documents: a document is something filed *about* a person, a letter is something the company
+  *issued to* them, and an appointment letter in a list of Aadhaar scans loses that. Candidates get
+  theirs in the pipeline drawer, where a reader already has one candidate in front of them.
+
+  Note `/dashboard/recruitment/letters` already existed and stays: it lists feature 011's letters
+  across every candidate, answering "what have we issued lately" rather than "what has this person
+  been sent". Two surfaces, two questions.
 
 ## Phase 9: Verification
 
@@ -315,3 +381,203 @@ for their home company only. Recorded here rather than left to be discovered.
   independent.
 - [ ] T061 **Browser**: define a new kind from this screen and require it, without leaving for
   Company Documents.
+
+## Phase 11: Amendment of 2026-09-16 — bug 3's web half (FR-022, FR-022a, FR-022b, FR-023, FR-023a, FR-023b, FR-024)
+
+**Why this phase exists.** Phase 10 covers the 2026-09-16 amendment for FR-019, FR-020 and FR-021. A
+*second* amendment landed the same day from the client's bug review — FR-022 through FR-024, the
+project document gate — and never got tasks. Seven requirements, none of them reflected below until
+now.
+
+No test framework is installed (`TODO(TESTING_STANDARD)`). No task creates a test file. Verification is
+`npx tsc --noEmit`, `npm run lint`, `npm run build` and the browser passes named.
+
+**Backend dependency**: api 017 phase 13 (T106-T132) — **landed 2026-09-30** (api `77837af`). It
+supplies the configurable required set with per-kind mandatory/advisory strength, the staged upload
+path, and the transactional creation gate. The note that "no endpoint creates a `ProjectDocument`
+today" no longer holds: `POST /projects/:projectId/documents` and `POST /projects/document-uploads`
+both exist.
+
+Two further api gaps were found building this phase and closed on 2026-10-01: there was **no download
+route** for a project document, so T077's "openable from there" was not possible, and
+`uploadedByUserId` was a bare id with no name resolved. Both are the same shape as 016's phases 8a
+and 8b — a read path nobody in the api repository consumes, so nothing noticed it was incomplete.
+
+### The settings editor (FR-022, FR-022a, FR-022b)
+
+- [X] T062 (FR-022) Extend `app/lib/api/project-documents.ts` with the required-set read and write,
+  zod-schemed, carrying each kind's **strength** — mandatory or advisory.
+
+  Already built by `afd878d`; verified 2026-10-01 and extended — `projectReadinessSchema` gained
+  the three advisory fields the api now returns, optional so a client ahead of the server degrades
+  rather than failing to parse the whole project list.
+
+- [X] T063 (FR-022) Build the editor in `app/dashboard/settings/project-documents/`: move a kind between
+  mandatory and advisory, add one from the kinds available to this company, remove one.
+
+  Already built by `afd878d`; verified 2026-10-01.
+
+- [X] T064 (FR-022) Support defining a **new kind in place**, without leaving for the document-types
+  screen. A gate that requires configuring a kind elsewhere before it can be required here is a gate
+  people route around.
+
+  Already built by `afd878d`; verified 2026-10-01, and now hidden from a reader who may not
+  configure (see T067).
+
+- [X] T065 (FR-022) Where the company has configured nothing, show the **shipped defaults**, say plainly
+  that they are defaults, and distinguish that from a company having chosen exactly those kinds. An
+  unconfigured screen that looks configured is how somebody concludes the set was reviewed when nobody
+  has looked at it.
+
+  Already built by `afd878d`; verified 2026-10-01. `usingDefaults` drives two different
+  sentences, and the defaults one says explicitly that saving makes them this company's own.
+
+- [X] T066 (FR-022a) Name the two strengths **by their consequence** — a mandatory kind refuses project
+  creation, an advisory kind is reported outstanding. Do not label them "required" and "optional":
+  optional describes a kind by what it is not and hides that the two now differ in effect.
+
+  **This was shipped wrong and is now fixed** (2026-10-01). `afd878d` labelled the two strengths
+  `Required` and `Optional` — the exact words this task forbids. They now read "Blocks project
+  creation" and "Reported as outstanding". The reason the task gives is the right one: since the
+  2026-09-16 amendment the two differ in *effect*, and a reader choosing between "Required" and
+  "Optional" cannot see that — least of all the person deciding whether to make a kind mandatory.
+
+- [X] T067 (FR-022b) Do **not** offer the editor's controls to a user who may upload project documents
+  but may not change settings. Hidden, not disabled — showing a control that will be refused teaches the
+  person that the screen is broken.
+
+  **There was no permission gating at all** before 2026-10-01: every control was offered to
+  everybody and the server's refusal was the only gate, which teaches the reader that the screen is
+  broken rather than that they lack the authority. Every write control — the strength select, Remove,
+  Save, Discard, Require another, Define it, and the in-place kind form — is now absent for a reader
+  without `SETTINGS`. The strength still *shows*, as a sentence rather than a control: the fact is
+  theirs to know, the decision is not theirs to take.
+
+- [X] T068 (FR-022b) Read the settings permission from `app/lib/permissions.ts`. It is `SETTINGS`, not
+  `COMPANY_SETTINGS` — the api spec's FR-007c was corrected to `SETTINGS` on 2026-09-16, and using the
+  wrong one here refuses the people who are supposed to hold this.
+
+  Done 2026-10-01: `SETTINGS`, matching the api (`GET` needs `PROJECTS`, `PUT` needs `SETTINGS`).
+  The task's warning was worth heeding — `COMPANY_SETTINGS` would have refused exactly the people
+  who are supposed to hold this.
+
+### The project creation form (FR-023, FR-023a, FR-023b)
+
+- [X] T069 (FR-023) Add an upload control per **mandatory** kind to the project creation form in
+  `app/dashboard/projects/portfolio/`, resolved from the company's configured set rather than a
+  hardcoded list.
+
+  Done 2026-10-01 in `app/ui/projects/project-document-uploads.tsx`, mounted on the creation form
+  only — an existing project is past FR-009's gate, and documents are filed against it through its
+  own documents screen. Resolved from `getDocumentRequirements`, never a hardcoded list.
+
+- [X] T070 (FR-023) Refuse submission until every mandatory kind carries a file. Refuse in the form, and
+  do not rely on the server's refusal as the only gate — though the server's gate is authoritative
+  (api FR-009).
+
+  Done 2026-10-01: the submit control is disabled while a mandatory kind has nothing staged, with
+  a count beside it. The server's gate remains the authoritative one — it is the only one that cannot
+  be bypassed — but letting somebody fill a long form to learn something the page already knew wastes
+  their time. `unstagedMandatory` is exported and shared, so the refusal and the controls cannot
+  disagree about which kinds are outstanding.
+
+- [X] T071 (FR-023) Show advisory kinds as uploads that do **not** block submission, distinguished from
+  the mandatory ones by their stated consequence, per T066's wording rule.
+
+  Done 2026-10-01, in two groups headed "Needed to create the project" and "Can follow later" —
+  named by consequence, per T066's wording rule.
+
+- [X] T072 (FR-023a) On a server refusal for missing mandatory documents, name the missing kinds **on
+  the controls they refer to**, not only in a summary at the top. A message listing kind names the user
+  then has to match against controls is a message that makes them do the matching.
+
+  Done 2026-10-01, and it needed **two** additions first. The api refusal carried the missing
+  kinds only as *labels*, which is right for a person to read and wrong for a form: matching a
+  control by display name means string-matching two names that are only incidentally equal, and two
+  kinds may legitimately share one. `missingTypeIds` was added alongside. `ApiError` then threw the
+  whole body away, so even that was unreachable from the browser — it now carries `details`.
+
+- [X] T073 (FR-023a) **Preserve every value and every file already supplied** across the refusal. This is
+  the task that matters most in this phase: a refusal that empties the form makes the gate punish the
+  person complying with it, and it is the behaviour most likely to be lost to a naive re-render.
+
+  Done 2026-10-01, and **true by construction rather than by careful re-rendering**, which is
+  what the task was worried about. Because each file is staged on selection and the *server* holds
+  it, a refused creation costs nothing: the reference is still valid and the next submission reuses
+  it. Had the files travelled with the creation request, every refusal would have emptied the file
+  inputs — a browser cannot restore a file selection — and the gate would punish the person
+  complying with it. `staged` is explicitly untouched in `onError`.
+
+- [X] T074 (FR-023b) Show upload progress and failure **per document**, as FR-006 already requires of the
+  company documents screen. Reuse that component rather than writing a second one.
+
+  Done 2026-10-01 per kind: uploading, attached with the file name, or failed with the reason on
+  that control. **`DocumentUpload` was not reused**, and the deviation is worth stating: it is a
+  *form* that submits one document against an entity that already exists, and the whole difficulty
+  here is that the project does not exist yet. Reusing it would have meant a form inside a form.
+
+- [X] T075 (FR-023b) Ensure a silently-failed upload cannot hold submission closed with no visible cause.
+  A form that refuses for a reason the user cannot see is indistinguishable from a broken form.
+
+  Done 2026-10-01. A failed upload shows its reason on the control, which matters precisely
+  because the failure also keeps submission closed — a form that refuses for a reason the user cannot
+  see is indistinguishable from a broken one.
+
+- [X] T076 (FR-023) Post to the staged-upload path api 017 phase 13 adds. Note here that this path does
+  not exist yet — **no endpoint creates a `ProjectDocument` today** — so this task is blocked on
+  T106-T132 rather than merely sequenced after them.
+
+  Done 2026-10-01. `POST /projects/document-uploads` exists as of api `77837af`, so the task's
+  blocker is gone; the ids travel as `stagedDocumentIds` on creation and are converted inside the
+  same transaction, so a refused creation files nothing and creates nothing.
+
+### The project's own document list (FR-024)
+
+- [X] T077 (FR-024) List **every** document filed against the project on the project screen — required
+  and supplementary alike — each openable from there.
+
+  Done 2026-10-01 in `app/ui/projects/project-documents-panel.tsx`, **unfiltered**. Needed two
+  api additions first: there was no download route for a project document at all, so "openable" was
+  not possible, and `uploadedByUserId` was a bare id. The new route is scoped by project as well as
+  id, so a document id copied from another project is a 404 rather than a download.
+
+- [X] T078 (FR-024) Do not make readiness status the only view of a project's papers. A screen that shows
+  "3 of 5 required" and nothing else cannot answer "what do we hold for this project", which is the
+  question the client's item 3 ends on.
+
+  Done 2026-10-01. Two lists, in this order: what is held, then what is outstanding. A compliance
+  screen that leads with absence tells somebody what they have not done; a project screen should
+  first say what the project has. Outstanding kinds are split by consequence rather than merged into
+  one "missing" list — a missing mandatory kind means the project could not be created today, a
+  missing advisory one means somebody is still chasing paper.
+
+- [X] T079 Copy in `app/lib/constants.ts` (Principle III), no inline styling (Principle II), all access
+  through `app/lib/api` (Principle V).
+
+  Done 2026-10-01 for everything in this commit: copy in `DOCUMENT_COPY`, no inline styling, all
+  access through `app/lib/api/project-documents.ts`.
+
+- [ ] T080 Browser pass: configure a set with one mandatory and one advisory kind, then create a project.
+  Confirm submission is refused with the mandatory kind missing, that the advisory kind does not block,
+  and that **every field and file survives** the refusal.
+- [ ] T081 Browser pass: as a user who may upload project documents but not change settings, confirm the
+  editor's controls are absent from the settings screen and that uploading still works.
+- [ ] T082 Browser pass: file a supplementary document against a project and confirm it appears on the
+  project screen alongside the required ones.
+- [X] T083 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+  Done 2026-10-01: `tsc --noEmit` clean, eslint clean on touched files, `next build` succeeds.
+
+### Dependencies
+
+Blocked on api 017 phase 13 (T106-T132), not merely sequenced after it: T076's endpoint does not exist.
+T062-T068 (the settings editor) can be built against the required-set contract as soon as that half
+lands, independently of the creation form.
+
+Phase 11 is independent of Phase 10.
+
+### MVP for this amendment
+
+**T069-T073** — the creation form's mandatory uploads with values preserved across a refusal. That is
+bug 3's actual ask ("Project Managers cannot create a project without them"), and T073 is what keeps
+the gate from being the thing people complain about.

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchBlob } from '@/app/lib/session';
 import { companyQuery } from '@/app/lib/api/company-query';
 
 /**
@@ -60,8 +60,73 @@ export const projectReadinessSchema = z.object({
   required: z.number(),
   present: z.number(),
   missingTypeIds: z.array(z.string()).default([]),
+  /**
+   * The advisory kinds, counted **separately** (FR-022a).
+   *
+   * `required`/`present`/`missingTypeIds` above continue to mean *mandatory* only — the figures
+   * every existing screen shows — so an advisory kind cannot make a complete project read as
+   * short. These are additive and optional, so a client ahead of the server degrades to not
+   * reporting them rather than failing to parse the project list.
+   *
+   * Why both exist at all: "we cannot start this project" and "we are still chasing paperwork"
+   * are different sentences, and a single pair of figures can only say one of them.
+   */
+  advisoryRequired: z.number().optional(),
+  advisoryPresent: z.number().optional(),
+  advisoryMissingTypeIds: z.array(z.string()).optional().default([]),
 });
 export type ProjectDocumentReadiness = z.infer<typeof projectReadinessSchema>;
+
+/**
+ * One document filed against a project — required or supplementary (FR-024).
+ *
+ * `documentTypeId` is null for a supplementary document, which is what "supplementary" means on
+ * the column rather than a second flag saying the same thing. `documentType` is the free-text
+ * label and is always present.
+ */
+export const projectDocumentSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  documentType: z.string(),
+  documentTypeId: z.string().nullable(),
+  remark: z.string().nullable().optional(),
+  uploadedAt: z.string(),
+  uploadedByUserId: z.string(),
+  /** Resolved server-side. Null when the account has gone — the document is still the point. */
+  uploadedByName: z.string().nullable().optional(),
+});
+export type ProjectDocument = z.infer<typeof projectDocumentSchema>;
+
+/**
+ * Every document filed against a project, **unfiltered**.
+ *
+ * Deliberately not narrowed to the required set. Filtering is exactly what made supplementary
+ * company documents invisible and produced this feature's amendment D1, and the same mistake is
+ * available here — "3 of 5 required" cannot answer "what do we hold for this project", which is
+ * where the client's item 3 ends.
+ */
+export async function getProjectDocuments(
+  projectId: string,
+  companyId?: string,
+): Promise<ProjectDocument[]> {
+  const raw = await authFetch<unknown>(
+    `/projects/${encodeURIComponent(projectId)}/documents${companyQuery(companyId)}`,
+  );
+  return z.array(projectDocumentSchema).parse(raw);
+}
+
+/** The bytes, as a blob the caller turns into a download. */
+export async function downloadProjectDocument(
+  projectId: string,
+  documentId: string,
+  companyId?: string,
+): Promise<Blob> {
+  return authFetchBlob(
+    `/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(
+      documentId,
+    )}/download${companyQuery(companyId)}`,
+  );
+}
 
 
 /**
@@ -126,3 +191,52 @@ export async function putDocumentRequirements(
  * `app/lib/api/projects.ts` owns the list call; this constant is the flag it passes.
  */
 export const INCLUDE_DOCUMENT_READINESS = 'documentReadiness';
+
+/**
+ * Stages one document before its project exists (FR-009b).
+ *
+ * **The reference is the caller's alone.** Creation refuses a staged id uploaded by anybody else,
+ * and refuses it with the same code as a nonexistent one — so the refusal cannot be used to
+ * discover that somebody else staged something. Unused references are swept with their files after
+ * the staging window, so an abandoned form costs nothing permanent.
+ */
+export async function stageProjectDocument(
+  input: {
+    documentTypeId?: string;
+    documentType: string;
+    /** Base64, without a data-URL prefix. */
+    data: string;
+    contentType: string;
+  },
+  companyId?: string,
+): Promise<{ stagedDocumentId: string }> {
+  const raw = await authFetch<unknown>(
+    `/projects/document-uploads${companyQuery(companyId)}`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  // Tolerant of the id's field name, because the route's own description calls it
+  // `stagedDocumentId` while a bare `id` is the shape every other create here returns.
+  const parsed = z
+    .object({ stagedDocumentId: z.string().optional(), id: z.string().optional() })
+    .parse(raw);
+  const stagedDocumentId = parsed.stagedDocumentId ?? parsed.id;
+  if (!stagedDocumentId) {
+    throw new Error('The upload did not return a reference.');
+  }
+  return { stagedDocumentId };
+}
+
+/** Reads a File as base64 without the data-URL prefix the API does not want. */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () =>
+      reject(new Error('The file could not be read.'));
+    reader.readAsDataURL(file);
+  });
+}

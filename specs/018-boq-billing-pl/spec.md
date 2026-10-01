@@ -17,6 +17,28 @@ The client asked for *"a Separate wing for generate of vendor bill and Client Bi
 hardest screens in this product: a billing engineer works down hundreds of BOQ lines entering
 quantities, and the interface has to make that fast and hard to get wrong.
 
+## Clarifications
+
+### Session 2026-09-29
+
+Raised against the client's re-stated requirement list, item 14: *"Generate a monthly labour wages
+summary per project"* and *"Produce a total monthly expense sheet per project for client billing
+reference."* Most of the item was already covered — feature 013 has a per-project wage sheet with
+per-worker lines, and US3's summary already carries the monthly labour cost with a drill-down. Two
+narrow things were missing on this side.
+
+- Q: Feature 013's wage sheet covers a wage period, not a calendar month. Does the project need a monthly labour view? → A: **Yes, per worker, for a calendar month.** A fortnightly cycle puts two or three sheets inside one month, and the drill-down from US3's labour figure lands on sheets rather than on people. Somebody asking "what did we pay Ramesh in September" currently has to open several sheets and add up.
+- Q: Does the monthly position need to leave the screen? → A: **Yes.** The client's phrase is "for client billing reference", which means it is quoted to a client from a document. FR-011 opens figures to their records on screen; nothing lets the reader hand the month to anybody.
+
+### Session 2026-10-01
+
+Raised while planning the web half, against a backend that is **entirely unimplemented** (0 of 74
+tasks) — so both of these settle design direction rather than unblocking work.
+
+- Q: Do bills need offline or intermittent-connection entry? → A: **Local draft recovery, not offline-first.** FR-005 requires that in-progress entry is not lost *silently*; a draft that survives a reload, a crash or a dropped connection and is offered back satisfies that literally. Submitting still requires connectivity. Full offline-first was considered and rejected **for this feature specifically**: it needs conflict resolution, and FR-014's "concurrent editing MUST NOT allow silent overwriting" becomes materially harder when one of the two editors was offline for an hour. It can be layered on later without redoing the draft store. The mechanics already exist — `app/lib/offline-queue.ts` is native IndexedDB carrying two stores that share one implementation, and a bill-draft store follows that documented precedent as a third. Unlike the other two it is never drained to the server, which is a difference worth stating where it is defined.
+
+- Q: How large is a real BOQ, and does the answer block the screen? → A: **It blocks one decision, not the plan.** NFR-001 already commits to 500 lines interactive within 3 seconds with lag-free typing, which is a target to design against today. At that size what matters is *where the state lives*: a single form object holding 500 lines re-renders the whole sheet on every keystroke — exactly the failure NFR-001 describes — while state isolated per row re-renders one. Per-row isolation is correct under every answer to the sizing question. The template decides only whether row virtualization is added on top, and that is incremental on per-row state where retrofitting per-row state into a single form object is not. If the template shows several thousand lines, FR-004's "keyboard entry down a column" additionally has to survive virtualization unmounting the row the focus is in.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Entering a client bill down the BOQ (Priority: P1)
@@ -90,6 +112,14 @@ figure opens to the records behind it.
    without the reader calculating anything.
 5. **Given** a month is changed, **When** the selection changes, **Then** every figure updates
    together, with no mixed-period state visible.
+6. **Given** the monthly labour figure, **When** it is opened, **Then** the workers paid that month are
+   listed with days worked, the rate applied and the amount — not only the payment sheets they came
+   from.
+7. **Given** a payment sheet whose period straddles the month, **When** the monthly labour view is
+   read, **Then** how it was apportioned is stated on the view rather than left for the reader to
+   infer.
+8. **Given** a project month, **When** it is exported, **Then** the exported document carries the same
+   figures as the screen, the project and month it covers, and the date it was produced.
 
 ---
 
@@ -115,6 +145,12 @@ screen — the *"P&L Summary of total Project"* the sheet's Group Dashboard row 
 - A month with revenue but no cost, or the reverse.
 - Negative material cost from returns to store.
 - A project whose currency formatting makes large numbers ambiguous in a dense table.
+- A month in which a payment sheet is reopened after somebody exported the month. The export's
+  production date is what tells the two apart.
+- A project with several hundred daily workers in one month — the per-worker view must stay readable
+  where the category total was one line.
+- A month whose labour was engaged entirely through a contractor, where there are no per-worker
+  disbursements to list.
 
 ## Requirements *(mandatory)*
 
@@ -136,6 +172,13 @@ screen — the *"P&L Summary of total Project"* the sheet's Group Dashboard row 
 - **FR-010**: The project summary MUST present revenue and cost by category, monthly and cumulative,
   with budget and variance.
 - **FR-011**: Every figure on the summary MUST open to the records comprising it.
+- **FR-010a**: The monthly labour figure MUST open to a per-worker view for that calendar month — days
+  worked, rate applied, gross and net — assembled across every payment sheet overlapping the month,
+  and MUST state how a straddling sheet was apportioned.
+- **FR-010b**: The per-worker view MUST be read-only. Wages are computed and corrected on the payment
+  sheet in the labour module; a second place to edit them would be a second source of truth.
+- **FR-010c**: The project summary MUST offer an export of the selected month carrying the same
+  figures as the screen, the project and month, and the production date.
 - **FR-012**: Changing the selected month MUST update every figure together, with no mixed-period
   state.
 - **FR-013**: The group board MUST present per-project and total position, scoped to what the viewer
@@ -180,6 +223,10 @@ screen — the *"P&L Summary of total Project"* the sheet's Group Dashboard row 
 - **SC-003**: Every figure on a project summary opens to records that sum to it exactly.
 - **SC-004**: A project manager can state a project's month margin within 30 seconds of opening it.
 - **SC-005**: No bill entry session loses data on a dropped connection, across 10 induced failures.
+- **SC-006**: A reader can state what one named worker was paid on a project in one calendar month
+  without opening a payment sheet or adding anything up.
+- **SC-007**: A project's month can be exported and handed to a client with no figure retyped, and the
+  exported figures match the screen exactly.
 
 ## Assumptions
 
@@ -190,14 +237,17 @@ screen — the *"P&L Summary of total Project"* the sheet's Group Dashboard row 
   supports, virtualisation is an implementation answer, not a specification change.
 - Totals shown while typing are computed client-side for responsiveness, and the backend's totals are
   authoritative on submit. Any disagreement is shown rather than silently reconciled.
+- The monthly labour view is derived from feature 013's payment sheets and never recomputes a wage, so
+  a sheet corrected later corrects the view over it.
 - No test framework is installed (constitution `TODO(TESTING_STANDARD)`); verification is lint,
   type-check, build and manual passes. **No test-file tasks may be generated.**
 
 ### Needing the client's decision
 
-- **[NEEDS CLARIFICATION: how large is a real BOQ?]** The interaction design depends on it. A
-  200-line schedule and a 5,000-line schedule need different screens, and the difference cannot be
-  discovered after the screen is built. A real BOQ file from a live project would settle it.
-- **[NEEDS CLARIFICATION: do bills need offline or intermittent-connection entry?]** Site offices
-  often have poor connectivity. If billing is done at site rather than head office, FR-005 becomes a
-  much larger requirement than an unsaved-changes warning.
+- **A real BOQ file, to confirm NFR-001's 500-line target.** The client is supplying a template. No
+  longer blocking, and the Clarifications session of 2026-10-01 records why: at 500 lines the decision
+  that matters is per-row state isolation, which is correct under every answer, and the template
+  changes only whether row virtualization is added on top. It blocks no task before Phase 2, and the
+  backend's own 74 tasks are unstarted.
+
+The intermittent-connection marker previously listed here is resolved in the same session.
