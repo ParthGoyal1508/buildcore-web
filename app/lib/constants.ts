@@ -232,6 +232,66 @@ export const MAX_GPS_ACCURACY_METERS = Number(
  * exception path. Point both at your own coordinates to test somewhere real.
  */
 /**
+ * Exit clearance (021 US4) — what a leaver still owes.
+ *
+ * Kinds are grouped by **consequence**, not by module: an asset has a site and a due date
+ * and physically exists somewhere, which is a different kind of obligation from money, and
+ * grouping them together obscures what is actually outstanding.
+ */
+export const CLEARANCE_COPY = {
+  heading: 'Exit clearance',
+  hint: 'Derived from each module on every read, so returning an asset in the asset register clears it here with no second action.',
+  loading: 'Loading…',
+  noExit: 'No exit has been initiated for this employee.',
+  groups: {
+    asset_custody: 'Assets in custody',
+    recoverable_kit: 'Recoverable kit',
+    salary_advance: 'Outstanding advances',
+    account_access: 'Account access',
+  },
+  /** Nothing outstanding at all. Distinct from "we could not check" below. */
+  allClear: 'Nothing outstanding.',
+  openAllocation: 'Open in asset register',
+  /**
+   * Said where an asset appears. The asset module owns returning — with its condition
+   * grade and its own consequences — so a return control here would be a second way to
+   * close an allocation, and the two would disagree.
+   */
+  returnElsewhere: 'Returned in the asset register, not here.',
+  cancel: 'Cancel',
+  waive: 'Waive',
+  waiveHeading: 'Stop pursuing this',
+  /** FR-014: the reason is required, and the backend enforces a real minimum. */
+  waiveReasonLabel: 'Why the company is not pursuing this',
+  waiveReasonShort: (min: number) =>
+    `A reason of at least ${min} characters is required — this writes off company money.`,
+  waiveSubmit: 'Record waiver',
+  waiveFailed: 'The waiver could not be recorded.',
+  /**
+   * A waiver is **not** a discharge. The backend is explicit: an asset waived here stays
+   * open in the asset register, because marking it returned would put a false fact in the
+   * register that owns the truth.
+   */
+  waivedBy: (name: string, at: string) => `Waived by ${name} on ${at}`,
+  waivedNotReturned: 'Waived — not returned. The obligation stands on the record.',
+  settleBlocked: 'Final settlement is unavailable while anything above is outstanding.',
+  settleReady: 'Nothing is outstanding. Final settlement may proceed.',
+  /**
+   * "Could not ask" is not "nothing held", and the difference is somebody leaving with a
+   * laptop. Styled as a warning for that reason, where an ordinary outstanding item is not.
+   */
+  unavailable: (names: string) =>
+    `${names} could not be checked, so this clearance may be incomplete. Settlement stays blocked until it can be.`,
+  /**
+   * Said once, where somebody would otherwise look for a figure. The backend deliberately
+   * computes no recovery value for an unreturned asset: that needs a valuation rule —
+   * original cost, depreciated, or replacement — and the client has not chosen one.
+   */
+  noAssetValuation:
+    'No recovery amount is shown for an unreturned asset: a valuation rule has not been agreed.',
+} as const;
+
+/**
  * Dashboard search (021 US1). Register labels are copy here, unlike document kinds:
  * the four are fixed by the backend's own union rather than being company configuration,
  * so there is nothing for a company to rename.

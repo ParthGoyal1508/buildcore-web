@@ -90,41 +90,61 @@ importer anywhere in the app.
 
 ---
 
-## Phase 2: Exit clearance
+## Phase 2: Exit clearance ✅ implemented 2026-10-01
 
 **Goal**: FR-012 – FR-014. **Independent test**: quickstart Scenario 2.
 **⚠️ Requires feature 019 web Phase 1 for T022.**
 
-- [ ] T017 [P] [US4] Add `CLEARANCE_COPY` to `app/lib/constants.ts`
-- [ ] T018 [US4] Create `app/lib/api/exit-clearance.ts` — the clearance read and the waiver write
-- [ ] T019 [US4] Create `app/ui/hr/exit-clearance.tsx` listing every outstanding item with its owner
+- [X] T017 [P] [US4] Added `CLEARANCE_COPY` to `app/lib/constants.ts`
+- [X] T018 [US4] Created `app/lib/api/exit-clearance.ts` — the clearance read and the waiver write
+- [X] T019 [US4] Created `app/ui/hr/exit-clearance.tsx`, mounted **above** the settlement in
+      `offboarding-panel.tsx` rather than beside it: FR-013 blocks settlement while anything is
+      outstanding, so a clearance below the Process button would be read after the decision it exists
+      to inform. Originally: listing every outstanding item with its owner
       (FR-012), mounted from `app/ui/hr/offboarding-panel.tsx` rather than as a parallel flow
-- [ ] T020 [US4] Assets in custody as **their own group** within that list (FR-012a), each with its
+- [X] T020 [US4] Assets in custody as **their own group** within that list (FR-012a), each with its
       site, expected return date and condition expectation. An asset is a different kind of obligation
       from an advance, and grouping it with money obscures that
-- [ ] T021 [US4] Each asset links to its allocation in the asset register (FR-012b). **No return
-      control here** — the asset module owns returning, with its condition grade and consequences, and
+- [X] T021 [US4] Each asset links to `ROUTES.assetsAllocations` (FR-012b), and the row says so in
+      words as well — "Returned in the asset register, not here" — because an absent control explains
+      nothing on its own. **No return control here** — the asset module owns returning, with its condition grade and consequences, and
       a second control would be a second way to close an allocation
-- [ ] T022 [US4] Gate the waiver control on `EMPLOYEES` at **write** level, using 019's `hasWrite`.
-      The backend's controller derives the same split from the verb because waiving writes off company
-      money. **This is the task that depends on 019 Phase 1** — without `grants`, `EMPLOYEES` means
-      only "holds the area at some level" and the waiver would be offered to every reader
-- [ ] T023 [US4] A waiver requires a reason and displays its author (FR-014)
-- [ ] T024 [US4] A waived item reads as **waived, not returned**. A waiver records that the company is
+- [X] T022 [US4] Waiver control gated on `EMPLOYEES` at **write**, via 019's `hasWrite` — the first
+      real consumer of that feature's Phase 1. Absent, not disabled: a disabled button still advertises
+      an authority the reader has not got. The 019 dependency was real and is now discharged
+- [X] T023 [US4] A waiver requires a reason and displays its author (FR-014)
+- [X] T024 [US4] A waived item reads as **waived, not returned**, said in a line of its own rather
+      than implied by a badge — "waived" reads as "dealt with" to anybody skimming. A waiver records that the company is
       not chasing this; it does not discharge the obligation, and an asset waived is still an asset the
       employee has
-- [ ] T025 [US4] Final settlement unavailable while items are outstanding, **naming them** (FR-013).
+- [X] T025 [US4] Final settlement unavailable while items are outstanding, **naming them** (FR-013).
       Naming is the requirement — "cannot settle yet" with no list is an instruction nobody can act on
-- [ ] T025a [US4] **FR-013a — the settlement summary lists every asset the employee held at exit,
+- [ ] T025a [US4] ⚠️ **Still open — needs the settlement summary, not this screen.** FR-013a — the settlement summary lists every asset the employee held at exit,
       with its outcome.** Distinct from T020's outstanding list and previously uncovered: the
       clearance screen shows what is *still* outstanding, while the settlement summary is the record of
       how each asset ended — returned, waived, or still held. An asset returned last week vanishes from
       the first and must still appear in the second, which is the whole point of the client's
       "any assets assigned to the employee should appear in the F&F summary"
-- [ ] T026 [US4] **Show no recovery value for an unreturned asset.** The backend deliberately computes
+- [X] T026 [US4] **No recovery value shown**, and said once in words where somebody would otherwise
+      look for a figure, rather than left as a silent absence. The backend deliberately computes
       none: that needs a valuation rule the client has not chosen. Note it here so nobody adds one
       from the asset's purchase cost, which would be a guess presented as a figure
-- [ ] T027 [US4] Verification: quickstart Scenario 2, **including step 4's read-only pass**
+- [X] T026a [US4] **Not in the plan, and the screen could not meet FR-014 without it**: the backend
+      returned only `waivedByUserId`, and this app has no user-name resolver at all — so the author
+      would have been a cuid. Added `waivedByName` to the backend, resolved through the shared
+      `actorNameOf` chain so the same person cannot appear under two names on two screens, with two
+      unit assertions. Committed separately
+- [X] T026b [US4] `settleable` is **read, never recomputed** from `items`. The backend holds it false
+      while any source could not be asked, because the safe answer to "is anything outstanding?" when
+      part of the question went unanswered is "assume yes". Deriving it here would offer settlement on
+      an incomplete picture — the one failure that lets somebody leave with a laptop
+- [X] T026c [US4] `unavailableSources` rendered **above** the list as a warning, because it changes how
+      everything below should be read. "Could not ask" is not "nothing held", and unlike an ordinary
+      outstanding item this one means the clearance may be incomplete
+- [X] T026d [US4] A 404 renders as "no exit has been initiated" rather than as a load failure, and
+      `retry: false` — for most employees that is a normal state, not an error worth retrying
+- [ ] T027 [US4] Verification: quickstart Scenario 2, **including step 4's read-only pass**. **Needs a
+      browser, a running API and two roles; not run.** Step 4 is the one that actually proves T022
 
 ---
 

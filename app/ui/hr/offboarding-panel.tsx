@@ -13,6 +13,7 @@ import {
 import { EXIT_REASONS, HR_MESSAGES, hrLabel } from '@/app/lib/constants';
 import { dateLabel, money, periodLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import ExitClearance from '@/app/ui/hr/exit-clearance';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -169,6 +170,17 @@ export default function OffboardingPanel({
                 <dd>{exit.fnfPayrollRunId ? 'Created' : 'Not yet created'}</dd>
               </div>
             </dl>
+
+            {/*
+              What this leaver still owes (021 US4), above the settlement rather than
+              beside it. FR-013 makes settlement unavailable while anything is
+              outstanding, so the reader needs to know what is outstanding *before*
+              reaching a Process button — a clearance below the settlement would be read
+              after the decision it is supposed to inform.
+            */}
+            <div className="border-t border-gray-100 pt-4">
+              <ExitClearance employeeId={employee.id} />
+            </div>
 
             {fnfLoading && (
               <p className="text-sm text-gray-500" role="status">
