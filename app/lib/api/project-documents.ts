@@ -191,3 +191,52 @@ export async function putDocumentRequirements(
  * `app/lib/api/projects.ts` owns the list call; this constant is the flag it passes.
  */
 export const INCLUDE_DOCUMENT_READINESS = 'documentReadiness';
+
+/**
+ * Stages one document before its project exists (FR-009b).
+ *
+ * **The reference is the caller's alone.** Creation refuses a staged id uploaded by anybody else,
+ * and refuses it with the same code as a nonexistent one — so the refusal cannot be used to
+ * discover that somebody else staged something. Unused references are swept with their files after
+ * the staging window, so an abandoned form costs nothing permanent.
+ */
+export async function stageProjectDocument(
+  input: {
+    documentTypeId?: string;
+    documentType: string;
+    /** Base64, without a data-URL prefix. */
+    data: string;
+    contentType: string;
+  },
+  companyId?: string,
+): Promise<{ stagedDocumentId: string }> {
+  const raw = await authFetch<unknown>(
+    `/projects/document-uploads${companyQuery(companyId)}`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  // Tolerant of the id's field name, because the route's own description calls it
+  // `stagedDocumentId` while a bare `id` is the shape every other create here returns.
+  const parsed = z
+    .object({ stagedDocumentId: z.string().optional(), id: z.string().optional() })
+    .parse(raw);
+  const stagedDocumentId = parsed.stagedDocumentId ?? parsed.id;
+  if (!stagedDocumentId) {
+    throw new Error('The upload did not return a reference.');
+  }
+  return { stagedDocumentId };
+}
+
+/** Reads a File as base64 without the data-URL prefix the API does not want. */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () =>
+      reject(new Error('The file could not be read.'));
+    reader.readAsDataURL(file);
+  });
+}

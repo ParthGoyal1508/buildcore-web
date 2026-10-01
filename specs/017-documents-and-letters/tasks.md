@@ -405,27 +405,73 @@ and 8b — a read path nobody in the api repository consumes, so nothing noticed
 
 ### The project creation form (FR-023, FR-023a, FR-023b)
 
-- [ ] T069 (FR-023) Add an upload control per **mandatory** kind to the project creation form in
+- [X] T069 (FR-023) Add an upload control per **mandatory** kind to the project creation form in
   `app/dashboard/projects/portfolio/`, resolved from the company's configured set rather than a
   hardcoded list.
-- [ ] T070 (FR-023) Refuse submission until every mandatory kind carries a file. Refuse in the form, and
+
+  Done 2026-10-01 in `app/ui/projects/project-document-uploads.tsx`, mounted on the creation form
+  only — an existing project is past FR-009's gate, and documents are filed against it through its
+  own documents screen. Resolved from `getDocumentRequirements`, never a hardcoded list.
+
+- [X] T070 (FR-023) Refuse submission until every mandatory kind carries a file. Refuse in the form, and
   do not rely on the server's refusal as the only gate — though the server's gate is authoritative
   (api FR-009).
-- [ ] T071 (FR-023) Show advisory kinds as uploads that do **not** block submission, distinguished from
+
+  Done 2026-10-01: the submit control is disabled while a mandatory kind has nothing staged, with
+  a count beside it. The server's gate remains the authoritative one — it is the only one that cannot
+  be bypassed — but letting somebody fill a long form to learn something the page already knew wastes
+  their time. `unstagedMandatory` is exported and shared, so the refusal and the controls cannot
+  disagree about which kinds are outstanding.
+
+- [X] T071 (FR-023) Show advisory kinds as uploads that do **not** block submission, distinguished from
   the mandatory ones by their stated consequence, per T066's wording rule.
-- [ ] T072 (FR-023a) On a server refusal for missing mandatory documents, name the missing kinds **on
+
+  Done 2026-10-01, in two groups headed "Needed to create the project" and "Can follow later" —
+  named by consequence, per T066's wording rule.
+
+- [X] T072 (FR-023a) On a server refusal for missing mandatory documents, name the missing kinds **on
   the controls they refer to**, not only in a summary at the top. A message listing kind names the user
   then has to match against controls is a message that makes them do the matching.
-- [ ] T073 (FR-023a) **Preserve every value and every file already supplied** across the refusal. This is
+
+  Done 2026-10-01, and it needed **two** additions first. The api refusal carried the missing
+  kinds only as *labels*, which is right for a person to read and wrong for a form: matching a
+  control by display name means string-matching two names that are only incidentally equal, and two
+  kinds may legitimately share one. `missingTypeIds` was added alongside. `ApiError` then threw the
+  whole body away, so even that was unreachable from the browser — it now carries `details`.
+
+- [X] T073 (FR-023a) **Preserve every value and every file already supplied** across the refusal. This is
   the task that matters most in this phase: a refusal that empties the form makes the gate punish the
   person complying with it, and it is the behaviour most likely to be lost to a naive re-render.
-- [ ] T074 (FR-023b) Show upload progress and failure **per document**, as FR-006 already requires of the
+
+  Done 2026-10-01, and **true by construction rather than by careful re-rendering**, which is
+  what the task was worried about. Because each file is staged on selection and the *server* holds
+  it, a refused creation costs nothing: the reference is still valid and the next submission reuses
+  it. Had the files travelled with the creation request, every refusal would have emptied the file
+  inputs — a browser cannot restore a file selection — and the gate would punish the person
+  complying with it. `staged` is explicitly untouched in `onError`.
+
+- [X] T074 (FR-023b) Show upload progress and failure **per document**, as FR-006 already requires of the
   company documents screen. Reuse that component rather than writing a second one.
-- [ ] T075 (FR-023b) Ensure a silently-failed upload cannot hold submission closed with no visible cause.
+
+  Done 2026-10-01 per kind: uploading, attached with the file name, or failed with the reason on
+  that control. **`DocumentUpload` was not reused**, and the deviation is worth stating: it is a
+  *form* that submits one document against an entity that already exists, and the whole difficulty
+  here is that the project does not exist yet. Reusing it would have meant a form inside a form.
+
+- [X] T075 (FR-023b) Ensure a silently-failed upload cannot hold submission closed with no visible cause.
   A form that refuses for a reason the user cannot see is indistinguishable from a broken form.
-- [ ] T076 (FR-023) Post to the staged-upload path api 017 phase 13 adds. Note here that this path does
+
+  Done 2026-10-01. A failed upload shows its reason on the control, which matters precisely
+  because the failure also keeps submission closed — a form that refuses for a reason the user cannot
+  see is indistinguishable from a broken one.
+
+- [X] T076 (FR-023) Post to the staged-upload path api 017 phase 13 adds. Note here that this path does
   not exist yet — **no endpoint creates a `ProjectDocument` today** — so this task is blocked on
   T106-T132 rather than merely sequenced after them.
+
+  Done 2026-10-01. `POST /projects/document-uploads` exists as of api `77837af`, so the task's
+  blocker is gone; the ids travel as `stagedDocumentIds` on creation and are converted inside the
+  same transaction, so a refused creation files nothing and creates nothing.
 
 ### The project's own document list (FR-024)
 
@@ -460,7 +506,9 @@ and 8b — a read path nobody in the api repository consumes, so nothing noticed
   editor's controls are absent from the settings screen and that uploading still works.
 - [ ] T082 Browser pass: file a supplementary document against a project and confirm it appears on the
   project screen alongside the required ones.
-- [ ] T083 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+- [X] T083 `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+  Done 2026-10-01: `tsc --noEmit` clean, eslint clean on touched files, `next build` succeeds.
 
 ### Dependencies
 

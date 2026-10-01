@@ -9,6 +9,11 @@ import { z } from 'zod';
 
 import { ApiError } from '@/app/lib/api/client';
 import { listEmployees } from '@/app/lib/api/hr-payroll';
+import { getDocumentRequirements } from '@/app/lib/api/project-documents';
+import ProjectDocumentUploads, {
+  unstagedMandatory,
+  type StagedUploads,
+} from '@/app/ui/projects/project-document-uploads';
 import {
   Project,
   ProjectInput,
@@ -17,6 +22,7 @@ import {
   updateProject,
 } from '@/app/lib/api/projects';
 import {
+  DOCUMENT_COPY,
   MESSAGES,
   PROJECT_DIVISIONS,
   PROJECT_SITE_TYPES,
@@ -92,6 +98,41 @@ export default function ProjectForm({ project }: { project?: Project }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  /**
+   * Files staged against each required kind, and the kinds the server last refused for.
+   *
+   * Both live in component state and are **never cleared on a refusal** (017 FR-023a, T073). The
+   * staged references stay valid on the server, so a second submission reuses them rather than
+   * asking for the files again — which a browser could not restore anyway, since a page cannot
+   * re-populate a file input. A gate that emptied the form would punish the person complying
+   * with it.
+   */
+  const [staged, setStaged] = useState<StagedUploads>({});
+  const [missingTypeIds, setMissingTypeIds] = useState<string[]>([]);
+
+  /**
+   * The required set, read only when creating.
+   *
+   * An existing project is past the gate: FR-009 refuses *creation*, and documents are filed
+   * against a project that exists through its own documents screen. Asking here on an edit would
+   * render upload controls that answer a requirement already satisfied or already waived.
+   */
+/**
+ * No `companyId` is passed, and that is deliberate.
+ *
+ * Nothing else in the projects tree mounts `CompanyProvider`, so `useCompanyContext` would throw on
+ * render — a crash a type-check and a build both pass straight over. The server resolves the company
+ * from the caller (and, since 019, narrows it to their selected company), which is how every other
+ * screen under `/dashboard/projects` already behaves. Introducing the provider here would make this
+ * subtree the only one with a company selector, for no requirement that asked for one.
+ */
+  const { data: requirementSet } = useQuery({
+    queryKey: ['projectDocumentRequirements'],
+    queryFn: () => getDocumentRequirements(),
+    enabled: !project,
+  });
+  const requirements = requirementSet?.requirements ?? [];
+  const outstanding = unstagedMandatory(requirements, staged);
 
   const { data: clients } = useQuery({
     queryKey: ['projects', 'clients', { pageSize: 200 }],
@@ -187,8 +228,13 @@ export default function ProjectForm({ project }: { project?: Project }) {
       }
       // Omitted rather than sent empty, so the server allocates from the company
       // PROJECTS series. Sending '' would be a caller-supplied code of no characters.
+      const withCode = values.code ? { ...payload, code: values.code } : payload;
+      const ids = Object.values(staged).map((file) => file.stagedDocumentId);
+      // Omitted when empty for the same reason as `code`: an empty array is a statement that no
+      // documents were staged, which is only worth making when the server would otherwise assume
+      // something. It would not.
       return createProject(
-        values.code ? { ...payload, code: values.code } : payload,
+        ids.length > 0 ? { ...withCode, stagedDocumentIds: ids } : withCode,
       );
     },
     onSuccess: () => {
@@ -198,14 +244,31 @@ export default function ProjectForm({ project }: { project?: Project }) {
       // list is where the saved project is visible today.
       router.push(ROUTES.projectsPortfolio);
     },
-    onError: (error: unknown) =>
+    onError: (error: unknown) => {
       setServerError(
         error instanceof ApiError ? error.message : MESSAGES.saveFailed,
-      ),
+      );
+      // T072: the kinds the server named, kept so each control can say so for itself. Branching on
+      // the code rather than on the message text, and reading the ids rather than the labels — two
+      // kinds may legitimately share a name, and matching on one would attach the refusal to the
+      // wrong control.
+      if (
+        error instanceof ApiError &&
+        error.code === 'PROJECT_DOCUMENTS_MANDATORY_MISSING'
+      ) {
+        const ids = error.details?.missingTypeIds;
+        setMissingTypeIds(Array.isArray(ids) ? ids.map(String) : []);
+      }
+      // Deliberately nothing else. `staged` is untouched, so every file already attached is still
+      // attached and the next submission costs the user nothing.
+    },
   });
 
   function onSubmit(values: ProjectFormValues) {
     setServerError(null);
+    // Cleared here, not in `onError`: a refusal from a previous attempt must stay on its controls
+    // until the user tries again, or the explanation vanishes before it has been read.
+    setMissingTypeIds([]);
     // Confirmed only on the transition, not on every save of an already-locked
     // project — re-asking on each edit trains people to click through it.
     if (values.isLocked !== wasLocked) {
@@ -444,13 +507,48 @@ export default function ProjectForm({ project }: { project?: Project }) {
         </section>
       )}
 
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isSubmitting || mutation.isPending}>
+      {/*
+        Creation only. An existing project is past FR-009's gate, and documents are filed against it
+        through its own documents screen.
+      */}
+      {!project && requirements.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            {DOCUMENT_COPY.creationHeading}
+          </h2>
+          <ProjectDocumentUploads
+            requirements={requirements}
+            staged={staged}
+            onStagedChange={setStaged}
+            missingTypeIds={missingTypeIds}
+            disabled={mutation.isPending}
+          />
+        </section>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="submit"
+          // T070: refused in the form as well as on the server. The server's gate is the
+          // authoritative one — it is the only one that cannot be bypassed — but letting somebody
+          // fill a long form and submit it to learn something the page already knew is a waste of
+          // their time.
+          disabled={
+            isSubmitting || mutation.isPending || outstanding.length > 0
+          }
+        >
           {mutation.isPending ? 'Saving…' : 'Save project'}
         </Button>
         <SecondaryButton type="button" onClick={handleCancel}>
           Cancel
         </SecondaryButton>
+        {outstanding.length > 0 && (
+          // The count, not the kinds: each kind says so on its own control, and repeating them
+          // here is the matching exercise T072 exists to remove.
+          <span className="text-sm text-amber-800">
+            {DOCUMENT_COPY.creationBlocked(outstanding.length)}
+          </span>
+        )}
       </div>
     </form>
   );

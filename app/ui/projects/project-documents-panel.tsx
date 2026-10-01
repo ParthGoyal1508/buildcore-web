@@ -11,7 +11,6 @@ import {
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 
 /**
@@ -42,12 +41,20 @@ export default function ProjectDocumentsPanel({
 }: {
   projectId: string;
 }) {
-  const { companyId } = useCompanyContext();
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
+/**
+ * No `companyId` is passed, and that is deliberate.
+ *
+ * Nothing else in the projects tree mounts `CompanyProvider`, so `useCompanyContext` would throw on
+ * render — a crash a type-check and a build both pass straight over. The server resolves the company
+ * from the caller (and, since 019, narrows it to their selected company), which is how every other
+ * screen under `/dashboard/projects` already behaves. Introducing the provider here would make this
+ * subtree the only one with a company selector, for no requirement that asked for one.
+ */
   const documents = useQuery({
-    queryKey: ['project', projectId, 'documents', companyId],
-    queryFn: () => getProjectDocuments(projectId, companyId ?? undefined),
+    queryKey: ['project', projectId, 'documents'],
+    queryFn: () => getProjectDocuments(projectId),
   });
 
   /**
@@ -57,18 +64,14 @@ export default function ProjectDocumentsPanel({
    * share one cached answer instead of asking twice.
    */
   const requirements = useQuery({
-    queryKey: ['projectDocumentRequirements', companyId],
-    queryFn: () => getDocumentRequirements(companyId ?? undefined),
+    queryKey: ['projectDocumentRequirements'],
+    queryFn: () => getDocumentRequirements(),
   });
 
   const open = async (document: ProjectDocument) => {
     setDownloadError(null);
     try {
-      const blob = await downloadProjectDocument(
-        projectId,
-        document.id,
-        companyId ?? undefined,
-      );
+      const blob = await downloadProjectDocument(projectId, document.id);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank', 'noopener');
       // Revoked on the next tick rather than immediately: the new tab needs the URL to still

@@ -2299,6 +2299,29 @@ export const DOCUMENT_COPY = {
     `${name} — blocks project creation`,
   projectDocumentsOutstandingAdvisory: (name: string) =>
     `${name} — reported as outstanding`,
+
+  // ── Documents on the project creation form (FR-023, FR-023a, FR-023b) ───────
+  creationHeading: 'Project documents',
+  creationHint:
+    'These are uploaded as you choose them, so a refused submission never loses a file you have already attached.',
+  creationNoneRequired: 'This company requires no documents of a new project.',
+  creationMandatoryHeading: 'Needed to create the project',
+  creationAdvisoryHeading: 'Can follow later',
+  creationAttached: (fileName: string) => `Attached: ${fileName}`,
+  creationReplace: 'Replace',
+  creationUploading: (fileName: string) => `Uploading ${fileName}…`,
+  creationUploadFailed: (fileName: string, reason: string) =>
+    `${fileName} could not be uploaded. ${reason}`,
+  /** T072: the server's refusal, said on the control it refers to. */
+  creationRefusedHere: 'The server refused the project without this document.',
+  /**
+   * The summary beside the submit control. Names the count, not the kinds — the kinds are named on
+   * their own controls, and repeating them here is the matching exercise T072 exists to remove.
+   */
+  creationBlocked: (count: number) =>
+    count === 1
+      ? 'One required document is still missing.'
+      : `${count} required documents are still missing.`,
 } as const;
 
 /** Copy for the letters surfaces. */
