@@ -1,0 +1,134 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+
+import {
+  listSelectableCompanies,
+  setCompanySelection,
+} from '@/app/lib/api/company-selection';
+import { COMPANY_SWITCHER } from '@/app/lib/constants';
+import { hasUnsavedChanges, unsavedScreens } from '@/app/lib/unsaved-changes';
+import { inlineSelectClass } from '@/app/ui/settings/form-fields';
+
+/**
+ * Chooses which company the whole application is working in (019 FR-001 – FR-006).
+ *
+ * **Visible only when the caller has more than one company to choose between** (FR-001). Not when
+ * they hold `CROSS_COMPANY_ACCESS`, which is what the retired `CompanyProvider` keyed on and is a
+ * different population: a permission is about what somebody may reach, and the question here is
+ * whether there is a choice to make. A single-company user with the permission got a selector with
+ * one entry in it; a user with two companies and no permission got none at all.
+ *
+ * The backend answers the population question directly, so there is nothing to infer here — one
+ * element back means no switcher.
+ */
+export default function CompanySwitcher() {
+  const queryClient = useQueryClient();
+  const [failed, setFailed] = useState(false);
+
+  const { data: companies } = useQuery({
+    queryKey: ['companies', 'selectable'],
+    queryFn: listSelectableCompanies,
+  });
+
+  /**
+   * The id shown while a switch is in flight.
+   *
+   * Local, because the authority is the server: the selection lives in the session, and after a
+   * successful switch every list on screen refetches against it. Holding the selection in state as
+   * the *source of truth* is precisely what made the retired provider wrong — a switch there never
+   * reached the server, so the interface and the data disagreed about which company was current.
+   */
+  const [pending, setPending] = useState<string | null>(null);
+
+  const switchCompany = useMutation({
+    mutationFn: setCompanySelection,
+    onSuccess: () => {
+      /**
+       * FR-005. Everything cached was fetched against the previous company.
+       *
+       * A curated list of invalidations was considered and rejected. It passes review, and then it
+       * fails the first time somebody adds a query without thinking about companies — which is to
+       * say it fails later, quietly, on a screen nobody was watching, showing one company's figures
+       * under another company's name. `clear()` is blunt and cannot rot.
+       *
+       * The selectable list is refetched along with everything else, which is correct: the set of
+       * companies somebody may work in is itself company-independent, but re-reading it costs one
+       * request and removes the need for an exception.
+       */
+      queryClient.clear();
+      setPending(null);
+    },
+    onError: () => {
+      // Back to whatever the server last confirmed. A select left showing a company the session is
+      // not actually in is the disagreement this whole component exists to remove.
+      setPending(null);
+      setFailed(true);
+    },
+  });
+
+  // FR-001: nothing to choose between, nothing to render. Also covers the loading window, where a
+  // switcher with no options would appear and then vanish.
+  if (!companies || companies.length < 2) return null;
+
+  /**
+   * The server's answer, not a default.
+   *
+   * The fallback to the first element is for the impossible case only — the server marks exactly one
+   * element `selected` — and it is a fallback rather than the primary path on purpose. Treating
+   * `companies[0]` as the selection is what the retired provider did, and it is how an interface
+   * comes to disagree with the data it is showing.
+   */
+  const selectedId = (companies.find((c) => c.selected) ?? companies[0]).id;
+
+  const handleChange = (companyId: string) => {
+    /**
+     * FR-006. A switch discards every cached view, so an unsaved form is lost with them.
+     *
+     * Covers the forms that register with `useUnsavedChanges`. Those are the only ones it can
+     * cover — a switch cannot know about work nobody declared — which is why the message names the
+     * screens rather than claiming to speak for the whole application.
+     */
+    if (hasUnsavedChanges()) {
+      const screens = unsavedScreens().join(', ');
+      if (!window.confirm(COMPANY_SWITCHER.confirmDiscard(screens))) return;
+    }
+    setFailed(false);
+    setPending(companyId);
+    switchCompany.mutate(companyId);
+  };
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <label
+        htmlFor="company-switcher"
+        className="hidden text-sm font-medium text-gray-500 sm:block"
+      >
+        {COMPANY_SWITCHER.label}
+      </label>
+      <select
+        id="company-switcher"
+        // `pending` only while a switch is in flight; otherwise the company the **server** says we
+        // are in, which arrives with the refetched list after `clear()`.
+        value={pending ?? selectedId}
+        disabled={switchCompany.isPending}
+        onChange={(event) => handleChange(event.target.value)}
+        className={inlineSelectClass}
+      >
+        {companies.map((company) => (
+          <option key={company.id} value={company.id}>
+            {company.name}
+          </option>
+        ))}
+      </select>
+      {failed && (
+        // Visible rather than a toast that may already have gone: the consequence of a silently
+        // failed switch is reading one company's numbers believing they are another's.
+        <p role="alert" className="text-sm text-red-600">
+          {COMPANY_SWITCHER.switchFailed}
+        </p>
+      )}
+    </div>
+  );
+}

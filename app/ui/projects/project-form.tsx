@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { ApiError } from '@/app/lib/api/client';
 import { listEmployees } from '@/app/lib/api/hr-payroll';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import ProjectDocumentUploads, {
   unstagedMandatory,
   type StagedUploads,
@@ -193,6 +194,15 @@ export default function ProjectForm({ project }: { project?: Project }) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
+
+  /**
+   * Lets a company switch warn before it discards this form (019 FR-006).
+   *
+   * The `beforeunload` guard above cannot cover it: switching company is a client-side state change,
+   * so the browser never fires a navigation event. This registration is what makes the switcher's
+   * confirmation name this screen instead of saying nothing.
+   */
+  useUnsavedChanges('Project form', isDirty);
 
   const wasLocked = project?.isLocked ?? false;
   // `useWatch` rather than `watch()`: the latter returns a fresh function on every

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { landingRoute } from '@/app/lib/permissions';
+import CompanySwitcher from '@/app/ui/company-switcher';
 import NotificationBell from '@/app/ui/dashboard/notification-bell';
 import Logo from '@/app/ui/logo';
 
@@ -79,6 +80,12 @@ export default function ShellHeader({
       <div className="flex min-w-0 flex-grow justify-end md:justify-start">
         {children}
       </div>
+      {/* Mounted here rather than in the slot above, unlike search — and the difference is
+          deliberate. Search belongs to one shell: a site employee in My Workspace has no register to
+          search, so putting it here would be wrong for them. The switcher is right everywhere and
+          hides itself where there is nothing to choose, so FR-001's "present on every screen" is met
+          by mounting it once in the shared header instead of in each shell that remembers to. */}
+      <CompanySwitcher />
       <NotificationBell />
     </header>
   );

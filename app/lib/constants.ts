@@ -477,6 +477,26 @@ export function reminderTypeLabel(type: string): string {
     .join(' ');
 }
 
+/**
+ * The company switcher's own copy (019 FR-001 – FR-006).
+ *
+ * Its own block rather than keys inside `MESSAGES`, which is where sign-in and session copy lives.
+ * Principle III keeps strings out of components; it does not ask for one bucket.
+ */
+export const COMPANY_SWITCHER = {
+  label: 'Company',
+  /**
+   * Named screens, not "you have unsaved changes".
+   *
+   * Somebody switching company has usually forgotten the half-filled form two tabs back, and that is
+   * the whole reason to ask. A message that cannot say what is at risk gets dismissed as noise.
+   */
+  confirmDiscard: (screens: string) =>
+    `Switching company will discard unsaved changes on: ${screens}. Continue?`,
+  switchFailed:
+    'Could not switch company. You are still working in the previous one.',
+} as const;
+
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
   welcomeBack: (name: string) => `Welcome back, ${name}!`,

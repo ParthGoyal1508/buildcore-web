@@ -28,6 +28,7 @@ import {
   ROUTES,
   hrLabel,
 } from '@/app/lib/constants';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import { Button } from '@/app/ui/button';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
@@ -343,6 +344,15 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
+
+  /**
+   * Lets a company switch warn before it discards this form (019 FR-006).
+   *
+   * The `beforeunload` guard above cannot cover it: switching company is a client-side state change,
+   * so the browser never fires a navigation event. This registration is what makes the switcher's
+   * confirmation name this screen instead of saying nothing.
+   */
+  useUnsavedChanges('Employee form', isDirty);
 
   const mutation = useMutation({
     mutationFn: (values: EmployeeFormOutput) => {
