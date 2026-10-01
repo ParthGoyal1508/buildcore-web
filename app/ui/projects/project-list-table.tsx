@@ -138,6 +138,17 @@ export default function ProjectListTable({
       emptyMessage="No projects yet. Add one to start tracking work."
       actions={(row) => (
         <>
+          {/*
+            T077's "openable from there" needs somewhere to open *from*. Readiness in the column
+            above says how far off complete a project is; this is the way to what it actually
+            holds, which is the question the client's item 3 ends on.
+          */}
+          <Link
+            href={ROUTES.projectsProjectDocuments(row.id)}
+            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            Documents
+          </Link>
           <Link
             href={ROUTES.projectsEditProject(row.id)}
             className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"

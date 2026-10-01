@@ -79,6 +79,9 @@ export const ROUTES = {
   projectsNewProject: '/dashboard/projects/portfolio/new',
   projectsEditProject: (id: string) =>
     `/dashboard/projects/portfolio/${id}/edit`,
+  /** What a project holds, and what it still owes (017 FR-024). */
+  projectsProjectDocuments: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/documents`,
   projectsClients: '/dashboard/projects/clients',
   projectsSites: '/dashboard/projects/sites',
 
@@ -2252,6 +2255,50 @@ export const DOCUMENT_COPY = {
     'Regulated personal data. It can be downloaded, and every download is recorded — there is no preview.',
   uploadFailed: 'The document could not be uploaded. Please try again.',
   supersedeHint: 'Uploading a new version keeps the old one on file.',
+
+  // ── A kind's strength, named by its consequence (FR-022a, T066) ─────────────
+  /**
+   * **Not "Required" and "Optional".**
+   *
+   * Those were the labels until 2026-10-01 and the task forbids them, for a reason worth keeping:
+   * "optional" describes a kind by what it is not, and since the 2026-09-16 amendment the two
+   * strengths differ in *effect* — one refuses the creation of a project, the other is reported
+   * outstanding and blocks nothing. A reader choosing between "Required" and "Optional" cannot
+   * tell that, and the person who most needs to is the one deciding whether to make a kind
+   * mandatory.
+   */
+  strengthMandatory: 'Blocks project creation',
+  strengthAdvisory: 'Reported as outstanding',
+  strengthMandatoryHint:
+    'A project cannot be created until a document of this kind is attached.',
+  strengthAdvisoryHint:
+    'A project can be created without it. It is reported as outstanding until it is filed.',
+  strengthLegend: 'What happens without it',
+
+  // ── A project's own papers (FR-024) ─────────────────────────────────────────
+  projectDocumentsHeading: 'Documents on file',
+  /**
+   * T078. Readiness is one view of a project's papers and must not be the only one — "3 of 5
+   * required" cannot answer "what do we hold for this project", which is where the client's
+   * item 3 ends.
+   */
+  projectDocumentsHint:
+    'Everything filed against this project, required and supplementary alike.',
+  projectDocumentsEmpty: 'Nothing has been filed against this project yet.',
+  projectDocumentRequiredBadge: 'Answers a required kind',
+  projectDocumentSupplementaryBadge: 'Supplementary',
+  projectDocumentFiledBy: (name: string, when: string) =>
+    `Filed by ${name} · ${when}`,
+  /** When the uploader's account has gone; the document and its date are still the point. */
+  projectDocumentFiledAt: (when: string) => `Filed ${when}`,
+  projectDocumentOpen: 'Open',
+  projectDocumentDownloadFailed:
+    'The document could not be downloaded. Please try again.',
+  projectDocumentsOutstandingHeading: 'Still outstanding',
+  projectDocumentsOutstandingMandatory: (name: string) =>
+    `${name} — blocks project creation`,
+  projectDocumentsOutstandingAdvisory: (name: string) =>
+    `${name} — reported as outstanding`,
 } as const;
 
 /** Copy for the letters surfaces. */

@@ -73,9 +73,17 @@ exist.
 
 - [X] T013 [P] [US2] Build the project document requirements screen under
       `app/dashboard/settings/` (write guarded by `SETTINGS`)
-- [ ] T014 [US2] Build the per-project documents view at `app/dashboard/projects/[id]/documents/`,
+- [X] T014 [US2] Build the per-project documents view at `app/dashboard/projects/[id]/documents/`,
       reusing `document-upload.tsx` and `completeness-panel.tsx` unchanged — two upload experiences is
       the failure this shared component exists to prevent
+
+  Done 2026-10-01 as `app/dashboard/projects/portfolio/[id]/documents/` (the task said
+  `app/dashboard/projects/[id]/documents/`; the portfolio segment is where project routes actually
+  live). A screen of its own rather than a section of the edit form: reading what a project holds and
+  changing what the project *is* are different jobs, and the edit form sits behind the project lock,
+  which has nothing to do with whether somebody may look at a filed document. Linked from the
+  portfolio list's row actions, since T077's "openable from there" needs somewhere to open from.
+
 - [X] T015 [US2] Show readiness **in the project list**, from the batch endpoint. One request for the
       whole list, never one per row
 
@@ -326,33 +334,74 @@ now.
 No test framework is installed (`TODO(TESTING_STANDARD)`). No task creates a test file. Verification is
 `npx tsc --noEmit`, `npm run lint`, `npm run build` and the browser passes named.
 
-**Backend dependency**: api 017 phase 13 (T106-T132, outstanding — 30 tasks). It supplies the
-configurable required set with per-kind mandatory/advisory strength, the staged upload path, and the
-transactional creation gate. Note that **no endpoint creates a `ProjectDocument` today** — the upload
-path this phase's forms post to does not yet exist.
+**Backend dependency**: api 017 phase 13 (T106-T132) — **landed 2026-09-30** (api `77837af`). It
+supplies the configurable required set with per-kind mandatory/advisory strength, the staged upload
+path, and the transactional creation gate. The note that "no endpoint creates a `ProjectDocument`
+today" no longer holds: `POST /projects/:projectId/documents` and `POST /projects/document-uploads`
+both exist.
+
+Two further api gaps were found building this phase and closed on 2026-10-01: there was **no download
+route** for a project document, so T077's "openable from there" was not possible, and
+`uploadedByUserId` was a bare id with no name resolved. Both are the same shape as 016's phases 8a
+and 8b — a read path nobody in the api repository consumes, so nothing noticed it was incomplete.
 
 ### The settings editor (FR-022, FR-022a, FR-022b)
 
-- [ ] T062 (FR-022) Extend `app/lib/api/project-documents.ts` with the required-set read and write,
+- [X] T062 (FR-022) Extend `app/lib/api/project-documents.ts` with the required-set read and write,
   zod-schemed, carrying each kind's **strength** — mandatory or advisory.
-- [ ] T063 (FR-022) Build the editor in `app/dashboard/settings/project-documents/`: move a kind between
+
+  Already built by `afd878d`; verified 2026-10-01 and extended — `projectReadinessSchema` gained
+  the three advisory fields the api now returns, optional so a client ahead of the server degrades
+  rather than failing to parse the whole project list.
+
+- [X] T063 (FR-022) Build the editor in `app/dashboard/settings/project-documents/`: move a kind between
   mandatory and advisory, add one from the kinds available to this company, remove one.
-- [ ] T064 (FR-022) Support defining a **new kind in place**, without leaving for the document-types
+
+  Already built by `afd878d`; verified 2026-10-01.
+
+- [X] T064 (FR-022) Support defining a **new kind in place**, without leaving for the document-types
   screen. A gate that requires configuring a kind elsewhere before it can be required here is a gate
   people route around.
-- [ ] T065 (FR-022) Where the company has configured nothing, show the **shipped defaults**, say plainly
+
+  Already built by `afd878d`; verified 2026-10-01, and now hidden from a reader who may not
+  configure (see T067).
+
+- [X] T065 (FR-022) Where the company has configured nothing, show the **shipped defaults**, say plainly
   that they are defaults, and distinguish that from a company having chosen exactly those kinds. An
   unconfigured screen that looks configured is how somebody concludes the set was reviewed when nobody
   has looked at it.
-- [ ] T066 (FR-022a) Name the two strengths **by their consequence** — a mandatory kind refuses project
+
+  Already built by `afd878d`; verified 2026-10-01. `usingDefaults` drives two different
+  sentences, and the defaults one says explicitly that saving makes them this company's own.
+
+- [X] T066 (FR-022a) Name the two strengths **by their consequence** — a mandatory kind refuses project
   creation, an advisory kind is reported outstanding. Do not label them "required" and "optional":
   optional describes a kind by what it is not and hides that the two now differ in effect.
-- [ ] T067 (FR-022b) Do **not** offer the editor's controls to a user who may upload project documents
+
+  **This was shipped wrong and is now fixed** (2026-10-01). `afd878d` labelled the two strengths
+  `Required` and `Optional` — the exact words this task forbids. They now read "Blocks project
+  creation" and "Reported as outstanding". The reason the task gives is the right one: since the
+  2026-09-16 amendment the two differ in *effect*, and a reader choosing between "Required" and
+  "Optional" cannot see that — least of all the person deciding whether to make a kind mandatory.
+
+- [X] T067 (FR-022b) Do **not** offer the editor's controls to a user who may upload project documents
   but may not change settings. Hidden, not disabled — showing a control that will be refused teaches the
   person that the screen is broken.
-- [ ] T068 (FR-022b) Read the settings permission from `app/lib/permissions.ts`. It is `SETTINGS`, not
+
+  **There was no permission gating at all** before 2026-10-01: every control was offered to
+  everybody and the server's refusal was the only gate, which teaches the reader that the screen is
+  broken rather than that they lack the authority. Every write control — the strength select, Remove,
+  Save, Discard, Require another, Define it, and the in-place kind form — is now absent for a reader
+  without `SETTINGS`. The strength still *shows*, as a sentence rather than a control: the fact is
+  theirs to know, the decision is not theirs to take.
+
+- [X] T068 (FR-022b) Read the settings permission from `app/lib/permissions.ts`. It is `SETTINGS`, not
   `COMPANY_SETTINGS` — the api spec's FR-007c was corrected to `SETTINGS` on 2026-09-16, and using the
   wrong one here refuses the people who are supposed to hold this.
+
+  Done 2026-10-01: `SETTINGS`, matching the api (`GET` needs `PROJECTS`, `PUT` needs `SETTINGS`).
+  The task's warning was worth heeding — `COMPANY_SETTINGS` would have refused exactly the people
+  who are supposed to hold this.
 
 ### The project creation form (FR-023, FR-023a, FR-023b)
 
@@ -380,13 +429,30 @@ path this phase's forms post to does not yet exist.
 
 ### The project's own document list (FR-024)
 
-- [ ] T077 (FR-024) List **every** document filed against the project on the project screen — required
+- [X] T077 (FR-024) List **every** document filed against the project on the project screen — required
   and supplementary alike — each openable from there.
-- [ ] T078 (FR-024) Do not make readiness status the only view of a project's papers. A screen that shows
+
+  Done 2026-10-01 in `app/ui/projects/project-documents-panel.tsx`, **unfiltered**. Needed two
+  api additions first: there was no download route for a project document at all, so "openable" was
+  not possible, and `uploadedByUserId` was a bare id. The new route is scoped by project as well as
+  id, so a document id copied from another project is a 404 rather than a download.
+
+- [X] T078 (FR-024) Do not make readiness status the only view of a project's papers. A screen that shows
   "3 of 5 required" and nothing else cannot answer "what do we hold for this project", which is the
   question the client's item 3 ends on.
-- [ ] T079 Copy in `app/lib/constants.ts` (Principle III), no inline styling (Principle II), all access
+
+  Done 2026-10-01. Two lists, in this order: what is held, then what is outstanding. A compliance
+  screen that leads with absence tells somebody what they have not done; a project screen should
+  first say what the project has. Outstanding kinds are split by consequence rather than merged into
+  one "missing" list — a missing mandatory kind means the project could not be created today, a
+  missing advisory one means somebody is still chasing paper.
+
+- [X] T079 Copy in `app/lib/constants.ts` (Principle III), no inline styling (Principle II), all access
   through `app/lib/api` (Principle V).
+
+  Done 2026-10-01 for everything in this commit: copy in `DOCUMENT_COPY`, no inline styling, all
+  access through `app/lib/api/project-documents.ts`.
+
 - [ ] T080 Browser pass: configure a set with one mandatory and one advisory kind, then create a project.
   Confirm submission is refused with the mandatory kind missing, that the advisory kind does not block,
   and that **every field and file survives** the refusal.
