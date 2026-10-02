@@ -889,3 +889,39 @@ Phases 8 and 9 are independent of each other.
 what to what. It is the client's own sentence in bug 2 ("it should also reflect in the attendance of
 the affected employee"), it is mobile-critical, and it is the half of bug 2 that no screen currently
 shows at all.
+
+---
+
+## Phase 9: The two new mobile-critical screens (added 2026-10-02)
+
+**Prerequisite met:** web constitution v2.2.0 (2026-10-02) adds the approvals queue and site attendance
+review to Principle VI's mobile-critical list. Principle VI is NON-NEGOTIABLE and its own "Changing the
+list" clause requires an amendment, which no feature spec may make — so that amendment, not this task
+list, was the gate on item 22.
+
+The client declined widening Principle VI wholesale and named these two instead. Plant logbook, fuel
+entry, material indents and inventory issue were offered and not chosen; they keep the 320px breakage
+floor and nothing stronger.
+
+Mobile-critical is a higher bar than "not broken": 44×44px touch targets, primary actions reachable
+one-handed, no action gated behind hover, and no layout break between 320px and 428px.
+
+- [ ] T108 [US4] Bring the approvals queue to the mobile-critical standard at 320px. **The reason it is
+      on the list is a Director deciding a payment release from a phone**, so approve, reject and return
+      are the controls that must be reachable one-handed — not the filters.
+- [ ] T109 [US4] Audit the queue for hover-gated actions. A row-hover action menu is the usual way an
+      otherwise-responsive list becomes unusable by touch, and it passes every desktop check.
+- [ ] T110 [US4] Make the item detail readable at 320px without the page body scrolling sideways. An
+      approver who cannot read what they are approving will approve it anyway, which is worse than a
+      broken layout.
+- [ ] T111 [US1] Bring site attendance review and correction to the same standard. **Its reason is a
+      supervisor on a site fixing a day the punch refusal turned away**, so raising a correction is the
+      control that must work, and the attendance grid is the hard part — it is wide by nature.
+- [ ] T112 [US1] The correction form at 320px: a form that submits a day's attendance from a phone is the
+      whole point, and a date picker or a reason field that is unreachable there fails the requirement
+      while the page looks fine.
+- [ ] T113 [P] Manual pass at 320px and again at desktop for both screens, per the constitution's
+      pre-merge check. No automated framework exists (`TODO(TESTING_STANDARD)`), so this is a person with
+      device emulation and it is **not done until somebody has actually done it**.
+- [ ] T114 [P] Keyboard operability on both, which Principle VI scopes to every screen regardless of
+      viewport and which a touch-target pass does not cover.

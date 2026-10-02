@@ -1,5 +1,29 @@
 <!--
-Sync Impact Report
+Sync Impact Report (v2.2.0, 2026-10-02)
+- Version change: 2.1.0 → 2.2.0
+- Modified principles:
+  - VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE). Two surfaces
+    are added to the mobile-critical list: **the approvals queue**, and **site attendance review and
+    correction**. MINOR, not MAJOR: the article is not redefined, the default stays desktop-first,
+    the list stays closed, and every rule attaching to the list applies to the two additions
+    unchanged. What is materially expanded is the list itself, which this principle's own "Changing
+    the list" clause requires an amendment to do — so this is that amendment.
+    Rationale: client review item 22 asks that the whole admin portal work on Android and iOS. Read
+    literally that is mobile-first everywhere, which would reverse the v2.0.0 finding this document
+    exists to record. Put to the client on 2026-10-02 with that cost stated; they chose to keep
+    desktop-first and name the screens that genuinely need a phone. These two were named. Plant
+    logbook, fuel entry, material indents and inventory issue were offered and not chosen, so they
+    keep the 320px breakage floor and nothing stronger.
+    Each addition is justified by who must use it away from a desk, not by how it looks: a Director
+    deciding a payment release, and a supervisor correcting a day the punch refusal turned away.
+- Templates requiring no change: plan, spec, tasks and checklist templates reference Principle VI
+  by name rather than restating its list.
+- Follow-up: the two added surfaces are not yet built to the mobile-critical standard. Until they
+  are, this amendment records an obligation rather than a fact, and feature 016's task list carries
+  the work.
+
+Previous report (v2.1.0) follows.
+
 - Version change: 2.0.0 → 2.1.0
 - Modified principles:
   - VI. Responsive Design: Desktop-First, Mobile-Critical Surfaces (NON-NEGOTIABLE). The
@@ -153,6 +177,17 @@ and MUST be built mobile-first — base Tailwind classes target the smallest vie
 - **Sign-in**, as the entry point to all of the above. It is listed not because it is field work in
   itself but because a field user cannot punch without passing through it; a desktop-only login
   would make the rest of this list unreachable.
+- **The approvals queue** — reading a pending item, and approving, rejecting or returning it.
+  *(Added v2.2.0.)* Listed because of who has to use it rather than where it is used: features 016
+  and 021 put a Director in the path of every payment release, payroll run and final settlement, and
+  a Director who can only decide at a desk is the reason items sit for days. The observed failure of
+  an approval gate is not that somebody rejects wrongly, it is that nobody acts and the gate gets
+  bypassed by sharing an account.
+- **Site attendance review and correction** — reading a day's attendance for a site and raising a
+  correction for it. *(Added v2.2.0.)* The counterpart to feature 020's punch refusal: a refused
+  punch records nothing at all, and the only route back is a correction raised by the supervisor —
+  who is standing on a site, not sitting at a desk. Listing the refusal without listing its remedy
+  would leave a worker's day recoverable only by someone who has gone back to the office.
 
 The **My Workspace shell** (feature 003) that hosts the employee-facing entries above stays
 mobile-first in its entirety, including the screens in it that are not themselves on this list
@@ -231,8 +266,8 @@ matters, without taxing the 90% of the product that does not.
   these are the non-negotiable articles most likely to be introduced accidentally.
 - New/changed screens MUST be manually checked before merge at the viewport Principle VI assigns
   them (browser dev tools device emulation, minimum):
-  - a **mobile-critical** surface (punch, attendance viewing, leave) at 320px, and again at
-    desktop;
+  - a **mobile-critical** surface (punch, attendance viewing, leave, sign-in, the approvals queue,
+    site attendance review and correction) at 320px, and again at desktop;
   - every **other** screen at desktop, and again at 320px for breakage only — this check is
     looking for clipped content, unreachable controls and a horizontally-scrolling page body, not
     for a phone-optimised layout. A dense table that scrolls sideways inside its own container
@@ -258,4 +293,4 @@ Workflow & Quality Gates); a reviewer who approves a change that knowingly viola
 NON-NEGOTIABLE principle MUST record the justification in the PR description, and that
 justification MUST itself prompt a constitution amendment if the exception is expected to recur.
 
-**Version**: 2.1.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-09-13
+**Version**: 2.2.0 | **Ratified**: 2026-08-26 | **Last Amended**: 2026-10-02

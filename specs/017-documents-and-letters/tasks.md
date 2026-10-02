@@ -581,3 +581,25 @@ Phase 11 is independent of Phase 10.
 **T069-T073** — the creation form's mandatory uploads with values preserved across a refusal. That is
 bug 3's actual ask ("Project Managers cannot create a project without them"), and T073 is what keeps
 the gate from being the thing people complain about.
+
+---
+
+## Phase 8: The field-declaration editor (added 2026-10-02)
+
+FR-014 of this specification already required "define a new letter kind, **its variable fields** and its
+fixed terms, without a developer". The requirement was here all along; the api had no way to store a
+kind's fields, so the editor could only offer the five shipped types' hard-coded lists and a
+company-defined kind got an empty one. The api half is 017 Phase 10.
+
+- [ ] T133 [US5] Let a kind's fields be defined alongside it: add, remove and name each, with where its
+      value comes from. This is what makes FR-014 true rather than merely written.
+- [ ] T134 [US5] Offer **only that kind's** declared fields in the template editor. The shared-list
+      alternative was declined by the client precisely so an offer letter's editor cannot offer
+      exit-settlement fields.
+- [ ] T135 [US5] Name the field that fails validation when a template references one the kind does not
+      declare. "Invalid template" on a screen whose whole content is a template tells the author nothing.
+- [ ] T136 [US5] Warn before removing a field that live templates reference, naming them — the same shape
+      FR-015 already uses for template deletion.
+- [ ] T137 [P] [US5] Manual pass: define a kind, declare its fields, write a template using them, issue a
+      letter, and read the rendered values. End to end, because every intermediate step passed before and
+      the feature still did not work.

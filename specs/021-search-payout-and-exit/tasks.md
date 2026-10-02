@@ -252,3 +252,24 @@ depends on nothing.
   backend Phases 4–6; 7 are verification.
 - Both [NEEDS CLARIFICATION] markers were closed on 2026-10-01 — slips send on an explicit action,
   and waiver authority has a working default.
+
+---
+
+## Phase 6: The waiver becomes a submission (added 2026-10-02)
+
+The web half of the client's waiver answer: HR proposes, the Director countersigns. **This supersedes the
+screen shipped on 2026-10-01**, where the waiver control wrote immediately for anyone with write access
+on Employees.
+
+- [ ] T049 [US4] The waiver control submits for approval rather than applying. Its label must say so —
+      "Request waiver", not "Waive" — because a control that says it has done a thing it has only
+      proposed is the kind of copy that gets an exit signed off on a waiver nobody approved.
+- [ ] T050 [US4] Show the pending state on the clearance row, with who proposed it and when. Until the
+      Director decides, the obligation is still outstanding and the screen must not read as cleared.
+- [ ] T051 [US4] Show a rejected waiver as rejected and the item as still outstanding. Silence after a
+      rejection reads as success.
+- [ ] T052 [US4] `mayWaive` becomes "may propose a waiver". The shipped `hasWrite(user, 'EMPLOYEES')` was
+      my placeholder, and the client has now set the authority deliberately.
+- [ ] T053 [US4] Settlement stays blocked while a waiver is pending. The gate is the api's, but the screen
+      must explain it — an exit that will not settle with no stated reason sends somebody to a developer.
+- [ ] T054 [P] [US4] Manual pass: propose, approve, settle; and propose, reject, confirm still blocked.

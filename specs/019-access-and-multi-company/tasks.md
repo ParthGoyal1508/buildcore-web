@@ -306,3 +306,31 @@ over work the API has already done.
 - 54 implementation tasks, 9 verification tasks, 63 total. None creates a test file.
 - The whole feature is additive except T038, which removes a mechanism that now contradicts the
   server.
+
+---
+
+## Phase 7: Cash entry controls disappear without the permission (added 2026-10-02)
+
+The web half of the client's cash answer. The api gains a `CASH_ENTRY` permission; this phase makes the
+controls it governs vanish for a caller who lacks it.
+
+**Phase 5's premise changed.** It was planned against "hiding is display-only, no control disappears",
+which the 2026-10-01 session established from shipped code. The client reversed it on 2026-10-02.
+Phase 5's rendering work still stands — blank, never zero — and this phase sits beside it rather than
+replacing it.
+
+- [ ] T064 [US3] Read `CASH_ENTRY` through `hasWrite`-style access on the current user, and hide every
+      control that records a cash payment behind it. Hide, not disable: a disabled button invites a
+      support call, and the client's intent is that the figures and their machinery are not visible at
+      all to an office viewer.
+- [ ] T065 [US3] Show the labour payment sheet's denomination breakup only to a `CASH_ENTRY` holder. It
+      is hidden from everyone today, including the cashier counting notes against it.
+- [ ] T066 [US3] **A screen that loses its cash controls must say so**, per FR-014. A payment sheet with
+      no way to record a payment and no explanation reads as a broken screen, and the person who meets it
+      cannot tell whether to report a bug or ask for access.
+- [ ] T067 [P] [US3] Manual pass with and without the permission, both at desktop and 320px. The
+      with-permission case matters as much: the whole design exists so a cashier keeps working, and a
+      change that hides controls from everybody would pass a test that only checked the restricted view.
+- [ ] T068 [US3] Confirm no screen infers cash-entry rights from the hiding setting. They are two
+      controls deliberately — one company-wide and about display, one per-caller and about capability —
+      and a screen that conflates them reintroduces the company-wide entry block the design rejected.
