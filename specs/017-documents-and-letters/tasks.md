@@ -603,3 +603,42 @@ company-defined kind got an empty one. The api half is 017 Phase 10.
 - [ ] T137 [P] [US5] Manual pass: define a kind, declare its fields, write a template using them, issue a
       letter, and read the rendered values. End to end, because every intermediate step passed before and
       the feature still did not work.
+
+---
+
+## Phase 10: A letter kind declares its own fields (added 2026-10-02, item 18)
+
+Built 2026-10-02 alongside the api's `LetterKindField`.
+
+**FR-014 already required this half** — "define a new letter kind, **its variable fields** and its
+fixed terms" — and only the kind itself was built. The api keyed its token sets to the five shipped
+letter types, so a kind defined here got an empty field list and the template editor then refused
+every field it used. Both halves were individually satisfied, and together they produced nothing
+usable. That is why this is an **editor** rather than a read-only list.
+
+- [x] T039 Add the field read, the upsert and the withdraw to `app/lib/api/letters.ts`, with the five
+      sources as a `z.enum` so a sixth arriving from the API fails loudly rather than rendering blank.
+- [x] T040 `app/ui/settings/letter-kind-fields.tsx` — the editor. Every field names **where its value
+      comes from**: a field that is only a label is a placeholder that renders blank, and a blank in a
+      signed letter is indistinguishable from a deliberate omission.
+- [x] T041 The path input is **absent** for a `manual` field, not disabled. A disabled path field reads
+      as "required and you cannot fill it"; its absence says the true thing — a value typed at issue
+      time reads no record.
+- [x] T042 A kind with no fields says so in amber, not as a neutral "none yet". Somebody about to write
+      a template needs to know it cannot use a single variable **before** they write it.
+- [x] T043 Shipped kinds are listed read-only. Their fields are what every live template already
+      references, and letting one company rename a token would break letters other companies issued.
+- [x] T044 Expanded in place on the kinds screen rather than on a route of its own: a kind's fields are
+      only meaningful beside the kind, and a separate route makes the common act — define a kind, then
+      say what goes in it — two navigations instead of one. One open at a time, because two expanded
+      lists on a phone is a scroll.
+- [x] T045 The toggle carries `intent="read"`, so it survives for a reader. Looking at what a kind
+      declares is legitimately a read, and without the marker 019's write gate would have hidden it.
+- [x] T046 Every api refusal is shown verbatim — `LETTER_FIELD_PATH_FORBIDDEN` in particular, which
+      names the regulated path. A generic "could not save" throws away the only part that says what to
+      do instead.
+- [ ] T047 **NOT RUN** Browser pass: define a kind, declare its fields, write a template using them,
+      issue a letter, and confirm the values appear. Needs a running API.
+
+`npx tsc --noEmit`, `npx eslint app` (0 errors) and `npm run build` all clean. Prettier deliberately
+not run — no config in this repository.

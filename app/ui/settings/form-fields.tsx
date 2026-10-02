@@ -167,7 +167,10 @@ export function SecondaryButton({
     <button
       {...rest}
       className={clsx(
-        'flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50',
+        // 44px below `sm`, the design's 40px above it — see `Button`, which does the same for the
+        // same reason. A Cancel that is hard to hit is how somebody submits a form they meant to
+        // abandon.
+        'flex h-11 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:h-10 sm:justify-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
     >

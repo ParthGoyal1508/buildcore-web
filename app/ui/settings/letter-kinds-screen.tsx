@@ -10,6 +10,7 @@ import {
 } from '@/app/lib/api/letters';
 import { LETTER_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import LetterKindFields from '@/app/ui/settings/letter-kind-fields';
 import {
   CheckboxField,
   FormError,
@@ -32,6 +33,8 @@ export function LetterKindsScreen() {
   const [label, setLabel] = useState('');
   const [requiresSignature, setRequiresSignature] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Which kind's fields are open. One at a time: two expanded lists on a phone is a scroll. */
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   /**
    * No company segment any more (019 FR-005).
@@ -112,18 +115,49 @@ export function LetterKindsScreen() {
                 {kind.requiresSignature ? ' · signed' : ''}
               </p>
             </div>
-            {/* A shipped kind belongs to every company, so this company may not edit or
-                delete it. Saying so beats a button that always fails. */}
-            {kind.isShipped ? (
-              <span className="text-xs text-gray-400">Not editable</span>
-            ) : (
+            <div className="flex shrink-0 items-center gap-2">
               <RowAction
                 type="button"
-                onClick={() => remove.mutate(kind.id)}
-                disabled={remove.isPending}
+                intent="read"
+                aria-expanded={expanded === kind.id}
+                onClick={() =>
+                  setExpanded((current) =>
+                    current === kind.id ? null : kind.id,
+                  )
+                }
               >
-                Delete
+                {expanded === kind.id ? 'Hide fields' : 'Fields'}
               </RowAction>
+              {/* A shipped kind belongs to every company, so this company may not edit or
+                  delete it. Saying so beats a button that always fails. */}
+              {kind.isShipped ? (
+                <span className="text-xs text-gray-400">Not editable</span>
+              ) : (
+                <RowAction
+                  type="button"
+                  onClick={() => remove.mutate(kind.id)}
+                  disabled={remove.isPending}
+                >
+                  Delete
+                </RowAction>
+              )}
+            </div>
+            {/*
+              017 FR-011b. Expanded in place rather than on a screen of its own: a kind's fields are
+              only meaningful beside the kind, and a separate route would make the common act —
+              define a kind, then say what goes in it — two navigations instead of one.
+
+              `intent="read"` on the toggle above because expanding writes nothing; without it the
+              control would vanish for a reader, who can legitimately look at what a kind declares.
+            */}
+            {expanded === kind.id && (
+              <div className="w-full">
+                <LetterKindFields
+                  kindId={kind.id}
+                  kindLabel={kind.label}
+                  isShipped={kind.isShipped}
+                />
+              </div>
             )}
           </li>
         ))}

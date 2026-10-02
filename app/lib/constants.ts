@@ -620,6 +620,50 @@ export const RECONCILIATION_COPY = {
   },
 } as const;
 
+/**
+ * Declaring a letter kind's fields (017 FR-011b, FR-011c) — `bugs.md` item 18.
+ *
+ * The copy repeatedly says **where a value comes from**, because that is the requirement rather than
+ * a nicety: a field that is only a label is a placeholder that renders blank, and a blank in a signed
+ * letter is indistinguishable from a deliberate omission.
+ */
+export const LETTER_FIELD_COPY = {
+  heading: (kind: string) => `Fields for ${kind}`,
+  hint: 'What this kind’s templates may use as {{variables}}. Each field says where its value is read from — a field with no source renders blank, and a blank in a signed letter cannot be told apart from a deliberate omission.',
+  loading: 'Loading fields…',
+  loadFailed: 'Could not load this kind’s fields.',
+  // Not a neutral "none yet": a kind with no fields has templates that cannot use a single variable.
+  noneYet:
+    'This kind declares no fields, so its templates cannot use any variables yet. Add the fields a letter of this kind needs.',
+  notEditable: 'Not editable',
+  remove: 'Remove',
+  removeFailed: 'That field could not be removed.',
+  saveFailed: 'That field could not be saved.',
+  requiredMark: 'required',
+  manualSource: 'typed at issue time',
+  addHeading: 'Add a field',
+  tokenLabel: 'Variable name',
+  tokenHint: 'Used in the template as {{name}}. Letters, digits and underscores only.',
+  labelLabel: 'Label',
+  labelHint: 'What the template editor calls it — “Site name”, not siteName.',
+  sourceLabel: 'Value comes from',
+  sourceHint: 'Which record the value is read from when a letter is issued.',
+  sourceLabels: {
+    employee: 'The employee record',
+    candidate: 'The candidate record',
+    project: 'The project record',
+    company: 'The company record',
+    manual: 'Typed when the letter is issued',
+  } as Record<string, string>,
+  pathLabel: 'Field in that record',
+  pathHint: 'A dotted path — designation.name, basic, dateOfJoining. Aadhaar, PAN and bank details are refused: a letter kind grants no way past that.',
+  requiredLabel: 'Refuse to issue a letter if this has no value',
+  requiredHint:
+    'An optional field with no value renders empty, which is often right. A required one stops the letter — use it where a blank would change what the letter says.',
+  add: 'Add field',
+  adding: 'Adding…',
+} as const;
+
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
   welcomeBack: (name: string) => `Welcome back, ${name}!`,

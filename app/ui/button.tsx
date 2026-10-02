@@ -42,7 +42,11 @@ export function Button({
         // Base is the brand navy itself, and hover goes *lighter* rather than the
         // usual darker: at #002d4e the shades below it are nearly black, so darkening
         // gives no visible feedback. Active still darkens, so a press reads.
-        'flex h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
+        // `h-11` below `sm` is 44px — Principle VI's mobile-critical touch target — falling back to
+        // the design's `h-10` from `sm` up, where a pointer is doing the aiming. Applied here rather
+        // than on the screens that need it: the two mobile-critical surfaces are a closed list today
+        // and the next addition to it should not have to remember this.
+        'flex h-11 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white sm:h-10 sm:justify-start transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
         className,
       )}
     >

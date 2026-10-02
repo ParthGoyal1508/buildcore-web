@@ -78,6 +78,88 @@ export async function upsertLetterKind(
 }
 
 /**
+ * What a letter kind's templates may reference (017 FR-011b, FR-011c) — `bugs.md` item 18.
+ *
+ * **This is the half that was missing.** This client's FR-014 already required "define a new letter
+ * kind, its variable fields and its fixed terms"; the api keyed its token sets to the five shipped
+ * letter types, so a kind defined here got an empty field list and the template editor refused every
+ * field it used. Both sides were individually satisfied and together they produced nothing usable.
+ */
+export const LETTER_FIELD_SOURCES = [
+  'employee',
+  'candidate',
+  'project',
+  'company',
+  'manual',
+] as const;
+export type LetterFieldSource = (typeof LETTER_FIELD_SOURCES)[number];
+
+const letterKindFieldSchema = z.object({
+  /** The `{{token}}` name, without braces. */
+  token: z.string(),
+  label: z.string(),
+  sourceType: z.enum(LETTER_FIELD_SOURCES),
+  /**
+   * The path the value is read from. Null only for `manual`.
+   *
+   * A field that names no source is a placeholder that renders blank — and a blank in a signed
+   * letter is indistinguishable from a deliberate omission, which is why the api refuses one.
+   */
+  sourcePath: z.string().nullable(),
+  isRequired: z.boolean().default(false),
+});
+export type LetterKindField = z.infer<typeof letterKindFieldSchema>;
+
+export async function getLetterKindFields(
+  kindId: string,
+): Promise<LetterKindField[]> {
+  return z
+    .array(letterKindFieldSchema)
+    .parse(
+      await authFetch<unknown>(
+        `/letter-kinds/${encodeURIComponent(kindId)}/fields`,
+      ),
+    );
+}
+
+/**
+ * Declares or redefines one field.
+ *
+ * An upsert on the token: editing a label or a source is the common case, and a delete-then-create
+ * would briefly leave saved templates referencing a field their kind did not declare.
+ *
+ * A path naming regulated personal data is refused with `LETTER_FIELD_PATH_FORBIDDEN` — defining a
+ * kind grants no way past that. The screen shows the message verbatim.
+ */
+export async function declareLetterKindField(
+  kindId: string,
+  field: {
+    token: string;
+    label: string;
+    sourceType: LetterFieldSource;
+    sourcePath?: string | null;
+    isRequired?: boolean;
+  },
+): Promise<LetterKindField> {
+  return letterKindFieldSchema.parse(
+    await authFetch<unknown>(
+      `/letter-kinds/${encodeURIComponent(kindId)}/fields/${encodeURIComponent(field.token)}`,
+      { method: 'PUT', body: JSON.stringify(field) },
+    ),
+  );
+}
+
+export async function withdrawLetterKindField(
+  kindId: string,
+  token: string,
+): Promise<void> {
+  await authFetch<unknown>(
+    `/letter-kinds/${encodeURIComponent(kindId)}/fields/${encodeURIComponent(token)}`,
+    { method: 'DELETE' },
+  );
+}
+
+/**
  * Deletes a kind nothing references.
  *
  * Refused with `LETTER_KIND_IN_USE` while letters or templates point at it. The screen

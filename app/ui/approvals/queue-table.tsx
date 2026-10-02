@@ -18,7 +18,9 @@ import {
 } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import ActionReview from '@/app/ui/approvals/action-review';
-import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import ResponsiveList, {
+  type Column,
+} from '@/app/ui/settings/responsive-list';
 import { RowAction } from '@/app/ui/settings/form-fields';
 
 /**
@@ -37,6 +39,21 @@ import { RowAction } from '@/app/ui/settings/form-fields';
  * reference to the item it governs. This application must not keep a second mapping from
  * entity type to route: it would have to be kept in step with the backend's forever, and
  * would be wrong first for whichever module was added last.
+ *
+ * ## Mobile-critical, not merely unbroken (016 FR-021, tasks T108 to T110)
+ *
+ * The client put this screen on the closed mobile-critical list for one reason: **a Director deciding
+ * a payment release from a phone.** That makes approve, reject and return the controls that must be
+ * reachable one-handed — not the filters, not the age column.
+ *
+ * So the queue renders as **cards below `md`** through `ResponsiveList`, not as a horizontally
+ * scrolling table. A `DataTable` inside `overflow-x-auto` meets the breakage floor and fails this
+ * standard: the decision controls sit in the last column, which at 320px is off-screen to the right,
+ * and an approver who has to scroll sideways to find Approve is an approver who approves without
+ * reading. On the card they sit at the bottom, under the subject, where a thumb is.
+ *
+ * `ResponsiveList` renders `actions` in a full-width footer on the card, which is what makes the
+ * 44px touch target achievable — `ActionReview` at `size="inline"` is sized for a table cell.
  */
 export default function ApprovalQueue() {
   const queryClient = useQueryClient();
@@ -85,7 +102,6 @@ export default function ApprovalQueue() {
     {
       key: 'subject',
       header: 'Item',
-      sticky: true,
       render: (row) => (
         <div className="space-y-0.5">
           <div className="font-medium text-gray-900">
@@ -141,40 +157,43 @@ export default function ApprovalQueue() {
         <span className="text-xs text-gray-700">{row.levelLabel}</span>
       ),
     },
-    {
-      key: 'decide',
-      header: 'Decision',
-      render: (row) => (
-        <ActionReview
-          size="inline"
-          entityLabel={row.subject}
-          // Every row in this list is actionable by construction: the server returned
-          // it because this caller can act on it now. Only the fields the control reads
-          // are passed — the queue does not know the chain's length and does not pretend
-          // to.
-          state={{
-            instanceId: row.instanceId,
-            canActNow: true,
-            inertReason: null,
-            levelLabel: row.levelLabel,
-            awaitingUserName: null,
-            currentPosition: row.currentPosition,
-          }}
-          onDecide={(action, reason) =>
-            decide.mutateAsync({ instanceId: row.instanceId, action, reason })
-          }
-        />
-      ),
-    },
   ];
+
+  /**
+   * The decision controls, as `ResponsiveList`'s `actions` rather than as a column.
+   *
+   * A column would put them in a card row labelled "Decision" beside a `<dt>`, cramped into the
+   * right half of a 320px card. As `actions` they get the card's full width in their own footer —
+   * which is the difference between a reachable control and a technically-present one.
+   */
+  const decision = (row: ApprovalQueueEntry) => (
+    <ActionReview
+      size="inline"
+      entityLabel={row.subject}
+      // Every row in this list is actionable by construction: the server returned it because this
+      // caller can act on it now. Only the fields the control reads are passed — the queue does not
+      // know the chain's length and does not pretend to.
+      state={{
+        instanceId: row.instanceId,
+        canActNow: true,
+        inertReason: null,
+        levelLabel: row.levelLabel,
+        awaitingUserName: null,
+        currentPosition: row.currentPosition,
+      }}
+      onDecide={(action, reason) =>
+        decide.mutateAsync({ instanceId: row.instanceId, action, reason })
+      }
+    />
+  );
 
   return (
     <div className="space-y-3">
-      <DataTable
-        caption="Items awaiting your decision"
+      <ResponsiveList
         columns={columns}
         rows={items}
         rowKey={(row) => row.instanceId}
+        actions={decision}
         isLoading={pages.isLoading}
         error={pages.isError ? MESSAGES.loadFailed : null}
         // Said plainly rather than left as a blank screen (FR-006). "Nothing is waiting on
@@ -184,6 +203,12 @@ export default function ApprovalQueue() {
       {nextCursor && (
         <RowAction
           type="button"
+          intent="read"
+          // `min-h-11` is 44px — the touch target Principle VI's mobile-critical standard requires.
+          // `RowAction` is sized for a table cell by default, which is right in a desktop row and too
+          // small for a thumb. `intent="read"` because loading the next page writes nothing: without
+          // it the control would vanish for a reader, who is exactly who scrolls a queue.
+          className="min-h-11 w-full justify-center sm:w-auto"
           onClick={() => setCursors((c) => [...c, nextCursor])}
           disabled={pages.isFetching}
         >
