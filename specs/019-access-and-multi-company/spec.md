@@ -25,6 +25,15 @@ Raised while planning this feature's web half, against the backend's **shipped**
 code rather than against its specification. Both markers this spec carried under "Needing the
 client's decision" were already answered in `buildcore-api`, and neither needed the client.
 
+### Session 2026-10-02
+
+- Q: The answer below — "entry is untouched" — was reached by reading shipped code, not by asking. Does the client agree? → A: **No. They want entry blocked.** Put to them on 2026-10-02 and answered the other way, so the reasoning below is superseded on its conclusion while remaining correct on its facts: the interceptor really does only shape responses, and that really is all that is built.
+- Q: Does the company-wide setting therefore block entry? → A: **No — two controls.** The setting stays display-only and company-wide; entry is gated by a new `CASH_ENTRY` permission. One control cannot do both, because a company-wide entry block stops every cashier in the company from paying labour while it is on, which makes it a switch nobody can leave on.
+- Q: And the screen list the marker below dismisses? → A: **Dismissal upheld, by the client this time.** The per-row rule stays and the product acquires no screen list. They accepted the one divergence from their own screen answer: a salary genuinely paid in cash stays hidden.
+- Q: The denomination breakup? → A: **Visible to `CASH_ENTRY` holders, hidden from everyone else.** The one change hiding itself needs.
+
+### Session 2026-10-01 *(superseded in part — see above)*
+
 - Q: With cash hiding on, may cash still be entered? → A: **Yes, entry is untouched.**
   `CashVisibilityInterceptor` "shapes the response; never touches a query or a row" — hiding is a
   display control, as FR-017 of the backend spec requires. So this never becomes the permission

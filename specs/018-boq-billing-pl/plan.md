@@ -31,8 +31,9 @@ web surfaces that touch them are sequenced last for the same reason.
 
 ## The sizing question, and what it does and does not block
 
-The spec carries **[NEEDS CLARIFICATION: how large is a real BOQ?]**, and the client is supplying a
-template. It does not block this plan, for two reasons.
+The spec carries **[NEEDS CLARIFICATION: how large is a real BOQ?]**. On 2026-10-02 the client
+confirmed they are supplying a real BOQ as a file, and declined the offer to build for a guessed
+ceiling in the meantime. It does not block this plan, for two reasons.
 
 **NFR-001 already commits to a figure**: a 500-line sheet interactive within 3 seconds, typing without
 perceptible lag thereafter. That is a target to design against today, and the template will confirm
