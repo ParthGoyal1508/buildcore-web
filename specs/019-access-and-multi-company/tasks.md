@@ -73,26 +73,26 @@ level visible to the code before anything acts on it.
 Controls are removed, never disabled. FR-007 says so, and a disabled button still advertises an
 action the person cannot take.
 
-- [ ] T012 Audit which modules carry write controls and record the list in this file before
+- [x] T012 Audit which modules carry write controls and record the list in this file before
       changing any of them. SC-004 is measured "across every module", and a list assembled while
       editing is a list that quietly omits whatever was edited last
-- [ ] T013 [P] Gate write controls in `app/ui/hr/` on `canWrite`
-- [ ] T014 [P] Gate write controls in `app/ui/plant/` on `canWrite` — the client's Note 22 example
+- [x] T013 [P] Gate write controls in `app/ui/hr/` on `canWrite`
+- [x] T014 [P] Gate write controls in `app/ui/plant/` on `canWrite` — the client's Note 22 example
       role (logbook entry, nothing else in machinery) is this module, and is what SC-003 measures
-- [ ] T015 [P] Gate write controls in `app/ui/inventory/` on `canWrite`
-- [ ] T016 [P] Gate write controls in `app/ui/projects/` on `canWrite`
-- [ ] T017 [P] Gate write controls in `app/ui/partners/` on `canWrite`
-- [ ] T018 [P] Gate write controls in `app/ui/labour/` on `canWrite`
-- [ ] T019 [P] Gate write controls in `app/ui/assets/` on `canWrite`
-- [ ] T020 [P] Gate write controls in `app/ui/recruitment/` on `canWrite`
-- [ ] T021 [P] Gate write controls in `app/ui/documents/` and `app/ui/letters/` on `canWrite`
-- [ ] T022 Gate write controls in `app/ui/settings/` on `canWrite`. Settings is last because its
+- [x] T015 [P] Gate write controls in `app/ui/inventory/` on `canWrite`
+- [x] T016 [P] Gate write controls in `app/ui/projects/` on `canWrite`
+- [x] T017 [P] Gate write controls in `app/ui/partners/` on `canWrite`
+- [x] T018 [P] Gate write controls in `app/ui/labour/` on `canWrite`
+- [x] T019 [P] Gate write controls in `app/ui/assets/` on `canWrite`
+- [x] T020 [P] Gate write controls in `app/ui/recruitment/` on `canWrite`
+- [x] T021 [P] Gate write controls in `app/ui/documents/` and `app/ui/letters/` on `canWrite`
+- [x] T022 Gate write controls in `app/ui/settings/` on `canWrite`. Settings is last because its
       own control (Phase 5) is gated by the same mechanism, and getting that backwards locks the
       feature's author out of the setting that configures it
-- [ ] T023 **Do not gate the approvals surfaces.** Authority to approve comes from the chain's slot
+- [x] T023 **Do not gate the approvals surfaces.** Authority to approve comes from the chain's slot
       mapping, not from a permission value — `app/dashboard/approvals/layout.tsx` already records
       this. Note it here so a later sweep does not "finish the job" by gating them
-- [ ] T024 Verification: sign in as the read-only role and walk every module — quickstart
+- [ ] T024 **NOT RUN** Verification: sign in as the read-only role and walk every module — quickstart
       Scenario 2. Record the pass, including the 403 replay that confirms the server is the actual
       boundary
 
@@ -103,30 +103,30 @@ action the person cannot take.
 **Goal**: FR-008, FR-011. **Independent test**: direct URL entry is refused consistently with
 feature 014's existing guard, and a user with nothing visible is told so.
 
-- [ ] T025 Extend feature 014's module guard to consult `canWrite` for routes that are
+- [x] T025 Extend feature 014's module guard to consult `canWrite` for routes that are
       write-by-nature. Extend the existing mechanism; do not add a second guard (FR-016)
-- [ ] T026 Identify which routes are write-by-nature. **The API already did this work and the
+- [x] T026 Identify which routes are write-by-nature. **The API already did this work and the
       answer is not "whatever uses POST"**: its T014 found two routes that are writes by verb and
       reads by meaning — `POST /attendance/import/validate` (checks a file, imports nothing) and
       `POST /dashboard/reports/:type/export` (exporting a report is seeing it). Mirror that
       judgement rather than re-deriving it from HTTP verbs
-- [ ] T027 Render the no-visible-modules message (FR-011) when `visibleModules` is empty. Plainly,
+- [x] T027 Render the no-visible-modules message (FR-011) when `visibleModules` is empty. Plainly,
       and naming who to ask — a user seeing an empty shell with no explanation assumes the product
       is broken rather than that their access is pending
-- [ ] T028 **FR-010 — a permission change reaches the holder on their next load, with no cache
+- [x] T028 **FR-010 — a permission change reaches the holder on their next load, with no cache
       clear.** Uncovered until now, and it fails in the direction that matters: a user whose write
       access was revoked keeps being offered write controls, and a user newly granted access keeps
       being refused. `['currentUser']` must not be served stale across a reload — refetch it on mount
       rather than trusting a cached entry
-- [ ] T029 **The service worker is the other half of FR-010** (spec edge case: "navigation cached by
+- [x] T029 **The service worker is the other half of FR-010** (spec edge case: "navigation cached by
       the service worker from before a permission change"). `app/sw.ts` exists and caches navigation.
       Confirm it does not serve a cached shell whose menu reflects permissions the user no longer has,
       and that a permission change does not require the user to clear site data — which is a thing no
       site worker will ever do and an administrator cannot do for them
-- [ ] T030 Verification for FR-010: revoke a permission on a signed-in user, reload, and confirm the
+- [ ] T030 **NOT RUN** Verification for FR-010: revoke a permission on a signed-in user, reload, and confirm the
       change is reflected without clearing anything. Then grant one back. Both directions, because
       only one of them is the security-relevant one and only the other is the one users complain about
-- [ ] T031 Verification: direct-URL entry to a refused route, and a user with no modules
+- [ ] T031 **NOT RUN** Verification: direct-URL entry to a refused route, and a user with no modules
 
 ---
 
@@ -233,24 +233,24 @@ The hiding itself is the API's. `CashVisibilityInterceptor` already shapes respo
 FR-013 covers exports without separate work: an export built from the same response carries the
 same nulls.
 
-- [ ] T047 Add `getCashVisibility()` and `setCashVisibility(hide)` to `app/lib/api/settings.ts`
-- [ ] T048 Create `app/ui/settings/cash-visibility.tsx`, present only for `COMPANY_SETTINGS` at
+- [x] T047 Add `getCashVisibility()` and `setCashVisibility(hide)` to `app/lib/api/settings.ts`
+- [x] T048 Create `app/ui/settings/cash-visibility.tsx`, present only for `COMPANY_SETTINGS` at
       **write** level (FR-012) — the first real consumer of Phase 1's `hasWrite`. Absent, not
       disabled
-- [ ] T049 Create `app/ui/hidden-amount.tsx` rendering a field where `amountHidden` is true. A
+- [x] T049 Create `app/ui/hidden-amount.tsx` rendering a field where `amountHidden` is true. A
       stated absence, **never a blank cell and never `0`** — the API returns null rather than zero
       precisely so the two can be told apart, and rendering it as empty throws that away
-- [ ] T050 Render `amountHidden` wherever a cash amount can appear. Audit by field, not by screen:
+- [x] T050 Render `amountHidden` wherever a cash amount can appear. Audit by field, not by screen:
       the API decides per row from `paymentMode`, holds no screen list, and the web holding one is
       how the two drift
-- [ ] T051 **Any total spanning a hidden row must say it is incomplete** (FR-014), rather than
+- [x] T051 **Any total spanning a hidden row must say it is incomplete** (FR-014), rather than
       present a figure that is quietly short by the value of every hidden row in it. This is the
       requirement the retired spec marker was really about
-- [ ] T052 On a successful setting change, invalidate the affected queries so open screens update
+- [x] T052 On a successful setting change, invalidate the affected queries so open screens update
       without a manual reload (FR-015)
-- [ ] T053 Note that cash **entry** is unaffected — the interceptor "never touches a query or a
+- [x] T053 Note that cash **entry** is unaffected — the interceptor "never touches a query or a
       row". No entry control is gated by this setting (Clarifications, 2026-10-01)
-- [ ] T054 Verification: quickstart Scenario 4 module by module (SC-005), the export, and recording
+- [ ] T054 **NOT RUN** Verification: quickstart Scenario 4 module by module (SC-005), the export, and recording
       a cash payment with hiding on
 
 ---
@@ -396,3 +396,127 @@ which would have left the form arriving in a state its viewer could not submit.
 **T067 NOT RUN** — the manual pass with and without the permission, at desktop and 320px. This
 repository has no test framework (`TODO(TESTING_STANDARD)`), so `tsc`, `eslint` and `next build` are
 the automated verification: all three clean.
+
+### Phases 2, 3 and 6 implementation record, 2026-10-02
+
+#### T012 — the audit, before anything was changed
+
+Files carrying a `useMutation`, by module:
+
+| Module | `app/ui/<module>` | `app/dashboard/<module>` |
+|---|---|---|
+| hr | 19 | 0 |
+| plant | 11 | 6 |
+| inventory | 7 | 5 |
+| projects | 3 | 3 |
+| partners | 5 | 4 |
+| labour | 0 | 7 |
+| assets | 5 | 2 |
+| recruitment | 2 | 7 |
+| documents | 1 | 0 |
+| letters | 0 | 0 |
+| settings | 13 | 0 |
+
+**Roughly a hundred files, and that number is what decided the design.** Gating each control
+individually would have been a hundred opportunities to name the wrong permission, silently: naming
+one the caller happens to hold looks exactly like naming the right one, and nothing in a build or a
+lint run can tell them apart. There is no test framework here to catch it either.
+
+#### What was built instead: resolve the area from the route
+
+`app/lib/write-access.tsx` answers "may the person on this screen write here" with no argument from
+the caller. Every module has published its own section-to-permission map since it was built, to gate
+its own tabs — `PLANT_PERMISSIONS`, `HR_PERMISSIONS`, and seven more — so the mapping already
+existed and was already being kept correct for a reason unrelated to this.
+
+**Section before module, longest prefix wins.** Plant is why, and it is also the client's own
+example of what they asked for in `bugs.md` item 19: site staff who may enter logbook and diesel
+readings and touch nothing else in machinery. `MACHINERY`, `LOGBOOK`, `FUEL`, `MAINTENANCE` and
+`HIRE_BILLS` are five permissions inside one module, and a module-level answer gets that case wrong
+in both directions at once.
+
+#### The default inverted, which is the whole of T013 to T022
+
+`Button` and `RowAction` are now **write-gated by default**, with `intent="read"` for the exceptions.
+Of 147 `Button` call sites one changes nothing; of about 70 `RowAction` call sites seven only look.
+So the work became marking eight controls rather than wrapping two hundred and sixteen, and the
+failure mode moved to the safe side: forgetting `read` hides a harmless control, where forgetting a
+wrapper would have left a destructive one on screen for somebody who may not use it.
+
+`SecondaryButton` is deliberately **not** gated. It is overwhelmingly Cancel and Close inside modals
+that a reader cannot open in the first place, and gating it would have made those modals
+un-dismissable in the one case where one did open.
+
+Removed, never disabled, per FR-007.
+
+#### Two exclusions, both deliberate
+
+**The approvals surfaces** (T023): authority to approve comes from the chain's slot mapping, not
+from a permission value. They sit outside every `guardPrefix`, so "no module claims this route" and
+"deliberately ungated" are one condition rather than two that have to be kept in step.
+
+**My Workspace**: an employee punching in is writing, and those endpoints carry no permission at all
+on the server — they are `@SelfService()`, answerable to who the caller is. Gating them on
+`MY_WORKSPACE` at write level would have taken the punch button away from the employees the module
+exists for.
+
+#### T025, T026 — write-by-nature routes
+
+Two: `/dashboard/projects/portfolio/new` and `/dashboard/hr/employees/new`. Everywhere else creation
+happens in a modal reached from a now-gated control, so the list is short by construction.
+`/dashboard/account-creation/new` is deliberately absent — it is how an account comes to exist, under
+no module, governed by role.
+
+Not derived from HTTP verbs, per T026: the backend's audit found two routes that are writes by verb
+and reads by meaning, and that judgement is mirrored rather than re-derived. The check extends
+`ModuleGuard` rather than adding a second guard (FR-016) — two guards deciding the same question is
+how they come to disagree.
+
+#### T028 — the stale-permission window was real
+
+`['currentUser']` inherited the client's 30-second `staleTime`, which is right for settings data and
+wrong for the field that decides every guard, every hidden control and every section tab across
+roughly 45 components. `setQueryDefaults(['currentUser'], { staleTime: 0, refetchOnMount: 'always' })`
+in `app/providers.tsx` — set once rather than at 45 reads, because a rule that must be remembered at
+each read is already broken somewhere.
+
+`refetchOnMount: 'always'` rather than a shorter window, because the risk is not age: it is a mount
+that trusts the cache. The cached value still renders immediately, so the cost is one background
+request per navigation.
+
+#### T029 — the service worker was already correct
+
+`app/sw.ts` routes everything cross-origin or under `/bff` to `NetworkOnly`, ahead of
+`defaultCache`'s catch-all. So no API response is ever cached, `['currentUser']` included. The app
+shell *is* precached — but the shell is a bundle that renders the menu from a live `['currentUser']`
+fetch, not a snapshot of one. **No change needed, and recorded rather than asserted**, because the
+reason it is safe is a rule in a different file that a future caching change could undo.
+
+#### T047 to T053 — the toggle `bugs.md` item 16 actually asked for
+
+It did not exist in this client at all. The API has had `GET`/`PATCH /settings/cash-visibility`
+since 019 Phase 5; nothing called it, so the client's "add a toggle to hide all cash payment
+entries" was unreachable from the product.
+
+`app/ui/settings/cash-visibility.tsx` is one component in two shapes: a compact toggle in the shell
+header, because the client said "in the main menu" and the situation it is for is situational —
+somebody walks into the room — and a panel on Settings → Companies, where somebody goes looking for
+it and where there is room to say what it does. One component rather than two, so the two cannot
+disagree about what the switch currently says. Present only for `COMPANY_SETTINGS` at **write**
+level, and absent otherwise: a disabled switch would tell every reader in the company that the
+figures in front of them can be concealed.
+
+On success the whole query cache is invalidated (T052), not a list of cash-holding modules: the API
+decides per row from `paymentMode` and keeps no screen list, and a list kept here is how the two
+drift.
+
+T053 confirmed: nothing gates a cash *entry* control on this setting. The one control that depends
+on it is the denomination breakup's visibility, which depends on `CASH_ENTRY` instead.
+
+#### Verification
+
+`npx tsc --noEmit`, `npx eslint app` (0 errors) and `npm run build` all clean.
+
+**T024, T030, T031, T054 NOT RUN** — all four are browser passes against a running API with
+specific roles provisioned. This repository has no test framework (`TODO(TESTING_STANDARD)`), so
+there is no automated stand-in for them, and saying so is more useful than implying otherwise.

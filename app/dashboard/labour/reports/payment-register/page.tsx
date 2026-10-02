@@ -66,6 +66,7 @@ export default function PaymentRegisterPage() {
         />
         <div className="flex items-end">
           <Button
+            intent="read"
             className="w-full justify-center"
             onClick={() => setSubmitted(true)}
             disabled={!projectId || !periodFrom || !periodTo}

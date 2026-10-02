@@ -352,3 +352,40 @@ export async function updateShift(id: string, input: ShiftInput): Promise<Shift>
 export async function deleteShift(id: string): Promise<void> {
   await authFetch(`/settings/shifts/${id}`, { method: 'DELETE' });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cash visibility (019 FR-012 to FR-015 — `bugs.md` item 16)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether cash amounts are hidden for this company.
+ *
+ * A **display** control, which is the whole of its design: nothing is deleted or altered while it
+ * is on, and turning it off restores every figure exactly. The API nulls a cash amount and sets
+ * `amountHidden` beside it rather than zeroing it — see `app/lib/api/cash-hiding.ts` for why that
+ * distinction has to survive all the way to the screen.
+ */
+export const cashVisibilitySchema = z.object({
+  hideCashTransactions: z.boolean(),
+});
+export type CashVisibility = z.infer<typeof cashVisibilitySchema>;
+
+export async function getCashVisibility(
+  companyId?: string,
+): Promise<CashVisibility> {
+  return cashVisibilitySchema.parse(
+    await authFetch(withCompany('/settings/cash-visibility', companyId)),
+  );
+}
+
+export async function setCashVisibility(
+  hideCashTransactions: boolean,
+  companyId?: string,
+): Promise<CashVisibility> {
+  return cashVisibilitySchema.parse(
+    await authFetch(withCompany('/settings/cash-visibility', companyId), {
+      method: 'PATCH',
+      body: JSON.stringify({ hideCashTransactions }),
+    }),
+  );
+}

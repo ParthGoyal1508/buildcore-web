@@ -102,7 +102,7 @@ export default function MustersPage() {
         emptyMessage="No musters in this state."
         actions={(m) => (
           <Link href={ROUTES.labourMuster(m.id)}>
-            <RowAction>Open</RowAction>
+            <RowAction intent="read">Open</RowAction>
           </Link>
         )}
       />

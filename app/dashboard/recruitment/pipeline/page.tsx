@@ -136,7 +136,9 @@ function PipelineInner() {
                   → {recruitmentLabel(NEXT_STAGE[c.stage])}
                 </RowAction>
               )}
-              <RowAction onClick={() => setDrawer(c)}>Open</RowAction>
+              <RowAction intent="read" onClick={() => setDrawer(c)}>
+                Open
+              </RowAction>
             </span>
           )}
         />

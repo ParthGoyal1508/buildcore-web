@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { hasModuleAccess, landingRoute } from '@/app/lib/permissions';
+import { canWriteAt, isWriteByNature } from '@/app/lib/write-access';
 import AccessDenied from '@/app/ui/access-denied';
 
 /**
@@ -76,6 +77,15 @@ export default function ModuleGuard({
       <p className="p-4 text-sm text-gray-500" role="status">
         {MESSAGES.navRedirecting}
       </p>
+    );
+  }
+
+  // 019 FR-008, T025. A screen that exists only to create something refuses a reader on arrival.
+  // Extending this guard rather than adding a second one (FR-016): two guards deciding the same
+  // question is how they come to disagree, and the one nobody is looking at is the one that wins.
+  if (isWriteByNature(pathname) && !canWriteAt(user, pathname)) {
+    return (
+      <AccessDenied detail="This page only creates records, and your role has read access here. The list it adds to is still open to you." />
     );
   }
 

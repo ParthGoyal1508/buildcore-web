@@ -28,7 +28,7 @@ export default function NewJoiningsReportPage() {
         <TextField id="nj-from" label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <TextField id="nj-to" label="To" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         <div className="flex items-end">
-          <Button className="w-full justify-center" onClick={() => setSubmitted(true)} disabled={!from || !to}>Run</Button>
+          <Button intent="read" className="w-full justify-center" onClick={() => setSubmitted(true)} disabled={!from || !to}>Run</Button>
         </div>
       </div>
 

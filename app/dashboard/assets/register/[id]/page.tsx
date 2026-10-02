@@ -376,7 +376,9 @@ export default function AssetDetailPage() {
           rowKey={(doc) => doc.id}
           emptyMessage="No documents attached yet."
           actions={(doc) => (
-            <RowAction onClick={() => openDocument(doc.id)}>Open</RowAction>
+            <RowAction intent="read" onClick={() => openDocument(doc.id)}>
+              Open
+            </RowAction>
           )}
         />
       )}

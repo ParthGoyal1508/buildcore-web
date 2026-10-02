@@ -16,7 +16,7 @@ import {
   type PaymentSheetLine,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { HIDDEN_AMOUNT } from '@/app/lib/api/cash-hiding';
+import HiddenAmount from '@/app/ui/hidden-amount';
 import { useCashRights } from '@/app/lib/cash-entry';
 import {
   CASH_DENOMINATIONS,
@@ -171,11 +171,13 @@ export default function PaymentSheetDetailPage() {
                   {/* A nulled deduction is a hidden one, not a zero: summing it as zero would
                       understate the column by the value of every concealed deduction, which is
                       the exact arithmetic the backend nulls rather than zeroes to prevent. */}
-                  {l.deductions.some((d) => d.amount === null)
-                    ? HIDDEN_AMOUNT
-                    : rupees(
-                        l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0),
-                      )}
+                  {l.deductions.some((d) => d.amount === null) ? (
+                    <HiddenAmount />
+                  ) : (
+                    rupees(
+                      l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0),
+                    )
+                  )}
                 </td>
                 <td className="px-3 py-2">{rupees(l.netPayable)}</td>
                 <td className="px-3 py-2">

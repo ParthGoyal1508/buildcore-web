@@ -83,7 +83,7 @@ export default function PaymentSheetsPage() {
         emptyMessage="No payment sheets yet."
         actions={(s) => (
           <Link href={ROUTES.labourPaymentSheet(s.id)}>
-            <RowAction>Open</RowAction>
+            <RowAction intent="read">Open</RowAction>
           </Link>
         )}
       />

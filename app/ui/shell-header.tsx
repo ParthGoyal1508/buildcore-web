@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { landingRoute } from '@/app/lib/permissions';
+import CashVisibility from '@/app/ui/settings/cash-visibility';
 import CompanySwitcher from '@/app/ui/company-switcher';
 import NotificationBell from '@/app/ui/dashboard/notification-bell';
 import Logo from '@/app/ui/logo';
@@ -86,6 +87,13 @@ export default function ShellHeader({
           hides itself where there is nothing to choose, so FR-001's "present on every screen" is met
           by mounting it once in the shared header instead of in each shell that remembers to. */}
       <CompanySwitcher />
+      {/* `bugs.md` item 16 asked for this "in the main menu", and the situation it is for is
+          situational — somebody walks into the room — so it has to be reachable without
+          navigating to Settings first. It renders nothing at all for anybody who cannot change
+          it, which is almost everybody, and hides below `sm` where the bar has no room. The same
+          component also appears on the Companies settings screen, where somebody goes looking
+          for it. */}
+      <CashVisibility variant="compact" />
       <NotificationBell />
     </header>
   );

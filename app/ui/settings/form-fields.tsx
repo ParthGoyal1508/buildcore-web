@@ -2,6 +2,8 @@
 
 import clsx from 'clsx';
 
+import { useCanWrite } from '@/app/lib/write-access';
+
 const FIELD_BOX =
   'rounded-md border border-gray-200 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:bg-gray-50 disabled:text-gray-500';
 
@@ -174,12 +176,34 @@ export function SecondaryButton({
   );
 }
 
-/** Small inline action used in list rows. */
+/**
+ * Small inline action used in list rows.
+ *
+ * **Gated on write access by default** (019 FR-009, FR-007). Nearly every row action in this app
+ * changes something — Edit, Delete, Approve, Disburse, Reverse — so the default that is right 65
+ * times out of 70 is the one that hides. A read-only holder sees the list and no way to act on it,
+ * and nothing had to be remembered at each of the 65 call sites for that to be true.
+ *
+ * `intent="read"` for the handful that only look: Open, Download, View. Spelling it out at those
+ * call sites is the trade this makes — and it is the right way round, because forgetting `read`
+ * hides a harmless control, while forgetting `write` would leave a destructive one on screen for
+ * somebody who may not use it.
+ *
+ * Removed, not disabled: FR-007 says so, and a disabled button still advertises an action its
+ * viewer cannot take, inviting the support call that asks why it does nothing.
+ *
+ * The server refuses either way. This is the affordance; `PermissionsGuard` is the boundary.
+ */
 export function RowAction({
   children,
   className,
+  intent = 'write',
   ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  intent?: 'write' | 'read';
+}) {
+  const canWrite = useCanWrite();
+  if (intent === 'write' && !canWrite) return null;
   return (
     <button
       {...rest}

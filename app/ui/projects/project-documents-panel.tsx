@@ -175,7 +175,11 @@ export default function ProjectDocumentsPanel({
                     ? DOCUMENT_COPY.projectDocumentRequiredBadge
                     : DOCUMENT_COPY.projectDocumentSupplementaryBadge}
                 </span>
-                <RowAction type="button" onClick={() => void open(document)}>
+                <RowAction
+                  intent="read"
+                  type="button"
+                  onClick={() => void open(document)}
+                >
                   {DOCUMENT_COPY.projectDocumentOpen}
                 </RowAction>
               </div>

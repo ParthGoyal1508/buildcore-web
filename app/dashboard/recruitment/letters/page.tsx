@@ -75,7 +75,7 @@ export default function LettersPage() {
         isLoading={letters.isPending}
         error={letters.isError ? 'Could not load letters.' : null}
         emptyMessage="No letters generated yet."
-        actions={(l) => <RowAction onClick={() => download.mutate(l.id)}>Download</RowAction>}
+        actions={(l) => <RowAction intent="read" onClick={() => download.mutate(l.id)}>Download</RowAction>}
       />
 
       {showGenerate && (
