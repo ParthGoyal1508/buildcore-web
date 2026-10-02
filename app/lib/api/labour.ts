@@ -11,6 +11,7 @@ import {
   RATE_SOURCES,
 } from '@/app/lib/constants';
 import { authFetch } from '@/app/lib/session';
+import { amountHidden, hideableDecimal } from './cash-hiding';
 
 /**
  * Every `/labour/*` and `/settings/skill-categories` call to `buildcore-api`
@@ -496,7 +497,10 @@ export type PaymentSheetListItem = z.infer<typeof paymentSheetListItemSchema>;
 const deductionSchema = z.object({
   type: z.string(),
   advanceId: z.string().optional(),
-  amount: decimal,
+  // Nullable because a deduction on a **cash** line is nulled with the rest of the row when the
+  // company hides cash — the interceptor applies a row's mode to everything nested under it. This
+  // was `decimal`, and one cash disbursement made the whole sheet fail to parse.
+  amount: hideableDecimal,
   label: z.string(),
 });
 
@@ -516,6 +520,7 @@ const paymentSheetLineSchema = z.object({
   shortPaymentReason: z.string().nullable(),
   carriedForwardBalance: decimal,
   status: z.enum(PAYMENT_SHEET_LINE_STATUSES),
+  amountHidden,
 });
 export type PaymentSheetLine = z.infer<typeof paymentSheetLineSchema>;
 

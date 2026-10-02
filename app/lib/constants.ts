@@ -525,6 +525,16 @@ export const MESSAGES = {
   // fault rather than anything the user did.
   sessionCookieMissing: 'Your session has ended. Please sign in again.',
 
+  // --- Cash entry (019 FR-017a, FR-017d) ---
+  // A screen that loses its cash controls must say so (FR-014): a payment form with no cash
+  // option and no explanation reads as a broken screen, and the person meeting it cannot tell
+  // whether to report a bug or ask for access. Which is why these name the permission — "ask an
+  // administrator" sends somebody to ask for they-know-not-what.
+  cashEntryUnavailable:
+    'Cash is not offered here because your role does not include Cash Entry. Other payment modes are unaffected.',
+  cashBreakupHidden:
+    'The cash denomination breakup is visible to roles with Cash Entry.',
+
   // --- Settings (feature 002) ---
   accessDeniedTitle: 'You do not have access to this page',
   accessDeniedBody:

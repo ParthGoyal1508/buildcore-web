@@ -319,18 +319,80 @@ which the 2026-10-01 session established from shipped code. The client reversed 
 Phase 5's rendering work still stands — blank, never zero — and this phase sits beside it rather than
 replacing it.
 
-- [ ] T064 [US3] Read `CASH_ENTRY` through `hasWrite`-style access on the current user, and hide every
+- [x] T064 [US3] Read `CASH_ENTRY` through `hasWrite`-style access on the current user, and hide every
       control that records a cash payment behind it. Hide, not disable: a disabled button invites a
       support call, and the client's intent is that the figures and their machinery are not visible at
       all to an office viewer.
-- [ ] T065 [US3] Show the labour payment sheet's denomination breakup only to a `CASH_ENTRY` holder. It
+- [x] T065 [US3] Show the labour payment sheet's denomination breakup only to a `CASH_ENTRY` holder. It
       is hidden from everyone today, including the cashier counting notes against it.
-- [ ] T066 [US3] **A screen that loses its cash controls must say so**, per FR-014. A payment sheet with
+- [x] T066 [US3] **A screen that loses its cash controls must say so**, per FR-014. A payment sheet with
       no way to record a payment and no explanation reads as a broken screen, and the person who meets it
       cannot tell whether to report a bug or ask for access.
-- [ ] T067 [P] [US3] Manual pass with and without the permission, both at desktop and 320px. The
+- [ ] T067 **NOT RUN** [P] [US3] Manual pass with and without the permission, both at desktop and 320px. The
       with-permission case matters as much: the whole design exists so a cashier keeps working, and a
       change that hides controls from everybody would pass a test that only checked the restricted view.
-- [ ] T068 [US3] Confirm no screen infers cash-entry rights from the hiding setting. They are two
+- [x] T068 [US3] Confirm no screen infers cash-entry rights from the hiding setting. They are two
       controls deliberately — one company-wide and about display, one per-caller and about capability —
       and a screen that conflates them reintroduces the company-wide entry block the design rejected.
+
+### Phase 7 implementation record, 2026-10-02
+
+**The phase found a broken screen before it found a missing control.** T064 asked for cash controls
+hidden behind `CASH_ENTRY`. Reading the money fields first turned up something worse: every one of
+them parsed as `decimal`, a union of number and string, and the backend's hiding interceptor
+replaces a cash row's amount with **`null`**. So for any company with hiding switched on,
+`paymentSchema.parse` threw and the payments list did not render a blank amount — it did not render
+at all. One cash disbursement did the same to a whole payment sheet, through the nested
+`deductionSchema`.
+
+That is the **fourth** time this cycle the server and these schemas disagreed about a field, after
+`ApiError.details`, the project-document `missingTypeIds` and `grants` — and the first where the
+disagreement broke a screen instead of quietly dropping something. `hideableDecimal` and
+`amountHidden` in `app/lib/api/cash-hiding.ts` are the fix, applied **only** to the fields the
+interceptor can actually reach: widening every money field to nullable would conceal the next
+genuine null, and a missing figure and a concealed one are different facts.
+
+**A hidden figure now reads "Hidden", not an em dash.** `rupees(null)` already produced an em dash,
+which is what these screens show for *no amount recorded*. Leaving it would have meant a reader
+could not tell a concealed payment from an unrecorded one — and `amountHidden` is exactly the field
+the backend added so they could.
+
+A nulled deduction is not summed as zero. Summing it would understate the column by the value of
+every concealed deduction, which is the arithmetic the backend nulls rather than zeroes to prevent;
+a column with any hidden row shows "Hidden" instead.
+
+### Two rights, not one
+
+`CASH_ENTRY` carries both levels and `app/lib/cash-entry.ts` exposes them separately:
+`mayEnterCash` (write — record a cash payment) and `maySeeCashBreakup` (either level — see a
+denomination breakup). A supervisor checking a payout against the notes needs the second and not the
+first. `useCashRights` shares the `['currentUser']` query key all 45 existing call sites use, so it
+adds no request.
+
+### T068: nothing infers one control from the other
+
+Confirmed by grep: `hideCashTransactions` appears in exactly one place in this client — the comment
+in `cash-entry.ts` saying nothing may read it. The two controls stay separate, which is the whole
+point of the two-control design.
+
+**One deliberate divergence.** The backend hides the breakup from a non-holder *only when hiding is
+on*; this client hides it from a non-holder regardless. Being stricter about display costs nothing —
+it never shows something the server concealed — and the alternative is for the client to read the
+company's hiding setting, which is precisely what T068 forbids. Recorded here rather than resolved
+silently.
+
+### What was hidden, and what was not
+
+The `cash` option disappears from the inventory payment modal and the labour disburse modal — the
+option, not the form, because a non-cash payment must stay recordable. Hidden and not disabled, per
+T064: a disabled control invites a support call.
+
+Each screen that loses a control says so, naming the permission (FR-014, T066). "Ask an
+administrator" sends somebody to ask for they-know-not-what.
+
+The disburse modal defaults to `bank` for a non-holder. It defaulted to `cash` unconditionally,
+which would have left the form arriving in a state its viewer could not submit.
+
+**T067 NOT RUN** — the manual pass with and without the permission, at desktop and 320px. This
+repository has no test framework (`TODO(TESTING_STANDARD)`), so `tsc`, `eslint` and `next build` are
+the automated verification: all three clean.
