@@ -58,6 +58,11 @@ const schema = z.object({
   esicEmployerRate: optionalNumber(rate),
   gratuityRate: optionalNumber(rate),
   bonusRate: optionalNumber(rate),
+  /**
+   * Text, never a number (021 FR-008a). `z.coerce.number()` on `09310400000819` yields
+   * `9310400000819` — the leading zero gone, and the transfer rejected at the bank.
+   */
+  payrollDebitAccountNumber: optionalText,
 });
 
 type FormValues = z.input<typeof schema>;
@@ -94,6 +99,7 @@ const FIELD_TAB: Record<string, TabId> = {
   esicEmployerRate: 'payroll',
   gratuityRate: 'payroll',
   bonusRate: 'payroll',
+  payrollDebitAccountNumber: 'payroll',
 };
 
 /**
@@ -149,6 +155,7 @@ export default function CompanyModal({
       esicEmployerRate: company?.esicEmployerRate ?? '',
       gratuityRate: company?.gratuityRate ?? '',
       bonusRate: company?.bonusRate ?? '',
+      payrollDebitAccountNumber: company?.payrollDebitAccountNumber ?? '',
     },
   });
 
@@ -295,6 +302,7 @@ export default function CompanyModal({
         </div>
 
         <div className={tab === 'payroll' ? 'space-y-4' : 'hidden'}>
+          <TextField id="payrollDebitAccountNumber" label="Payroll debit account number" placeholder="e.g. 09310400000819" hint="The company account salary transfers are debited from. Kept as text so a leading zero survives — the bank transfer sheet cannot be generated without it." error={err('payrollDebitAccountNumber')} {...register('payrollDebitAccountNumber')} />
           <TextField id="payrollLockDay" label="Payroll lock day" type="number" min={1} max={31} placeholder="Uses the configured default" hint="Day of month after which attendance edits lock." error={err('payrollLockDay')} {...register('payrollLockDay')} />
           <TextField id="pfEmployerRate" label="PF employer rate (%)" type="number" step="0.01" placeholder="Uses the configured default" error={err('pfEmployerRate')} {...register('pfEmployerRate')} />
           <TextField id="esicEmployerRate" label="ESIC employer rate (%)" type="number" step="0.01" placeholder="Uses the configured default" error={err('esicEmployerRate')} {...register('esicEmployerRate')} />

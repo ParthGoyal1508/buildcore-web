@@ -20,11 +20,17 @@ import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
+import SlipDelivery from '@/app/ui/hr/slip-delivery';
+import TransactionReconciliation from '@/app/ui/hr/transaction-reconciliation';
 
 const TABS = [
   { id: 'lines', label: 'Line items' },
   { id: 'register', label: 'Salary register' },
   { id: 'deductions', label: 'Deduction report' },
+  // 021 FR-006 to FR-011 (`bugs.md` item 8). Both tabs, and in this order: the slips go out after
+  // the money moves, and the bank's sheet comes back after that.
+  { id: 'delivery', label: 'Payslip delivery' },
+  { id: 'reconciliation', label: 'Bank reconciliation' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -251,6 +257,31 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
             </tr>
           }
         />
+      </TabPanel>
+
+      <TabPanel id="delivery" idPrefix="run" active={tab}>
+        {!processed ? (
+          /*
+            FR-009 asks for the reason rather than a disabled control. A draft run has no publishable
+            figures, so there is nothing to email — and saying so is what stops somebody waiting for
+            an email that was never going to be sent.
+          */
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            {HR_MESSAGES.deliveryNeedsProcessedRun}
+          </p>
+        ) : (
+          <SlipDelivery runId={runId} />
+        )}
+      </TabPanel>
+
+      <TabPanel id="reconciliation" idPrefix="run" active={tab}>
+        {!processed ? (
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            {HR_MESSAGES.reconciliationNeedsProcessedRun}
+          </p>
+        ) : (
+          <TransactionReconciliation runId={runId} />
+        )}
       </TabPanel>
 
       <TabPanel id="register" idPrefix="run" active={tab}>

@@ -169,21 +169,21 @@ importer anywhere in the app.
 
 **Goal**: FR-006 – FR-009. Sending is an **explicit action** (decision of 2026-10-01).
 
-- [ ] T028 [US2] Add slip-delivery reads and the retry to `app/lib/api/hr-payroll.ts`
-- [ ] T029 [US2] Create `app/ui/hr/slip-delivery.tsx` listing delivered, failed and undeliverable
+- [x] T028 [US2] Add slip-delivery reads and the retry to `app/lib/api/hr-payroll.ts`
+- [x] T029 [US2] Create `app/ui/hr/slip-delivery.tsx` listing delivered, failed and undeliverable
       (FR-006), mounted on `app/ui/hr/payroll-run-detail.tsx`
-- [ ] T030 [US2] An explicit **send** control. Not automatic: an explicit send can be automated later,
+- [x] T030 [US2] An explicit **send** control. Not automatic: an explicit send can be automated later,
       whereas an automatic send that was wrong has already emailed 500 people their salary slips
-- [ ] T031 [US2] A **retry that resends only failures** (FR-007), presented so it cannot be mistaken
+- [x] T031 [US2] A **retry that resends only failures** (FR-007), presented so it cannot be mistaken
       for "send all" — the difference is 12 emails or 500
-- [ ] T032 [US2] Show the **address as sent** on each row. An employee whose email is corrected after
+- [x] T032 [US2] Show the **address as sent** on each row. An employee whose email is corrected after
       a failure must not have the old failure read as though it went to the new address
-- [ ] T033 [US2] A run that is not fully approved refuses delivery; **show the reason** rather than a
+- [x] T033 [US2] A run that is not fully approved refuses delivery; **show the reason** rather than a
       disabled control with no explanation (FR-009)
-- [ ] T034 [US2] Present a run with some failures as **partial, not failed**. Failures are isolated by
+- [x] T034 [US2] Present a run with some failures as **partial, not failed**. Failures are isolated by
       design — one bad address does not stop the other 499 — and a screen that reads as a failed run
       invites somebody to re-send everything
-- [ ] T035 [US2] Verification: quickstart Scenario 3
+- [ ] T035 **NOT RUN** [US2] Verification: quickstart Scenario 3
 
 ---
 
@@ -192,16 +192,16 @@ importer anywhere in the app.
 **Goal**: FR-010, FR-011. The transaction-sheet format rests on a file the client has not supplied;
 the backend builds against one seeded mapping profile so theirs becomes a second profile.
 
-- [ ] T036 [US3] Add the bank sheet and reconciliation reads to `app/lib/api/hr-payroll.ts`
-- [ ] T036a [US3] **FR-008 — the transaction sheet upload itself**, showing matched lines, unmatched
+- [x] T036 [US3] Add the bank sheet and reconciliation reads to `app/lib/api/hr-payroll.ts`
+- [x] T036a [US3] **FR-008 — the transaction sheet upload itself**, showing matched lines, unmatched
       lines and differences. Previously implied by the display tasks below without anything actually
       uploading a file. A validated multipart upload (Principle II on the backend's side; a typed
       client on this one)
-- [ ] T037 [US3] Show advance recoveries as **named lines** (FR-010), not a netted figure
-- [ ] T038 [US3] Explain differences between the sheet and the run **line by line** (FR-011)
-- [ ] T039 [US3] An unparseable row **uploads and is reported**; the file does not fail. A parser that
+- [x] T037 [US3] Show advance recoveries as **named lines** (FR-010), not a netted figure
+- [x] T038 [US3] Explain differences between the sheet and the run **line by line** (FR-011)
+- [x] T039 [US3] An unparseable row **uploads and is reported**; the file does not fail. A parser that
       refuses on the first unrecognised row reports nothing, which is the opposite of what is wanted
-- [ ] T040 [US3] Verification: quickstart Scenario 4, once a real file exists
+- [ ] T040 **NOT RUN** [US3] Verification: quickstart Scenario 4, once a real file exists
 
 ---
 
@@ -261,15 +261,100 @@ The web half of the client's waiver answer: HR proposes, the Director countersig
 screen shipped on 2026-10-01**, where the waiver control wrote immediately for anyone with write access
 on Employees.
 
-- [ ] T049 [US4] The waiver control submits for approval rather than applying. Its label must say so —
+- [x] T049 [US4] The waiver control submits for approval rather than applying. Its label must say so —
       "Request waiver", not "Waive" — because a control that says it has done a thing it has only
       proposed is the kind of copy that gets an exit signed off on a waiver nobody approved.
-- [ ] T050 [US4] Show the pending state on the clearance row, with who proposed it and when. Until the
+- [x] T050 [US4] Show the pending state on the clearance row, with who proposed it and when. Until the
       Director decides, the obligation is still outstanding and the screen must not read as cleared.
-- [ ] T051 [US4] Show a rejected waiver as rejected and the item as still outstanding. Silence after a
+- [x] T051 [US4] Show a rejected waiver as rejected and the item as still outstanding. Silence after a
       rejection reads as success.
-- [ ] T052 [US4] `mayWaive` becomes "may propose a waiver". The shipped `hasWrite(user, 'EMPLOYEES')` was
+- [x] T052 [US4] `mayWaive` becomes "may propose a waiver". The shipped `hasWrite(user, 'EMPLOYEES')` was
       my placeholder, and the client has now set the authority deliberately.
-- [ ] T053 [US4] Settlement stays blocked while a waiver is pending. The gate is the api's, but the screen
+- [x] T053 [US4] Settlement stays blocked while a waiver is pending. The gate is the api's, but the screen
       must explain it — an exit that will not settle with no stated reason sends somebody to a developer.
-- [ ] T054 [P] [US4] Manual pass: propose, approve, settle; and propose, reject, confirm still blocked.
+- [ ] T054 **NOT RUN** [P] [US4] Manual pass: propose, approve, settle; and propose, reject, confirm still blocked.
+
+### Phases 3, 4 and 6 implementation record, 2026-10-02
+
+#### The waiver control no longer claims to waive (Phase 6)
+
+"Request waiver", not "Waive"; "Send for approval", not "Record waiver". T049 is right about why:
+**a control that says it has done a thing it has only proposed is the copy that gets an exit signed
+off on a waiver nobody approved.** Somebody presses it, reads the label, and reports the obligation
+cleared.
+
+The modal says the request goes to the Director **before** the field rather than after the button —
+somebody who only learns it on success has already pressed a control they believed cleared the
+obligation.
+
+`mayWaive` became `mayPropose` on `PAYROLL` at write level (T052). `hasWrite(user, 'EMPLOYEES')` was
+a placeholder; the client set the authority deliberately, and the backend gates `waive()` on exactly
+the same value.
+
+**The pending state needed a backend change to exist.** `ClearanceItem.waiver` only appears once the
+Director has countersigned, so there was nothing for the screen to read — it would have shown the
+obligation as plainly outstanding with no sign a decision was in flight. `proposal` was added to the
+api for this, and the screen renders pending in amber (not green: a reader scanning for what is done
+must not find this row among it) and rejected in red with "it can be requested again".
+
+T053's explanation distinguishes "something is outstanding" from "a request is sitting on the
+Director's desk". The second is not an answer the first gives, and an exit that will not settle with
+no stated reason sends somebody to a developer.
+
+#### Delivery: two controls that must not be confused (Phase 3)
+
+The retry **names its count** — "Retry 3 failures" — sits apart from the send, and is **absent**
+rather than disabled when nothing failed. The difference between the two controls is twelve emails or
+five hundred, and an unlabelled "Retry" beside a "Send" is how somebody picks the wrong one. The
+server enforces it too (the retry queries `status: failed`), but a screen that invites the mistake is
+still a screen that causes it.
+
+Four tallies, not two. `undeliverable` has its own colour and its own hint saying a retry will not
+help, because these need somebody to find an address. `notAttempted` is separate because "nobody has
+tried yet" sends a different person to a different place than "it bounced".
+
+A run with some failures reads as **partial**, never failed — failures are isolated by design, and a
+banner saying "delivery failed" invites somebody to send everything again.
+
+The address column shows the address **as sent**, which is what the backend stores. Showing the
+current one would make an old failure read as though it went to the corrected address.
+
+#### Reconciliation: two kinds of gap, never one number (Phase 4)
+
+Unmatched lines and missing employees are separate sections with separate explanations. A line
+matching no employee is money that moved to somebody the run does not know about; an employee with no
+line is money that **did not move**. One "discrepancies" count sends both to whoever asked first.
+
+Missing employees are deliberately **not** rows in the main table: they are not lines in the sheet,
+and putting them there would make "lines in sheet" a number that did not match the file.
+
+Differences are not coloured by sign, and the hint says why: a transfer short by an advance recovery
+is correct, and a red row would have somebody chasing the bank about a deduction the company made on
+purpose.
+
+#### One thing worth recording about the upload
+
+`fileToBase64` reads an `ArrayBuffer` and chunks it through `String.fromCharCode`, not `btoa` over a
+string. `btoa` on a file read as text corrupts every byte above 0x7F — which is most of a zip
+archive, and an `.xlsx` is one. The chunking is because spreading a megabyte-long array into
+`fromCharCode` exceeds the argument limit and throws, on exactly the large files somebody would
+upload.
+
+#### The two fields that had no home
+
+`bankAccountHolderName` and `payrollDebitAccountNumber` reached the api's schema with its Phase 9 and
+had no DTO and no form, so the transfer sheet would have refused every row and every file — correctly,
+with no way for anybody to fix it. Both are now on the employee pay tab and the company payroll tab.
+The debit account is a **text** field: `z.coerce.number()` on `09310400000819` yields
+`9310400000819`, zero gone, transfer rejected.
+
+#### Verification
+
+`npx tsc --noEmit`, `npx eslint app` (0 errors) and `npm run build` all clean.
+
+**T035, T040 and T054 NOT RUN** — all three are browser passes against a running API with a seeded
+run and a provisioned Director. No test framework here (`TODO(TESTING_STANDARD)`).
+
+**Prettier was deliberately not run on any file in this repository.** There is no config here, so its
+defaults would reformat whatever it touched — the mistake that produced a 2,400-line diff in untouched
+code on 2026-10-01.

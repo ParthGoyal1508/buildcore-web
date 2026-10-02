@@ -198,6 +198,17 @@ export const employeeSchema = z.object({
   bankBranch: z.string().nullable(),
   bankAccountNumber: z.string().nullable(),
   ifscCode: z.string().nullable(),
+  /**
+   * The name the **bank** holds against the account (021 FR-008e).
+   *
+   * Not the employee's name as HR spells it, and often not even close: in the client's own bank
+   * sample these are "Arivnd" and "Rosan". A transfer is matched on the account number, but a name
+   * disagreeing with the bank's gets the payment returned — so the transfer sheet refuses a row
+   * without this rather than substituting the employee's name.
+   *
+   * `.nullable().default(null)` so an employee record saved before the field existed still parses.
+   */
+  bankAccountHolderName: z.string().nullable().default(null),
 
   mobile: z.string().nullable(),
   alternateMobile: z.string().nullable(),
@@ -1611,3 +1622,166 @@ export async function listSites() {
 }
 
 export type SiteOption = z.infer<typeof siteOptionSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slip delivery (021 FR-005 to FR-007 — `bugs.md` item 8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SLIP_DELIVERY_STATUSES = [
+  'pending',
+  'sent',
+  'failed',
+  'undeliverable',
+] as const;
+export type SlipDeliveryStatus = (typeof SLIP_DELIVERY_STATUSES)[number];
+
+const slipDeliveryRowSchema = z.object({
+  employeeId: z.string(),
+  employeeCode: z.string(),
+  employeeName: z.string(),
+  /**
+   * The address **as sent**, not as it stands now.
+   *
+   * The backend stores it rather than joining it at read time, and the screen must show what it
+   * stores: an employee whose email was corrected after a failure must not have the old failure read
+   * as though it went to the new address.
+   */
+  address: z.string(),
+  status: z.enum(SLIP_DELIVERY_STATUSES),
+  failureReason: z.string().nullable(),
+  sentAt: z.string().nullable(),
+});
+export type SlipDeliveryRow = z.infer<typeof slipDeliveryRowSchema>;
+
+export const slipDeliverySummarySchema = z.object({
+  runId: z.string(),
+  period: z.string(),
+  sent: z.number(),
+  failed: z.number(),
+  undeliverable: z.number(),
+  /**
+   * Employees in the run with no delivery row at all.
+   *
+   * "Nobody has tried yet" is a different thing to say from "it failed", and a screen that conflated
+   * them sends somebody retrying what was never attempted.
+   */
+  notAttempted: z.number(),
+  rows: z.array(slipDeliveryRowSchema),
+});
+export type SlipDeliverySummary = z.infer<typeof slipDeliverySummarySchema>;
+
+export async function getSlipDeliveries(
+  runId: string,
+): Promise<SlipDeliverySummary> {
+  return slipDeliverySummarySchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/slip-deliveries`),
+  );
+}
+
+/** Sends to everybody not already sent to. Skips the rest, so pressing twice sends once. */
+export async function sendSlipDeliveries(
+  runId: string,
+): Promise<SlipDeliverySummary> {
+  return slipDeliverySummarySchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/slip-deliveries`, {
+      method: 'POST',
+    }),
+  );
+}
+
+/** Resends **only** the failures. Never the undeliverable ones — they have no address. */
+export async function retrySlipDeliveries(
+  runId: string,
+): Promise<SlipDeliverySummary> {
+  return slipDeliverySummarySchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/slip-deliveries/retry`, {
+      method: 'POST',
+    }),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transaction sheet reconciliation (021 FR-008 to FR-011 — `bugs.md` item 8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const reconciledLineSchema = z.object({
+  rowNumber: z.number(),
+  beneficiaryName: z.string().nullable(),
+  beneficiaryAccount: z.string().nullable(),
+  ifsc: z.string().nullable(),
+  sheetAmount: nullableDecimal,
+  matchedEmployeeId: z.string().nullable(),
+  matchedEmployeeCode: z.string().nullable(),
+  runAmount: nullableDecimal,
+  /**
+   * Sheet minus run. Positive means the bank moved more than the run said.
+   *
+   * Reported, not judged — a transfer short by an advance recovery is correct, and the server does
+   * not know which differences are expected. The screen says the same.
+   */
+  difference: nullableDecimal,
+  unmatchedReason: z.string().nullable(),
+});
+export type ReconciledLine = z.infer<typeof reconciledLineSchema>;
+
+export const reconciliationSchema = z.object({
+  runId: z.string(),
+  period: z.string(),
+  totalLines: z.number(),
+  matched: z.number(),
+  unmatched: z.number(),
+  /**
+   * Employees in the run with no line in the sheet — money that did **not** move.
+   *
+   * A separate list from the unmatched lines, deliberately: this is the half somebody chases the
+   * bank about and the other half is the half somebody chases HR about.
+   */
+  missingFromSheet: z.array(
+    z.object({
+      employeeId: z.string(),
+      employeeCode: z.string(),
+      runAmount: decimal,
+    }),
+  ),
+  lines: z.array(reconciledLineSchema),
+});
+export type Reconciliation = z.infer<typeof reconciliationSchema>;
+
+/**
+ * Uploads the bank's returned sheet and reconciles it.
+ *
+ * Base64 in a JSON body, matching every other upload in this product. **An unparseable row uploads
+ * and is reported**: the only refusal is a file that cannot be opened as a workbook, because there
+ * the remedy is a different file rather than a report.
+ */
+export async function uploadTransactionSheet(
+  runId: string,
+  file: File,
+): Promise<Reconciliation> {
+  const data = await fileToBase64(file);
+  return reconciliationSchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/transaction-sheet`, {
+      method: 'POST',
+      body: JSON.stringify({ data, contentType: file.type }),
+    }),
+  );
+}
+
+/**
+ * A file as base64, without its data-URL prefix.
+ *
+ * `FileReader` rather than `btoa` over a string: a spreadsheet is binary, and `btoa` on a string read
+ * as text corrupts every byte above 0x7F — which is most of a zip archive, and an `.xlsx` is one.
+ */
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  // Chunked, because `String.fromCharCode(...bytes)` on a megabyte-long array exceeds the argument
+  // limit and throws — on exactly the large files somebody would upload.
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}

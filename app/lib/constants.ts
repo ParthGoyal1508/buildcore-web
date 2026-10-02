@@ -259,14 +259,38 @@ export const CLEARANCE_COPY = {
    */
   returnElsewhere: 'Returned in the asset register, not here.',
   cancel: 'Cancel',
-  waive: 'Waive',
-  waiveHeading: 'Stop pursuing this',
+  /**
+   * "Request waiver", not "Waive" (021 FR-016, task T049 — changed 2026-10-02).
+   *
+   * HR proposes and the Director countersigns, so the control does not waive anything. **A control
+   * that says it has done a thing it has only proposed is the copy that gets an exit signed off on
+   * a waiver nobody approved** — somebody presses it, reads "Waive", and reports the obligation
+   * cleared.
+   */
+  waive: 'Request waiver',
+  waiveHeading: 'Request a waiver',
   /** FR-014: the reason is required, and the backend enforces a real minimum. */
   waiveReasonLabel: 'Why the company is not pursuing this',
   waiveReasonShort: (min: number) =>
     `A reason of at least ${min} characters is required — this writes off company money.`,
-  waiveSubmit: 'Record waiver',
-  waiveFailed: 'The waiver could not be recorded.',
+  waiveSubmit: 'Send for approval',
+  waiveFailed: 'The waiver request could not be sent.',
+  /** Said in the modal, before it is sent, so nobody expects the item to clear. */
+  waiveNeedsApproval:
+    'This goes to the Director for approval. The obligation stays outstanding until they agree, and the exit cannot be settled before then.',
+  /** The pending state on the row (T050). */
+  waiverPending: (name: string, at: string) =>
+    `Waiver requested by ${name} on ${at} — awaiting the Director's approval.`,
+  waiverPendingStill:
+    'Still outstanding. Nothing has been written off yet.',
+  /** The rejected state (T051). Silence after a rejection reads as success. */
+  waiverRejected: (name: string, at: string) =>
+    `A waiver requested by ${name} on ${at} was not approved.`,
+  waiverRejectedStill:
+    'The obligation stands and the exit cannot be settled. It can be requested again with a fuller reason.',
+  /** Who countersigned, beside who asked (T090's two facts). */
+  waiverApprovedBy: (name: string, at: string) =>
+    `Approved by ${name} on ${at}`,
   /**
    * A waiver is **not** a discharge. The backend is explicit: an asset waived here stays
    * open in the asset register, because marking it returned would put a false fact in the
@@ -275,6 +299,15 @@ export const CLEARANCE_COPY = {
   waivedBy: (name: string, at: string) => `Waived by ${name} on ${at}`,
   waivedNotReturned: 'Waived — not returned. The obligation stands on the record.',
   settleBlocked: 'Final settlement is unavailable while anything above is outstanding.',
+  /**
+   * Said when the only thing in the way is a waiver nobody has decided yet (T053).
+   *
+   * The gate is the api's, but an exit that will not settle with no stated reason sends somebody to
+   * a developer — and "something is outstanding" is not an answer when the thing outstanding is a
+   * request already made.
+   */
+  settleBlockedPending:
+    'Final settlement is waiting on a waiver request the Director has not decided yet.',
   settleReady: 'Nothing is outstanding. Final settlement may proceed.',
   /**
    * "Could not ask" is not "nothing held", and the difference is somebody leaving with a
@@ -503,6 +536,88 @@ export const COMPANY_SWITCHER = {
    * caption three companies' figures with one company's name.
    */
   allCompanies: 'All companies',
+} as const;
+
+/**
+ * Slip delivery (021 FR-006 to FR-009) — `bugs.md` item 8.
+ *
+ * The retry's label **names its count**, and that is not decoration: the difference between it and
+ * the send is twelve emails or five hundred, and an unlabelled "Retry" beside a "Send" is how
+ * somebody picks the wrong one.
+ */
+export const SLIP_DELIVERY_COPY = {
+  heading: 'Payslip delivery',
+  hint: 'Emails each employee their payslip for this run, as an attachment. Sending is deliberate rather than automatic.',
+  loading: 'Checking who has been sent their payslip…',
+  loadFailed: 'Could not load the delivery status for this run.',
+  send: 'Email payslips',
+  sendRemaining: (count: number) =>
+    count === 0 ? 'Email payslips' : `Email the remaining ${count}`,
+  sendFailed: 'The payslips could not be sent.',
+  retry: (count: number) =>
+    count === 1 ? 'Retry 1 failure' : `Retry ${count} failures`,
+  retryFailed: 'The failed payslips could not be resent.',
+  noneYet: 'Nobody has been sent their payslip for this run yet.',
+  tally: {
+    sent: 'Sent',
+    failed: 'Failed',
+    undeliverable: 'No address',
+    notAttempted: 'Not tried',
+  },
+  statusLabels: {
+    sent: 'Sent',
+    failed: 'Failed',
+    undeliverable: 'No address',
+    pending: 'Pending',
+  } as Record<string, string>,
+  // Says what to do, because a retry will not fix these — they have no address to retry to.
+  undeliverableHint:
+    'Some employees have no email address on file, so there is nothing to retry. Add an address on their record, then send again.',
+  columns: {
+    employee: 'Employee',
+    address: 'Sent to',
+    status: 'Status',
+    detail: 'When / why',
+  },
+} as const;
+
+/**
+ * Reconciling the bank's returned sheet (021 FR-008 to FR-011) — `bugs.md` item 8.
+ *
+ * Two kinds of gap, named separately throughout: a line matching no employee is money that moved to
+ * somebody the run does not know about; an employee with no line is money that **did not move**.
+ * Different people chase each, and one "discrepancies" count would send both to whoever asked first.
+ */
+export const RECONCILIATION_COPY = {
+  heading: 'Bank transaction sheet',
+  hint: 'Upload the sheet the bank returned. Rows it cannot read are reported rather than rejected — the upload succeeds and the reconciliation is what is incomplete.',
+  upload: 'Upload the bank’s sheet',
+  uploading: 'Reading the sheet…',
+  uploadFailed: 'That file could not be read as a spreadsheet.',
+  noneYet: 'No transaction sheet has been uploaded for this run.',
+  tally: {
+    total: 'Lines in sheet',
+    matched: 'Matched',
+    unmatched: 'Unmatched',
+    missing: 'Not in sheet',
+  },
+  unmatchedHint:
+    'These lines name an account no employee in this run has. Money moved to somebody the run does not know about.',
+  missingHint:
+    'These employees are in the run and have no line in the sheet. That money did not move.',
+  differenceHint:
+    'A difference is reported, not judged: a transfer short by an advance recovery is correct, and this screen does not know which differences were intended.',
+  columns: {
+    row: 'Row',
+    beneficiary: 'Beneficiary',
+    account: 'Account',
+    sheetAmount: 'In sheet',
+    runAmount: 'In run',
+    difference: 'Difference',
+    matched: 'Matched to',
+    reason: 'Why not',
+    employee: 'Employee',
+  },
 } as const;
 
 export const MESSAGES = {
@@ -1476,6 +1591,17 @@ export const MY_ATTENDANCE_MESSAGES = {
 } as const;
 
 export const HR_MESSAGES = {
+  /**
+   * 021 FR-009. The reason rather than a disabled control.
+   *
+   * A draft run has no publishable figures, so there is nothing to email — and saying so is what
+   * stops somebody waiting for an email that was never going to be sent.
+   */
+  deliveryNeedsProcessedRun:
+    'Payslips can be emailed once this run has been processed. A draft run’s figures are still allowed to move.',
+  reconciliationNeedsProcessedRun:
+    'A bank sheet can be reconciled once this run has been processed and a transfer has been made against it.',
+
   // Employees
   employeeSaved: 'Employee saved.',
   employeeLoadFailed: 'Could not load this employee.',

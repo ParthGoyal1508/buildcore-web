@@ -34,6 +34,15 @@ export const companySchema = z.object({
   esicEmployerRate: z.number(),
   gratuityRate: z.number(),
   bonusRate: z.number(),
+  /**
+   * The account the payroll transfer is debited from (021 FR-008a).
+   *
+   * A **string**: an account number's leading zero is part of it, and the client's own sample debits
+   * `09310400000819`. Parsing it as a number would destroy the zero before any screen saw it.
+   *
+   * `.nullable().default(null)` so a company saved before the field existed still parses.
+   */
+  payrollDebitAccountNumber: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
