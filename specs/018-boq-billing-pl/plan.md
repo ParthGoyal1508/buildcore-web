@@ -31,9 +31,36 @@ web surfaces that touch them are sequenced last for the same reason.
 
 ## The sizing question, and what it does and does not block
 
-The spec carries **[NEEDS CLARIFICATION: how large is a real BOQ?]**. On 2026-10-02 the client
-confirmed they are supplying a real BOQ as a file, and declined the offer to build for a guessed
-ceiling in the meantime. It does not block this plan, for two reasons.
+**RESOLVED 2026-10-02 — the file arrived**: `buildcore-api/docs/BOQ_794578.xls`.
+
+It is not a simple sheet. It is a government e-tender template (`BoQ_Ver3.0`, "Percentage BoQ", against
+a PWD Integrated BSR, for an IOCL tender), macro-driven, with the usual warning that the bidder must
+not modify it. Five things in it change this plan, and none was guessable:
+
+1. **~312 line items, of which 83 are heading rows carrying no quantity.** A BOQ is a **two-level
+   hierarchy** — item `12` is a heading whose children are `12.01` and `12.02` — not the flat list this
+   plan assumed. NFR-001's 500-line interactivity target survives at the right order of magnitude.
+2. **The bidder's percentage applies once at the grand total, not per line.** `Total in Figures` is
+   29,961,506.78; `Quoted Rate in Figures` is 30,698,559.85, which is that total × 1.0246 for a 2.46%
+   excess. So a BOQ has an **estimated total and a quoted total** differing by a single percentage, and
+   per-line Addition/Deduction columns exist but are not in the line totals. A model that applied the
+   percentage per line would produce a figure close enough to look right and wrong by rounding.
+3. **26 distinct unit spellings for about 12 real units** — `Sqm`, `Sqm.`, `Sqm `, `sqm` are one unit
+   written four ways; `Mtr.`, `Mtr`, `Rm`, `R. mtr`, `R Mtr.`, `R.Mtr.`, `R. Mtr.` are a worse case. A
+   naive import creates 26 units, and every per-unit rate comparison and aggregate is then quietly
+   wrong. Normalisation on import is mandatory, not a nicety.
+4. **Columns 238–242 hold 216 rows of leftover test data** — `item1`, `item2`, `item3`, `item4`
+   repeating — in the same shape as real line items (code, description, item, quantity, unit). An
+   importer scanning for populated columns will find them. They must be ignored explicitly.
+5. **243 columns, about 35 populated**, and most of the populated ones are pre-GST tax columns (Excise
+   Duty, VAT, Cenvat, DGS&D/RITES) that are blank throughout. The template predates GST; the columns
+   must be tolerated on import and not resurrected in the product.
+
+Line totals are quantity × rate exactly (825.7287 × 251 = 207,257.9037), so the arithmetic is
+confirmed. The source carries float noise (`29961506.782150004`), which is one more reason to store
+decimals rather than re-derive from the file's own totals.
+
+It does not block this plan, for two reasons.
 
 **NFR-001 already commits to a figure**: a 500-line sheet interactive within 3 seconds, typing without
 perceptible lag thereafter. That is a target to design against today, and the template will confirm

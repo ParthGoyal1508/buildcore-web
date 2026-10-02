@@ -229,3 +229,43 @@ client's item 11.
 - T017 is conditional on the client's BOQ template and is the only task that answer touches.
 - Both [NEEDS CLARIFICATION] markers were addressed on 2026-10-01: draft recovery was decided, and
   the sizing question was reduced from a blocker to one conditional task.
+
+---
+
+## Phase 7: What the real BOQ changed (added 2026-10-02, file received)
+
+`buildcore-api/docs/BOQ_794578.xls` — a government e-tender BOQ, ~312 items. See the plan for the five
+findings. These tasks exist because the sheet contradicted the plan, not merely to confirm it.
+
+- [ ] T056 **CRITICAL** [US1] Model a BOQ line as a **two-level hierarchy**: a heading row with no
+      quantity, and sub-items numbered `12.01`, `12.02`. 83 of the sample's 312 rows are headings. The
+      flat list this feature was planned around cannot represent the file it has to import.
+- [ ] T057 [US1] Render a heading row as a heading — no quantity, no rate, no line total — and never as
+      a line with zeros. A zero quantity on a heading reads as a real measured quantity of nothing.
+- [ ] T058 **CRITICAL** [US1] Hold the **estimated total and the quoted total separately**, with the
+      bidder's percentage applied once to the estimated total. The sample: 29,961,506.78 at 2.46% excess
+      gives 30,698,559.85. Applying the percentage per line gives a figure close enough to pass a glance
+      and wrong by rounding, which is the worst available outcome for a tender document.
+- [ ] T059 [P] [US1] Unit test the grand-total arithmetic against the sample's own two figures. The file
+      is the test fixture: it carries both numbers, so this is checkable rather than assumed.
+- [ ] T060 **CRITICAL** [US1] Normalise units on import. `Sqm`/`Sqm.`/`Sqm `/`sqm` are one unit; the
+      running-metre family has seven spellings. Keep the original string against the line for audit and
+      match on the normalised form — discarding what the client typed would make a disagreement
+      unarguable.
+- [ ] T061 [P] [US1] Unit test: the sample's 26 unit spellings resolve to the expected ~12 units, and
+      `Excess (+)` — which appears in the units column on the quoted-rate row — resolves to none.
+- [ ] T062 [US1] Ignore columns beyond the known schedule on import. The sample holds 216 rows of
+      leftover test data in columns 238–242 shaped exactly like line items, and an importer scanning for
+      populated columns finds them.
+- [ ] T063 [P] [US1] Unit test: importing the sample yields ~312 lines, not ~528. The failure this
+      guards is silent and doubles a tender.
+- [ ] T064 [US1] Tolerate the blank pre-GST tax columns (Excise Duty, VAT, Cenvat, DGS&D/RITES) on
+      import without carrying them into the product. The template predates GST.
+- [ ] T065 [US1] Store quantities and rates as decimals and compute totals ourselves. The source carries
+      float noise (`178.09326499999995`, `29961506.782150004`); line totals are quantity × rate exactly,
+      so recomputing is both possible and more trustworthy than importing the file's figures.
+- [ ] T066 [P] [US1] Import the sample end to end and compare the computed grand total against its
+      stated one. One assertion that exercises the hierarchy, the units, the junk columns and the
+      arithmetic at once.
+- [ ] T067 [US1] Measure against NFR-001 using this file rather than a synthetic one: 312 lines
+      interactive within 3 seconds, typing without perceptible lag thereafter.
