@@ -12,7 +12,19 @@
  */
 
 const DB_NAME = 'buildcore-my-workspace';
-const DB_VERSION = 2;
+/**
+ * 3 since feature 018: the bill-draft store was added (`app/lib/bill-drafts.ts`).
+ *
+ * **A bump is required for a new object store and for nothing else.** An object store holds no
+ * column list, so a new *field* on an existing entry needs no bump — which is why
+ * `accuracyMeters` arrived without one.
+ *
+ * Feature 020 Phase 2 retires the punch store from this same database. Whichever of the two lands
+ * second must **not** treat the other's bump as a conflict to resolve by reverting: the version is
+ * a high-water mark, and reverting it leaves browsers that already opened the database at the
+ * higher version unable to open it at all.
+ */
+const DB_VERSION = 3;
 const STORE = 'punch-queue';
 /**
  * Muster capture queue (feature 013 FR-006).
@@ -25,6 +37,20 @@ const STORE = 'punch-queue';
  * other's payloads; both are driven by the identical logic below.
  */
 const MUSTER_STORE = 'muster-queue';
+
+/**
+ * Bill drafts (018 FR-005), owned by `app/lib/bill-drafts.ts`.
+ *
+ * A third store in the same database, for the reason the muster store is a second one: the
+ * mechanics here — `openDb`, `promisify`, the version ladder — are the thing worth sharing, and a
+ * second IndexedDB implementation in the same app would be two upgrade paths to keep in step.
+ *
+ * **This store is never drained to the server**, and that is the one thing to know before touching
+ * it. The punch and muster queues hold work that has not happened yet and must reach the API; a
+ * bill draft holds what somebody had typed, to offer back when the sheet reopens. Wiring it into a
+ * drain loop would submit half-finished bills.
+ */
+export const BILL_DRAFT_STORE = 'bill-drafts';
 
 /** One punch captured with no connectivity, awaiting sync. */
 export interface OfflineQueueEntry {
@@ -80,7 +106,7 @@ export interface MusterQueueEntry {
 
 /** Resolves null where IndexedDB is unavailable (SSR, or a browser with storage
  * disabled) so callers can degrade rather than crash. */
-function openDb(): Promise<IDBDatabase | null> {
+export function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') {
     return Promise.resolve(null);
   }
@@ -94,6 +120,11 @@ function openDb(): Promise<IDBDatabase | null> {
       if (!db.objectStoreNames.contains(MUSTER_STORE)) {
         db.createObjectStore(MUSTER_STORE, { keyPath: 'id', autoIncrement: true });
       }
+      // Keyed by the sheet it belongs to, not auto-incremented: there is exactly one draft per
+      // bill sheet, and the second save must replace the first rather than accumulate.
+      if (!db.objectStoreNames.contains(BILL_DRAFT_STORE)) {
+        db.createObjectStore(BILL_DRAFT_STORE, { keyPath: 'key' });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     // A queue that cannot be opened must not take the punch screen down with it —
@@ -102,7 +133,7 @@ function openDb(): Promise<IDBDatabase | null> {
   });
 }
 
-function promisify<T>(request: IDBRequest<T>): Promise<T> {
+export function promisify<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);

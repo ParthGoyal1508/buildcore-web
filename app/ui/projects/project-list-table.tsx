@@ -149,6 +149,31 @@ export default function ProjectListTable({
           >
             Documents
           </Link>
+          {/*
+            018's three money screens, reachable from the row rather than from a project detail
+            page that does not exist. Shown to everyone: the pages themselves refuse a caller
+            without `PROJECT_FINANCIALS`, and hiding the links here would need this table to load
+            the current user for a decision the destination already makes — at which point a reader
+            who *does* hold the permission and sees no link has no way to tell why.
+          */}
+          <Link
+            href={ROUTES.projectsSummary(row.id)}
+            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            Position
+          </Link>
+          <Link
+            href={ROUTES.projectsBilling(row.id)}
+            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            Bills
+          </Link>
+          <Link
+            href={ROUTES.projectsRaBills(row.id)}
+            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            Subcontractors
+          </Link>
           <Link
             href={ROUTES.projectsEditProject(row.id)}
             className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"

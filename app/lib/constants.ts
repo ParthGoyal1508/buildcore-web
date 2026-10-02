@@ -85,6 +85,26 @@ export const ROUTES = {
   projectsClients: '/dashboard/projects/clients',
   projectsSites: '/dashboard/projects/sites',
 
+  // --- Projects: billing and the P&L (feature 018, `bugs.md` items 11 and 14) ---
+  // Gated on `PROJECT_FINANCIALS`, not `PROJECTS` — see `PROJECTS_PERMISSIONS`. Billing
+  // and the summary are money screens and the backend guards them separately.
+  /** Every client bill on a project, and the sheet that composes the next one (FR-001). */
+  projectsBilling: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/billing`,
+  /** One client bill, at the rates it was billed at (FR-006). */
+  projectsClientBill: (projectId: string, billId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/billing/${billId}`,
+  /** Subcontractor RA bills measured against a work order's award (FR-007). */
+  projectsRaBills: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/ra-bills`,
+  projectsRaBill: (projectId: string, billId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/ra-bills/${billId}`,
+  /** Revenue and cost by category, monthly and cumulative, for one project (FR-010). */
+  projectsSummary: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/summary`,
+  /** Every project's position side by side, with the company total (FR-013). */
+  projectsPnlBoard: '/dashboard/projects/pnl',
+
   // --- Dashboard: Reminders centre (feature 004, US9) ---
   // Not a NAV_MODULES entry: Reminders is part of the Dashboard module, not a
   // module of its own, and it is gated by DASHBOARD. Note that the `dashboard`
@@ -664,6 +684,303 @@ export const LETTER_FIELD_COPY = {
   adding: 'Adding…',
 } as const;
 
+/**
+ * Every word the billing sheets say (018 US1, US2 — `bugs.md` items 11 and 12).
+ *
+ * Principle III: no string below is written at a call site. The ones that matter most are the
+ * explanations — an over-measured line and an unpriced line are both states a biller will meet while
+ * typing, and a sheet that only colours them red teaches people to ignore the colour.
+ */
+export const BILLING_COPY = {
+  // --- The BOQ sheet ---
+  boqHeading: 'Bill of quantities',
+  boqHint:
+    'Enter what was measured this period. Line and bill totals follow as you type — nothing is saved until you compose the bill.',
+  boqLoading: 'Loading the schedule…',
+  boqLoadFailed: 'Could not load this project’s bill of quantities.',
+  boqEmpty:
+    'This project has no bill of quantities yet, so there is nothing to bill against. Enter the BOQ first — a bill that references nothing cannot be reconciled against anything.',
+  columns: {
+    boqNo: 'Item',
+    task: 'Description',
+    unit: 'Unit',
+    scopeQty: 'Contracted',
+    billedQty: 'Billed to date',
+    remainingQty: 'Remaining',
+    rate: 'Rate',
+    quantity: 'This bill',
+    amount: 'Amount',
+  },
+  /** Both totals, because the quoted figure is the estimated one plus the bidder's percentage. */
+  estimatedTotal: 'Schedule total',
+  quotedTotal: 'Quoted total',
+  quotedPercentageNote: (percent: string) =>
+    `The quoted total is the schedule total plus the quoted excess of ${percent}, applied once to the total rather than line by line.`,
+  // --- States a biller meets while typing ---
+  unpriced: 'No rate',
+  unpricedHint:
+    'Nobody has priced this line yet, so it cannot be billed. A bill carrying it would be quietly short and would look finished.',
+  unpricedCount: (count: number) =>
+    count === 1
+      ? '1 line has no rate and cannot be billed.'
+      : `${count} lines have no rate and cannot be billed.`,
+  overQuantity: 'Past contracted',
+  /** FR-003: flagged at the line, and the bill is still submittable. */
+  overQuantityHint:
+    'This measurement goes past the contracted quantity. That is often correct — the bill can still be composed — but submitting it needs a reason.',
+  overQuantityReasonLabel: 'Why this goes past the contracted quantity',
+  overQuantityReasonMissing:
+    'A line past its contracted quantity needs a reason before the bill can be submitted.',
+  // --- Deductions, each in its own right ---
+  gross: 'Gross',
+  retention: 'Retention',
+  retentionBasis: (percent: string) => `${percent} of gross, withheld by the client`,
+  advanceRecovery: 'Advance recovery',
+  advanceRecoveryBasis: 'Money already advanced, coming back',
+  otherDeductions: 'Other deductions',
+  deductionTotal: 'Total deductions',
+  net: 'Net',
+  netPayable: 'Net payable',
+  /**
+   * The four-way distinction, said on the screen and not only in the code.
+   *
+   * A reader who drills from the summary's cost figure into a bill lands on a deduction line, and
+   * without this would reasonably conclude the project spent it.
+   */
+  deductionsAreNotCost:
+    'Retention is money withheld and an advance recovery is money already paid. Neither is project spend, which is why the summary reads gross rather than net.',
+  // --- Composing and submitting ---
+  compose: 'Compose bill',
+  composing: 'Composing…',
+  composeFailed: 'That bill could not be composed.',
+  submit: 'Submit bill',
+  submitting: 'Submitting…',
+  submitFailed: 'That bill could not be submitted.',
+  billNumberLabel: 'Bill number',
+  billingDateLabel: 'Billing date',
+  descriptionLabel: 'Description',
+  retentionPercentLabel: 'Retention withheld (%)',
+  nothingMeasured:
+    'Nothing has been measured yet. Enter a quantity against at least one line.',
+  // --- A bill read back ---
+  billsHeading: 'Bills raised',
+  billsEmpty: 'No bills have been raised on this project yet.',
+  historicalRatesNote:
+    'Shown at the rates it was billed at. A rate revised afterwards does not restate a bill that was already sent.',
+  certified: 'Certified',
+  certifiedShort: (variance: string) =>
+    `The client certified ${variance} less than was billed. Both figures are kept — the variance is the thing to chase, and overwriting the billed amount would erase the fact that there was one.`,
+  statusLabels: {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    certified: 'Certified',
+    approved: 'Approved',
+  } as Record<string, string>,
+  // --- Drafts recovered locally (FR-005) ---
+  draftFound: 'An unsaved draft of this sheet was found on this device.',
+  draftFoundHint:
+    'It was not sent to the server. Restoring it replaces what is on screen; discarding it cannot be undone.',
+  draftRestore: 'Restore draft',
+  draftDiscard: 'Discard draft',
+  draftSaved: (when: string) => `Draft kept on this device at ${when}`,
+  // --- RA bills (US2) ---
+  raHeading: 'Subcontractor bill',
+  raHint:
+    'Measured against what the work order awarded. Each deduction is shown with its basis — a deduction whose basis is hidden is imposed rather than arguable.',
+  raColumns: {
+    description: 'Awarded item',
+    unit: 'Unit',
+    awardedQty: 'Awarded',
+    toDateQty: 'Measured to date',
+    remainingQty: 'Remaining',
+    rate: 'Rate',
+    thisPeriodQty: 'This bill',
+    amount: 'Amount',
+  },
+  raEmpty: 'This work order has no awarded lines to measure against.',
+  exceedsAward:
+    'This measures more than the work order awarded. Raise a variation to the award first — paying above an award is the company agreeing to work it never ordered, and there is nobody downstream to catch it.',
+  // --- Revising a certified bill (FR-009) ---
+  reviseHeading: 'Revise measured quantities',
+  /** The warning IS the requirement: it comes before the edit, never as a toast after it. */
+  reviseWarning:
+    'This bill has been certified. Changing its quantities withdraws that certification and sends the bill for approval again — the existing approval is kept as a record of what was signed, and it will not apply to the new figures.',
+  reviseWarningPending:
+    'This bill is waiting on an approval. Changing its quantities replaces that request with a new one, so nobody is left deciding a version that no longer exists.',
+  reviseReasonLabel: 'Why the quantities changed',
+  reviseReasonHint:
+    'Required. Somebody has to decide this bill a second time, and “why” is the first thing they will ask.',
+  revise: 'Save and re-submit',
+  revising: 'Saving…',
+  reviseFailed: 'That revision could not be saved.',
+  /** FR-009's eventual consistency — see the note beside it in the sheet. */
+  reviseDone:
+    'Saved and sent for approval again. The approval queue may take a moment to catch up.',
+  // --- Conflict (FR-014) ---
+  conflictHeading: 'Somebody else changed this bill',
+  conflictHint:
+    'Your entry is still here and has not been sent. Open the bill’s current state in another tab, decide what should stand, and save again — nothing you typed has been discarded.',
+  conflictReload: 'Show me the current figures',
+  conflictKeep: 'Keep my entry',
+  // --- Recording what the client certified (FR-005) ---
+  certifyLabel: 'Amount the client certified',
+  certifyHint:
+    'Kept alongside the billed amount, never instead of it. The variance between the two is the thing to chase, and overwriting the billed figure would erase the fact that there was one.',
+  statusHeader: 'Status',
+  certifyOpen: 'Record certification',
+  certifySave: 'Save certification',
+  certifySaving: 'Saving…',
+  cancel: 'Cancel',
+  loading: 'Loading…',
+} as const;
+
+/**
+ * Work orders and award capture (018 US2).
+ *
+ * Separate from `BILLING_COPY` because this surface is **feature 008 User Story 6's**, delivered
+ * minimally so an RA bill is reachable at all. When 008 builds it properly these strings move with
+ * it, and keeping them in their own block is what makes that a move rather than an extraction.
+ */
+export const WORK_ORDER_COPY = {
+  heading: 'Work orders',
+  loading: 'Loading work orders…',
+  loadFailed: 'Could not load this project’s work orders.',
+  empty:
+    'No work order has been raised on this project yet. A subcontractor bill is measured against a work order’s award, so one has to exist first.',
+  summary: (retentionPercent: string, awardLines: number, bills: number) =>
+    `Retention ${retentionPercent} · ${awardLines} award line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
+  newHeading: 'New work order — what the subcontractor is doing',
+  retentionLabel: 'Retention (%)',
+  retentionHint:
+    'Cannot be changed once a bill has been raised: the retention on an issued bill is already withheld at the old rate, and moving the basis would make the subcontractor’s copy disagree with ours about money already held.',
+  raise: 'Raise work order',
+  raising: 'Raising…',
+  raiseFailed: 'That work order could not be raised.',
+  // --- Award capture ---
+  awardHeading: 'Capture the award',
+  awardHint:
+    'One line per awarded item: description, unit, quantity, rate — separated by a tab or a pipe. Paste it from the order; nothing is saved until you choose to.',
+  awardPlaceholder: 'RCC M25 in foundations | Cum | 100 | 4500',
+  awardLabel: 'Awarded lines',
+  awardSave: 'Save award',
+  awardSaving: 'Saving…',
+  /** Said rather than silently ignoring unparseable rows — a half-read award is worse than none. */
+  awardUnparseable:
+    'No usable lines were found. Each line needs a description, a unit, a quantity and a rate, separated by a tab or a pipe.',
+  awardMissing:
+    'This work order has no award captured yet, so there is nothing to measure against.',
+} as const;
+
+/**
+ * Every word the project summary and the P&L board say (018 US3, US4).
+ *
+ * The two most important strings here are `unavailable` and `notItemised`. A category nobody could
+ * ask about and a category with nothing in it are different facts, and a director acts differently on
+ * each — the first is a deployment problem, the second is a project running under budget.
+ */
+export const PNL_COPY = {
+  heading: 'Revenue, cost and budget',
+  loading: 'Loading the position…',
+  loadFailed: 'Could not load this project’s position.',
+  monthLabel: 'Month',
+  columns: {
+    line: 'Line',
+    monthly: 'This month',
+    cumulative: 'To date',
+    budget: 'Budget',
+    variance: 'Variance',
+  },
+  revenue: 'Revenue billed',
+  totalCost: 'Total cost',
+  margin: 'Margin',
+  categories: {
+    labour: 'Labour',
+    materials: 'Materials',
+    machinery: 'Machinery',
+    fuel: 'Fuel',
+    subcontractors: 'Subcontractors',
+    overheads: 'Overheads',
+  } as Record<string, string>,
+  /** FR-010: named, never reported as zero. */
+  unavailable: 'Not available',
+  unavailableHint: (categories: string) =>
+    `Nobody can say what was spent on ${categories}, so those figures are left out of the totals rather than counted as zero. Counting them as zero is how a project looks profitable because half its costs are invisible.`,
+  overScopeWarning:
+    'This month’s revenue includes a bill measured past its contracted quantity.',
+  // --- Drilling in (FR-011, FR-012) ---
+  drillHeading: (figure: string) => `What makes up ${figure}`,
+  drillLoading: 'Opening the records…',
+  drillFailed: 'Could not open the records behind this figure.',
+  drillEmpty: 'Nothing was recorded against this figure in the selected month.',
+  /** The spec's edge case: never an empty list where the answer is "we cannot show you". */
+  drillNotItemised:
+    'This figure is measured, but the module behind it reports a period total without listing the records inside it — so there is nothing to open here yet. The figure on the summary stands.',
+  drillRefused:
+    'You do not have access to the records behind this figure. It is shown here because it is part of a total you may see; what is inside it is not.',
+  drillColumns: {
+    reference: 'Reference',
+    date: 'Date',
+    amount: 'Amount',
+    status: 'Status',
+    description: 'Note',
+  },
+  drillTotal: 'Total of these records',
+  drillReconciles: 'Adds up to the figure it was opened from.',
+  drillDiffers: (difference: string) =>
+    `These records come to ${difference} less than the figure they were opened from. Treat both as suspect and report it.`,
+  // --- The monthly labour register (FR-010a) ---
+  labourHeading: 'Labour wages, by worker',
+  labourHint:
+    'Every payment sheet overlapping the calendar month, by worker. Read-only — wages are computed and corrected on the payment sheet, and a second place to change them would be a second answer to what somebody was paid.',
+  labourLoading: 'Loading the wage register…',
+  labourLoadFailed: 'Could not load the month’s wages.',
+  labourEmpty: 'No approved payment sheet overlaps this month.',
+  labourColumns: {
+    worker: 'Worker',
+    code: 'Code',
+    daysWorked: 'Days',
+    rate: 'Rate',
+    gross: 'Gross',
+    deductions: 'Deductions',
+    net: 'Net',
+  },
+  /** The spec's edge case: a contractor month has no per-worker disbursement to list. */
+  labourContractorOnly:
+    'This month’s labour was engaged through a contractor, so there is no per-worker disbursement to list. The sheet is the contractor’s basis of payment and its totals are below.',
+  labourApportioned: 'Apportioned',
+  labourApportionedHint:
+    'A payment sheet crossing the month boundary contributes only the days worked inside this month, taken from the approved muster — not a share of elapsed calendar days.',
+  labourDraftSheets: (count: number) =>
+    count === 1
+      ? '1 payment sheet overlapping this month is still in draft and is not counted.'
+      : `${count} payment sheets overlapping this month are still in draft and are not counted.`,
+  labourSheetsHeading: 'Payment sheets behind these figures',
+  // --- Export (FR-010c) ---
+  exportLabel: 'Export this month',
+  exporting: 'Preparing…',
+  exportFailed: 'That export could not be produced.',
+  exportHint:
+    'The same figures as the screen, carrying the project, the month and the time it was produced. The production time is what tells two exports of the same month apart after a payment sheet is reopened.',
+  exportPdf: 'PDF',
+  exportExcel: 'Excel',
+  // --- The group board (US4) ---
+  boardHeading: 'Every project’s position',
+  boardLoading: 'Loading positions…',
+  boardLoadFailed: 'Could not load the group position.',
+  boardEmpty: 'No projects to show for the selected month.',
+  boardColumns: {
+    project: 'Project',
+    revenue: 'Revenue to date',
+    cost: 'Cost to date',
+    margin: 'Margin',
+  },
+  boardTotal: 'Company total',
+  /** FR-013's visibility rule, said out loud rather than left to be inferred. */
+  boardTotalNote:
+    'The total is the sum of the rows above it. Projects you may not see appear in neither.',
+  boardOpen: 'Open',
+} as const;
+
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
   welcomeBack: (name: string) => `Welcome back, ${name}!`,
@@ -1191,6 +1508,13 @@ export const PROJECTS_PERMISSIONS = {
   portfolio: 'PROJECTS',
   clients: 'PROJECTS',
   sites: 'PROJECTS',
+  // 018. The P&L board is its own section and is a money screen: the backend guards
+  // `GET projects/pnl` with `PROJECT_FINANCIALS`, so a `PROJECTS` holder with no
+  // financial access would get a page whose every request 403s. The billing and summary
+  // screens sit *under* `portfolio/:id/`, so this per-section map cannot reach them —
+  // they check `PROJECT_FINANCIALS` on the page, which is the same arrangement the
+  // portfolio's document tab already uses.
+  pnl: 'PROJECT_FINANCIALS',
 } as const;
 
 export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;

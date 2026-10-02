@@ -1,5 +1,6 @@
 import {
   BuildingOffice2Icon,
+  ChartBarIcon,
   MapPinIcon,
   RectangleStackIcon,
 } from '@heroicons/react/24/outline';
@@ -46,6 +47,17 @@ export const PROJECT_SECTIONS: {
     title: 'Sites',
     description: 'Locations, geofences and the weekly-off calendar.',
     icon: MapPinIcon,
+  },
+  {
+    // 018 US4. Gated on `PROJECT_FINANCIALS` rather than `PROJECTS`, which is why the permission
+    // map had to stop being three identical values — a `PROJECTS` holder with no financial access
+    // now sees neither the tile nor the tab, instead of a page whose every request 403s.
+    key: 'pnl',
+    href: ROUTES.projectsPnlBoard,
+    title: 'P&L',
+    description:
+      'Revenue, cost and margin per project, with the company total.',
+    icon: ChartBarIcon,
   },
 ];
 
