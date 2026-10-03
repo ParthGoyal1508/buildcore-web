@@ -186,7 +186,9 @@ without needing DWR or P&L to exist.
    008-projects-backend research.md §12).
 4. **Given** the BOQ Alert section, **When** viewed, **Then** it shows three tabs: Today Task
    (items with today as target date), Delayed (items past their Finish Date with pending qty),
-   To Be Delayed (items at risk based on current Avg Qty Per Day vs required Per Day Qty).
+   To Be Delayed (items at risk based on current Avg Qty Per Day vs required Per Day Qty) — and,
+   per the 2026-10-03 amendment, **an unplanned item appears in none of the three** and is counted
+   as unplanned where the section's own summary can be read.
 5. **Given** a locked project, **When** the BOQ section is viewed, **Then** Add/Edit/Import
    controls are disabled with a "Project Locked" tooltip.
 
@@ -567,3 +569,56 @@ and sign-in). Projects is a **desktop surface**: the BOQ tree, RA bills, work or
   control's existence.
 
 **Review gate:** these screens are verified at desktop, then re-checked at 768px for breakage only.
+
+---
+
+## Amendment 2026-10-03 — The BOQ screens, against the client's actual tender sheet
+
+User Story 5 has never been built, and neither has its backend half. Feature 018's billing screens
+measure against a BOQ that **no screen in this application can create** — see
+`buildcore-api/specs/008-projects-backend/spec.md`, Amendment 2026-10-03, for the full finding. This
+amendment adapts US5 to the client's real file and to the four decisions taken with them on
+2026-10-03. It does not restate US5; it changes and adds to it.
+
+### Additional Functional Requirements
+
+- **FR-025**: The BOQ tree MUST render a two-level schedule where the levels came from the source's
+  own shape, and MUST distinguish a group heading from a measurable line visually — a heading
+  carries no quantity, and showing it in a quantity column as blank or as zero are both wrong for
+  different reasons.
+- **FR-026**: Programme columns (Start Date, Finish Date, Duration, Per Day Qty, Avg Qty Per Day,
+  Days to Complete) MUST render an explicit **unplanned** state, not an em dash, a zero or an empty
+  cell. A 312-line imported tender is entirely unplanned on the day it arrives, so this is the
+  normal state of the screen rather than an exception in it.
+- **FR-027**: The import flow MUST show the validation report before anything is written, and that
+  report MUST carry, in the client's own terms: how many lines were read, how many groups they fell
+  under, the schedule total, the quoted total, the quoted percentage found (or, stated plainly, that
+  it was not found), and every rejected row with its row number, column and reason.
+- **FR-028**: Where the quoted percentage was not found, the screen MUST say so as a condition to be
+  resolved and MUST NOT present a zero. A percentage silently read as zero under-bills every line on
+  the project, which on the client's own file is ₹7.37 lakh.
+- **FR-029**: A refusal of the whole file — an unreadable workbook, no sheets, no candidate rows —
+  MUST be shown as a refusal naming the condition. A report of "0 rows imported" alongside a success
+  state is specifically prohibited.
+- **FR-030**: Units MUST be displayed exactly as the source spelled them. The screen MUST NOT
+  silently rewrite `R. mtr` to `R.Mtr.`: the client reconciles against their own sheet, and a
+  tidied-up unit is a difference they cannot trace.
+- **FR-031**: Confirming an import MUST be unavailable while the validation report shows the file
+  would be rejected, and MUST be unavailable twice — a second confirm of an already-committed batch
+  MUST be refused rather than appending the schedule again.
+- **FR-032**: Every new surface here MUST hold at 320px without breaking, per Principle VI's floor
+  for non-mobile-critical screens. The BOQ tree is wide, so it MUST scroll inside its own container
+  rather than the page scrolling sideways.
+
+### Additional Success Criteria
+
+- **SC-A04**: An administrator can put the client's own tender file into a project through the
+  portal, unaided, and see its lines available to a client bill afterwards.
+- **SC-A05**: A 312-line imported schedule is legible on the BOQ screen without any planning having
+  been done, and nothing on it reads as delayed or on-time.
+
+### Additional Assumptions
+
+- The screen is the one place a person sees whether the import understood their file. Every figure
+  the backend reconciles (FR-045 there) is shown here rather than logged, because a reconciliation
+  nobody reads is not a check.
