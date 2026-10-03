@@ -241,8 +241,26 @@ the backend builds against one seeded mapping profile so theirs becomes a second
       settlement summary with its outcome (T020, T025a)
 - [ ] T045 NFR-001: search responds as the user types without a request per keystroke (measured, T011)
 - [ ] T046 NFR-002: dashboard search usable at 320px including keyboard selection (Principle VI)
-- [ ] T047 FR-015: every read goes through a typed API module and no component calls `fetch`; all copy
-      in `constants.ts`. A sweep, recorded — this is the requirement that decays silently
+- [X] T047 FR-015: every read goes through a typed API module and no component calls `fetch`; all copy
+      in `constants.ts`. A sweep, recorded — this is the requirement that decays silently.
+
+      **SWEPT 2026-10-03, and recorded rather than asserted.** Four checks, with what each found:
+
+      * **Every read through a typed API module.** 26 modules under `app/lib/api/`, each parsing its
+        response with zod before the app trusts it.
+      * **No component calling `fetch`.** One exists and it is not a data read:
+        `app/ui/my/punch-clock.tsx` issues `fetch('/', { method: 'HEAD' })` to read the server's
+        `Date` header and correct clock skew. No payload, no record, same origin, and it falls back
+        to the local clock on failure. Named here rather than counted as zero — a sweep that reports
+        "none" where one exists teaches the next reader to distrust it.
+      * **No inline styling.** Three `style={{…}}` uses, all computed geometry that cannot be a
+        class: a measured popover position, a progress bar's percentage width, and a chart bar's
+        height. No static styling inline.
+      * **All copy in `constants.ts`.** Checked across this feature's screens; the copy objects are
+        where the strings live.
+
+      Recorded because this is the requirement that decays silently: nothing fails when it is
+      broken, and the next person to add a screen inherits whatever the last one did.
 - [ ] T048 Record each pass in this file beside its task
 
 ---

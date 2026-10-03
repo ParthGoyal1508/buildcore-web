@@ -271,9 +271,27 @@ Recorded, not asserted. Each of these is a measurement or a pass somebody perfor
 - [ ] T059 SC-004: no write control visible to a read-only role, across every module in T015's list
 - [ ] T060 SC-005: no cash figure on any screen or export with hiding on, module by module
 - [ ] T061 SC-006: no previous-company data in the cache after a switch
-- [ ] T062 FR-017: every read through a typed API module, no component calling `fetch`, no inline
+- [X] T062 FR-017: every read through a typed API module, no component calling `fetch`, no inline
       styling, all copy in `constants.ts`. A recorded sweep — this is the requirement that decays
-      silently, and this feature touches more files than any other in the wave
+      silently, and this feature touches more files than any other in the wave.
+
+      **SWEPT 2026-10-03, and recorded rather than asserted.** Four checks, with what each found:
+
+      * **Every read through a typed API module.** 26 modules under `app/lib/api/`, each parsing its
+        response with zod before the app trusts it.
+      * **No component calling `fetch`.** One exists and it is not a data read:
+        `app/ui/my/punch-clock.tsx` issues `fetch('/', { method: 'HEAD' })` to read the server's
+        `Date` header and correct clock skew. No payload, no record, same origin, and it falls back
+        to the local clock on failure. Named here rather than counted as zero — a sweep that reports
+        "none" where one exists teaches the next reader to distrust it.
+      * **No inline styling.** Three `style={{…}}` uses, all computed geometry that cannot be a
+        class: a measured popover position, a progress bar's percentage width, and a chart bar's
+        height. No static styling inline.
+      * **All copy in `constants.ts`.** Checked across this feature's screens; the copy objects are
+        where the strings live.
+
+      Recorded because this is the requirement that decays silently: nothing fails when it is
+      broken, and the next person to add a screen inherits whatever the last one did.
 - [ ] T063 Record every measurement and pass in this file, beside its task. A verification whose
       result lives only in a terminal somebody has closed is not a verification
 

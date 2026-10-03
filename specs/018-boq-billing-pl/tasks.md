@@ -83,7 +83,13 @@ look plausible.
       lists
 - [x] T016 [US1] Render a submitted bill at **the rates it was billed at** (FR-006), never today's BOQ
       rate. A rate revised after billing would otherwise silently restate history
-- [ ] T017 **SKIPPED — 312 lines confirmed, see the record below** [US1] **If the client's template shows several thousand lines**, add row virtualization —
+- [X] T017 **SKIPPED — not needed, and the figure is now measured rather than estimated.** The
+      client's file carries **311 schedule rows, of which 231 are priced lines and 80 are headings**
+      (measured through the parser 2026-10-03, replacing the earlier estimate of 312). That is well
+      inside the 500 this task's own condition names, so virtualization would add an unmounting
+      focus target to solve a problem the file does not have. Ticked as skipped rather than left
+      open: the condition was checked and did not hold.
+      [US1] **If the client's template shows several thousand lines**, add row virtualization —
       and make FR-004's keyboard navigation survive it. A virtualized row scrolled out of view is
       unmounted, and the focus target with it. Skip this task if 500 is confirmed
 - [ ] T018 **NOT RUN (needs the React Profiler in a browser)** [US1] Verification: quickstart Scenario 2, including the **React Profiler measurement** at
