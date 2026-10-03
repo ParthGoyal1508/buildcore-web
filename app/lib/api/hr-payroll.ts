@@ -838,6 +838,21 @@ export const leaveApplicationSchema = z.object({
   status: enumOf(LEAVE_APPLICATION_STATUSES),
   adminRemarks: z.string().nullable().optional(),
   decidedAt: nullableIsoDate.optional(),
+
+  /**
+   * The employee, resolved by the server (api `src/hr/employee-name.ts`).
+   *
+   * `.optional()` as well as `.nullable()`, and that is not belt-and-braces: a server
+   * predating the field omits the key entirely, and a schema demanding it would turn a
+   * missing name into a failed parse — the whole list vanishing because one column
+   * could not be filled. Null means the server looked and could not say; absent means
+   * it was never asked.
+   *
+   * The two are separately nullable. A code with a null name is somebody with no name
+   * on record; both null is somebody outside the caller's scope.
+   */
+  employeeCode: z.string().nullable().optional(),
+  employeeName: z.string().nullable().optional(),
 });
 
 export type LeaveApplication = z.infer<typeof leaveApplicationSchema>;

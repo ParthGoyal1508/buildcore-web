@@ -127,6 +127,30 @@ function DecisionModal({
   );
 }
 
+/**
+ * What goes in the Employee column.
+ *
+ * The server sends `employeeCode` and `employeeName` (api 2026-10-03). The roster hook
+ * is the fallback for a server that predates them, and it no longer returns an id when
+ * it cannot answer either.
+ *
+ * Code and name are read separately because the server distinguishes them: a code with
+ * no name is an employee whose record carries none, and that is worth showing as the
+ * code rather than as "unavailable".
+ */
+function employeeLabel(
+  application: LeaveApplication,
+  roster: { label: (id: string) => string },
+): string {
+  const { employeeCode, employeeName } = application;
+  if (employeeCode && employeeName) return `${employeeCode} · ${employeeName}`;
+  if (employeeCode) return employeeCode;
+  if (employeeName) return employeeName;
+  // Either an older server, or one that looked and could not say. The hook answers both
+  // honestly — and never with the id, which is what this column used to show.
+  return roster.label(application.employeeId);
+}
+
 export default function LeaveApplicationsTable() {
   const employees = useEmployeeNames();
   const [status, setStatus] = useState<string>('pending');
@@ -150,7 +174,7 @@ export default function LeaveApplicationsTable() {
       key: 'employee',
       header: 'Employee',
       sticky: true,
-      render: (row) => employees.label(row.employeeId),
+      render: (row) => employeeLabel(row, employees),
     },
     { key: 'type', header: 'Leave type', render: (row) => hrLabel(row.leaveType) },
     {
@@ -230,7 +254,7 @@ export default function LeaveApplicationsTable() {
         <DecisionModal
           application={pending.application}
           decision={pending.decision}
-          employeeLabel={employees.label(pending.application.employeeId)}
+          employeeLabel={employeeLabel(pending.application, employees)}
           onClose={() => setPending(null)}
         />
       )}

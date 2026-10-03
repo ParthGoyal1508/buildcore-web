@@ -2031,6 +2031,20 @@ export const HR_MESSAGES = {
   rejectNeedsRemarks: 'A rejection needs a reason — the employee sees this remark.',
   leaveDecided: 'Application updated.',
 
+  /**
+   * What stands in an Employee column when the name cannot be resolved.
+   *
+   * Never the employee id. The leave queue rendered a cuid for months because the
+   * client-side roster join fell back to it, and an id in a column headed "Employee"
+   * reads as data — nobody reports it as a failure, they report it as "the names are
+   * wrong". A phrase that admits it is missing gets reported as what it is.
+   *
+   * Two phrasings because two different things go wrong, and they call for different
+   * actions: the roster has not arrived yet, or this person is not in it.
+   */
+  employeeNameLoading: 'Loading…',
+  employeeNameUnavailable: 'Name unavailable',
+
   // Payroll
   runLocked:
     'This run has been processed, so its figures can no longer change. Reverse it or start a new run.',

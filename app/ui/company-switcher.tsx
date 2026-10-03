@@ -12,6 +12,19 @@ import { hasUnsavedChanges, unsavedScreens } from '@/app/lib/unsaved-changes';
 import { inlineSelectClass } from '@/app/ui/settings/form-fields';
 
 /**
+ * The key this control's own query lives under.
+ *
+ * Named because two places now refer to it — the query and the sweep that must skip it — and a
+ * second inline copy of `['companies', 'selectable']` would be a typo away from the sweep resetting
+ * the list the switcher renders from.
+ */
+const SELECTABLE_COMPANIES_KEY = ['companies', 'selectable'] as const;
+
+const isSelectableCompanies = (key: readonly unknown[]): boolean =>
+  key.length === SELECTABLE_COMPANIES_KEY.length &&
+  SELECTABLE_COMPANIES_KEY.every((part, index) => key[index] === part);
+
+/**
  * Chooses which company the whole application is working in (019 FR-001 – FR-006).
  *
  * **Visible only when the caller has more than one company to choose between** (FR-001). Not when
@@ -28,7 +41,7 @@ export default function CompanySwitcher() {
   const [failed, setFailed] = useState(false);
 
   const { data: companies } = useQuery({
-    queryKey: ['companies', 'selectable'],
+    queryKey: SELECTABLE_COMPANIES_KEY,
     queryFn: listSelectableCompanies,
   });
 
@@ -51,14 +64,36 @@ export default function CompanySwitcher() {
        * A curated list of invalidations was considered and rejected. It passes review, and then it
        * fails the first time somebody adds a query without thinking about companies — which is to
        * say it fails later, quietly, on a screen nobody was watching, showing one company's figures
-       * under another company's name. `clear()` is blunt and cannot rot.
+       * under another company's name. An unfiltered sweep is blunt and cannot rot.
        *
-       * The selectable list is refetched along with everything else, which is correct: the set of
-       * companies somebody may work in is itself company-independent, but re-reading it costs one
-       * request and removes the need for an exception.
+       * **`resetQueries()`, not `clear()`** — bug report 2026-10-03, where a switch changed the name
+       * in this control and nothing else on screen until the page was reloaded. `clear()` removes
+       * every query from the cache and destroys it, but it pushes no result to the observers that
+       * were watching: nothing re-renders, so no query is rebuilt, so nothing refetches, and the
+       * previous company's rows sit under the new company's name — the exact disagreement this
+       * component exists to prevent, reintroduced by the call meant to prevent it.
+       *
+       * `resetQueries()` does both halves: it drops the data *and* returns every active observer to
+       * its loading state and refetches it. Returning to loading matters as much as the refetch —
+       * the alternative shows the old company's figures while the new ones are in flight, and a
+       * reader who glances during that window has no way to know which company they are looking at.
        */
-      queryClient.clear();
-      setPending(null);
+      void queryClient.resetQueries({
+        predicate: (query) => !isSelectableCompanies(query.queryKey),
+      });
+      /**
+       * This control's own list is invalidated rather than reset, and `pending` is held until it
+       * settles.
+       *
+       * Resetting it would empty `companies` for as long as the refetch took, and the guard below
+       * renders nothing without at least two — so the switcher would vanish from the top bar in the
+       * middle of a switch and reappear a moment later. Invalidating keeps the previous list on
+       * screen while the new `selected` flag is fetched, which is safe precisely because the set of
+       * companies somebody may work in does not change when they switch between them.
+       */
+      void queryClient
+        .invalidateQueries({ queryKey: SELECTABLE_COMPANIES_KEY })
+        .finally(() => setPending(null));
     },
     onError: () => {
       // Back to whatever the server last confirmed. A select left showing a company the session is
@@ -114,7 +149,7 @@ export default function CompanySwitcher() {
       <select
         id="company-switcher"
         // `pending` only while a switch is in flight; otherwise the company the **server** says we
-        // are in, which arrives with the refetched list after `clear()`.
+        // are in, which arrives with the refetched list the switch invalidated.
         value={pending ?? selectedId}
         disabled={switchCompany.isPending}
         onChange={(event) => handleChange(event.target.value)}
