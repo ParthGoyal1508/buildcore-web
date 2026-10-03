@@ -162,37 +162,77 @@ success that was not one.
 
 **Goal**: FR-013, FR-013a, FR-013b, FR-014. **Independent test**: quickstart Scenario 3.
 
-**Do not start before the client has seen the refusal-rate figure.** The backend's
-`PunchRefusalsService.rateSince` produces it and its T016 is "a client obligation, not a code task".
-Its own tasks say: *"Nothing in Phase 3 should be built until that conversation has happened."*
+**The gate, and how it was resolved — 2026-10-03.**
 
-- [ ] T015 [US3] Add the three refusal codes to `app/lib/constants.ts` as a closed union:
-      `PUNCH_REFUSED_LOCATION`, `PUNCH_REFUSED_UNLOCATABLE`, `PUNCH_REFUSED_FACE`
-- [ ] T016 [US3] Create `app/lib/punch-refusal.ts` mapping code → message, as a pure function
-      (Principle I). Not a chain of conditionals inside the punch component
-- [ ] T017 [US3] Write the three messages as three **actions**, in `constants.ts` where they can be
-      reviewed as a set: where to be / phone cannot place you / retake the photo. **Never render the
-      server's prose as the whole message.** `LOCATION` and `UNLOCATABLE` are both "we could not
-      accept this for location reasons", and telling a worker standing in the right place to move is
-      the exact failure FR-014 exists to prevent
-- [ ] T018 [US3] Display the refusal on the punch screen at the moment of the attempt. This is the
-      **only** place the refusal exists as far as that employee's attendance is concerned
-- [ ] T019 [US3] The repeat case: a worker refused three times running must not be told the same
-      thing a third time. The escalation to "ask your supervisor" lives in the screen's state, not in
-      the message table — no single message solves it
-- [ ] T020 [US3] **Do not offer to show the failed photo.** None is retained on a face refusal
-      (backend plan D20): a mismatch means the system could not establish whose face it is, and
-      keeping an unattributed biometric against a named employee is worse than the record it replaces
-- [ ] T021 [US3] **Now** re-label `app/ui/my/punch-exceptions.tsx` as covering past flagged punches.
-      In this phase and not earlier: until the backend's Phase 3 ships, `PunchResultDto` still returns
-      201 "because the punch is recorded either way" and new exceptions are still being created, so
-      re-labelling it today would be a different lie. Delete nothing — an exception still travelling
-      the chain needs the one surface in the product belonging to the person who raised it
-- [ ] T022 [US3] Confirm no refusal appears in the attendance view. Putting one there would recreate
-      the "refused day" the backend forbids every reader from seeing
-- [ ] T023 [US3] Verification: quickstart Scenario 3, **including the inside-the-fence-but-inaccurate
-      case**, which is the one that distinguishes the two location codes
-- [ ] T024 [US3] Verification at 320px
+As written: *do not start before the client has seen the refusal-rate figure.* That gate was taken
+seriously and then found to be circular. The figure comes from production data, the system is not
+deployed, and the refusal is shipped switched off for every company — so the rate cannot be measured
+until the block is switched on somewhere, and the block cannot humanely be switched on until a
+refused worker is told why, which is this phase.
+
+Held as written, nothing here ever ships.
+
+**Resolved by moving the gate, not removing it.** It now sits where it actually protects somebody:
+the client must see the refusal-rate figure **before the refusal is switched on for any company** —
+not before the messages that make it survivable are written. Building this changes nothing for any
+worker today, because the block remains off; it is what makes switching it on a decision the client
+can take rather than one nobody can take.
+
+If the client sees the figure and rejects the hard refusal, what is lost is three messages, a pure
+mapper and a panel. That is the cheapest possible way to be wrong here, and far cheaper than the
+alternative, which is that the whole of 020 stays unreachable.
+
+- [X] T015 [US3] Add the three refusal codes to `app/lib/constants.ts` as a closed union
+
+      Done 2026-10-03 as `PUNCH_REFUSAL_CODES` with a `PunchRefusalCode` type. Closed so a code the
+      server begins sending and this client has never heard of is a type error at the mapping rather
+      than an `undefined` reaching a worker's phone as the reason their punch failed.
+- [X] T016 [US3] Create `app/lib/punch-refusal.ts` mapping code → message, as a pure function
+
+      Done. `satisfies Record<PunchRefusalCode, string>` makes an unmapped code a compile error.
+      `isPunchRefusal` narrows rather than casts, because a punch can fail for things that are not
+      refusals at all — a locked payroll period, the day's pair already recorded — and treating any
+      failure as one would tell a worker to walk to the site when they had simply already punched out.
+- [X] T017 [US3] Write the three messages as three **actions**, in `constants.ts`
+
+      Done. Each says what to do next; the worker is at a gate holding a phone and an explanation
+      they cannot act on is noise. The server's prose is used in exactly one case — a code this
+      client does not know — and the type system makes that the exception rather than the path.
+- [X] T018 [US3] Display the refusal on the punch screen at the moment of the attempt
+
+      Done. Amber and `role="alert"`, separate from `FormError`: nothing is broken and nothing
+      failed — a well-formed punch was not accepted, and there is something to do about it. Three
+      parts in order of usefulness: what to do, that nothing was recorded and who can fix that, and
+      the escalation. Branched on `ApiError.code`, never on message text.
+- [X] T019 [US3] The repeat case
+
+      Done. `refusalsInARow` is screen state; the threshold is a named constant because it is a
+      judgement about people, not an implementation detail. Three: twice is ordinary — a cloud, a
+      badly lit photo — and by four the worker has stopped reading. A successful punch clears the
+      streak; starting a new attempt clears the *message* but deliberately not the count, or the
+      escalation could never be reached.
+- [X] T020 [US3] **Do not offer to show the failed photo.**
+
+      Done — and one line further than "do not offer": on a face refusal the screen says the photo
+      is not kept. Silence would read as a missing feature somebody should fix. Shown on face
+      refusals only, so it reads as a fact about this product rather than an apology.
+- [X] T021 [US3] **Now** re-label `app/ui/my/punch-exceptions.tsx` as covering past flagged punches
+
+      Done: "Earlier punches being checked", with a line saying why nothing new appears — so an
+      empty list reads as "there are none" rather than as a screen that has stopped working. Nothing
+      deleted.
+- [X] T022 [US3] Confirm no refusal appears in the attendance view
+
+      Confirmed by construction, which is stronger than by inspection: the attendance view renders
+      `getAttendanceHistory`, and the backend writes **nothing** for a refused punch (FR-013d), so
+      there is no field for a refused day to arrive in. The refusal is shown at the moment of the
+      attempt and listed under refused attempts; neither is in the calendar.
+- [ ] T023 [US3] **NOT RUN (no browser, and it needs a device with a poor GPS fix)** Verification:
+      quickstart Scenario 3, **including the inside-the-fence-but-inaccurate case**, which is the one
+      that distinguishes the two location codes. This is the pass that matters most in this phase:
+      the two location refusals are separate precisely so a worker standing in the right place is
+      never told to move.
+- [ ] T024 [US3] **NOT RUN (no browser)** Verification at 320px
 
 ---
 

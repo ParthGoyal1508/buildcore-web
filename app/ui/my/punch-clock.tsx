@@ -12,6 +12,7 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
 import { DEV_FALLBACK_POSITION, MESSAGES } from '@/app/lib/constants';
+import { isPunchRefusal, punchRefusalMessage } from '@/app/lib/punch-refusal';
 import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
@@ -19,6 +20,15 @@ import CameraCapture from '@/app/ui/my/camera-capture';
 
 /** HTTP 423 — the backend's status for a write into a closed payroll period. */
 const HTTP_LOCKED = 423;
+
+/**
+ * Refusals in a row before the screen stops repeating itself and names a person (T019).
+ *
+ * Three: twice is ordinary — a cloud over the GPS, a badly lit photo — and by four the worker has
+ * usually stopped reading. A named constant rather than a literal because it is a judgement about
+ * people, not an implementation detail, and somebody will want to argue with it.
+ */
+const REFUSALS_BEFORE_ESCALATING = 3;
 
 const two = (n: number) => String(n).padStart(2, '0');
 const clockText = (date: Date) =>
@@ -70,6 +80,19 @@ export default function PunchClock() {
    * "offer the punch", not "tell a worker with perfect signal they have none".
    */
   const [isOnline, setIsOnline] = useState(true);
+  /**
+   * The refusal to show, and how many have come in a row (020 FR-013, T018, T019).
+   *
+   * Held here rather than in `error` because a refusal is not an error in the sense that one is:
+   * the request succeeded, the server understood it, and nothing is broken — the punch simply was
+   * not accepted. It also needs two lines and a count, which `FormError` does not carry.
+   *
+   * The count is screen state and belongs nowhere else. No message in a table can know it is being
+   * read for the third time, and a worker told the same sentence three times concludes the product
+   * is stuck rather than that they should do something different.
+   */
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusalsInARow, setRefusalsInARow] = useState(0);
   // Which step of the capture -> locate -> submit sequence is running. Locating can
   // take many seconds (and on a device that cannot get a fix, the better part of
   // half a minute before it gives up), during which the screen previously showed
@@ -241,6 +264,10 @@ export default function PunchClock() {
     },
     onSuccess: (punchResult: PunchResult) => {
       setPendingType(null);
+      // The streak ends on anything that was accepted. A worker refused twice and then accepted is
+      // not one attempt away from being told to find their supervisor.
+      setRefusal(null);
+      setRefusalsInARow(0);
       // A flagged punch is still a recorded punch (FR-007/FR-005). The notice is
       // informational, not an error, because there is nothing for the worker to
       // redo — punching again would only create a second exception.
@@ -289,6 +316,23 @@ export default function PunchClock() {
         setError(MESSAGES.payrollLocked);
         return;
       }
+      /**
+       * A refused punch (020 FR-013). **This is the only place the worker learns what happened.**
+       *
+       * Under FR-013d nothing is written to attendance, so unlike every other failure on this
+       * screen there is no record to go back to: the day will read as a day with no punch. The
+       * refusal is shown here and listed under "Refused attempts"; it is deliberately absent from
+       * the attendance view, which would recreate the refused day the backend refuses to keep.
+       *
+       * Branched on `code`, never on the message text — the convention this feature set, and the
+       * reason the backend sends a code at all.
+       */
+      if (err instanceof ApiError && isPunchRefusal(err.code)) {
+        setRefusal(punchRefusalMessage(err.code, err.message));
+        setRefusalsInARow((count) => count + 1);
+        queryClient.invalidateQueries({ queryKey: ['my', 'punch-refusals'] });
+        return;
+      }
       // 409 is the day's own state refusing the punch (backend FR-008) — already
       // punched in, already punched out, nothing to punch out from. The server's
       // message says which, and is more useful than any generic copy here.
@@ -299,6 +343,10 @@ export default function PunchClock() {
   function startPunch(type: 'in' | 'out') {
     setError(null);
     setNotice(null);
+    // The previous refusal goes as soon as the worker acts on it. `refusalsInARow` deliberately
+    // does not: it is the count of attempts, and resetting it here would mean the escalation could
+    // never be reached, since every attempt starts by clearing what the last one said.
+    setRefusal(null);
     setPendingType(type);
   }
 
@@ -368,6 +416,32 @@ export default function PunchClock() {
       )}
 
       <FormError message={error} />
+
+      {/* The refusal (020 FR-013, T018–T020).
+          Amber rather than red, and separate from `FormError`: nothing is broken and nothing
+          failed — a well-formed punch was not accepted, and the worker has something to do about
+          it. Three parts, in the order they are useful: what to do, that nothing was recorded and
+          who can fix that, and — only after three in a row — to stop and find a supervisor.
+
+          No offer to show the photo (T020). A face refusal keeps none: an unattributed biometric
+          held against a named employee is worse than the record it replaces. The line saying so is
+          shown on a face refusal only, so it reads as a fact about this product rather than as an
+          apology for a missing feature. */}
+      {refusal && (
+        <div
+          role="alert"
+          className="space-y-2 rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-900"
+        >
+          <p className="font-medium">{refusal}</p>
+          <p className="text-amber-800">{MESSAGES.punchRefusedRecovery}</p>
+          {refusal === MESSAGES.punchRefusedFace && (
+            <p className="text-amber-700">{MESSAGES.punchRefusedNoPhoto}</p>
+          )}
+          {refusalsInARow >= REFUSALS_BEFORE_ESCALATING && (
+            <p className="font-medium">{MESSAGES.punchRefusedRepeatedly}</p>
+          )}
+        </div>
+      )}
 
       {notice && (
         <p

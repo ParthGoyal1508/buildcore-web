@@ -13,7 +13,12 @@ import LastAction from '@/app/ui/approvals/last-action';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 
 /**
- * The worker's own flagged punches (016 FR-005, T042).
+ * The worker's own flagged punches (016 FR-005, T042) — **history since 020 Phase 3**.
+ *
+ * Nothing new lands here. A punch failing the fence or the face check is now refused at the moment
+ * of punching and creates no exception; `refused-attempts.tsx` is where those appear. This list is
+ * kept, and deliberately not emptied, because an exception already travelling a chain needs the one
+ * surface in the product that belongs to the person who raised it.
  *
  * **The only approval surface in the product that belongs to the person who raised the
  * item rather than to a reviewer.** Attendance exceptions record the punching employee as
@@ -104,9 +109,14 @@ export default function PunchExceptions() {
 
   return (
     <section className="mt-6">
-      <h2 className="mb-2 text-sm font-semibold text-gray-900">
+      <h2 className="text-sm font-semibold text-gray-900">
         {MY_PUNCH_EXCEPTIONS.heading}
       </h2>
+      {/* 020 T021. Says why nothing new appears, so an empty list reads as "there are none"
+          rather than as a screen that has stopped working. */}
+      <p className="mb-2 text-xs text-gray-500">
+        {MY_PUNCH_EXCEPTIONS.subheading}
+      </p>
       <ResponsiveList
         columns={columns}
         rows={data ?? []}

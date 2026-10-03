@@ -1144,6 +1144,55 @@ export const MESSAGES = {
     'Punch recorded, but it needs review — your face or location did not match. Your supervisor has been notified; you do not need to punch again.',
   payrollLocked:
     'This period is closed for payroll. Punches and leave changes dated inside it can no longer be recorded.',
+
+  /**
+   * What a refused punch tells the worker (020 FR-013a, T017).
+   *
+   * **Three actions, not three explanations.** Each says what to do next, because the worker is
+   * standing at a gate holding a phone and an explanation they cannot act on is noise.
+   *
+   * `LOCATION` and `UNLOCATABLE` must never collapse into one. Both are "we could not accept this
+   * for location reasons", and the single merged message tells a worker standing in exactly the
+   * right place to go somewhere else — which is the failure FR-014 exists to prevent, and the one
+   * that destroys trust fastest, because the worker knows they are where they should be.
+   *
+   * Reviewed as a set here rather than written at three call sites, so the moment two of them start
+   * saying the same thing is visible.
+   */
+  punchRefusedLocation:
+    'You are too far from your site for this punch to count. Walk to the site and punch again there.',
+  punchRefusedUnlocatable:
+    'Your phone could not work out where you are precisely enough. Step into the open, away from walls and roofs, wait a few seconds and punch again.',
+  punchRefusedFace:
+    'This photo did not match your enrolled face. Take it again in better light, looking straight at the camera.',
+  /**
+   * Said once, under the message, for every refusal.
+   *
+   * FR-013d means the day will read as a day with no punch — not as a refused one — so a worker who
+   * walks away now has nothing to point at later. Naming the correction here is what stops a refused
+   * punch becoming an unpaid day.
+   */
+  punchRefusedRecovery:
+    'Nothing has been recorded for this attempt. If you cannot get a punch accepted today, tell your supervisor — they can raise a correction for the day.',
+  /**
+   * The third refusal in a row (T019).
+   *
+   * Escalation belongs to the screen, not to the message table: no single message can know it is
+   * being read for the third time, and a worker told the same sentence three times concludes the
+   * product is stuck. Three because twice is ordinary — a cloud, a bad photo — and four is somebody
+   * who has already given up.
+   */
+  punchRefusedRepeatedly:
+    'That is three attempts in a row. Stop trying for now and tell your supervisor what the screen said — they can record the day for you.',
+  /**
+   * Shown where a refused attempt would otherwise look like a missing feature (FR-012, T020).
+   *
+   * There is no photo to show. A face refusal stores none, because keeping an unattributed
+   * biometric against a named employee is worse than the record it replaces — so the screen must
+   * not offer to show one, and must not read as though the photo were merely unavailable.
+   */
+  punchRefusedNoPhoto:
+    'The photo from a refused attempt is not kept.',
   notEnrolled: 'Enrol your face before punching in.',
   enrolmentConsent:
     'I consent to my facial data being captured and stored for attendance verification.',
@@ -1792,6 +1841,26 @@ export const PII_FIELD_LABELS: Record<PiiField, string> = {
 };
 
 // --- Enum value lists, mirroring buildcore-api's prisma schema exactly ---
+
+/**
+ * The codes a refused punch can carry (020 FR-013, T015).
+ *
+ * A closed union, mirroring the backend's `PUNCH_REFUSAL_CODES`. Closed so that a code the server
+ * starts sending and this client has never heard of is a type error at the mapping, not an
+ * `undefined` reaching a worker's phone as the reason their punch failed.
+ *
+ * Three codes, four backend reasons: `face_mismatch` and `no_face_detected` both arrive as
+ * `PUNCH_REFUSED_FACE` because the advice is identical — retake the photo — and the difference
+ * between "no face in the picture" and "a face that is not yours" is worth detecting on our side,
+ * not worth explaining to the person holding the camera.
+ */
+export const PUNCH_REFUSAL_CODES = [
+  'PUNCH_REFUSED_LOCATION',
+  'PUNCH_REFUSED_UNLOCATABLE',
+  'PUNCH_REFUSED_FACE',
+] as const;
+
+export type PunchRefusalCode = (typeof PUNCH_REFUSAL_CODES)[number];
 
 export const GENDERS = ['male', 'female', 'other'] as const;
 export const MARITAL_STATUSES = ['single', 'married', 'divorced', 'widowed'] as const;
@@ -2734,7 +2803,22 @@ export const APPROVAL_RESUBMIT = {
  * is when the item is waiting on *them*, which is what the resubmit copy says.
  */
 export const MY_PUNCH_EXCEPTIONS = {
-  heading: 'Punches being checked',
+  /**
+   * Re-labelled in 020 Phase 3 (T021), and **not before**.
+   *
+   * This list is now history. A punch that fails the fence or the face check is refused outright
+   * and creates no exception, so nothing new arrives here — what remains are punches flagged under
+   * the old behaviour, still travelling a chain that somebody has to finish. Nothing is deleted:
+   * an exception in flight needs the one surface in the product belonging to the person who
+   * raised it.
+   *
+   * The timing was the point. Re-labelling this before the backend's refusal shipped would have
+   * been a different lie — exceptions were still being created then, and calling them "earlier"
+   * would have hidden the live ones.
+   */
+  heading: 'Earlier punches being checked',
+  subheading:
+    'Punches flagged before checks moved to the moment of punching. Nothing new is added here.',
   /** Shown when the list is empty — the ordinary case, and good news. */
   empty: 'None of your punches need checking.',
   loadFailed: 'Your flagged punches could not be loaded.',
