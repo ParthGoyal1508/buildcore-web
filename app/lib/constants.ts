@@ -3397,6 +3397,7 @@ export const PAYMENT_PROOF_COPY = {
  */
 export const BOQ_COPY = {
   heading: 'Bill of Quantities',
+  loading: 'Loading the schedule…',
   subheading: 'The schedule every bill is measured against.',
   empty: 'No BOQ yet. Enter sections and lines, or import a tender workbook.',
   loadFailed: 'The BOQ could not be loaded.',
