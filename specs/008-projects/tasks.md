@@ -519,46 +519,46 @@ T027–T031 above are **superseded, not deleted**; each carries a note naming it
 
 ### Phase B1: Types and reads
 
-- [ ] T059 [P] [US5] Extend `app/lib/api/projects.ts` — not a new module, because groups and items
+- [X] T059 [P] [US5] ✅ Done — added to `app/lib/api/projects.ts`, and the module's own header note corrected: it said BOQ had no functions because the endpoints did not exist, which stopped being true on 2026-10-03 Extend `app/lib/api/projects.ts` — not a new module, because groups and items
       are project data and a second module would split the project's own types across two files:
       `getBOQ`, `createBOQGroup`, `createBOQItem`, `deleteBOQItem`, `getBOQAlerts`,
       `validateBOQImport`, `confirmBOQImport`.
-- [ ] T060 [P] [US5] zod schemas with the programme fields `.nullable()` and the report's
+- [X] T060 [P] [US5] ✅ Done — `perDayQty`, `avgQtyPerDay`, `daysToComplete`, both dates and `quotedPercentage` all `.nullable()` with the reason on the type zod schemas with the programme fields `.nullable()` and the report's
       `quotedPercentage` `.nullable()` too. **Sixth occurrence of this class of defect** in this
       project: a nullable the schema treats as required fails the whole read, and one the schema
       omits loses exactly the distinction FR-026 exists to draw. Asserted, not assumed.
-- [ ] T061 [P] [US5] One type for the validation report mirroring the contract exactly — both
+- [X] T061 [P] [US5] ✅ Done — `warnings` separate from `errors`, both totals with their differences and the tolerance, the percentage with its found flag, and the alert preview One type for the validation report mirroring the contract exactly — both
       totals with their differences and the tolerance, the percentage with its found flag, the alert
       preview, and **`warnings` as a separate field from `errors`**: a line grouped under the sheet
       name is not a rejected row.
 
 ### Phase B2: The tree
 
-- [ ] T062 [US5] `app/ui/projects/boq-tree.tsx` — collapsible groups, keyboard-operable, scrolling
+- [X] T062 [US5] ✅ Done — `app/ui/projects/boq-tree.tsx`, scrolling in its own `overflow-x-auto` container; eleven columns, so the page body must not be what moves `app/ui/projects/boq-tree.tsx` — collapsible groups, keyboard-operable, scrolling
       in its own `overflow-x-auto` container so the page body never scrolls sideways (FR-032).
-- [ ] T063 [US5] **A heading renders as a heading** (FR-025): a group's quantity cell is neither
+- [X] T063 [US5] ✅ Done — a section spans with `colSpan` and a `rowgroup` scope, collapsible, with its line count **A heading renders as a heading** (FR-025): a group's quantity cell is neither
       blank nor `0` — blank reads as missing data, `0` reads as a real figure, and the row is in fact
       a section title. Rendered as a spanning label.
-- [ ] T064 [US5] **Unplanned is explicit** (FR-026): programme columns show the word, not an em dash
+- [X] T064 [US5] ✅ Done — "Not planned" in grey, never an em dash and never a zero; grey rather than amber because this is the state of all 231 lines of a fresh tender and styling the normal case as a warning teaches people to ignore warnings **Unplanned is explicit** (FR-026): programme columns show the word, not an em dash
       and not a zero. 312 unplanned lines is the normal state of a freshly imported tender, so this
       is the common case and must not read as an error.
-- [ ] T065 [US5] Add Group / Add Item forms with the four programme fields optional and labelled as
+- [X] T065 [US5] ✅ Done — `boq-entry.tsx`; the four programme fields labelled optional and each sent only when it has a value; both controls **absent** on a locked project Add Group / Add Item forms with the four programme fields optional and labelled as
       optional; controls **absent**, not disabled, on a locked project, matching how the rest of this
       application shows a lock.
 
 ### Phase B3: The import, and the report that justifies it
 
-- [ ] T066 [US5] `app/ui/projects/boq-import.tsx` — upload, then a report, then a separate confirm.
+- [X] T066 [US5] ✅ Done — `boq-import.tsx`, `.xls` first in the accept list because the client's own tender is the legacy format `app/ui/projects/boq-import.tsx` — upload, then a report, then a separate confirm.
       The file input accepts `.xls` **and** `.xlsx`: the client's own tender is the former, which is
       the whole reason this amendment exists.
-- [ ] T067 [US5] The report carries what the import **understood** (FR-027): lines read, groups they
+- [X] T067 [US5] ✅ Done — lines, groups, the sheet name, both derived totals beside the file's own two with difference and tolerance, the percentage, units as typed with counts, and errors and warnings in separate collapsible tables The report carries what the import **understood** (FR-027): lines read, groups they
       fell under, both derived totals beside the two the file states with the difference and the
       tolerance, the percentage found or plainly not found, every rejected row with its row number,
       column and reason, and warnings listed apart from errors.
-- [ ] T068 [US5] **A missing percentage is a condition, not a zero** (FR-028): shown as something to
+- [X] T068 [US5] ✅ Done — shown as an `role="alert"` condition naming the consequence in rupees, never as a zero **A missing percentage is a condition, not a zero** (FR-028): shown as something to
       resolve before confirming, with the consequence in the copy — on the client's own file the
       silence is ₹7.37 lakh.
-- [ ] T069 [US5] **Every whole-file refusal gets its own sentence** (FR-029). Enumerated against
+- [X] T069 [US5] ✅ Done — all fourteen codes mapped in `BOQ_COPY.refusals`; the fallback is reached only when the API sends no code **Every whole-file refusal gets its own sentence** (FR-029). Enumerated against
       the api contract rather than described, because the 2026-10-03 analysis pass found this task
       naming three codes and leaving eleven to prose — which ends as three mapped and eleven falling
       to a generic message. All fourteen: `BOQ_FILE_TOO_LARGE`, `BOQ_WORKBOOK_UNREADABLE`,
@@ -568,7 +568,7 @@ T027–T031 above are **superseded, not deleted**; each carries a note naming it
       `BOQ_BATCH_EXPIRED`, `BOQ_BATCH_IN_PROGRESS`, `BOQ_BATCH_ALREADY_CONFIRMED`,
       `BOQ_BATCH_NOT_YOURS`. A success state beside "0 rows" is prohibited — that is exactly what
       the old library would have produced for the client's real file.
-- [ ] T070 [US5] Confirm unavailable twice (FR-031): while the report shows the file would be
+- [X] T070 [US5] ✅ Done — confirm disabled while the report does not reconcile; a second confirm resolves to the already-imported sentence rather than an error; units rendered verbatim Confirm unavailable twice (FR-031): while the report shows the file would be
       rejected, and after a successful confirm. `BOQ_BATCH_ALREADY_CONFIRMED` is shown as "already
       imported" and `BOQ_BATCH_IN_PROGRESS` as "being imported now" — neither as a failure, because
       the schedule is in or on its way, which is what the person wanted. `BOQ_BATCH_EXPIRED` says so
@@ -577,19 +577,19 @@ T027–T031 above are **superseded, not deleted**; each carries a note naming it
 
 ### Phase B4: Alerts and mounting
 
-- [ ] T071 [US5] `app/ui/projects/boq-alert-tabs.tsx` with **four** tabs — Today, Delayed, To Be
+- [X] T071 [US5] ✅ Done — `boq-alert-tabs.tsx`, four tabs with counts, proper `tablist`/`tab`/`tabpanel` roles, and the unplanned tab explaining itself inline `app/ui/projects/boq-alert-tabs.tsx` with **four** tabs — Today, Delayed, To Be
       Delayed, Unplanned. Three would mean an unplanned line is silently absent from the one screen
       whose claim is to show what needs attention.
-- [ ] T072 [US5] Mount the tree, the import and the alerts in the project detail page's BOQ tab and
+- [X] T072 [US5] ✅ Done — `/dashboard/projects/portfolio/[id]/boq`, linked from the portfolio row **before** the three money screens, since until today they all measured against a table nothing could fill. The confirm invalidates the tree, the alerts and the project itself, the last because an import may set its quoted percentage Mount the tree, the import and the alerts in the project detail page's BOQ tab and
       wire the TanStack Query keys, invalidating the BOQ tree and the alerts together after a
       confirm.
-- [ ] T073 [US5] All copy into `app/lib/constants`, per the convention the FR-015 sweep enforces —
+- [X] T073 [US5] ✅ Done — all copy in `BOQ_COPY`; the sweep found no literals left in the four new files All copy into `app/lib/constants`, per the convention the FR-015 sweep enforces —
       and run the sweep rather than asserting it, since it has twice found literals that assertion
       would have missed.
 
 ### Verification
 
-- [ ] T074 [US5] `npx tsc --noEmit`, `npx eslint app`, `npm run build`. **Never
+- [X] T074 [US5] ✅ Done 2026-10-03 — `tsc --noEmit` clean, `eslint app` 0 errors (11 pre-existing warnings), `next build` compiles with the new route present. Prettier **not** run, per the standing note `npx tsc --noEmit`, `npx eslint app`, `npm run build`. **Never
       `npx prettier --write`** — there is no prettier config in this repository, so its defaults
       reformat untouched files (2,400-line diff, 1 October).
 - [ ] T075 [P] [US5] Browser pass: import the client's file, read the report, confirm, and check the

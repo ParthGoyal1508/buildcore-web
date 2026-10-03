@@ -85,6 +85,16 @@ export const ROUTES = {
   projectsClients: '/dashboard/projects/clients',
   projectsSites: '/dashboard/projects/sites',
 
+  /**
+   * The BOQ for one project — the schedule every bill below is measured against (008 US5,
+   * amended 2026-10-03).
+   *
+   * Gated on `PROJECTS` and not `PROJECT_FINANCIALS`, unlike the money screens below: a schedule
+   * carries rates but it is the list of what is to be built, and a site engineer who may not open
+   * a bill may certainly need to read it.
+   */
+  projectsBoq: (id: string) => `/dashboard/projects/portfolio/${id}/boq`,
+
   // --- Projects: billing and the P&L (feature 018, `bugs.md` items 11 and 14) ---
   // Gated on `PROJECT_FINANCIALS`, not `PROJECTS` — see `PROJECTS_PERMISSIONS`. Billing
   // and the summary are money screens and the backend guards them separately.

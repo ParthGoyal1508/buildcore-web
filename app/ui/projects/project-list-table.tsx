@@ -150,6 +150,18 @@ export default function ProjectListTable({
             Documents
           </Link>
           {/*
+            The BOQ, before the money screens that depend on it. First of the four deliberately:
+            until 2026-10-03 nothing could create a schedule, so every one of the links below
+            measured against a table nothing could fill. Not gated on `PROJECT_FINANCIALS` —
+            a schedule is project work.
+          */}
+          <Link
+            href={ROUTES.projectsBoq(row.id)}
+            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            BOQ
+          </Link>
+          {/*
             018's three money screens, reachable from the row rather than from a project detail
             page that does not exist. Shown to everyone: the pages themselves refuse a caller
             without `PROJECT_FINANCIALS`, and hiding the links here would need this table to load
