@@ -271,26 +271,69 @@ alternative, which is that the whole of 020 stays unreachable.
 
 ---
 
-## Phase 5: Location assignment ⚠️ GATED on backend Phase 4 (0 of 12)
+## Phase 5: Location assignment — gate cleared (backend Phase 4 shipped, api `c1f7ee1`)
 
 **Goal**: FR-007 – FR-011. **Independent test**: quickstart Scenario 5.
 
-- [ ] T030 [US2] Add location assignment, history and exemption reads/writes to
+- [X] T030 [US2] Add location assignment, history and exemption reads/writes to
       `app/lib/api/hr-payroll.ts`
-- [ ] T031 [US2] Create `app/ui/hr/location-assignment.tsx` showing the assigned location and its
-      effective date on the employee record (FR-007)
-- [ ] T032 [US2] Require an effective date on change, and keep prior assignments visible (FR-008).
-      A transfer has to be explicable months later
-- [ ] T033 [US2] Mobility exemption with author and reason displayed (FR-009)
-- [ ] T034 [US2] State on the exemption control that it covers **location only, never the face
-      check** — mobility says where a person legitimately works; the face check says who is holding
-      the phone (backend Clarifications, 2026-09-16)
-- [ ] T035 [US2] Bulk assignment for a site's staff (FR-010)
-- [ ] T036 [US2] Where an employee has no assignment, **state the fallback on screen** (FR-011):
-      they are validated against their site's geofence, as before. Not a warning — no employee carries
-      an individual assignment on the day this ships, so this is the normal case, and styling it as a
-      problem would mark every employee as misconfigured
-- [ ] T037 [US2] Verification: quickstart Scenario 5
+
+      Done 2026-10-03 against `GET`/`PUT /hr/employees/:id/location-assignments`. `PUT` with no id
+      looks wrong and is right: the resource being replaced is "where this employee punches", and
+      its history is the audit.
+
+- [X] T031 [US2] Create `app/ui/hr/location-assignment.tsx`
+
+      Done, mounted on the employee's **Attendance** tab rather than Employment. It decides whether
+      a punch is accepted, so it is read when somebody asks why a day is missing — and that question
+      gets asked next to the calendar that is missing the day.
+
+- [X] T032 [US2] Require an effective date on change, and keep prior assignments visible (FR-008)
+
+      Done. Prior assignments are in a collapsed `<details>`: present for the question that is asked
+      rarely and matters enormously — where was this person supposed to be on the day of that
+      punch — without pushing the current arrangement off the screen.
+
+      There is **no edit control at all**, which is the design: an append-only history cannot answer
+      that question if a row can be rewritten. The server agrees — its endpoint takes no id.
+
+- [X] T033 [US2] Mobility exemption with author and reason displayed (FR-009)
+
+      Done, and a reason is **required** for a mobility exemption specifically — refused in the form
+      before the request. An exemption without one is unreviewable a year later: nobody can tell
+      whether it was considered or merely convenient.
+
+- [X] T034 [US2] State on the exemption control that it covers **location only, never the face check**
+
+      Done, on the control itself rather than in help text. The confusion it prevents is specific and
+      expensive: an administrator who believes mobility exempts somebody from every check will treat
+      the first face refusal as a bug, and may disable face checking to "fix" it.
+
+- [X] T035 [US2] Bulk assignment for a site's staff (FR-010)
+
+      Done as `bulk-location-assignment.tsx`, opened from the employee list so the list's own site
+      filter **is** the selection — a second employee picker would be a second place for the two to
+      disagree about who counts.
+
+      **The API has no bulk route**; 020's backend scope never mentions one. So this is a loop of
+      single-employee calls, which is an acceptable trade for an administrative action over tens of
+      rows on one condition: partial success must be visible. It reports failures **by employee
+      code**, because "28 of 30 saved" tells an administrator two people are wrong without telling
+      them which two — leaving them to check thirty records by hand, or to assume it was fine. The
+      action is withdrawn once it has run, so nobody re-runs the whole set to catch two stragglers
+      and appends a duplicate for the twenty-eight that worked.
+
+      It does not roll back, and cannot: there is no transaction across these calls, and undoing a
+      successful append would mean appending a second row saying the opposite — worse history than
+      the partial truth.
+
+- [X] T036 [US2] Where an employee has no assignment, **state the fallback on screen** (FR-011)
+
+      Done, in grey. On the day this ships the table is empty, so **every** employee is in this
+      state — an amber or red treatment would mark the entire workforce as misconfigured, and an
+      administrator who sees thirty flags stops reading all thirty.
+
+- [ ] T037 [US2] **NOT RUN (no browser)** Verification: quickstart Scenario 5
 
 ---
 

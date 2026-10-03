@@ -27,6 +27,7 @@ import OffboardingPanel from '@/app/ui/hr/offboarding-panel';
 import TransferModal from '@/app/ui/hr/transfer-modal';
 import { getCurrentUser } from '@/app/lib/api/users';
 import AssetsInCustody from '@/app/ui/assets/assets-in-custody';
+import LocationAssignmentPanel from '@/app/ui/hr/location-assignment';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
@@ -366,7 +367,13 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
       </TabPanel>
 
       <TabPanel id="attendance" idPrefix="employee-detail" active={tab}>
-        <AttendanceCalendar employeeId={employee.id} />
+        {/* 020 FR-007. On the Attendance tab rather than Employment, because this decides whether
+            a punch is accepted — it is read when somebody asks why a day is missing, and that
+            question is asked here, next to the calendar that is missing the day. */}
+        <LocationAssignmentPanel employeeId={employee.id} />
+        <div className="mt-6">
+          <AttendanceCalendar employeeId={employee.id} />
+        </div>
       </TabPanel>
 
       <TabPanel id="leave" idPrefix="employee-detail" active={tab}>

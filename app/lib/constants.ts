@@ -2809,6 +2809,58 @@ export const APPROVAL_RESUBMIT = {
  * and sharing copy would blur them: an exception is a punch that was *recorded* and is being
  * checked by somebody; a refusal is a punch that does not exist and that nobody will check.
  */
+/**
+ * Where an employee may punch (020 FR-007 – FR-011).
+ *
+ * The hardest copy in this feature is `noAssignment`. On the day this ships **every** employee has
+ * no individual assignment, because the table is empty — so a sentence that reads as a warning
+ * marks the entire workforce as misconfigured, and an administrator who sees thirty red flags stops
+ * reading all thirty. It states the fallback as the ordinary thing it is.
+ */
+export const LOCATION_ASSIGNMENT = {
+  heading: 'Where this employee punches',
+  noAssignment:
+    'No individual assignment. Punches are checked against this employee’s own site geofence, which is the normal arrangement.',
+  current: 'In force now',
+  history: 'Earlier assignments',
+  mobile: 'Mobile — exempt from location checks',
+  /**
+   * FR-014, stated on the control itself rather than in a help page.
+   *
+   * The confusion it prevents is specific and expensive: an administrator who believes mobility
+   * exempts somebody from *all* checks will raise a support ticket the first time that person is
+   * refused for a bad photo, and may well disable face checking to "fix" it.
+   */
+  mobileScope:
+    'Mobility covers location only, never the photo check. A mobile employee is still refused if the photo does not match — where someone works and who is holding the phone are different questions.',
+  effectiveFrom: 'In force from',
+  effectiveFromRequired:
+    'Give the date this takes effect — a punch is judged by the assignment in force on its own day.',
+  saving: 'Saving…',
+  effectiveFromHint:
+    'A punch is judged by the assignment in force on the day it was taken, so backdating this changes how past days are read.',
+  reason: 'Why',
+  reasonRequiredForMobile:
+    'A mobility exemption needs a reason — a year from now, nobody can tell whether it was considered or merely convenient.',
+  siteRequired: 'Choose a site, or mark the employee mobile.',
+  assign: 'Assign location',
+  assignedBy: 'Assigned by',
+  bulkHeading: 'Assign a site’s staff together',
+  bulkHint:
+    'Everyone selected gets the same assignment, from the same date. They are recorded one at a time, so if some fail the rest still stand.',
+  bulkNobodySelected: 'Select at least one employee.',
+  bulkDone: (ok: number) =>
+    `${ok} employee${ok === 1 ? '' : 's'} assigned.`,
+  /**
+   * Partial failure, named rather than summarised.
+   *
+   * "28 of 30 saved" tells an administrator that two people are wrong and not which two, which
+   * leaves them to check thirty records by hand or — far more likely — to assume it was fine.
+   */
+  bulkPartial: (ok: number, failed: string[]) =>
+    `${ok} assigned. ${failed.length} could not be: ${failed.join(', ')}. Those employees keep their previous arrangement.`,
+} as const;
+
 export const REFUSED_ATTEMPTS = {
   heading: 'Refused attempts',
   /**

@@ -1800,3 +1800,108 @@ async function fileToBase64(file: File): Promise<string> {
   }
   return btoa(binary);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Where an employee may punch (020 FR-007 – FR-011 — `bugs.md` items 2, 15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const locationAssignmentSchema = z.object({
+  id: z.string(),
+  employeeId: z.string(),
+  /** Null on a mobility exemption: there is no fence, which is the point of one. */
+  siteId: z.string().nullable(),
+  isMobile: z.boolean(),
+  effectiveFrom: isoDate,
+  reason: z.string().nullable(),
+  assignedByUserId: z.string().nullable(),
+  createdAt: isoDate,
+});
+
+export type LocationAssignment = z.infer<typeof locationAssignmentSchema>;
+
+/**
+ * Every assignment this employee has had, newest effective date first.
+ *
+ * **An empty list is not a misconfiguration.** It means the employee is validated against their own
+ * site's geofence, which is what every employee does today — so the screen says that as the normal
+ * case rather than styling it as a problem (FR-011). On the day this ships, every single employee
+ * is in this state.
+ */
+export async function getLocationAssignments(employeeId: string) {
+  return z
+    .array(locationAssignmentSchema)
+    .parse(
+      await authFetch<unknown>(
+        `/hr/employees/${employeeId}/location-assignments`,
+      ),
+    );
+}
+
+export interface AssignLocationInput {
+  /** Required unless `isMobile` — an assignment naming no site and claiming no exemption validates nothing. */
+  siteId?: string;
+  isMobile?: boolean;
+  /** `YYYY-MM-DD`. Resolution keys on the punch's own day, so this is never "now". */
+  effectiveFrom: string;
+  reason?: string;
+}
+
+/**
+ * Records a new assignment. **Appends — a prior row is never altered.**
+ *
+ * `PUT` with no id, which looks odd and is right: the resource being replaced is "where this
+ * employee punches", and its history is the audit. A transfer six months ago has to stay
+ * explicable, and a mutable current value cannot answer that.
+ */
+export async function assignLocation(
+  employeeId: string,
+  input: AssignLocationInput,
+) {
+  return locationAssignmentSchema.parse(
+    await authFetch<unknown>(
+      `/hr/employees/${employeeId}/location-assignments`,
+      { method: 'PUT', body: JSON.stringify(input) },
+    ),
+  );
+}
+
+/** One employee's outcome in a bulk assignment. */
+export interface BulkAssignmentOutcome {
+  employeeId: string;
+  error?: string;
+}
+
+/**
+ * Assigns the same location to several employees (FR-010).
+ *
+ * **Sequential single-employee calls, because the API has no bulk route** — 020's backend scope
+ * never mentions one. A loop here rather than a new endpoint is the right trade for an
+ * administrative action over tens of rows, on one condition: partial success must be *visible*.
+ * Hiding it behind a single "saved" is how an administrator comes to believe a site is assigned
+ * when four of its thirty staff are not.
+ *
+ * Sequential rather than parallel so the failures come back in a stable order, and so a company
+ * with a large site does not open thirty connections at once for a once-a-quarter action.
+ *
+ * It does not roll back. There is no transaction across these calls to roll back *with*, and
+ * undoing a successful append would mean writing a second append that says the opposite — which is
+ * worse history than the partial truth.
+ */
+export async function assignLocationToMany(
+  employeeIds: string[],
+  input: AssignLocationInput,
+): Promise<BulkAssignmentOutcome[]> {
+  const outcomes: BulkAssignmentOutcome[] = [];
+  for (const employeeId of employeeIds) {
+    try {
+      await assignLocation(employeeId, input);
+      outcomes.push({ employeeId });
+    } catch (error) {
+      outcomes.push({
+        employeeId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+  return outcomes;
+}
