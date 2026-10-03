@@ -10,11 +10,17 @@ import {
   processFnf,
   type Employee,
 } from '@/app/lib/api/hr-payroll';
-import { EXIT_REASONS, HR_MESSAGES, hrLabel } from '@/app/lib/constants';
+import {
+  EXIT_REASONS,
+  HR_MESSAGES,
+  SETTLEMENT_ASSET_COPY,
+  hrLabel,
+} from '@/app/lib/constants';
 import { dateLabel, money, periodLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import ExitClearance from '@/app/ui/hr/exit-clearance';
 import Modal from '@/app/ui/settings/modal';
+import StatusBadge from '@/app/ui/status-badge';
 import {
   FormError,
   SecondaryButton,
@@ -59,6 +65,17 @@ export default function OffboardingPanel({
     enabled: Boolean(exit),
     retry: false,
   });
+
+  /**
+   * Assets still held and not written off (021 FR-018a).
+   *
+   * Counted from the list rather than from a separate field, so the warning and the rows it refers
+   * to cannot disagree. `null` assets means the register could not be asked, which is said in its
+   * own sentence rather than counted as zero.
+   */
+  const stillHeld = (fnf?.assets ?? []).filter(
+    (asset) => asset.outcome === 'outstanding',
+  ).length;
 
   const initiate = useMutation({
     mutationFn: () =>
@@ -242,6 +259,114 @@ export default function OffboardingPanel({
                     </dd>
                   </div>
                 </dl>
+
+                {/*
+                  021 FR-018a — `bugs.md` item 10's "any assets assigned to the employee should
+                  appear in the F&F summary", read literally.
+
+                  **Longer than the clearance above on purpose.** The clearance lists what is still
+                  outstanding, so an asset returned during the notice period correctly disappears
+                  from it. This is the record of how each one *ended*, which is what somebody
+                  signing off a settlement needs — and the api used to derive it from the clearance,
+                  so a returned asset was missing from both.
+                */}
+                <section className="rounded-lg border border-gray-200">
+                  <div className="border-b border-gray-100 px-4 py-2.5">
+                    <h4 className="text-sm font-medium text-gray-900">
+                      {SETTLEMENT_ASSET_COPY.heading}
+                    </h4>
+                    <p className="mt-0.5 text-xs text-gray-600">
+                      {SETTLEMENT_ASSET_COPY.hint}
+                    </p>
+                  </div>
+
+                  {fnf.assets === null ? (
+                    /*
+                      Never rendered as "no assets". This is the state where the asset register
+                      could not be asked, and reporting it as "held nothing" would have somebody
+                      sign off a settlement on a question nobody answered.
+                    */
+                    <p
+                      role="alert"
+                      className="bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+                    >
+                      {SETTLEMENT_ASSET_COPY.unavailable}
+                    </p>
+                  ) : fnf.assets.length === 0 ? (
+                    <p className="px-4 py-2.5 text-sm text-gray-500">
+                      {SETTLEMENT_ASSET_COPY.none}
+                    </p>
+                  ) : (
+                    <>
+                      <ul className="divide-y divide-gray-100">
+                        {fnf.assets.map((asset) => (
+                          <li
+                            key={asset.allocationId}
+                            className="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5 text-sm"
+                          >
+                            <div className="min-w-0">
+                              <p className="break-words text-gray-900">
+                                {asset.label}
+                              </p>
+                              {asset.detail && (
+                                <p className="break-words text-xs text-gray-500">
+                                  {asset.detail}
+                                </p>
+                              )}
+                              {/* The reason, verbatim. A write-off of company money with no
+                                  stated reason is the thing FR-016 exists to prevent. */}
+                              {asset.waiverReason && (
+                                <p className="mt-0.5 break-words text-xs text-gray-600">
+                                  {asset.waiverReason}
+                                </p>
+                              )}
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <StatusBadge
+                                status={
+                                  asset.outcome === 'returned'
+                                    ? 'asset_returned'
+                                    : asset.outcome === 'waived'
+                                      ? 'asset_waived'
+                                      : 'asset_held'
+                                }
+                                label={
+                                  SETTLEMENT_ASSET_COPY.outcomes[asset.outcome]
+                                }
+                              />
+                              <p className="mt-0.5 text-xs text-gray-500">
+                                {asset.outcome === 'returned' &&
+                                  asset.returnedOn &&
+                                  SETTLEMENT_ASSET_COPY.returnedOn(
+                                    asset.returnedOn,
+                                  )}
+                                {asset.outcome === 'waived' &&
+                                  asset.waivedByName &&
+                                  SETTLEMENT_ASSET_COPY.waivedBy(
+                                    asset.waivedByName,
+                                  )}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      {stillHeld > 0 && (
+                        <p
+                          role="alert"
+                          className="border-t border-gray-100 bg-amber-50 px-4 py-2 text-xs text-amber-900"
+                        >
+                          {SETTLEMENT_ASSET_COPY.stillHeldWarning(stillHeld)}
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {/* FR-018b, said rather than left to be inferred from the absence of a
+                      deduction line above. */}
+                  <p className="border-t border-gray-100 px-4 py-2 text-xs text-gray-600">
+                    {SETTLEMENT_ASSET_COPY.noDeduction}
+                  </p>
+                </section>
 
                 <p className="text-xs text-gray-600">
                   Settled against {periodLabel(fnf.period)}. Processing creates a

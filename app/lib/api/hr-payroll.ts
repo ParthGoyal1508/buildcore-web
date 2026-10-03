@@ -1490,9 +1490,51 @@ const fnfSchema = z.object({
   netPayable: decimal,
   /** Surfaced verbatim above the figures — each one is a reason to stop. */
   warnings: z.array(z.string()),
+  /**
+   * Every asset the leaver held, with how each one ended (021 FR-018a) — `bugs.md` item 10.
+   *
+   * **The api has served this since 021 shipped and this schema dropped it.** Zod strips unknown
+   * keys, so `assets` arrived on every response and never reached a screen — the settlement summary
+   * showed the figures and said nothing about the laptop. That is why web T025a stayed open, and it
+   * is the eighth time in this review a schema has been found quietly discarding or coercing
+   * something the server sent.
+   *
+   * `null` means the asset module is not deployed and the question went unanswered. **Not an empty
+   * list**: "could not ask" and "held nothing" are different facts, and a settlement is signed off
+   * on the difference.
+   */
+  assets: z
+    .array(
+      z.object({
+        allocationId: z.string(),
+        label: z.string(),
+        detail: z.string().nullable().default(null),
+        /** `returned` with a date, `waived` with an author, or nobody has decided. */
+        outcome: z.enum(['returned', 'waived', 'outstanding']),
+        returnedOn: z.string().nullable().default(null),
+        waivedByName: z.string().nullable().default(null),
+        waiverReason: z.string().nullable().default(null),
+      }),
+    )
+    .nullable()
+    .default(null),
+  /** True when `assets` is null because the asset module could not be asked. */
+  assetsUnavailable: z.boolean().default(false),
+  /** False while the clearance still has something outstanding and unwaived (FR-013). */
+  clearanceSettleable: z.boolean().default(false),
+  /**
+   * Always null, and said rather than omitted (FR-018b).
+   *
+   * No asset value is recovered from the final payable. Original cost, depreciated book value and
+   * replacement cost give three different figures, the client has chosen none, and a deduction
+   * computed from an unstated rule is worse than none — so a waiver records the write-off with a
+   * name against it instead.
+   */
+  assetValueRecovered: z.number().nullable().default(null),
 });
 
 export type FnfComputation = z.infer<typeof fnfSchema>;
+export type FnfAsset = NonNullable<FnfComputation['assets']>[number];
 
 export async function computeFnf(employeeId: string) {
   return fnfSchema.parse(

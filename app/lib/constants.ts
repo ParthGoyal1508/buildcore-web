@@ -716,6 +716,40 @@ export const TEMPLATE_COPY = {
   activeBadge: 'Active',
 } as const;
 
+/**
+ * The asset record on a settlement summary (021 FR-018a, FR-018b) — `bugs.md` item 10.
+ *
+ * Principle III: no string below is written at a call site. The one that carries the most weight is
+ * `noDeduction` — the client asked for assets on the F&F summary and did not say what an unreturned
+ * one is worth, and a summary that said nothing about valuation would be read as "nothing was
+ * recovered because nothing was due".
+ */
+export const SETTLEMENT_ASSET_COPY = {
+  heading: 'Assets held at exit',
+  // Says why the list is here and why it is longer than the clearance above it.
+  hint: 'Every asset this employee was given, including ones already returned. The clearance above lists only what is still outstanding.',
+  loading: 'Loading the asset record…',
+  // Not "no assets". This is the state where feature 012 could not be asked, and reporting it as
+  // "held nothing" would have somebody sign off a settlement on a question nobody answered.
+  unavailable:
+    'The asset register could not be asked, so this settlement cannot say what the employee held. Do not read the empty list as "nothing outstanding".',
+  none: 'No assets were ever allocated to this employee.',
+  outcomes: {
+    returned: 'Returned',
+    waived: 'Written off',
+    outstanding: 'Still held',
+  } as Record<string, string>,
+  returnedOn: (date: string) => `returned ${date}`,
+  waivedBy: (name: string) => `written off by ${name}`,
+  // FR-018b, stated rather than left to be inferred from the absence of a deduction line.
+  noDeduction:
+    'No asset value is deducted from the payable. Original cost, book value and replacement cost give three different figures and none has been agreed, so an unreturned asset is written off by name rather than priced by a rule nobody chose.',
+  stillHeldWarning: (count: number) =>
+    count === 1
+      ? 'One asset is still held and not written off.'
+      : `${count} assets are still held and not written off.`,
+} as const;
+
 export const LETTER_FIELD_COPY = {
   heading: (kind: string) => `Fields for ${kind}`,
   hint: 'What this kind’s templates may use as {{variables}}. Each field says where its value is read from — a field with no source renders blank, and a blank in a signed letter cannot be told apart from a deliberate omission.',

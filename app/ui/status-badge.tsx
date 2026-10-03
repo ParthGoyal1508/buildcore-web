@@ -46,6 +46,15 @@ const STATUS_STYLES: Record<string, string> = {
   in_transit: 'bg-blue-100 text-blue-800',
   received: 'bg-green-100 text-green-800',
 
+  // Asset outcome on a settlement summary (021 FR-018a). Three keys of its own rather than reusing
+  // the bill-payment or urgency sets above, because none of them means this: an asset written off
+  // is neither late nor paid, it is a decision somebody made and signed. Green for back on the
+  // shelf, amber for written off — money the company lost, with a name against it — and red for
+  // still held, which is the one that should stop a settlement.
+  asset_returned: 'bg-green-100 text-green-800',
+  asset_waived: 'bg-amber-100 text-amber-900',
+  asset_held: 'bg-red-100 text-red-800',
+
   // Plant (006). `under_maintenance` is orange rather than red: a machine in the
   // workshop is not a failure, it is a machine being looked after — red belongs to
   // a service that is late. `inactive` reuses the grey above; a decommissioned

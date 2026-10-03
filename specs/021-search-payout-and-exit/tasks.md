@@ -136,12 +136,34 @@ importer anywhere in the app.
       employee has
 - [X] T025 [US4] Final settlement unavailable while items are outstanding, **naming them** (FR-013).
       Naming is the requirement — "cannot settle yet" with no list is an instruction nobody can act on
-- [ ] T025a [US4] ⚠️ **Still open — needs the settlement summary, not this screen.** FR-013a — the settlement summary lists every asset the employee held at exit,
-      with its outcome.** Distinct from T020's outstanding list and previously uncovered: the
-      clearance screen shows what is *still* outstanding, while the settlement summary is the record of
-      how each asset ended — returned, waived, or still held. An asset returned last week vanishes from
-      the first and must still appear in the second, which is the whole point of the client's
-      "any assets assigned to the employee should appear in the F&F summary"
+- [X] T025a [US4] FR-013a — the settlement summary lists every asset the employee held at exit,
+      with its outcome. Distinct from T020's outstanding list: the clearance screen shows what is
+      *still* outstanding, while the settlement summary is the record of how each asset ended —
+      returned, waived, or still held. An asset returned last week vanishes from the first and must
+      still appear in the second, which is the whole point of the client's "any assets assigned to
+      the employee should appear in the F&F summary".
+
+      **DONE 2026-10-03**, and the note above turned out to describe a live defect rather than only
+      a missing screen.
+
+      The api's settlement summary derived its asset list by **filtering the clearance's items**, and
+      the clearance can only ever contain open custody — so an asset returned a week before the last
+      working day was absent from the summary entirely. The summary said the employee had never been
+      given it. `FnfService`'s own docblock claimed every asset appeared "whether or not it blocked
+      the settlement", which was the intent and not the behaviour. Fixed by a second registry
+      question, `custodyHistoryFor`, returning open **and** closed allocations; seven service tests
+      cover it, including the returned-asset case.
+
+      And this client's `fnfSchema` **dropped the field**. The api had served `assets` since 021
+      shipped; zod strips unknown keys, so it arrived on every response and never reached a screen.
+      That is the eighth instance in this review of a schema quietly discarding or coercing something
+      the server sent.
+
+      The summary now lists every asset with one word for its outcome — returned with the date,
+      written off with the author's name and reason, or still held — warns when anything is still
+      held and unwaived, and states FR-018b in words rather than leaving it to be inferred from the
+      absence of a deduction line. A null asset list is rendered as "the register could not be
+      asked", never as "nothing was held": a settlement is signed off on that difference.
 - [X] T026 [US4] **No recovery value shown**, and said once in words where somebody would otherwise
       look for a figure, rather than left as a silent absence. The backend deliberately computes
       none: that needs a valuation rule the client has not chosen. Note it here so nobody adds one
