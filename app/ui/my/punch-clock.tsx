@@ -12,7 +12,6 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
 import { DEV_FALLBACK_POSITION, MESSAGES } from '@/app/lib/constants';
-import { enqueue } from '@/app/lib/offline-queue';
 import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
@@ -61,7 +60,16 @@ export default function PunchClock() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
-  const [queuedNotice, setQueuedNotice] = useState(false);
+  /**
+   * Whether the device has a connection, tracked rather than read at tap time (020 T011).
+   *
+   * Read during render, so it cannot be `navigator.onLine` directly: the server renders this
+   * component and has no navigator, and seeding state from it during render would make the markup
+   * disagree with the browser's. It starts optimistic — `true` — and the effect below corrects it
+   * on mount. Optimistic rather than pessimistic because the wrong guess for one frame should be
+   * "offer the punch", not "tell a worker with perfect signal they have none".
+   */
+  const [isOnline, setIsOnline] = useState(true);
   // Which step of the capture -> locate -> submit sequence is running. Locating can
   // take many seconds (and on a device that cannot get a fix, the better part of
   // half a minute before it gives up), during which the screen previously showed
@@ -123,6 +131,21 @@ export default function PunchClock() {
       active = false;
       clearTimeout(firstPaint);
       clearInterval(tick);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setIsOnline(navigator.onLine);
+    // Scheduled, not called in the effect body, for the reason the clock's first paint is:
+    // writing state synchronously there forces an immediate second render pass, which
+    // `react-hooks/set-state-in-effect` exists to prevent.
+    const first = setTimeout(sync, 0);
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      clearTimeout(first);
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
     };
   }, []);
 
@@ -204,33 +227,20 @@ export default function PunchClock() {
       const input = { type, photo, capturedAt, ...coords };
       setPhase('submitting');
 
-      // Offline (US6, T031): queue rather than fail. The punch already happened —
-      // the worker is standing at the gate — and the only thing missing is a
-      // network, so refusing it would lose a real attendance event.
-      if (!navigator.onLine) {
-        await enqueue(input);
-        return 'queued' as const;
-      }
-
-      try {
-        return await submitPunch(input);
-      } catch (err) {
-        // A network-level failure is indistinguishable from being offline as far as
-        // the punch is concerned. An ApiError means the server answered and had a
-        // reason, which the worker needs to see rather than have silently queued.
-        if (err instanceof ApiError) throw err;
-        await enqueue(input);
-        return 'queued' as const;
-      }
+      /**
+       * No queue (020 T008). A punch that cannot reach the server cannot be refused by it, and
+       * under FR-013 a refusal has to arrive while the worker is still standing at the gate —
+       * a queued punch delivered its refusal eight hours later, when nothing could be done.
+       *
+       * A network failure here surfaces as an error rather than being swallowed into a queue,
+       * which is the same thing the screen now says before the attempt: punching needs a
+       * connection. Nothing is lost that was not already lost, because the alternative was a
+       * success the worker believed and the system later discarded.
+       */
+      return await submitPunch(input);
     },
-    onSuccess: (result) => {
+    onSuccess: (punchResult: PunchResult) => {
       setPendingType(null);
-      if (result === 'queued') {
-        setQueuedNotice(true);
-        setNotice(MESSAGES.punchQueued);
-        return;
-      }
-      const punchResult = result as PunchResult;
       // A flagged punch is still a recorded punch (FR-007/FR-005). The notice is
       // informational, not an error, because there is nothing for the worker to
       // redo — punching again would only create a second exception.
@@ -289,7 +299,6 @@ export default function PunchClock() {
   function startPunch(type: 'in' | 'out') {
     setError(null);
     setNotice(null);
-    setQueuedNotice(false);
     setPendingType(type);
   }
 
@@ -363,11 +372,7 @@ export default function PunchClock() {
       {notice && (
         <p
           role="status"
-          className={
-            queuedNotice
-              ? 'rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800'
-              : 'rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800'
-          }
+          className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
         >
           {notice}
         </p>
@@ -393,10 +398,24 @@ export default function PunchClock() {
         </p>
       )}
 
+      {/* No connection, no punch control (020 T011, T012).
+          Stated before the capture rather than after it: a worker who photographs themselves,
+          waits through the locate, and only then learns there is no signal has been made to do
+          work for nothing. Styled as a condition — the amber of "punched in since", not the red
+          of an error — because the application is not broken and must not look it. */}
+      {!isOnline && !dayIsComplete && (
+        <div className="space-y-2 rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
+          <p role="status">{MESSAGES.punchNeedsConnection}</p>
+          <p className="text-amber-700">
+            {MESSAGES.punchNeedsConnectionRecovery}
+          </p>
+        </div>
+      )}
+
       {/* Nothing to offer once the day's pair is recorded (FR-019c) — the boxes
           above already show what happened, and the only control that could appear
           here is one the server would refuse. */}
-      {dayIsComplete ? null : pendingType ? (
+      {dayIsComplete || !isOnline ? null : pendingType ? (
         <CameraCapture
           captureLabel={`Confirm punch ${pendingType}`}
           disabled={punch.isPending}

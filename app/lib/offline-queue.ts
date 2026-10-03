@@ -1,5 +1,18 @@
 /**
- * The offline punch queue (research.md §5, spec FR-009).
+ * The offline capture queues.
+ *
+ * **The punch store is drain-only since 020 Phase 2 (2026-10-03).** Nothing enqueues a punch any
+ * more: a queued punch cannot carry FR-013's refusal back to the worker at the moment they punched,
+ * so they saw a success at 8am and learnt at 5pm that the day did not count. `enqueue` is gone;
+ * `drainQueue` stays, because punches captured under the old promise are still sitting on devices
+ * and discarding them would throw away days people actually worked. See `drainQueue` below.
+ *
+ * The muster store (013 FR-006) is **unaffected and still enqueues**. It was a separate object
+ * store for exactly this reason. A muster is a supervisor recording other people's attendance in a
+ * place that frequently has no signal, and nothing about it is refused at capture time — the two
+ * acts look similar and are not.
+ *
+ * Original note (research.md §5, spec FR-009):
  *
  * Native IndexedDB, no wrapper library: this is one object store and three
  * operations, and a dependency for that would cost more than it saves.
@@ -19,10 +32,11 @@ const DB_NAME = 'buildcore-my-workspace';
  * column list, so a new *field* on an existing entry needs no bump — which is why
  * `accuracyMeters` arrived without one.
  *
- * Feature 020 Phase 2 retires the punch store from this same database. Whichever of the two lands
- * second must **not** treat the other's bump as a conflict to resolve by reverting: the version is
- * a high-water mark, and reverting it leaves browsers that already opened the database at the
- * higher version unable to open it at all.
+ * **020 Phase 2 landed second (2026-10-03) and did not bump it** — T009a's coordination point,
+ * resolved. Retiring the punch *writer* removes no object store: the store itself must stay, because
+ * punches queued under the old promise are still on devices and `drainQueue` has to read them. A
+ * version is a high-water mark and reverting it leaves browsers that already opened the database at
+ * the higher version unable to open it at all, so neither feature touches the other's number.
  */
 const DB_VERSION = 3;
 const STORE = 'punch-queue';
@@ -140,18 +154,13 @@ export function promisify<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
-/** Stores a punch for later submission. */
-export async function enqueue(entry: OfflineQueueEntry): Promise<void> {
-  const db = await openDb();
-  if (!db) throw new Error('Offline storage is unavailable on this device.');
-  const tx = db.transaction(STORE, 'readwrite');
-  // `id` is autoIncrement; passing an explicit undefined would set the key path to
-  // undefined rather than letting the store assign one.
-  const { id: _id, ...record } = entry;
-  void _id;
-  await promisify(tx.objectStore(STORE).add(record));
-  db.close();
-}
+/*
+ * `enqueue` was here, and is deliberately gone (020 T008).
+ *
+ * Removed rather than left unused, so that re-introducing offline punching takes a decision and a
+ * diff somebody reviews, instead of an import nobody noticed was still available. `enqueueMuster`
+ * below is the one that remains, and it is a different act.
+ */
 
 /** Every queued punch, oldest capture first. */
 export async function listQueued(): Promise<OfflineQueueEntry[]> {
@@ -194,7 +203,12 @@ export interface DrainResult {
 }
 
 /**
- * Submits every queued punch in capture order.
+ * Submits every punch still queued from before 020 Phase 2, in capture order.
+ *
+ * **A flush, not a queue drain.** Nothing writes to this store any more (T010): these entries were
+ * captured under the old promise that an offline punch would sync, and the only option that does
+ * not silently discard a worker's day is to honour that promise once and then let the store stay
+ * empty. A device that never had a queued punch drains nothing and shows nothing.
  *
  * Order matters: the backend enforces one open punch-in at a time, so replaying an
  * out before its in would be rejected outright.

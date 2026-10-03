@@ -1105,11 +1105,41 @@ export const MESSAGES = {
     'Location is unavailable over an insecure connection. Open this site over HTTPS (or on localhost) to punch in.',
   locationInaccurate: (accuracy: number) =>
     `Your location is only accurate to about ${Math.round(accuracy)}m, which is not precise enough to confirm you are on site. Wait a moment and try again.`,
-  punchQueued:
-    'Queued — this punch will sync automatically when you are back online.',
+  /**
+   * Punching now requires a connection (020 Phase 2, FR-013).
+   *
+   * **A condition, not a malfunction.** A worker who reads this as "the app is broken" stops
+   * trusting it and stops using it, and the wording is the only thing deciding which of the two
+   * they conclude. So it says what is true of the moment — there is no signal here — rather than
+   * anything about the application.
+   *
+   * The exchange it pays for: a queued punch cannot be refused at the gate. The worker saw a
+   * success at 8am and the refusal arrived at 5pm, by which time the day was lost and nobody could
+   * tell them why. Immediate refusal is worth more than a success that was not one.
+   */
+  punchNeedsConnection:
+    'Punching needs a connection, and your phone has no signal right now. Move to where you have signal and punch there.',
+  /**
+   * FR-013b. The way back, named rather than implied.
+   *
+   * "Nothing you can do" is what makes people abandon a system. A day genuinely worked but never
+   * punched is fixed by somebody, and saying who — before the worker has to ask — is the
+   * difference between a process and a dead end.
+   */
+  punchNeedsConnectionRecovery:
+    'If you work a day and cannot punch at all, tell your supervisor: they can raise a correction for that day, which is reviewed and then shows in your attendance.',
   punchQueuedCount: (count: number) =>
-    `${count} punch${count === 1 ? '' : 'es'} queued — will sync when you are back online.`,
+    `${count} punch${count === 1 ? '' : 'es'} queued on this device from before — syncing now.`,
   punchSyncFailed: (reason: string) => `A queued punch could not be synced: ${reason}`,
+  /**
+   * The end of the legacy queue, said once.
+   *
+   * Phase 2 retired offline punching, so this can only ever report punches captured before that
+   * shipped. It was an inline template in the layout; here because Principle III puts copy in one
+   * place, and because this one is about to stop appearing at all and should be easy to find then.
+   */
+  punchSyncedCount: (count: number) =>
+    `${count} punch${count === 1 ? '' : 'es'} queued on this device ${count === 1 ? 'has' : 'have'} now been sent.`,
   punchExceptionFlagged:
     'Punch recorded, but it needs review — your face or location did not match. Your supervisor has been notified; you do not need to punch again.',
   payrollLocked:

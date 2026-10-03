@@ -89,28 +89,72 @@ A queued punch cannot deliver FR-013's refusal at the moment of punching — the
 at 8am and the refusal arrives at 5pm. The exchange is deliberate: a refusal seen immediately, for a
 success that was not one.
 
-- [ ] T008 [US3] Retire the punch path of `app/lib/offline-queue.ts`: stop enqueuing punches, and
+- [X] T008 [US3] Retire the punch path of `app/lib/offline-queue.ts`: stop enqueuing punches, and
       remove the punch drain from `app/my/layout.tsx`
-- [ ] T009 [US3] **Keep the muster store.** `drainMusters` and `MusterQueueEntry` are feature 013's,
+
+      Done 2026-10-03. `enqueue` is **deleted**, not left unused — re-introducing offline punching
+      should cost a decision and a diff somebody reviews, not an import nobody noticed was still
+      there. The punch screen's two queue paths went with it: the `!navigator.onLine` branch and the
+      non-`ApiError` catch that queued on any network failure.
+
+      **The drain stays in `app/my/layout.tsx`** — see T010, which decided it must. The task as
+      written said to remove it; removing it would strand every punch already on a device.
+
+- [X] T009 [US3] **Keep the muster store.** `drainMusters` and `MusterQueueEntry` are feature 013's,
       serve a different act, and were a separate object store for exactly this reason. Note it beside
       the removal so a later tidy-up does not take both
-- [ ] T009a [US3] **Coordinate the `DB_VERSION` change with feature 018's Phase 2a**, which adds a
-      bill-draft store to this same file and this same database. Whichever lands second must not treat
-      the other's version bump as a conflict to resolve by reverting. 018's T021 carries the matching
-      note; this one exists so the dependency is visible from both sides rather than only from the one
-      that happened to be written second
-- [ ] T010 [US3] Decide and record what happens to punches **already queued** on a device when this
-      ships. They were captured under the old promise; draining them once on upgrade and then
-      retiring the path is the only option that does not silently discard a worker's day
-- [ ] T011 [US3] On the punch screen with no connectivity, state that a punch needs a connection and
-      offer no punch action. It must read as a **condition, not a malfunction** — a worker who thinks
-      the app is broken stops trusting it
-- [ ] T012 [US3] Name the recovery in that notice: a day genuinely worked but not punched is fixed by
-      a supervisor-raised correction. "Nothing you can do" is what makes people abandon the system;
-      this is the wording that prevents it (FR-013b)
-- [ ] T013 [US3] Verification: quickstart Scenario 2 in full — **including step 4**, which opens the
-      muster offline and confirms it still queues. That step exists to catch retiring too much
-- [ ] T014 [US3] Verification at 320px
+
+      Done. The module docblock now states it in the same paragraph as the retirement, so the next
+      reader sees both facts at once: a muster is a supervisor recording other people's attendance
+      somewhere with no signal, and nothing about it is refused at capture time. The two acts look
+      alike and are not.
+
+- [X] T009a [US3] **Coordinate the `DB_VERSION` change with feature 018's Phase 2a**
+
+      Resolved 2026-10-03: **020 landed second and bumped nothing.** The coordination assumed this
+      phase would remove an object store, which needs a bump. It does not — the store must survive
+      so `drainQueue` can read what is in it (T010). `DB_VERSION` stays at 3, 018's number, and the
+      comment in `offline-queue.ts` now records the resolution rather than the open question.
+
+- [X] T010 [US3] Decide and record what happens to punches **already queued** on a device
+
+      Decided: **flush once, never enqueue again.** They were captured under the promise that an
+      offline punch would sync, and that promise was made to a worker who then went home. The three
+      alternatives all discard somebody's day — dropping the store silently, dropping it with a
+      notice they will not understand, or leaving them queued forever behind a drain nobody calls.
+
+      The flush is the existing `online` listener, unchanged in mechanism and re-described in intent.
+      A device that never queued a punch drains nothing and shows nothing, so this is invisible to
+      everybody except the people it exists for, and it disappears on its own as devices empty.
+
+- [X] T011 [US3] On the punch screen with no connectivity, state that a punch needs a connection and
+      offer no punch action
+
+      Done. Stated **before** the capture, not after: a worker who photographs themselves, waits
+      through the locate, and only then learns there is no signal has been made to do work for
+      nothing. Amber — the colour of "punched in since" — rather than red, because the application
+      is not broken and must not look it.
+
+      Connectivity is tracked in state and corrected by an effect, never read during render: this
+      component is server-rendered, and seeding from `navigator.onLine` during render makes the
+      markup disagree with the browser's. It starts `true`, so the wrong guess for one frame offers
+      a punch rather than telling a worker with full signal they have none.
+
+- [X] T012 [US3] Name the recovery in that notice (FR-013b)
+
+      Done, as a second line under the first: a supervisor can raise a correction for the day, which
+      is reviewed and then shows in the worker's attendance. Named rather than implied — "nothing
+      you can do" is what makes people abandon a system.
+
+- [ ] T013 [US3] **NOT RUN (no browser in this environment)** Verification: quickstart Scenario 2 in
+      full — **including step 4**, which opens the muster offline and confirms it still queues. That
+      step exists to catch retiring too much.
+
+      Asserted in code rather than in a browser: `enqueueMuster`, `listQueuedMusters`,
+      `drainMusters` and `MUSTER_STORE` are untouched, and `app/labour/muster/page.tsx` still calls
+      them. That is not the same as having watched it queue, which is why this stays unticked.
+
+- [ ] T014 [US3] **NOT RUN (no browser)** Verification at 320px
 
 ---
 
