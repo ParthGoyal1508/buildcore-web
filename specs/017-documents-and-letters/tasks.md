@@ -112,9 +112,25 @@ exist.
 ## Phase 6: US5 — The template builder (P2)
 
 - [X] T022 [US5] Build `app/dashboard/settings/letter-kinds/page.tsx` — kind CRUD
-- [ ] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
+- [X] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
       markup** (spec Assumptions). This is a form, not an editor, and that constraint is what keeps it
-      tractable
+      tractable.
+
+  **DONE 2026-10-03.** `app/dashboard/recruitment/letter-templates/page.tsx` is now keyed to
+  `LetterKind` and draws its variable list from `GET /letter-kinds/:id/fields`. Still a form: fixed
+  text with `{{variables}}` inserted from a list, which is what makes validation possible at all.
+
+  The blockage described in the 2026-10-01 note below was real and is gone. The api gained
+  `LetterKindField`, the three endpoints that serve it, and validation against the fields a kind
+  **declares** rather than against a hardcoded map. One more api change was needed on the day and was
+  made: the recruitment template endpoints still ran the old `LETTER_TOKENS` pre-check *before* the
+  new one, so a field an administrator added to a shipped kind was declared, offered by this editor,
+  and then refused by a list written before that endpoint existed.
+
+  Found while rewriting this screen: the list schema parsed `letterType` as
+  `z.enum(LETTER_TYPES).catch('offer')`. A template for any of 017's other ten kinds was **silently
+  relabelled an offer letter**, and saving an edit would have moved it onto the offer kind. The
+  seventh instance of that pattern in this review.
 
   **Blocked on backend work, and the 2026-09-16 note above was wrong about why** (investigated
   2026-10-01). That note said "the API modules and shared components they need are built and typed;
@@ -137,8 +153,15 @@ exist.
   table) and serving it. That is not in api 017's tasks or its spec, so it is a gap in both halves
   rather than a sequencing problem. Left open and unstarted rather than half-built.
 
-- [ ] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
-      response includes one (FR-013a). Belt and braces, because the cost here is legal
+- [X] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
+      response includes one (FR-013a). Belt and braces, because the cost here is legal.
+
+  **DONE 2026-10-03, and now meaningful.** The picker is fed by a server response, which is the case
+  the 2026-10-01 note said this task was waiting for. The api refuses to *declare* a field whose path
+  names regulated personal data (`LETTER_FIELD_PATH_FORBIDDEN`), so a restricted field should not
+  exist to be offered; the editor filters again on token and path anyway. Belt and braces, as the
+  task asked, because the cost of offering an Aadhaar token in a letter template is legal rather
+  than cosmetic.
 
   **Not currently violated, and not yet meaningful.** The picker is fed by the hardcoded list
   described under T023, which contains no Aadhaar and no document type at all — so FR-013a holds by
@@ -591,15 +614,40 @@ fixed terms, without a developer". The requirement was here all along; the api h
 kind's fields, so the editor could only offer the five shipped types' hard-coded lists and a
 company-defined kind got an empty one. The api half is 017 Phase 10.
 
-- [ ] T133 [US5] Let a kind's fields be defined alongside it: add, remove and name each, with where its
+- [X] T133 [US5] Let a kind's fields be defined alongside it: add, remove and name each, with where its
       value comes from. This is what makes FR-014 true rather than merely written.
-- [ ] T134 [US5] Offer **only that kind's** declared fields in the template editor. The shared-list
+
+  **Already built when this was checked on 2026-10-03** — `app/ui/settings/letter-kind-fields.tsx`,
+  shipped with the api half earlier the same day. Recorded rather than silently ticked: the task file
+  said outstanding and the code said otherwise, which is the third time in this review a task file
+  has been wrong in our favour.
+- [X] T134 [US5] Offer **only that kind's** declared fields in the template editor. The shared-list
       alternative was declined by the client precisely so an offer letter's editor cannot offer
       exit-settlement fields.
-- [ ] T135 [US5] Name the field that fails validation when a template references one the kind does not
+
+  **DONE 2026-10-03.** Every list on the editor is scoped to the template's own kind, fetched by that
+  kind's id. The kind is fixed once a template is saved, for the same reason: moving a template to
+  another kind would leave every variable in it undeclared.
+- [X] T135 [US5] Name the field that fails validation when a template references one the kind does not
       declare. "Invalid template" on a screen whose whole content is a template tells the author nothing.
-- [ ] T136 [US5] Warn before removing a field that live templates reference, naming them — the same shape
+
+  **DONE 2026-10-03, in two places that cannot disagree.** The editor names every undeclared token
+  while the author types, and the api's own refusal (`LETTER_FIELD_NOT_DECLARED`, carrying the tokens
+  in `fields`) is shown verbatim on save. Both read the same declared-field list, so the screen
+  cannot promise something the server then refuses.
+- [X] T136 [US5] Warn before removing a field that live templates reference, naming them — the same shape
       FR-015 already uses for template deletion.
+
+  **DONE 2026-10-03**, with one api addition it needed: `GET /letter-kinds/:id/fields/:token/usage`.
+  The list could not be derived in the browser — this screen's caller holds `SETTINGS` and the
+  template endpoints require `RECRUITMENT`, so a browser computing it would be refused for exactly
+  the administrator most likely to be tidying a kind.
+
+  The removal is still not blocked, which is the api's deliberate choice: an administrator tidying a
+  kind should not be stopped by a draft somebody abandoned, and the refusal belongs at issue time
+  where the person affected is the one issuing. So this names the templates, marks which are live,
+  and says what will happen — then lets them decide. A failed usage check says so and still offers
+  the removal, rather than implying nothing will break.
 - [ ] T137 [P] [US5] Manual pass: define a kind, declare its fields, write a template using them, issue a
       letter, and read the rendered values. End to end, because every intermediate step passed before and
       the feature still did not work.

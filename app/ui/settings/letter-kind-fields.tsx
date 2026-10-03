@@ -7,8 +7,10 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   LETTER_FIELD_SOURCES,
   declareLetterKindField,
+  getLetterFieldUsage,
   getLetterKindFields,
   withdrawLetterKindField,
+  type FieldUsage,
   type LetterFieldSource,
 } from '@/app/lib/api/letters';
 import { LETTER_FIELD_COPY } from '@/app/lib/constants';
@@ -17,6 +19,7 @@ import {
   CheckboxField,
   FormError,
   RowAction,
+  SecondaryButton,
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
@@ -38,6 +41,14 @@ import {
  * blank**, and a blank in a signed letter is indistinguishable from a deliberate omission. So the
  * source is required, the path is required for every source but `manual`, and the form says which is
  * which rather than letting the server refuse.
+ *
+ * ## Removing a field warns, and the api does not refuse it
+ *
+ * Withdrawing a field is deliberately not blocked while templates use it — an administrator tidying
+ * a kind should not be stopped by a draft somebody abandoned, and the refusal belongs at issue time
+ * where the person affected is the one issuing. So this screen asks the api **which templates
+ * reference the field** and names them before the removal happens. That warning is the only thing
+ * between a tidy-up and a letter that refuses to issue a fortnight later.
  *
  * ## Shipped kinds are shown, not edited
  *
@@ -61,6 +72,8 @@ export default function LetterKindFields({
   const [sourcePath, setSourcePath] = useState('');
   const [isRequired, setIsRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The field the administrator has asked to remove, held while its usage is checked. */
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   const fields = useQuery({
     queryKey: ['letterKindFields', kindId],
@@ -98,11 +111,25 @@ export default function LetterKindFields({
       ),
   });
 
+  /**
+   * Which templates use the field waiting to be removed.
+   *
+   * Asked of the api, not derived here: this screen's caller holds `SETTINGS` and the template
+   * endpoints require `RECRUITMENT`, so a browser computing it would be refused for exactly the
+   * administrator most likely to be tidying.
+   */
+  const usage = useQuery({
+    queryKey: ['letterFieldUsage', kindId, pendingRemoval],
+    queryFn: () => getLetterFieldUsage(kindId, pendingRemoval as string),
+    enabled: pendingRemoval !== null,
+  });
+
   const withdraw = useMutation({
     mutationFn: (fieldToken: string) =>
       withdrawLetterKindField(kindId, fieldToken),
     onSuccess: () => {
       setError(null);
+      setPendingRemoval(null);
       void invalidate();
     },
     onError: (err) =>
@@ -173,7 +200,10 @@ export default function LetterKindFields({
               ) : (
                 <RowAction
                   type="button"
-                  onClick={() => withdraw.mutate(field.token)}
+                  onClick={() => {
+                    setError(null);
+                    setPendingRemoval(field.token);
+                  }}
                   disabled={withdraw.isPending}
                 >
                   {LETTER_FIELD_COPY.remove}
@@ -182,6 +212,62 @@ export default function LetterKindFields({
             </li>
           ))}
         </ul>
+      )}
+
+      {pendingRemoval !== null && (
+        <div
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900"
+          role="alert"
+        >
+          {usage.isPending ? (
+            <p role="status">{LETTER_FIELD_COPY.usageChecking}</p>
+          ) : usage.isError ? (
+            /*
+              Shown rather than swallowed, and the removal is still offered. The api does not refuse
+              it, so being unable to check is not a reason to block an administrator — but it is
+              every reason to say so rather than implying nothing will break.
+            */
+            <p>{LETTER_FIELD_COPY.usageFailed}</p>
+          ) : usage.data.length === 0 ? (
+            <p>
+              {LETTER_FIELD_COPY.usageNone(`{{${pendingRemoval}}}`)}
+            </p>
+          ) : (
+            <>
+              <p className="font-medium">
+                {LETTER_FIELD_COPY.usageWarning(
+                  `{{${pendingRemoval}}}`,
+                  usage.data.length,
+                )}
+              </p>
+              <ul className="mt-1 list-inside list-disc">
+                {usage.data.map((template: FieldUsage) => (
+                  <li key={template.id} className="break-words">
+                    {template.name}
+                    {template.isActive && (
+                      <span className="ml-1 text-xs">
+                        ({LETTER_FIELD_COPY.usageActive})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1">{LETTER_FIELD_COPY.usageConsequence}</p>
+            </>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              disabled={withdraw.isPending || usage.isPending}
+              onClick={() => withdraw.mutate(pendingRemoval)}
+            >
+              {LETTER_FIELD_COPY.usageConfirm}
+            </Button>
+            <SecondaryButton onClick={() => setPendingRemoval(null)}>
+              {LETTER_FIELD_COPY.usageCancel}
+            </SecondaryButton>
+          </div>
+        </div>
       )}
 
       {/* Shipped kinds are listed and not edited — see the file docblock. */}

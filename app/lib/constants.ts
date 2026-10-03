@@ -657,6 +657,65 @@ export const RECONCILIATION_COPY = {
  * a nicety: a field that is only a label is a placeholder that renders blank, and a blank in a signed
  * letter is indistinguishable from a deliberate omission.
  */
+/**
+ * Every word the template editor says (017 US5, FR-014) — `bugs.md` item 18.
+ *
+ * Principle III: no string below is written at a call site. The ones that carry weight are the
+ * refusals — an author looking at a screen that is entirely one template needs to be told *which*
+ * field is the problem, and "invalid template" tells them nothing they can act on.
+ */
+export const TEMPLATE_COPY = {
+  title: 'Letter Templates',
+  // Says what the editor is keyed to now. It used to say "one active template per type", and "type"
+  // was the five-value enum 017 replaced with fifteen kinds.
+  description:
+    'One active template per letter kind. The variables a template may use are the fields its kind declares.',
+  newTemplate: 'New template',
+  edit: 'Edit',
+  none: 'No templates yet.',
+  loading: 'Loading templates…',
+  loadFailed: 'Could not load the templates.',
+  editHeading: 'Edit template',
+  newHeading: 'New template',
+  kindLabel: 'Letter kind',
+  // The kind cannot change after the first save: the body is validated against that kind's declared
+  // fields, and moving a template to another kind would leave every field in it undeclared.
+  kindFixedHint:
+    'Fixed once saved — a template’s variables are validated against its kind’s fields.',
+  nameLabel: 'Name',
+  bodyLabel: 'Body',
+  bodyHint:
+    'Fixed text with {{variables}}. Insert a variable from the list rather than typing it, so it cannot be misspelled.',
+  fieldsHeading: 'Variables this kind declares',
+  fieldsLoading: 'Loading this kind’s variables…',
+  fieldsFailed:
+    'Could not load this kind’s variables, so the editor cannot tell you which are valid. Saving is disabled until it can.',
+  // Not a neutral empty state. A kind with no declared fields cannot have a template using any
+  // variable at all, and the remedy is on another screen — so it is named.
+  fieldsNone:
+    'This kind declares no variables yet. Declare them on the letter kind first, in Settings → Letter kinds — a template may only use fields its kind declares.',
+  requiredMark: 'required',
+  manualSource: 'typed at issue time',
+  insert: 'Insert',
+  undeclaredHeading: (count: number) =>
+    count === 1
+      ? 'One variable is not declared by this kind'
+      : `${count} variables are not declared by this kind`,
+  // Named, every one of them. This is T135's whole requirement.
+  undeclaredBody: (tokens: string[]) =>
+    `${tokens.map((token) => `{{${token}}}`).join(', ')} — either declare ${
+      tokens.length === 1 ? 'it' : 'them'
+    } on the letter kind, or remove ${
+      tokens.length === 1 ? 'it' : 'them'
+    } from the body. A letter cannot be issued with a variable nothing supplies, because a blank where a value belongs cannot be told apart from a deliberate omission.`,
+  activeLabel: 'Active — deactivates any other active template for this kind',
+  save: 'Save',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  saveFailed: 'Could not save the template.',
+  activeBadge: 'Active',
+} as const;
+
 export const LETTER_FIELD_COPY = {
   heading: (kind: string) => `Fields for ${kind}`,
   hint: 'What this kind’s templates may use as {{variables}}. Each field says where its value is read from — a field with no source renders blank, and a blank in a signed letter cannot be told apart from a deliberate omission.',
@@ -692,6 +751,24 @@ export const LETTER_FIELD_COPY = {
     'An optional field with no value renders empty, which is often right. A required one stops the letter — use it where a blank would change what the letter says.',
   add: 'Add field',
   adding: 'Adding…',
+  // T136. The api does not refuse the removal — an administrator tidying a kind should not be
+  // blocked by a draft somebody abandoned — so this warning is the only thing between a tidy-up and
+  // a letter that refuses to issue a fortnight later. It names the templates, because "some
+  // templates use this" leaves somebody opening every one.
+  usageChecking: 'Checking which templates use it…',
+  usageNone: (field: string) =>
+    `No template uses ${field}. Removing it now breaks nothing.`,
+  usageWarning: (field: string, count: number) =>
+    count === 1
+      ? `One template uses ${field}:`
+      : `${count} templates use ${field}:`,
+  usageConsequence:
+    'Removing it does not change those templates, and they will refuse to issue until the variable is taken out of them or declared again.',
+  usageFailed:
+    'Could not check which templates use this field. Removing it may break a template that references it.',
+  usageActive: 'active',
+  usageConfirm: 'Remove anyway',
+  usageCancel: 'Keep the field',
 } as const;
 
 /**

@@ -149,6 +149,37 @@ export async function declareLetterKindField(
   );
 }
 
+const fieldUsageSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isActive: z.boolean().default(false),
+});
+export type FieldUsage = z.infer<typeof fieldUsageSchema>;
+
+/**
+ * Which of this kind's templates reference a field (web T136).
+ *
+ * Asked **before** offering to withdraw it. The api does not refuse the removal — an administrator
+ * tidying a kind should not be blocked by a draft somebody abandoned — so the warning is the only
+ * thing standing between a tidy-up and a letter that refuses to issue a fortnight later.
+ *
+ * Served by the api rather than derived here, because this screen's caller holds `SETTINGS` and the
+ * template endpoints require `RECRUITMENT`: a browser computing it would 403 for exactly the
+ * administrator most likely to be doing the tidying.
+ */
+export async function getLetterFieldUsage(
+  kindId: string,
+  token: string,
+): Promise<FieldUsage[]> {
+  return z
+    .array(fieldUsageSchema)
+    .parse(
+      await authFetch<unknown>(
+        `/letter-kinds/${encodeURIComponent(kindId)}/fields/${encodeURIComponent(token)}/usage`,
+      ),
+    );
+}
+
 export async function withdrawLetterKindField(
   kindId: string,
   token: string,
@@ -174,6 +205,100 @@ export async function deleteLetterKind(
     `/letter-kinds/${encodeURIComponent(id)}${companyQuery(companyId)}`,
     { method: 'DELETE' },
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Letter templates
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A template, keyed to its **letter kind** (017 §1) — `bugs.md` item 18.
+ *
+ * ## `letterType` is a string here, and that is a fix
+ *
+ * `app/lib/api/recruitment.ts` parsed this field as `z.enum(LETTER_TYPES).catch('offer')` — feature
+ * 011's five values, with a fallback. 017 replaced that enum with `LetterKind` rows and FR-010 names
+ * fifteen kinds, so a template for any of the other ten arrived with a key the enum rejected and
+ * **`.catch` relabelled it as an offer letter.** It would have been listed as "Offer Letter", and
+ * editing it would have sent `letterType: "offer"` back — moving a work-order template onto the
+ * offer kind, silently, on save.
+ *
+ * That is the seventh time in this review a zod schema has been found quietly discarding or coercing
+ * something the server sent. The shape of the fix is always the same: parse what the server actually
+ * sends, and get the label from the data rather than from a constant compiled in last quarter.
+ */
+const letterTemplateSchema = z.object({
+  id: z.string(),
+  /** The kind's row id — what the fields endpoint is keyed by. */
+  letterKindId: z.string(),
+  /** The kind's key, as the wire has always called it. Any of the fifteen, not one of five. */
+  letterType: z.string(),
+  name: z.string(),
+  bodyTemplate: z.string(),
+  letterheadAssetId: z.string().nullable().default(null),
+  isActive: z.boolean().default(false),
+});
+export type LetterTemplate = z.infer<typeof letterTemplateSchema>;
+
+export async function getLetterTemplates(
+  companyId?: string,
+): Promise<LetterTemplate[]> {
+  return z
+    .array(letterTemplateSchema)
+    .parse(
+      await authFetch<unknown>(
+        `/recruitment/letter-templates${companyQuery(companyId)}`,
+      ),
+    );
+}
+
+export interface LetterTemplateInput {
+  /** The kind's **key**, which is what this endpoint has always taken. */
+  letterType: string;
+  name: string;
+  bodyTemplate: string;
+  isActive?: boolean;
+}
+
+/**
+ * Saves a new template.
+ *
+ * Refused with `LETTER_FIELD_NOT_DECLARED` when the body uses a token the kind does not declare,
+ * naming the tokens in `fields`. The screen shows that message verbatim: "invalid template" on a
+ * screen whose entire content is a template tells the author nothing.
+ */
+export async function createLetterTemplate(
+  input: LetterTemplateInput,
+): Promise<LetterTemplate> {
+  return letterTemplateSchema.parse(
+    await authFetch<unknown>('/recruitment/letter-templates', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function updateLetterTemplate(
+  id: string,
+  input: { name?: string; bodyTemplate?: string; isActive?: boolean },
+): Promise<LetterTemplate> {
+  return letterTemplateSchema.parse(
+    await authFetch<unknown>(
+      `/recruitment/letter-templates/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+    ),
+  );
+}
+
+/** Every `{{token}}` a body references, distinct, in the order they appear. */
+export function templateTokens(body: string): string[] {
+  const found: string[] = [];
+  const pattern = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(body)) !== null) {
+    if (!found.includes(match[1])) found.push(match[1]);
+  }
+  return found;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
