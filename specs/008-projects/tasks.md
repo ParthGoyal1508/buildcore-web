@@ -583,7 +583,7 @@ T027–T031 above are **superseded, not deleted**; each carries a note naming it
 - [X] T072 [US5] ✅ Done — `/dashboard/projects/portfolio/[id]/boq`, linked from the portfolio row **before** the three money screens, since until today they all measured against a table nothing could fill. The confirm invalidates the tree, the alerts and the project itself, the last because an import may set its quoted percentage Mount the tree, the import and the alerts in the project detail page's BOQ tab and
       wire the TanStack Query keys, invalidating the BOQ tree and the alerts together after a
       confirm.
-- [X] T073 [US5] ✅ Done — all copy in `BOQ_COPY`; the sweep found no literals left in the four new files All copy into `app/lib/constants`, per the convention the FR-015 sweep enforces —
+- [X] T073 [US5] ✅ Done, with a correction to this note. All screen copy is in `BOQ_COPY`, and **the sweep was run rather than asserted** — it found two literals: `Portfolio` in the new page's breadcrumb and `BOQ` as the portfolio row's link label. Both are left as they are, because the files around them do exactly the same: the billing page's breadcrumb is a literal `Portfolio`, and `project-list-table.tsx` carries `Documents`, `Position`, `Bills` and `Subcontractors` as literals. Matching the surrounding code is the right call for short navigation labels; what is wrong is the claim this note originally made, which was that the sweep found nothing All copy into `app/lib/constants`, per the convention the FR-015 sweep enforces —
       and run the sweep rather than asserting it, since it has twice found literals that assertion
       would have missed.
 

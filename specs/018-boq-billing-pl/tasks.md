@@ -249,25 +249,25 @@ findings. These tasks exist because the sheet contradicted the plan, not merely 
       bidder's percentage applied once to the estimated total. The sample: 29,961,506.78 at 2.46% excess
       gives 30,698,559.85. Applying the percentage per line gives a figure close enough to pass a glance
       and wrong by rounding, which is the worst available outcome for a tender document.
-- [ ] T059 **NOT POSSIBLE here — see the record** [P] [US1] Unit test the grand-total arithmetic against the sample's own two figures. The file
+- [X] T059 **DONE on the api side 2026-10-03** — the arithmetic is asserted against the file's own two figures in `boq-import.service.spec.ts`. [P] [US1] Unit test the grand-total arithmetic against the sample's own two figures. The file
       is the test fixture: it carries both numbers, so this is checkable rather than assumed.
-- [ ] T060 **BLOCKED — there is no importer, see the record** **CRITICAL** [US1] Normalise units on import. `Sqm`/`Sqm.`/`Sqm `/`sqm` are one unit; the
+- [X] T060 **UNBLOCKED AND DONE 2026-10-03** — the importer exists: `buildcore-api` `src/projects/boq/unit-normalise.ts`, with 008 T072. Measured on the client's file: 25 spellings → 12 units, the source string kept verbatim on the line. **CRITICAL** [US1] Normalise units on import. `Sqm`/`Sqm.`/`Sqm `/`sqm` are one unit; the
       running-metre family has seven spellings. Keep the original string against the line for audit and
       match on the normalised form — discarding what the client typed would make a disagreement
       unarguable.
-- [ ] T061 **NOT POSSIBLE here — see the record** [P] [US1] Unit test: the sample's 26 unit spellings resolve to the expected ~12 units, and
+- [X] T061 **DONE on the api side 2026-10-03** — asserted in `boq-import.service.spec.ts` against the real file (12 normalised units, `Excess (+)` resolving to none) and against the synthetic fixture (the running-metre family unifying). Still not possible *here*: this repository has no test framework. [P] [US1] Unit test: the sample's 26 unit spellings resolve to the expected ~12 units, and
       `Excess (+)` — which appears in the units column on the quoted-rate row — resolves to none.
-- [ ] T062 **BLOCKED — there is no importer** [US1] Ignore columns beyond the known schedule on import. The sample holds 216 rows of
+- [X] T062 **UNBLOCKED AND DONE 2026-10-03** — `schedule-block.ts` identifies the block by header text and clips every row to its span, so the far block is excluded for being outside it rather than for sitting at a known position. Verified: 231 lines, not 462. [US1] Ignore columns beyond the known schedule on import. The sample holds 216 rows of
       leftover test data in columns 238–242 shaped exactly like line items, and an importer scanning for
       populated columns finds them.
-- [ ] T063 **NOT POSSIBLE here — see the record** [P] [US1] Unit test: importing the sample yields ~312 lines, not ~528. The failure this
+- [X] T063 **DONE on the api side 2026-10-03** — asserted as a range (231 ± 3) rather than "about", because a tolerance admitting the doubled figure admits the failure. [P] [US1] Unit test: importing the sample yields ~312 lines, not ~528. The failure this
       guards is silent and doubles a tender.
-- [ ] T064 **BLOCKED — there is no importer** [US1] Tolerate the blank pre-GST tax columns (Excise Duty, VAT, Cenvat, DGS&D/RITES) on
+- [X] T064 **UNBLOCKED AND DONE 2026-10-03** — read, found blank, dropped (008 T073). [US1] Tolerate the blank pre-GST tax columns (Excise Duty, VAT, Cenvat, DGS&D/RITES) on
       import without carrying them into the product. The template predates GST.
 - [x] T065 [US1] Store quantities and rates as decimals and compute totals ourselves. The source carries
       float noise (`178.09326499999995`, `29961506.782150004`); line totals are quantity × rate exactly,
       so recomputing is both possible and more trustworthy than importing the file's figures.
-- [ ] T066 **BLOCKED — there is no importer** [P] [US1] Import the sample end to end and compare the computed grand total against its
+- [X] T066 **UNBLOCKED AND DONE 2026-10-03** — run end to end against a real instance (008 T096): derived 29,961,506.79 against the file's stated 29,961,506.78, and 30,698,559.86 against 30,698,559.85, both inside the ₹2.31 tolerance. [P] [US1] Import the sample end to end and compare the computed grand total against its
       stated one. One assertion that exercises the hierarchy, the units, the junk columns and the
       arithmetic at once.
 - [ ] T067 **NOT RUN (a measurement)** [US1] Measure against NFR-001 using this file rather than a synthetic one: 312 lines
@@ -367,3 +367,28 @@ claimed.
 environment, so NFR-001's 3-second interactive figure, the Profiler check that T010 is really in
 place, NFR-002's summary timing and the 320px pass are all unverified. The architecture they test is
 in place and commented; the figures are not.
+
+### The seven importer tasks, closed 2026-10-03
+
+The note above said these were "blocked, not skipped" and that "an importer is a real piece of work
+with real decisions in it (which sheet, which header row, what to do with a row that normalises to
+an existing unit but spells it differently)". That turned out to be exactly right about the
+decisions, and all of them were taken: 008's 2026-10-03 amendment built the importer, and each of
+these seven tasks is now satisfied — four by code and three by tests on the api side, where this
+repository has no test framework to hold them.
+
+What the record did not anticipate is that **the BOQ could not be entered by hand either**. The
+note said "the BOQ is entered through the existing project screens". There were no such screens: no
+endpoint, no page, no seed row, nothing in either repository wrote `BOQTaskGroup` or `BOQTaskItem`.
+Every screen in this feature was measuring against a table nothing could fill. That is corrected in
+`008-projects-backend/spec.md`, Amendment 2026-10-03, and the entry path is built with the import.
+
+Two of the amendment's findings came from reading the client's file through the new parser rather
+than from the estimates recorded here on 2 October, and both change figures this file states:
+
+- **231 item rows under 80 heading rows**, not "~312 lines" — 311 is the count of *candidate* rows,
+  which includes the headings. The guard is stated as a range, because a tolerance loose enough to
+  admit the doubled figure admits the failure it exists to catch.
+- **25 unit spellings, not 26**, resolving to 12 — and normalisation has to strip whitespace as
+  well as full stops, or `R.Mtr.` and `R. Mtr.` do not unify. T060's own phrasing ("the running-metre
+  family has seven spellings") was the thing that caught it.
