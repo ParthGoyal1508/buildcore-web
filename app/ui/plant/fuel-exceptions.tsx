@@ -203,20 +203,26 @@ function EntryDetail({ exception }: { exception: FuelException }) {
   return (
     <dl className="grid gap-2 text-sm sm:grid-cols-4">
       <div>
-        <dt className="text-xs uppercase tracking-wide text-gray-500">Issued</dt>
+        <dt className="text-xs uppercase tracking-wide text-gray-500">
+          {FUEL_EXCEPTIONS.entryIssued}
+        </dt>
         <dd>{FUEL_EXCEPTIONS.litres(fuelEntry.quantity)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-gray-500">Rate</dt>
+        <dt className="text-xs uppercase tracking-wide text-gray-500">
+          {FUEL_EXCEPTIONS.entryRate}
+        </dt>
         <dd>{money(fuelEntry.rate)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-gray-500">Cost</dt>
+        <dt className="text-xs uppercase tracking-wide text-gray-500">
+          {FUEL_EXCEPTIONS.entryCost}
+        </dt>
         <dd>{money(fuelEntry.amount)}</dd>
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-gray-500">
-          Over benchmark
+          {FUEL_EXCEPTIONS.entryOverBenchmark}
         </dt>
         <dd>
           {fuelEntry.variancePercent === null
@@ -239,13 +245,14 @@ function EntryDetail({ exception }: { exception: FuelException }) {
 /** Where an exception has got to, and — for a recovery — whether any money has actually moved. */
 function StatusCell({ exception }: { exception: FuelException }) {
   if (exception.status === 'dismissed') {
-    return <span className="text-gray-500">Dismissed</span>;
+    return <span className="text-gray-500">{FUEL_EXCEPTIONS.statusDismissed}</span>;
   }
-  if (exception.status === 'open') return <span>Open</span>;
+  if (exception.status === 'open')
+    return <span>{FUEL_EXCEPTIONS.statusOpen}</span>;
 
   return (
     <div className="space-y-1">
-      <span>Confirmed</span>
+      <span>{FUEL_EXCEPTIONS.statusConfirmed}</span>
       {exception.hireBillDeduction && (
         <p className="text-xs text-gray-600">
           {FUEL_EXCEPTIONS.recoveredHireBill(
@@ -402,7 +409,7 @@ function ReviewModal({
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
-            Cancel
+            {FUEL_EXCEPTIONS.cancel}
           </SecondaryButton>
           <Button
             type="button"
@@ -425,7 +432,7 @@ function ReviewModal({
 
         <SelectField
           id="fuel-decision"
-          label="Decision"
+          label={FUEL_EXCEPTIONS.decision}
           value={decision}
           onChange={(event) =>
             setDecision(event.target.value as 'confirmed' | 'dismissed')

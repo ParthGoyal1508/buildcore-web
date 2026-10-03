@@ -117,7 +117,7 @@ export default function BulkLocationAssignment({
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
-            {result ? 'Close' : 'Cancel'}
+            {result ? LOCATION_ASSIGNMENT.close : LOCATION_ASSIGNMENT.cancel}
           </SecondaryButton>
           {/* Gone once it has run. Offering it again after a partial failure invites somebody to
               re-run the whole set to catch two stragglers, which appends a duplicate assignment
@@ -137,8 +137,7 @@ export default function BulkLocationAssignment({
           {LOCATION_ASSIGNMENT.bulkHint}
         </p>
         <p className="text-sm font-medium text-gray-900">
-          {employees.length} employee{employees.length === 1 ? '' : 's'} in the
-          current list
+          {LOCATION_ASSIGNMENT.bulkCount(employees.length)}
         </p>
 
         {result ? (
@@ -149,12 +148,12 @@ export default function BulkLocationAssignment({
           <>
             <SelectField
               id="bulk-assignment-site"
-              label="Site"
+              label={LOCATION_ASSIGNMENT.siteLabel}
               value={siteId}
               disabled={isMobile}
               onChange={(event) => setSiteId(event.target.value)}
             >
-              <option value="">Select a site</option>
+              <option value="">{LOCATION_ASSIGNMENT.sitePlaceholder}</option>
               {(sites ?? []).map((site) => (
                 <option key={site.id} value={site.id}>
                   {site.name}

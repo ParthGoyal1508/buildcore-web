@@ -147,13 +147,13 @@ export default function LocationAssignmentPanel({
       <div className="space-y-3 border-t border-gray-200 pt-4">
         <SelectField
           id="assignment-site"
-          label="Site"
+          label={LOCATION_ASSIGNMENT.siteLabel}
           value={siteId}
           disabled={isMobile}
           hint={isMobile ? LOCATION_ASSIGNMENT.mobileScope : undefined}
           onChange={(event) => setSiteId(event.target.value)}
         >
-          <option value="">Select a site</option>
+          <option value="">{LOCATION_ASSIGNMENT.sitePlaceholder}</option>
           {(sites ?? []).map((site) => (
             <option key={site.id} value={site.id}>
               {site.name}

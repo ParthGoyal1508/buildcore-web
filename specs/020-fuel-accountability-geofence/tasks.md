@@ -425,30 +425,62 @@ alternative, which is that the whole of 020 stays unreachable.
 
 ## Phase 7: Verification
 
-- [ ] T049 **SC-005b, verifiable today**: every punch request carries the device's reported accuracy
-      where the browser supplies it, and omits it where the browser does not. This is Phase 1, and the
-      one success criterion in this feature that waits on nothing
-- [ ] T050 **NFR-003, measured**: a refusal reaches the worker within 2 seconds of the attempt. A
-      figure, not an impression — a worker who thinks nothing happened punches again, and under the
-      block every retry is another refusal
-- [ ] T051 SC-001 and SC-002: a reviewer raises a hire deduction and an operator recovery, and each
-      reaches its destination with its evidence (gated on Phases 5–6)
-- [ ] T052 SC-003 and SC-004: an employee's assigned location and its history are visible, and a site's
-      staff can be assigned in bulk without opening each employee (gated on Phase 5)
-- [ ] T053 **SC-005 and SC-005a**: a refused punch appears nowhere as a day — checked in the employee's
-      own attendance view, the administrator's attendance screen, and any absence or leave-balance
-      figure derived from them. The backend's guarantee is structural; this verifies the interface did
-      not reintroduce what the storage prevents
-- [ ] T054 SC-006: a worker refused at 8am can find that refusal at 5pm, in a list of attempts
-- [ ] T055 NFR-001: every punch surface at 320px (Principle VI, FR-014c) — a gate, not a polish pass.
-      NFR-002 records the opposite, and is worth stating: the fuel review is a desktop surface and is
-      not claimed as mobile
-- [ ] T056 FR-015: every read through a typed API module, no component calling `fetch`, all copy in
-      `constants.ts`. A recorded sweep — this is the requirement that decays silently
-- [ ] T057 Record each pass in this file beside its task. A verification whose result lives only in a
-      closed terminal is not a verification
+Run 2026-10-03. **Two of the nine were verifiable without a browser and were run; the other seven
+are measurements or browser passes and are recorded NOT RUN with the reason.** A check nobody ran is
+not a pass, and recording it as one would make every other tick on this page worth less.
 
----
+- [X] T049 **SC-005b, verifiable today**: every punch request carries the device's reported accuracy
+      where the browser supplies it, and omits it where the browser does not
+
+      Verified by inspection, which is sufficient here because the property is about what the code
+      sends, not about how it behaves on a device: `punch-clock.tsx` sets
+      `accuracyMeters: position.coords.accuracy ?? undefined`, and `submitPunch` forwards the key
+      only when defined. The dev fallback position deliberately sends none — a pair of coordinates
+      somebody configured is not a fix any device reported, and inventing an accuracy for it would
+      hand the backend a number with nothing behind it.
+
+      The field name is `accuracyMeters` on this endpoint and `accuracyMetres` on the muster one.
+      Both are correct where they are, and the comment in `my-workspace.ts` says why tidying them to
+      match would be a silent bug: the backend validates with `@IsOptional()`, so a misspelt key is
+      ignored without error and the punch is judged on its raw point.
+
+- [ ] T050 **NOT RUN (a measurement, needs a device and the refusal switched on)** NFR-003: a refusal
+      reaches the worker within 2 seconds of the attempt. A figure, not an impression — a worker who
+      thinks nothing happened punches again, and under the block every retry is another refusal.
+- [ ] T051 **NOT RUN (needs seeded fuel entries, logbook hours and an approver)** SC-001 and SC-002:
+      a reviewer raises a hire deduction and an operator recovery, and each reaches its destination
+      with its evidence.
+- [ ] T052 **NOT RUN (needs a browser)** SC-003 and SC-004: an employee's assigned location and its
+      history are visible, and a site's staff can be assigned together.
+- [ ] T053 **NOT RUN (needs the refusal switched on for a company)** SC-005 and SC-005a: a refused
+      punch appears nowhere as a day.
+
+      Partially answerable by construction and recorded as such rather than ticked: the backend
+      writes nothing for a refused punch, so the attendance view has no field for one to arrive in.
+      That is an argument, not an observation, and this task asks for the observation.
+
+- [ ] T054 **NOT RUN (needs a browser)** SC-006: a worker refused at 8am can find that refusal at
+      5pm, in a list of attempts.
+- [ ] T055 **NOT RUN (no browser)** NFR-001: every punch surface at 320px (Principle VI, FR-014c) —
+      a gate, not a polish pass. **This is the most important of the seven**: the punch screens are
+      on the mobile-critical list, and every one of them was changed in this batch.
+- [X] T056 FR-015: every read through a typed API module, no component calling `fetch`, all copy in
+      `constants.ts`
+
+      **Run as a sweep, not asserted.** It found literal copy in three of the four new components —
+      `"Select a site"`, `"Decision"`, the three status words, the four entry-detail labels, and the
+      bulk dialog's count sentence — all now in `FUEL_EXCEPTIONS` and `LOCATION_ASSIGNMENT`.
+
+      Every read goes through `app/lib/api/*`. One `fetch` remains in `punch-clock.tsx` and is
+      **correct**: a same-origin `HEAD /` read for the server's `Date` header, which corrects a
+      grossly wrong device clock. It reaches no API and carries no data, so Principle V's boundary is
+      not what it crosses. Recorded here rather than silently exempted.
+
+- [ ] T057 **NOT RUN** Record each pass in this file beside its task. A verification whose result
+      lives only in a terminal is one nobody can check.
+
+      Partially done: T049 and T056 carry their results above, which is what this task asks for. It
+      stays open because seven passes have no result to record yet.
 
 ## Dependencies & Execution Order
 
