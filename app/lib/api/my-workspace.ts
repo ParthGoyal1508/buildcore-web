@@ -536,3 +536,64 @@ export async function getMyPunchExceptions(): Promise<MyPunchException[]> {
     .array(myPunchExceptionSchema)
     .parse(await authFetch('/my/punch/exceptions'));
 }
+
+/**
+ * The reasons a punch can be refused, as the backend's `PunchRefusalReason` enum (020 FR-012).
+ *
+ * Four here where the refusal response carries three codes: `face_mismatch` and `no_face_detected`
+ * share a code because the advice is identical, but they are separate rows in the log — which is
+ * where the difference is worth something. A worker refused repeatedly for "no face detected" has a
+ * camera or a lighting problem; one refused for "mismatch" may not be the enrolled person.
+ */
+export const PUNCH_REFUSAL_REASONS = [
+  'outside_geofence',
+  'unlocatable',
+  'face_mismatch',
+  'no_face_detected',
+] as const;
+
+export type PunchRefusalReason = (typeof PUNCH_REFUSAL_REASONS)[number];
+
+const refusedAttemptSchema = z.object({
+  id: z.string(),
+  type: z.enum(['in', 'out']),
+  reason: z.enum(PUNCH_REFUSAL_REASONS),
+  capturedAt: z.string(),
+  /**
+   * How far outside the fence, where the refusal was about distance.
+   *
+   * `Decimal` columns arrive as strings; coerced here so no component has to know that. Null on a
+   * face refusal, and on an `unlocatable` one — the whole point of that refusal is that no distance
+   * could be computed.
+   */
+  distanceMeters: z
+    .union([z.number(), z.string(), z.null()])
+    .transform((v) => (v === null ? null : Number(v)))
+    .refine((v) => v === null || !Number.isNaN(v), { message: 'Not a number' }),
+  /** What the device claimed to know, in metres. Null where the browser reported none. */
+  accuracyMeters: z.number().nullable(),
+});
+
+export type RefusedAttempt = z.infer<typeof refusedAttemptSchema>;
+
+/**
+ * The caller's own refused punches (020 FR-012).
+ *
+ * The companion to the 422 the attempt itself returns. That response is gone with the screen, and
+ * under FR-013d the day reads as a day with no punch — so without this, a worker refused at 8am and
+ * wondering at 5pm has nothing to look at and nothing to tell their supervisor.
+ *
+ * **Nothing here can be resolved, appealed or dismissed**, which is the backend's position and the
+ * right one: a refused punch is not a work item, because the punch does not exist. The way back is
+ * a manual attendance correction, which somebody reviews.
+ *
+ * `.passthrough()` is deliberately not used and the row's other fields — latitude, longitude,
+ * `faceMatchDistance` — are deliberately not read. They are evidence for an administrator looking
+ * at a support ticket, not for the worker, and a face-match distance shown to the person it
+ * describes is a number they cannot interpret and will not forget.
+ */
+export async function getMyRefusedAttempts(): Promise<RefusedAttempt[]> {
+  return z
+    .array(refusedAttemptSchema)
+    .parse(await authFetch('/my/punch/refusals'));
+}

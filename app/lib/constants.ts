@@ -2802,6 +2802,32 @@ export const APPROVAL_RESUBMIT = {
  * than a level label they have no way to interpret. The one thing they must understand
  * is when the item is waiting on *them*, which is what the resubmit copy says.
  */
+/**
+ * The worker's own refused punches (020 FR-012).
+ *
+ * Its own block rather than entries in `MY_PUNCH_EXCEPTIONS`, because the two lists are opposites
+ * and sharing copy would blur them: an exception is a punch that was *recorded* and is being
+ * checked by somebody; a refusal is a punch that does not exist and that nobody will check.
+ */
+export const REFUSED_ATTEMPTS = {
+  heading: 'Refused attempts',
+  /**
+   * Says the two things a worker needs before reading a single row: nothing was recorded, and there
+   * is a way to fix a day. Without the first they assume the attempt counted for something; without
+   * the second they assume the day is simply lost.
+   */
+  subheading:
+    'Punches that were not accepted. Nothing was recorded for these attempts — if a day you worked has no punch, ask your supervisor to raise a correction.',
+  /** Good news, and said as such: being refused is the exception, not the norm. */
+  empty: 'No punches of yours have been refused.',
+  loadFailed: 'Your refused attempts could not be loaded.',
+  columnWhen: 'When',
+  columnType: 'Punch',
+  columnReason: 'Why it was not accepted',
+  punchIn: 'In',
+  punchOut: 'Out',
+} as const;
+
 export const MY_PUNCH_EXCEPTIONS = {
   /**
    * Re-labelled in 020 Phase 3 (T021), and **not before**.

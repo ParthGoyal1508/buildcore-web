@@ -240,12 +240,34 @@ alternative, which is that the whole of 020 stays unreachable.
 
 **Goal**: FR-012. A list of **attempts**, not of days.
 
-- [ ] T025 [US3] Add the refused-attempts read to `app/lib/api/my-workspace.ts`
-- [ ] T026 [US3] Create `app/ui/my/refused-attempts.tsx` — each attempt with its time and reason
-- [ ] T027 [US3] Keep it **outside** the attendance view. A worker refused at 8am and asking at 5pm
-      needs somewhere to look, and that somewhere is not the attendance calendar
-- [ ] T028 [US3] Verification: quickstart Scenario 4, including confirming the day shows no punch
-- [ ] T029 [US3] Verification at 320px
+- [X] T025 [US3] Add the refused-attempts read to `app/lib/api/my-workspace.ts`
+
+      Done 2026-10-03 against `GET /my/punch/refusals`. The row's latitude, longitude and
+      `faceMatchDistance` are **deliberately not read**: they are evidence for an administrator
+      reading a support ticket, and a face-match distance shown to the person it describes is a
+      number they cannot interpret and will not forget.
+
+- [X] T026 [US3] Create `app/ui/my/refused-attempts.tsx` — each attempt with its time and reason
+
+      Done. Attempts, not days: three refusals on one morning are three rows, because collapsing
+      them into a day loses the only thing that makes the list useful — that it was tried,
+      repeatedly, and why. The reason shown is the same sentence the worker saw at the gate, through
+      the same mapper; two wordings for one refusal would make them doubt it was the same attempt.
+
+      `punch-refusal.ts` gained the reason→code map, which is where the backend's two vocabularies
+      meet: the response carries three codes (what to tell the worker), the log carries four reasons
+      (what happened). One place, so the two surfaces cannot drift.
+
+- [X] T027 [US3] Keep it **outside** the attendance view
+
+      Done — mounted on the punch page between the exceptions and the calendar. Not in the calendar:
+      a refused punch wrote nothing to attendance, and a marker on a day would recreate exactly the
+      refused day the backend refuses to keep. On the punch page because that is the screen the
+      worker was on when it happened and the one they will open to ask about it.
+
+- [ ] T028 [US3] **NOT RUN (no browser)** Verification: quickstart Scenario 4, including confirming
+      the day shows no punch
+- [ ] T029 [US3] **NOT RUN (no browser)** Verification at 320px
 
 ---
 

@@ -1,3 +1,4 @@
+import type { PunchRefusalReason } from '@/app/lib/api/my-workspace';
 import {
   MESSAGES,
   PUNCH_REFUSAL_CODES,
@@ -54,4 +55,29 @@ export function punchRefusalMessage(
 ): string {
   if (isPunchRefusal(code)) return MESSAGE_BY_CODE[code];
   return serverMessage?.trim() || MESSAGES.saveFailed;
+}
+
+/**
+ * The reason enum the refusal *log* carries, mapped to the code the refusal *response* carries.
+ *
+ * Two vocabularies for one fact, and the asymmetry is in the backend by design: the response says
+ * what to tell the worker (three codes), the log says what happened (four reasons). This is the one
+ * place they meet, so the refused-attempts list and the punch screen cannot drift into explaining
+ * the same refusal two different ways.
+ */
+const CODE_BY_REASON = {
+  outside_geofence: 'PUNCH_REFUSED_LOCATION',
+  unlocatable: 'PUNCH_REFUSED_UNLOCATABLE',
+  face_mismatch: 'PUNCH_REFUSED_FACE',
+  no_face_detected: 'PUNCH_REFUSED_FACE',
+} as const satisfies Record<PunchRefusalReason, PunchRefusalCode>;
+
+/** What a past refusal is called in a list the worker reads. */
+export function punchRefusalReasonMessage(reason: PunchRefusalReason): string {
+  return punchRefusalMessage(CODE_BY_REASON[reason]);
+}
+
+/** True where the refusal was about the photo, which is where "no photo is kept" applies. */
+export function isFaceRefusal(reason: PunchRefusalReason): boolean {
+  return CODE_BY_REASON[reason] === 'PUNCH_REFUSED_FACE';
 }
