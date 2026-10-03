@@ -184,11 +184,12 @@ without needing DWR or P&L to exist.
    admin reviews the report and clicks Confirm Import, **Then** the valid rows are committed and
    appear in the BOQ tree (matches the backend's two-step validate/confirm import, buildcore-api
    008-projects-backend research.md §12).
-4. **Given** the BOQ Alert section, **When** viewed, **Then** it shows three tabs: Today Task
-   (items with today as target date), Delayed (items past their Finish Date with pending qty),
-   To Be Delayed (items at risk based on current Avg Qty Per Day vs required Per Day Qty) — and,
-   per the 2026-10-03 amendment, **an unplanned item appears in none of the three** and is counted
-   as unplanned where the section's own summary can be read.
+4. **Given** the BOQ Alert section, **When** viewed, **Then** it shows **four** tabs — amended
+   2026-10-03, and the count is part of the change rather than a note beside it: Today Task (finish
+   date is today), Delayed (finish date past with pending quantity), To Be Delayed (at risk by
+   api FR-047 — the rate needed to finish by the finish date exceeds the rate achieved) and
+   **Unplanned** (no finish date). The four are mutually exclusive and jointly exhaustive, so every
+   line has exactly one home and none is absent from all of them.
 5. **Given** a locked project, **When** the BOQ section is viewed, **Then** Add/Edit/Import
    controls are disabled with a "Project Locked" tooltip.
 
@@ -329,7 +330,8 @@ Cumulative, and confirming cost overrun categories (Actual > Budget by >10%) are
   on change; the selected period MUST be reflected in the URL query parameter for shareability.
 - **FR-007**: RA Bill state transitions (Submit, Approve, Reject) MUST show a confirmation dialog
   before calling the API, with Reject requiring a remarks input before enabling Confirm.
-- **FR-008**: The BOQ Alert tabs (Today Task, Delayed, To Be Delayed) MUST refresh automatically
+- **FR-008**: The BOQ Alert tabs (Today Task, Delayed, To Be Delayed, **Unplanned** — amended
+  2026-10-03) MUST refresh automatically
   when DWRs are approved and the BOQ quantities change.
 - **FR-009**: DWR status badges MUST use consistent colours: Draft (gray), Submitted (orange),
   Approved (green) — matching the status badge convention from Settings and HR features.

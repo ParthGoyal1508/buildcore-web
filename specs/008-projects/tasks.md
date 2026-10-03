@@ -558,10 +558,16 @@ T027–T031 above are **superseded, not deleted**; each carries a note naming it
 - [ ] T068 [US5] **A missing percentage is a condition, not a zero** (FR-028): shown as something to
       resolve before confirming, with the consequence in the copy — on the client's own file the
       silence is ₹7.37 lakh.
-- [ ] T069 [US5] **Every whole-file refusal gets its own sentence** (FR-029), covering the backend's
-      full list: too large, unreadable, no sheets, no schedule block, no rows, none importable, too
-      many rows, too many batches, already populated (naming the existing count). A success state
-      beside "0 rows" is prohibited — that is exactly what the old library would have produced.
+- [ ] T069 [US5] **Every whole-file refusal gets its own sentence** (FR-029). Enumerated against
+      the api contract rather than described, because the 2026-10-03 analysis pass found this task
+      naming three codes and leaving eleven to prose — which ends as three mapped and eleven falling
+      to a generic message. All fourteen: `BOQ_FILE_TOO_LARGE`, `BOQ_WORKBOOK_UNREADABLE`,
+      `BOQ_WORKBOOK_EMPTY`, `BOQ_NO_SCHEDULE_BLOCK`, `BOQ_NO_SCHEDULE_ROWS`,
+      `BOQ_NO_IMPORTABLE_ROWS`, `BOQ_TOO_MANY_ROWS`, `BOQ_TOO_MANY_BATCHES`,
+      `BOQ_ALREADY_POPULATED` (naming the existing count), `BOQ_BATCH_NOT_FOUND`,
+      `BOQ_BATCH_EXPIRED`, `BOQ_BATCH_IN_PROGRESS`, `BOQ_BATCH_ALREADY_CONFIRMED`,
+      `BOQ_BATCH_NOT_YOURS`. A success state beside "0 rows" is prohibited — that is exactly what
+      the old library would have produced for the client's real file.
 - [ ] T070 [US5] Confirm unavailable twice (FR-031): while the report shows the file would be
       rejected, and after a successful confirm. `BOQ_BATCH_ALREADY_CONFIRMED` is shown as "already
       imported" and `BOQ_BATCH_IN_PROGRESS` as "being imported now" — neither as a failure, because
