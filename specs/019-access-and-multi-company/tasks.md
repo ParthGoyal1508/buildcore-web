@@ -520,3 +520,77 @@ on it is the denomination breakup's visibility, which depends on `CASH_ENTRY` in
 **T024, T030, T031, T054 NOT RUN** — all four are browser passes against a running API with
 specific roles provisioned. This repository has no test framework (`TODO(TESTING_STANDARD)`), so
 there is no automated stand-in for them, and saying so is more useful than implying otherwise.
+
+---
+
+## Phase 8: Amendment of 2026-10-03 — setting the levels, not just honouring them (FR-018 – FR-021)
+
+Appended, not renumbered. T001–T068 above are shipped and their numbering is referenced from commit
+messages and from the api repository's task files.
+
+**Why this exists.** Every requirement in this feature until now is about honouring the read/write
+distinction, and none is about setting it. The role editor offers one checkbox per area, and the
+backend's rule that a role naming no levels gets read **and** write — correct as a migration
+default, so no existing role changed meaning — makes that silent. The half that refuses works
+perfectly; the half that configures was never built, so Note 22's own example could be produced
+only by calling the API directly.
+
+**Backend dependency**: api `aaa850d` (2026-10-03) — `grants` now comes back on every role read. It
+was writable since Phase 1 and readable nowhere, which is why the screen had nothing to render.
+
+- [X] T069 Read `grants` on the role schema in `app/lib/api/settings.ts` (FR-019)
+
+      Done 2026-10-03, with `.default([])` so a server predating the field still parses — an empty
+      list means "no levels named", which is exactly what the backend treats as read+write.
+
+- [X] T070 Send `grants` from `createRole` and `updateRole` (FR-018)
+
+      Done, and **always sent**. Omitting it means read and write on everything, so a role narrowed
+      on this screen would silently widen again on the next save that left it out.
+
+- [X] T071 Offer each granted area at read-only or read+write, seeded from the role's current grants
+
+      Done. The level appears only under a ticked area: an area nobody has granted has no level to
+      choose, and a disabled pair of radios against every unticked row turns a nine-item list into
+      twenty-seven controls to read past.
+
+      **An area absent from `grants` seeds as writable**, not read-only. That is what the backend
+      does with a role that named no levels, and every role predating the split is in that state —
+      seeding read-only would narrow every existing role the first time somebody opened it to
+      rename it.
+
+- [X] T072 Make write imply read (FR-020)
+
+      Done structurally rather than by validation: `grantsFor` emits both rows for a writable area,
+      so there is no control that can express write-without-read. The backend refuses it anyway —
+      confirmed against the running API, which returns `WRITE_WITHOUT_READ` — but a form whose only
+      protection is the server's refusal is a form that shows somebody an error for a state it
+      offered them.
+
+- [X] T073 Word the choice in terms of what a holder can do (FR-021)
+
+      Done: "View only" and "View and change", with what each means underneath. An administrator
+      here is deciding whether somebody can change records; "read" and "write" are this system's
+      words for that, not theirs, and using them makes the safer option sound like the technical one.
+
+- [X] T074 An area that is unchecked carries no level
+
+      Done — unticking clears the level rather than leaving an orphan the next save re-sends.
+      Ticking grants view **and** change, which is what every role held before levels existed: the
+      narrower choice should be deliberate, not one somebody trips into.
+
+- [X] T075 Verification: create a role with view-only machinery and read it back — Note 22's own
+      example
+
+      **Run against the real API** on 2026-10-03, on a spare port: `Site Logbook Clerk` created with
+      `MACHINERY` at `read` only, and read back from the list with that grant intact. Before this
+      change the same request from the interface produced a role holding read **and** write.
+
+      The second half — signing in as that role and confirming the logbook is readable while nothing
+      in machinery is editable — is **NOT RUN**: it needs a browser and a provisioned user. The
+      guard enforcing it is covered by api tests; what was missing was never the enforcement.
+
+#### Verification
+
+`npx tsc --noEmit`, eslint on the touched files and `npm run build` all clean. The api half is
+`aaa850d`.

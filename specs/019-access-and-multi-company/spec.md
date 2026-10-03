@@ -167,6 +167,28 @@ without them; reports and exports match. Turning it off restores the view.
 - **FR-017**: All access MUST go through the typed API modules (Principle V); no inline styling
   (Principle II).
 
+#### Amendment of 2026-10-03 — a read-only role must be creatable from the portal
+
+Found while reviewing what shipped, not by a failing test: every requirement above is about
+*honouring* the read/write distinction, and none of them is about *setting* it. The role screen
+offers one checkbox per area, so every role it creates holds both levels — and the backend's rule
+that a role naming no levels gets read **and** write, correct as a migration default, makes that
+silent.
+
+The consequence is that FR-007 to FR-009 are enforced against a distinction nobody can configure.
+Note 22's own example — site staff who may enter logbook readings and see nothing else of
+machinery — can be produced only by calling the API directly.
+
+- **FR-018**: The role editor MUST let each granted area be set to read-only or to read and write.
+- **FR-019**: A role's current levels MUST be shown when it is opened, not re-derived or assumed.
+  A screen that cannot show an existing read-only grant will silently widen it to write the next
+  time anybody saves that role.
+- **FR-020**: Write MUST NOT be settable on an area that is not also readable. "May edit but may not
+  see" is not a state any screen in this product can render, and the backend already refuses it.
+- **FR-021**: The editor MUST say what the two levels mean in terms of what a holder can do, not in
+  terms of the permission model. An administrator choosing between them is deciding whether somebody
+  can change records, and "read" and "write" are the system's words for that, not theirs.
+
 ### Non-Functional Requirements
 
 - **NFR-001** *(Note 25)*: The company switcher MUST be reachable and operable at 320px without

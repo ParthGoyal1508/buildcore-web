@@ -98,10 +98,33 @@ export async function getCodeSeries(companyId: string): Promise<CodeSeriesView> 
 
 // -------------------------------------------------------------------- Roles
 
+/** The two levels an area can be held at. Write implies read; the backend refuses write alone. */
+export const ACCESS_LEVELS = ['read', 'write'] as const;
+export type AccessLevel = (typeof ACCESS_LEVELS)[number];
+
+export const roleGrantSchema = z.object({
+  permission: z.string(),
+  level: z.enum(ACCESS_LEVELS),
+});
+export type RoleGrant = z.infer<typeof roleGrantSchema>;
+
 export const roleSchema = z.object({
   id: z.string(),
   name: z.string(),
   permissions: z.array(z.string()),
+  /**
+   * What level each area is held at (019 FR-019).
+   *
+   * **This was being discarded.** The server sends it, the guard enforces it, and this schema
+   * dropped it on the floor — so the editor had nothing to render, sent `permissions` alone, and
+   * every role it saved came back holding read **and** write on everything. That is the sixth time
+   * in this codebase a server field has been silently lost to a schema, and the first where the
+   * loss was a security-relevant default rather than a missing label.
+   *
+   * `.default([])` so a server predating the field still parses: an empty list means "no levels
+   * named", which is exactly what the backend treats as read+write.
+   */
+  grants: z.array(roleGrantSchema).default([]),
   isProtected: z.boolean(),
   assignedUserCount: z.number(),
   createdAt: z.string(),
@@ -113,9 +136,18 @@ export async function listRoles(): Promise<Role[]> {
   return z.array(roleSchema).parse(await authFetch('/settings/roles'));
 }
 
+/**
+ * Creating or editing a role (019 FR-018).
+ *
+ * `grants` is optional on the wire and means something specific when omitted: **read and write on
+ * everything in `permissions`**, which is what holding a permission meant before levels existed and
+ * what the Phase 1 backfill gave every role. Sending it is how anything narrower is expressed, so
+ * the editor always sends it — omitting it quietly widens a role that was read-only.
+ */
 export async function createRole(input: {
   name: string;
   permissions: string[];
+  grants?: RoleGrant[];
 }): Promise<Role> {
   return roleSchema.parse(
     await authFetch('/settings/roles', {
@@ -127,7 +159,7 @@ export async function createRole(input: {
 
 export async function updateRole(
   id: string,
-  input: { name?: string; permissions?: string[] },
+  input: { name?: string; permissions?: string[]; grants?: RoleGrant[] },
 ): Promise<Role> {
   return roleSchema.parse(
     await authFetch(`/settings/roles/${id}`, {

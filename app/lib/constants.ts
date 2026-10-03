@@ -2825,6 +2825,31 @@ export const APPROVAL_RESUBMIT = {
  * believes otherwise either hesitates to raise a correct one or assumes a wrong one is already
  * fixed.
  */
+/**
+ * Choosing what a role may do (019 FR-018 – FR-021).
+ *
+ * **Said in terms of records, not of the permission model.** An administrator choosing here is
+ * deciding whether somebody can change things; "read" and "write" are this system's words for that,
+ * not theirs, and a screen that uses them makes the safer option sound like the technical one.
+ */
+export const ROLE_LEVELS = {
+  legend: 'What this role can do in each area',
+  /**
+   * The hint that makes the whole control worth having.
+   *
+   * Until 2026-10-03 every role created here held both levels, because the screen could not express
+   * anything else. Somebody arriving now needs to know the choice exists and that it is per area.
+   */
+  hint: 'Tick an area to give access, then choose whether this role can only look at it or can also change it. Decide per area — a role can be able to change one thing and only view another.',
+  viewOnly: 'View only',
+  viewOnlyHint: 'Can open and read it. Nothing in it can be added, edited or deleted.',
+  viewAndChange: 'View and change',
+  viewAndChangeHint: 'Can read it and can add, edit and delete within it.',
+  /** FR-020. Not an error message — the control cannot express the state at all. */
+  writeImpliesRead:
+    'Changing always includes viewing, so there is no "change but not view".',
+} as const;
+
 export const FUEL_EXCEPTIONS = {
   heading: 'Fuel exceptions',
   subheading:

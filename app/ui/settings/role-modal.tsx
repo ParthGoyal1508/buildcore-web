@@ -3,12 +3,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
-import { Role, createRole, updateRole } from '@/app/lib/api/settings';
+import {
+  Role,
+  createRole,
+  updateRole,
+  type RoleGrant,
+} from '@/app/lib/api/settings';
 import {
   MESSAGES,
   NAV_GOVERNING_PERMISSIONS,
   NAV_MODULE_BY_PERMISSION,
   PERMISSIONS,
+  ROLE_LEVELS,
   permissionLabel,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
@@ -45,6 +51,107 @@ const NON_NAV_PERMISSIONS = PERMISSIONS.filter(
   (permission) => !NAV_GOVERNING_PERMISSIONS.has(permission),
 );
 
+
+/**
+ * Which areas a role may already change (FR-019).
+ *
+ * An area absent from `grants` entirely is **writable**, not read-only: that is what the backend
+ * does with a role that named no levels, and every role predating the split is in that state.
+ * Guessing read-only here would narrow every existing role the first time somebody opened it to
+ * change its name.
+ */
+function initialWritable(role: Role | null): string[] {
+  if (!role) return [];
+  const named = new Set(role.grants.map((grant) => grant.permission));
+  return role.permissions.filter(
+    (permission) =>
+      !named.has(permission) ||
+      role.grants.some(
+        (grant) => grant.permission === permission && grant.level === 'write',
+      ),
+  );
+}
+
+/**
+ * The grants a save should send (FR-018, FR-020).
+ *
+ * Always sent, never omitted: omitting means read **and** write on everything, so a role narrowed
+ * on this screen would silently widen again. Write always carries read with it, which is why this
+ * emits two rows rather than one — "may edit but may not see" is not a state any screen here can
+ * render, and the backend refuses it outright.
+ */
+function grantsFor(selected: string[], writable: Set<string>): RoleGrant[] {
+  return selected.flatMap((permission) =>
+    writable.has(permission)
+      ? [
+          { permission, level: 'read' as const },
+          { permission, level: 'write' as const },
+        ]
+      : [{ permission, level: 'read' as const }],
+  );
+}
+
+/**
+ * One area's checkbox and, when ticked, its level.
+ *
+ * The level appears only for a ticked area. An area nobody has granted has no level to choose, and
+ * rendering a disabled pair of radios against every unticked row turns a nine-item list into
+ * twenty-seven controls somebody has to read past.
+ */
+function PermissionRow({
+  permission,
+  description,
+  checked,
+  writable,
+  onToggle,
+  onLevel,
+}: {
+  permission: string;
+  description?: string;
+  checked: boolean;
+  writable: boolean;
+  onToggle: () => void;
+  onLevel: (level: 'read' | 'write') => void;
+}) {
+  return (
+    <div>
+      <CheckboxField
+        id={`permission-${permission}`}
+        label={permissionLabel(permission)}
+        description={description}
+        checked={checked}
+        onChange={onToggle}
+      />
+      {checked && (
+        <div className="ml-6 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          {(
+            [
+              ['read', ROLE_LEVELS.viewOnly, ROLE_LEVELS.viewOnlyHint],
+              ['write', ROLE_LEVELS.viewAndChange, ROLE_LEVELS.viewAndChangeHint],
+            ] as const
+          ).map(([level, label, hint]) => (
+            <label
+              key={level}
+              className="flex items-center gap-1.5 text-xs text-gray-600"
+              title={hint}
+            >
+              <input
+                type="radio"
+                name={`level-${permission}`}
+                value={level}
+                checked={level === 'write' ? writable : !writable}
+                onChange={() => onLevel(level)}
+                className="h-3.5 w-3.5 border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RoleModal({
   role,
   onClose,
@@ -54,6 +161,21 @@ export default function RoleModal({
 }) {
   const [name, setName] = useState(role?.name ?? '');
   const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
+  /**
+   * Whether each ticked area may be changed as well as viewed (019 FR-018, FR-019).
+   *
+   * Seeded from the role's own grants, which is the whole point of FR-019: a screen that cannot
+   * show an existing read-only grant silently widens it to write the next time anybody saves that
+   * role, and nobody would see it happen.
+   *
+   * **An area absent from `grants` is writable**, not read-only. That is the backend's rule for a
+   * role that named no levels — every role predating the split is in exactly that state — and
+   * guessing read-only here would narrow every existing role the first time somebody opened it to
+   * rename it.
+   */
+  const [writable, setWritable] = useState<Set<string>>(
+    () => new Set(initialWritable(role)),
+  );
   const [nameError, setNameError] = useState<string | undefined>();
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -61,8 +183,16 @@ export default function RoleModal({
   const mutation = useMutation({
     mutationFn: () =>
       role
-        ? updateRole(role.id, { name: name.trim(), permissions: selected })
-        : createRole({ name: name.trim(), permissions: selected }),
+        ? updateRole(role.id, {
+            name: name.trim(),
+            permissions: selected,
+            grants: grantsFor(selected, writable),
+          })
+        : createRole({
+            name: name.trim(),
+            permissions: selected,
+            grants: grantsFor(selected, writable),
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       onClose();
@@ -79,11 +209,31 @@ export default function RoleModal({
   });
 
   function toggle(permission: string) {
+    const removing = selected.includes(permission);
     setSelected((current) =>
-      current.includes(permission)
+      removing
         ? current.filter((p) => p !== permission)
         : [...current, permission],
     );
+    // T074. Unticking an area clears its level rather than leaving an orphan the next save would
+    // re-send. Ticking one grants view and change, which is what every role held before levels
+    // existed — the narrower choice should be deliberate, not the default somebody trips into.
+    setWritable((current) => {
+      const next = new Set(current);
+      if (removing) next.delete(permission);
+      else next.add(permission);
+      return next;
+    });
+  }
+
+  /** FR-020 is structural here: there is no control that can express write-without-read. */
+  function setLevel(permission: string, level: 'read' | 'write') {
+    setWritable((current) => {
+      const next = new Set(current);
+      if (level === 'write') next.add(permission);
+      else next.delete(permission);
+      return next;
+    });
   }
 
   function onSubmit(event: React.FormEvent) {
@@ -126,6 +276,12 @@ export default function RoleModal({
           onChange={(event) => setName(event.target.value)}
         />
 
+        {/* 019 FR-021. Said once, above both groups: the choice is per area and it is about
+            changing records, not about a permission model. */}
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          {ROLE_LEVELS.hint} {ROLE_LEVELS.writeImpliesRead}
+        </p>
+
         <fieldset>
           <legend className="text-sm font-medium text-gray-700">
             Sidebar modules
@@ -137,17 +293,18 @@ export default function RoleModal({
             {NAV_PERMISSIONS.map((permission) => {
               const moduleName = NAV_MODULE_BY_PERMISSION.get(permission);
               return (
-                <CheckboxField
+                <PermissionRow
                   key={permission}
-                  id={`permission-${permission}`}
-                  label={permissionLabel(permission)}
+                  permission={permission}
                   description={
                     moduleName
                       ? MESSAGES.permissionControlsModule(moduleName)
                       : undefined
                   }
                   checked={selected.includes(permission)}
-                  onChange={() => toggle(permission)}
+                  writable={writable.has(permission)}
+                  onToggle={() => toggle(permission)}
+                  onLevel={(level) => setLevel(permission, level)}
                 />
               );
             })}
@@ -163,12 +320,13 @@ export default function RoleModal({
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {NON_NAV_PERMISSIONS.map((permission) => (
-              <CheckboxField
+              <PermissionRow
                 key={permission}
-                id={`permission-${permission}`}
-                label={permissionLabel(permission)}
+                permission={permission}
                 checked={selected.includes(permission)}
-                onChange={() => toggle(permission)}
+                writable={writable.has(permission)}
+                onToggle={() => toggle(permission)}
+                onLevel={(level) => setLevel(permission, level)}
               />
             ))}
           </div>
