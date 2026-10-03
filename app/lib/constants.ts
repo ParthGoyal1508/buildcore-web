@@ -2817,6 +2817,100 @@ export const APPROVAL_RESUBMIT = {
  * marks the entire workforce as misconfigured, and an administrator who sees thirty red flags stops
  * reading all thirty. It states the fallback as the ordinary thing it is.
  */
+/**
+ * Turning a fuel alert into a decision with a name against it (020 FR-001 – FR-006).
+ *
+ * Every string here is read by somebody about to cost a vendor or an employee money, which is why
+ * the proposal wording is laboured: a recovery raised is not a recovery taken, and a reviewer who
+ * believes otherwise either hesitates to raise a correct one or assumes a wrong one is already
+ * fixed.
+ */
+export const FUEL_EXCEPTIONS = {
+  heading: 'Fuel exceptions',
+  subheading:
+    'Machines that burned more than their category benchmark allowed for the hours they ran. Confirming one records who bears it; recovering it is a separate step.',
+  empty: 'No fuel exceptions. Nothing has breached its benchmark.',
+  loadFailed: 'Fuel exceptions could not be loaded.',
+
+  columnMachine: 'Machine',
+  columnDate: 'Date',
+  columnActual: 'Actual',
+  columnBenchmark: 'Benchmark',
+  columnShortfall: 'Excess',
+  columnStatus: 'Status',
+
+  /** FR-001's units, stated once so two columns cannot disagree about them. */
+  perHour: (value: number) => `${value} l/hr`,
+  litres: (value: number) => `${value} l`,
+  /**
+   * Null actual, said in words.
+   *
+   * The fuel was issued and the machine's hours were never entered. A dash would read as a missing
+   * column; a zero would read as a machine that ran no hours and still burned fuel.
+   */
+  noReading: 'No logbook reading for that day',
+  noBenchmark: 'No benchmark set for this category',
+
+  review: 'Review',
+  confirm: 'Confirm',
+  dismiss: 'Dismiss',
+  attribution: 'Who bears this',
+  attributionHirer: 'The hirer — deduct from their hire bill',
+  attributionOperator: 'The operator — recover from their salary',
+  attributionBoth: 'Both',
+  attributionNeither: 'Nobody — the variance was genuine and is not being pursued',
+  /**
+   * FR-004, said rather than silently hidden.
+   *
+   * Offering a hire deduction on a machine the company owns invites a figure nobody can collect.
+   * The option is absent and this explains the absence — an option that merely vanishes reads as a
+   * bug to the person who used it yesterday on a hired machine.
+   */
+  ownedNoHirer:
+    'This machine is owned, so there is no hirer to deduct from. Only an operator recovery is available.',
+  reasonLabel: 'Why',
+  reasonRequiredToDismiss:
+    'A dismissal needs a reason. Without one an exception register becomes a list everybody clears without reading.',
+  attributionRequired: 'Say who bears this before confirming.',
+  /**
+   * FR-005. The refusal that matters most on this screen.
+   *
+   * Several people ran the machine that day, and the server refuses to guess — because guessing is
+   * how the wrong person's wages get docked. The candidates come back in the refusal itself.
+   */
+  operatorRequired:
+    'Several operators ran this machine that day. Choose the one who bears this — it is never assumed.',
+  operatorNoneRecorded:
+    'No operator is recorded against this machine for that day. The logbook has to say who ran it before a recovery can name them.',
+  operatorLabel: 'Operator',
+
+  recoverHireBill: 'Deduct from hire bill',
+  recoverOperator: 'Propose salary recovery',
+  recoveredHireBill: (amount: string) => `Deducted from the hire bill: ${amount}`,
+  /**
+   * FR-006, T045. **Proposed, not applied** — the single most important sentence here.
+   *
+   * The recovery reaches no payslip until the chain approves it. A reviewer who thinks the money is
+   * already taken will tell the operator so, and then either an unapproved recovery never happens
+   * or an approved one arrives as a surprise.
+   */
+  recoveryProposed: (amount: string) =>
+    `${amount} proposed as a salary recovery. It is waiting for approval and has not been deducted from anyone's pay.`,
+  recoveryAwaitingApproval: 'Awaiting approval — not yet deducted',
+  recoveryApproved: 'Approved — applies on the next payroll run',
+
+  /**
+   * T047. The pattern worth catching before fifty deductions are raised.
+   *
+   * When nearly every machine of a category breaches at once, the likely fault is the benchmark,
+   * not fifty operators. Stated as a question rather than a verdict — it can also be a genuinely
+   * bad batch of fuel, and a screen that announces the benchmark is wrong would get a correct
+   * exception dismissed.
+   */
+  benchmarkSuspect: (count: number, category: string) =>
+    `${count} machines in ${category} breached together. That is usually a benchmark that needs correcting rather than ${count} separate recoveries — check the category's benchmark before raising any.`,
+} as const;
+
 export const LOCATION_ASSIGNMENT = {
   heading: 'Where this employee punches',
   noAssignment:

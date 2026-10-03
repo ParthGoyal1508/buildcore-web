@@ -337,32 +337,89 @@ alternative, which is that the whole of 020 stays unreachable.
 
 ---
 
-## Phase 6: Fuel exception review ⚠️ GATED on backend Phases 5–6 (0 of 27)
+## Phase 6: Fuel exception review — gate cleared (backend Phases 5–7 shipped, api `6c6fe39`, `7f46460`)
 
 **Goal**: FR-001 – FR-006. **Independent test**: quickstart Scenario 6.
 
-- [ ] T038 [US1] Add fuel exceptions, hire deductions and operator recoveries to
-      `app/lib/api/plant.ts`. `fuelBenchmark` and `fuelVarianceThresholdPercent` are already typed
-      on equipment — extend, do not re-declare
-- [ ] T039 [US1] Create `app/ui/plant/fuel-exceptions.tsx` listing each breaching machine with actual
-      average, benchmark, and shortfall in **litres and rupees** (FR-001)
-- [ ] T040 [US1] An exception opens to the fuel entries comprising it (FR-002)
-- [ ] T041 [US1] Offer hire deduction, operator recovery, both, or dismiss (FR-003)
-- [ ] T042 [US1] **No hire deduction for an owned machine** (FR-004) — there is no hirer to deduct
-      from, and offering it invites a figure nobody can collect
-- [ ] T043 [US1] Where several operators ran the machine, require the responsible one to be chosen
-      explicitly (FR-005). No default — a defaulted attribution is a recovery raised against whoever
-      happened to be first in a list
-- [ ] T044 [US1] A dismissal without a reason is refused (US1 scenario 6)
-- [ ] T045 [US1] A raised recovery shows its approval state and reads as **proposed, not applied**
+- [X] T038 [US1] Add fuel exceptions, hire deductions and operator recoveries to
+      `app/lib/api/plant.ts`
+
+      Done 2026-10-03. **The API had to be extended first** — see the api commit of the same date.
+      FR-001 asks for the actual rate and the shortfall in litres and rupees, and the list carried
+      neither: the excess is measured against what the benchmark allowed for the hours actually run,
+      and the hours are in the logbook, not on the fuel entry. The alternative was working a rupee
+      figure back from a percentage rounded at save time — a figure the readings cannot reproduce,
+      which would then disagree with what the recovery deducts.
+
+- [X] T039 [US1] Create `app/ui/plant/fuel-exceptions.tsx` with actual average, benchmark and
+      shortfall in **litres and rupees** (FR-001)
+
+      Done, mounted on the Fuel screen above the entry list: the exceptions are the part somebody
+      has to act on and the entries below are the evidence. `actualPerHour` renders as **words**
+      where the logbook has no reading for that day — a dash reads as a missing column and a zero
+      reads as a machine that ran no hours and still burned fuel.
+
+- [X] T040 [US1] An exception opens to the fuel entries comprising it (FR-002)
+
+      Done, with one honest correction: an exception **is** one fuel entry — the table carries a
+      unique index on `fuelEntryId` — so the detail shows that entry (litres, rate, cost, variance)
+      rather than a list implying an aggregation that does not exist and leaving somebody hunting
+      for the other rows.
+
+- [X] T041 [US1] Offer hire deduction, operator recovery, both, or dismiss (FR-003)
+
+      Done, as **two separate acts**. Reviewing records who bears it and moves no money; recovering
+      is a second explicit action on a confirmed exception. That separation is what lets somebody
+      work down a list without each click costing a vendor or an employee.
+
+- [X] T042 [US1] **No hire deduction for an owned machine** (FR-004)
+
+      Done — the hirer options are absent, not disabled, and a line on the control says why. An
+      option that merely vanishes reads as a bug to whoever used it yesterday on a hired machine.
+
+- [X] T043 [US1] Where several operators ran the machine, require the responsible one to be chosen
+      explicitly (FR-005)
+
+      Done, driven by the server's refusal rather than by a guess here. `FUEL_EXCEPTION_OPERATOR_REQUIRED`
+      carries `candidates` — the operators who ran the machine that day — read from `ApiError.details`.
+      Without reading it the only option would be sending the reviewer to the logbook, where most
+      people pick the name they remember: exactly the guess the server refuses to make. **No
+      pre-selection**, because a defaulted attribution is a recovery raised against whoever happened
+      to be first in a list.
+
+      Where exactly one operator ran it the server adopts them and never asks — forcing somebody to
+      retype the only possible answer teaches them to click past the question.
+
+- [X] T044 [US1] A dismissal without a reason is refused (US1 scenario 6)
+
+      Done in the form as well as on the server, because this one is about a form somebody is still
+      filling in.
+
+- [X] T045 [US1] A raised recovery shows its approval state and reads as **proposed, not applied**
       (FR-006)
-- [ ] T046 [US1] **The recovery cap is an open client question** (backend Phase 7, 0 of 6). Indian
-      wage law constrains what may be deducted from wages. Until it is answered, display a raised
-      recovery without implying a figure will reach a payslip
-- [ ] T047 [US1] Help the reviewer recognise the bad-benchmark pattern: a benchmark so wrong that
-      every machine of a category appears as an exception needs to read as *the benchmark is wrong*,
-      not as fifty deductions to raise (spec edge case)
-- [ ] T048 [US1] Verification: quickstart Scenario 6
+
+      Done. The single most important sentence on the screen: a reviewer who believes the money is
+      already docked tells the operator so, and then either an unapproved recovery never happens or
+      an approved one arrives as a surprise. Awaiting approval and approved read differently, and
+      neither claims the money has moved — approval means it applies on the **next** payroll run.
+
+- [X] T046 [US1] ~~**The recovery cap is an open client question**~~ — **closed 2026-10-02**, and
+      backend Phase 7 shipped (api `7f46460`): capped at half the payslip's wages counting every
+      other deduction, with the remainder carried forward.
+
+      The task's instruction still holds for a different reason, and is implemented: a raised
+      recovery does not imply a figure will reach a payslip — not because the cap is unknown, but
+      because the recovery is **pending approval** and may never be applied at all.
+
+- [X] T047 [US1] Help the reviewer recognise the bad-benchmark pattern
+
+      Done. Five or more open exceptions in one category raises a note saying the benchmark is the
+      likelier fault. Phrased as a question, not a verdict: it can also be a bad batch of fuel, and
+      a screen that announces the benchmark is wrong gets a correct exception dismissed. Counted
+      over open rows only, so a benchmark already corrected stops warning about itself.
+
+- [ ] T048 [US1] **NOT RUN (no browser, and it needs seeded fuel entries with logbook hours)**
+      Verification: quickstart Scenario 6
 
 ---
 
