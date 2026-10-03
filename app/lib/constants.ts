@@ -3386,3 +3386,147 @@ export const PAYMENT_PROOF_COPY = {
   view: 'View proof',
   missingFilterLabel: 'Missing proof only',
 } as const;
+
+/**
+ * BOQ entry, the tree, the alert tabs and the tender import (008 US5, amended 2026-10-03).
+ *
+ * The refusal strings are the point of this block. Fourteen conditions, fourteen sentences —
+ * enumerated against the API contract rather than described, because the first draft of the task
+ * named three and left eleven to prose, which ends as three mapped and eleven falling to one
+ * generic message. A refusal the reader cannot act on is this whole feature's recurring defect.
+ */
+export const BOQ_COPY = {
+  heading: 'Bill of Quantities',
+  subheading: 'The schedule every bill is measured against.',
+  empty: 'No BOQ yet. Enter sections and lines, or import a tender workbook.',
+  loadFailed: 'The BOQ could not be loaded.',
+
+  // The tree
+  columnBoqNo: 'BOQ No.',
+  columnTask: 'Item',
+  columnUnit: 'Unit',
+  columnScope: 'Scope qty',
+  columnDone: 'Done',
+  columnPending: 'Pending',
+  columnPerDay: 'Per day',
+  columnAvgPerDay: 'Avg / day',
+  columnDaysLeft: 'Days to finish',
+  columnFinish: 'Finish by',
+  /**
+   * What an unplanned programme column reads (FR-026).
+   *
+   * The word, not an em dash and not a zero. A 312-line imported tender is entirely unplanned on
+   * the day it arrives, so this is the screen's normal state rather than an exception in it — and
+   * a zero per-day target reads as "achieving nothing", which is a different claim.
+   */
+  unplanned: 'Not planned',
+  /** A section heading carries no quantity, because it is a title and not a line. */
+  sectionLabel: 'Section',
+  variation: 'Variation',
+
+  // Entry
+  addSection: 'Add section',
+  addLine: 'Add line',
+  sectionName: 'Section name',
+  taskName: 'Item description',
+  unitLabel: 'Unit',
+  unitHint: 'As it appears on your schedule — it is stored exactly as typed.',
+  scopeQty: 'Scope quantity',
+  rate: 'Rate',
+  rateHint: 'Leave blank and the line stays unpriced; a bill will refuse it rather than bill it free.',
+  startDate: 'Start date (optional)',
+  finishDate: 'Finish date (optional)',
+  duration: 'Working days (optional)',
+  perDay: 'Per-day target (optional)',
+  programmeHint: 'Dates are optional. A line without them is simply not planned yet.',
+  save: 'Save',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  deleteLine: 'Delete',
+  deleteBlocked: 'This line cannot be deleted because work has been recorded against it.',
+
+  // Alert tabs — four, not three
+  alertsHeading: 'What needs attention',
+  tabToday: 'Due today',
+  tabDelayed: 'Overdue',
+  tabToBeDelayed: 'At risk',
+  tabUnplanned: 'Not planned',
+  tabEmpty: 'Nothing here.',
+  unplannedExplainer:
+    'These lines have no finish date, so they are neither on time nor late. Plan them to see them in the other tabs.',
+
+  // Import
+  importHeading: 'Import a tender workbook',
+  importHint: 'Excel (.xls or .xlsx). Nothing is saved until you confirm.',
+  importChoose: 'Choose file',
+  importReading: 'Reading the workbook…',
+  importConfirm: 'Confirm import',
+  importConfirming: 'Importing…',
+  importDiscard: 'Discard',
+  importDone: (groups: number, lines: number) =>
+    `Imported ${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}.`,
+
+  // The report
+  reportHeading: 'What the import understood',
+  reportLines: (lines: number, groups: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}`,
+  reportSheet: (sheet: string) => `Read from sheet “${sheet}”`,
+  reportScheduleTotal: 'Schedule total',
+  reportQuotedTotal: 'Quoted total',
+  reportStated: 'Stated in the file',
+  reportDifference: 'Difference',
+  reportTolerance: (tolerance: string) => `within ${tolerance} allowed`,
+  reportReconciles: 'Both totals agree with the figures in your file.',
+  reportDoesNotReconcile:
+    'The totals do not agree with the figures stated in your file. Check the schedule before confirming.',
+  reportPercentage: 'Quoted percentage',
+  /**
+   * Shown where the percentage was not found (FR-028).
+   *
+   * A condition to resolve, never a zero. The consequence is named because it is invisible
+   * otherwise: on the client's own file the silence is ₹7.37 lakh across the project.
+   */
+  reportPercentageMissing:
+    'Not found in this file. Every bill will be raised at the schedule rate, with no percentage added — on a ₹3 crore tender a missing 2.46% is about ₹7.4 lakh. Set it on the project before billing.',
+  reportUnits: 'Units found',
+  reportUnitsHint: 'Shown as your file spells them. Matching ignores case, spacing and full stops.',
+  reportErrors: (count: number) =>
+    `${count} row${count === 1 ? '' : 's'} could not be imported`,
+  reportWarnings: (count: number) =>
+    `${count} note${count === 1 ? '' : 's'} about rows that were imported`,
+  reportColumnRow: 'Row',
+  reportColumnColumn: 'Column',
+  reportColumnReason: 'Reason',
+  reportNothingWritten: 'Nothing has been saved yet.',
+
+  /** One sentence per refusal (FR-029). A generic message here is a refusal nobody can act on. */
+  refusals: {
+    BOQ_FILE_TOO_LARGE:
+      'That file is too large to read. A BOQ schedule is normally well under 1MB — check you have uploaded the schedule and not a folder of drawings.',
+    BOQ_WORKBOOK_UNREADABLE:
+      'That file is not an Excel workbook. Upload the .xls or .xlsx itself — a PDF, a CSV or a renamed file of another kind cannot be read.',
+    BOQ_WORKBOOK_EMPTY:
+      'The workbook opened but has no sheets with any content. If it came from a tender portal, open it in Excel and save it again before uploading.',
+    BOQ_NO_SCHEDULE_BLOCK:
+      'No schedule could be found. The sheet needs a header row naming an item description, a quantity, a unit and a rate.',
+    BOQ_NO_SCHEDULE_ROWS: 'The schedule has a header row but no items beneath it.',
+    BOQ_NO_IMPORTABLE_ROWS:
+      'Every row in the schedule was rejected, so there is nothing to import. The reasons are listed above.',
+    BOQ_TOO_MANY_ROWS:
+      'This schedule has more rows than one import can take. Import its sections separately.',
+    BOQ_TOO_MANY_BATCHES:
+      'Too many imports are waiting to be confirmed. Confirm or discard one of them, then try again.',
+    BOQ_ALREADY_POPULATED:
+      'This project already has a BOQ. Importing again would add a second copy rather than replace the first, and the existing lines cannot be removed automatically because bills may already measure against them. Add or revise lines instead.',
+    BOQ_BATCH_NOT_FOUND: 'That import is no longer available. Upload the file again.',
+    BOQ_BATCH_EXPIRED:
+      'This import was prepared a while ago and has expired. Nothing was saved — upload the file again.',
+    /** Not a failure: the schedule is on its way in, which is what the person wanted. */
+    BOQ_BATCH_IN_PROGRESS: 'This schedule is being imported now. Reload the project in a moment.',
+    /** Not a failure either: it already worked. */
+    BOQ_BATCH_ALREADY_CONFIRMED: 'Already imported. Nothing further is needed.',
+    BOQ_BATCH_NOT_YOURS:
+      'This import was prepared by someone else, or for a different project. Upload the file again here.',
+  } as const,
+  refusalFallback: 'The workbook could not be imported.',
+} as const;

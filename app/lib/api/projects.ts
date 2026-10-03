@@ -17,9 +17,10 @@ import { projectReadinessSchema } from '@/app/lib/api/project-documents';
  * `fetch()`. Every response is parsed through a `zod` schema before the app trusts
  * it (Principle IV), and the `z.infer` type is what the UI consumes.
  *
- * Scoped to User Stories 1–3. BOQ, DWR, revenue, billing, budget, P&L and documents
- * are in `contracts/projects-web-api.md` but have no functions here, because the
- * endpoints they would call do not exist yet — a typed stub against an absent
+ * Scoped to User Stories 1–3, **and User Story 5's BOQ since 2026-10-03** — the endpoints it
+ * calls were built that day, because nothing in either repository could write a BOQ and 018's
+ * billing screens had been measuring against a table nothing could fill. DWR, revenue, budget and
+ * P&L still have no functions here, for the original reason: a typed stub against an absent
  * endpoint is a compile-time promise the runtime cannot keep.
  *
  * Schemas validate the fields the UI reads and let `zod` strip the rest, the same
@@ -386,4 +387,226 @@ export async function updateProject(
 
 export async function deleteProject(id: string): Promise<void> {
   await authFetch<unknown>(`/projects/${id}`, { method: 'DELETE' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOQ — entry, the tree, the four alert groups, and the tender import
+// (008 US4/US5, amended 2026-10-03)
+//
+// The module note at the top of this file says BOQ "has no functions here, because the endpoints
+// they would call do not exist yet". They exist now: nothing in either repository could write a
+// BOQ, which is why 018's billing screens have been measuring against a table nothing could fill.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Every state one line can be in — five, of which four are alerts (api FR-048).
+ *
+ * `onTrack` is the absence of an alert: a line inside its dates and keeping pace, or finished
+ * before its finish date, needs nobody's attention. It appears on the tree and in none of the
+ * alert groups.
+ */
+export const BOQ_LINE_STATES = [
+  'today',
+  'delayed',
+  'toBeDelayed',
+  'unplanned',
+  'onTrack',
+] as const;
+
+const boqItemSchema = z.object({
+  id: z.string(),
+  boqNo: z.string(),
+  taskName: z.string(),
+  /**
+   * As the source spelled it (api FR-041).
+   *
+   * Displayed verbatim and never tidied: the client reconciles against their own sheet, and
+   * silently rewriting `R. mtr` to `R.Mtr.` creates a difference they cannot trace.
+   */
+  unit: z.string(),
+  scopeQty: decimal,
+  rate: decimal,
+  doneQty: decimal,
+  pendingQty: decimal,
+  /**
+   * **`.nullable()` deliberately, and this is the sixth time this class of defect has appeared
+   * in this project.** A nullable the schema treats as required fails the whole read; a nullable
+   * the schema omits loses exactly the distinction FR-026 exists to draw. Null means *unplanned*,
+   * which is not zero: "achieving nothing" and "nobody has set a target" are different claims.
+   */
+  perDayQty: decimal.nullable(),
+  avgQtyPerDay: decimal.nullable(),
+  daysToComplete: z.number().nullable(),
+  startDate: z.string().nullable(),
+  finishDate: z.string().nullable(),
+  isVariation: z.boolean(),
+  state: z.enum(BOQ_LINE_STATES),
+});
+
+const boqGroupSchema = z.object({
+  id: z.string(),
+  boqNo: z.string(),
+  name: z.string(),
+  scopeQty: decimal,
+  startDate: z.string().nullable(),
+  finishDate: z.string().nullable(),
+  items: z.array(boqItemSchema),
+});
+
+export type BoqItem = z.infer<typeof boqItemSchema>;
+export type BoqGroup = z.infer<typeof boqGroupSchema>;
+
+const boqAlertsSchema = z.object({
+  today: z.array(boqItemSchema),
+  delayed: z.array(boqItemSchema),
+  toBeDelayed: z.array(boqItemSchema),
+  /** The normal state of a freshly imported tender, and reported rather than hidden. */
+  unplanned: z.array(boqItemSchema),
+});
+
+export type BoqAlerts = z.infer<typeof boqAlertsSchema>;
+
+/** A rejected row, or a row accepted with something worth saying about it. */
+const rowProblemSchema = z.object({
+  row: z.number(),
+  column: z.string(),
+  reason: z.string(),
+});
+
+const importTotalsSchema = z.object({
+  /** Computed from the lines, never read from the file (api FR-044). */
+  scheduleDerived: decimal,
+  /** What the workbook says about itself, where it says anything. */
+  scheduleStated: decimal.nullable(),
+  quotedDerived: decimal.nullable(),
+  quotedStated: decimal.nullable(),
+  scheduleDifference: decimal.nullable(),
+  quotedDifference: decimal.nullable(),
+  /** One paisa per line — derived from the rounding rather than chosen (api FR-045). */
+  tolerance: decimal,
+  reconciles: z.boolean(),
+});
+
+const importReportSchema = z.object({
+  batchId: z.string(),
+  sheetName: z.string(),
+  groups: z.number(),
+  lines: z.number(),
+  units: z.array(
+    z.object({ asTyped: z.string(), normalised: z.string(), lines: z.number() }),
+  ),
+  totals: importTotalsSchema,
+  /**
+   * **Null means "not found", and is never 0** (api FR-040). Zero is a valid percentage, so a
+   * schema that defaulted this would turn a failed read into a tender quoted at the schedule of
+   * rates exactly — which under-bills every line on the project.
+   */
+  quotedPercentage: decimal.nullable(),
+  quotedPercentageFound: z.boolean(),
+  errors: z.array(rowProblemSchema),
+  /** Separate from `errors`: a line grouped under the sheet name is not a rejected row. */
+  warnings: z.array(rowProblemSchema),
+  alerts: z.object({
+    today: z.number(),
+    delayed: z.number(),
+    toBeDelayed: z.number(),
+    unplanned: z.number(),
+  }),
+});
+
+export type BoqImportReport = z.infer<typeof importReportSchema>;
+
+export interface BoqGroupInput {
+  boqNo: string;
+  name: string;
+  scopeQty: string;
+  /** Omitted until somebody plans the work (api FR-037). */
+  startDate?: string;
+  finishDate?: string;
+}
+
+export interface BoqItemInput {
+  groupId: string;
+  boqNo: string;
+  taskName: string;
+  unit: string;
+  scopeQty: string;
+  rate?: string;
+  startDate?: string;
+  finishDate?: string;
+  duration?: number;
+  perDayQty?: string;
+}
+
+export async function getBOQ(projectId: string): Promise<BoqGroup[]> {
+  const raw = await authFetch<unknown>(`/projects/${projectId}/boq`);
+  return z.array(boqGroupSchema).parse(raw);
+}
+
+export async function getBOQAlerts(projectId: string): Promise<BoqAlerts> {
+  const raw = await authFetch<unknown>(`/projects/${projectId}/boq/alerts`);
+  return boqAlertsSchema.parse(raw);
+}
+
+export async function createBOQGroup(projectId: string, input: BoqGroupInput) {
+  return authFetch<{ id: string }>(`/projects/${projectId}/boq/groups`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createBOQItem(projectId: string, input: BoqItemInput) {
+  return authFetch<{ id: string }>(`/projects/${projectId}/boq/items`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteBOQItem(projectId: string, itemId: string): Promise<void> {
+  await authFetch<unknown>(`/projects/${projectId}/boq/items/${itemId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Reads a tender workbook and reports what it says, writing nothing.
+ *
+ * **Base64 in JSON rather than `FormData`**, matching every other upload in this application —
+ * feature 015 established that there is no `FormData` anywhere here, and the API takes base64 for
+ * company documents, equipment photos, purchase bills and payment attachments for the same reason.
+ */
+export async function validateBOQImport(
+  projectId: string,
+  file: File,
+): Promise<BoqImportReport> {
+  const base64 = await fileToBase64(file);
+  const raw = await authFetch<unknown>(`/projects/${projectId}/boq/import/validate`, {
+    method: 'POST',
+    body: JSON.stringify({ file: base64 }),
+  });
+  return importReportSchema.parse(raw);
+}
+
+export async function confirmBOQImport(
+  projectId: string,
+  batchId: string,
+): Promise<{ groups: number; lines: number; quotedPercentageSet: boolean }> {
+  return authFetch<{ groups: number; lines: number; quotedPercentageSet: boolean }>(
+    `/projects/${projectId}/boq/import/confirm`,
+    { method: 'POST', body: JSON.stringify({ batchId }) },
+  );
+}
+
+/** The data portion only — the API decodes bytes, not a data URL. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('The file could not be read.'));
+    reader.onload = () => {
+      const result = String(reader.result);
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
 }
