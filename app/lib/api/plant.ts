@@ -13,7 +13,8 @@ import {
   SERVICE_SCHEDULE_STATUSES,
   SPARE_PART_MOVEMENT_TYPES,
 } from '@/app/lib/constants';
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/dashboard/plant/*` call to `buildcore-api` (feature 006).
@@ -401,8 +402,8 @@ export async function uploadEquipmentDocument(
 export async function getEquipmentDocumentFile(
   equipmentId: string,
   documentId: string,
-): Promise<Blob> {
-  return authFetchBlob(
+): Promise<StoredFile> {
+  return authFetchFile(
     `/plant/equipment/${equipmentId}/documents/${documentId}/download`,
   );
 }

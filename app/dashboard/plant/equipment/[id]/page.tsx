@@ -20,6 +20,7 @@ import {
   plantLabel,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
+import { openStoredFile } from '@/app/lib/download-file';
 import DocumentModal from '@/app/ui/plant/document-modal';
 import {
   FormError,
@@ -69,10 +70,10 @@ export default function EquipmentDetailPage() {
     setOpening(documentId);
     setError(null);
     try {
-      const blob = await getEquipmentDocumentFile(id, documentId);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      openStoredFile(
+        await getEquipmentDocumentFile(id, documentId),
+        `equipment-document-${documentId}`,
+      );
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not open that document.',

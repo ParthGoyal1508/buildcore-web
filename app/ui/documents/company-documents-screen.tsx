@@ -12,6 +12,7 @@ import {
   type CompanyDocument,
 } from '@/app/lib/api/company-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
+import { openStoredFile } from '@/app/lib/download-file';
 import { CompletenessPanel } from '@/app/ui/documents/completeness-panel';
 import {
   DocumentUpload,
@@ -124,12 +125,7 @@ export function CompanyDocumentsScreen() {
   const open = async (doc: CompanyDocument) => {
     setDownloadError(null);
     try {
-      const blob = await downloadCompanyDocument(doc.id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      // Revoked on a timer rather than immediately: the new tab needs the URL to
-      // survive long enough to start reading it.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      openStoredFile(await downloadCompanyDocument(doc.id), `${doc.code}-${doc.id}`);
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       setDownloadError(

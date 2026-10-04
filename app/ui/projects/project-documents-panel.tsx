@@ -11,6 +11,7 @@ import {
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
+import { openStoredFile } from '@/app/lib/download-file';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 
 /**
@@ -70,12 +71,12 @@ export default function ProjectDocumentsPanel({
   const open = async (document: ProjectDocument) => {
     setDownloadError(null);
     try {
-      const blob = await downloadProjectDocument(projectId, document.id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      // Revoked on the next tick rather than immediately: the new tab needs the URL to still
-      // resolve when it loads, and never revoking leaks the blob for the life of the page.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // The server's own name for the file, with its extension — see `openStoredFile`. The
+      // fallback is only reached if the response carried no readable `Content-Disposition`.
+      openStoredFile(
+        await downloadProjectDocument(projectId, document.id),
+        `${document.documentType}-${document.id}`,
+      );
     } catch {
       setDownloadError(DOCUMENT_COPY.projectDocumentDownloadFailed);
     }

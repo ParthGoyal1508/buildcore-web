@@ -21,6 +21,7 @@ import {
   formatAssetQuantity,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
+import { openStoredFile } from '@/app/lib/download-file';
 import AllocateModal from '@/app/ui/assets/allocate-modal';
 import AssetModal from '@/app/ui/assets/asset-modal';
 import AssetDocumentModal from '@/app/ui/assets/document-modal';
@@ -88,10 +89,10 @@ export default function AssetDetailPage() {
   async function openDocument(documentId: string) {
     setError(null);
     try {
-      const blob = await getAssetDocumentFile(assetId, documentId);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      openStoredFile(
+        await getAssetDocumentFile(assetId, documentId),
+        `asset-document-${documentId}`,
+      );
     } catch (err) {
       setError(
         err instanceof ApiError

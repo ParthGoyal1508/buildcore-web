@@ -11,6 +11,7 @@ import {
 import { fileToBase64 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
+import { openStoredFile } from '@/app/lib/download-file';
 
 /**
  * One payment's transfer proof — the RTGS advice or confirmation (017 FR-020, bugs.md item 23).
@@ -58,10 +59,10 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
   const open = async () => {
     setError(null);
     try {
-      const blob = await downloadPaymentProof(payment.id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      openStoredFile(
+        await downloadPaymentProof(payment.id),
+        `payment-proof-${payment.id}`,
+      );
     } catch {
       setError(DOCUMENT_COPY.proofDownloadFailed);
     }

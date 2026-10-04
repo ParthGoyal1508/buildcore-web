@@ -1,4 +1,10 @@
-import { apiFetch, apiFetchBlob, ApiError } from './api/client';
+import {
+  apiFetch,
+  apiFetchBlob,
+  apiFetchFile,
+  ApiError,
+  type StoredFile,
+} from './api/client';
 import { SESSION_COOKIE_MISSING, SESSION_EXPIRED, SESSION_REVOKED } from './session-codes';
 import { ROUTES } from './constants';
 
@@ -115,6 +121,19 @@ export async function authFetchBlob(
   init?: RequestInit,
 ): Promise<Blob> {
   return withAuth(path, init, apiFetchBlob);
+}
+
+/**
+ * `authFetchBlob` for a stored document, keeping the name the server gave it.
+ *
+ * Use this wherever the file is one a person uploaded. `authFetchBlob` is still right for a
+ * report the app names itself, where the server's name is not the interesting one.
+ */
+export async function authFetchFile(
+  path: string,
+  init?: RequestInit,
+): Promise<StoredFile> {
+  return withAuth(path, init, apiFetchFile);
 }
 
 /**

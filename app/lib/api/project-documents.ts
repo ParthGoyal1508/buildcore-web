@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
 import { companyQuery } from '@/app/lib/api/company-query';
 
 /**
@@ -120,8 +121,8 @@ export async function downloadProjectDocument(
   projectId: string,
   documentId: string,
   companyId?: string,
-): Promise<Blob> {
-  return authFetchBlob(
+): Promise<StoredFile> {
+  return authFetchFile(
     `/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(
       documentId,
     )}/download${companyQuery(companyId)}`,
@@ -207,6 +208,8 @@ export async function stageProjectDocument(
     /** Base64, without a data-URL prefix. */
     data: string;
     contentType: string;
+    /** The uploader's own file name, so the download is what they recognise. */
+    fileName?: string;
   },
   companyId?: string,
 ): Promise<{ stagedDocumentId: string }> {

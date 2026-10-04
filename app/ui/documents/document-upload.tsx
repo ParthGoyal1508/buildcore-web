@@ -19,6 +19,8 @@ export interface DocumentUploadInput {
   documentTypeId: string;
   data: string;
   contentType: string;
+  /** The uploader's own file name, so the download is what they recognise. */
+  fileName: string;
   documentNumber?: string;
   expiresAt?: string;
 }
@@ -105,6 +107,7 @@ export function DocumentUpload({
         documentTypeId,
         data: await readAsBase64(file),
         contentType: file.type || 'application/octet-stream',
+        fileName: file.name,
         documentNumber: documentNumber.trim() || undefined,
         expiresAt: expiresAt || undefined,
       });
