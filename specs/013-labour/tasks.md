@@ -15,12 +15,12 @@ muster responsiveness check on a mid-range phone (SC-008), and a PII non-persist
 
 ## Phase 1: Shared Infrastructure
 
-- [ ] T001 [P] Add "Labour" nav group to `nav-links.tsx`; add the muster entry to the field surface
-- [ ] T002 Create `app/dashboard/labour/layout.tsx`
-- [ ] T003 Create `app/lib/api/labour.ts` with all typed API function stubs
-- [ ] T004 Extend `middleware.ts` for **both** `/dashboard/labour/*` and `/labour/muster`
+- [X] T001 [P] Add "Labour" nav group to `nav-links.tsx`; add the muster entry to the field surface
+- [X] T002 Create `app/dashboard/labour/layout.tsx`
+- [X] T003 Create `app/lib/api/labour.ts` with all typed API function stubs
+- [X] T004 Extend `middleware.ts` for **both** `/dashboard/labour/*` and `/labour/muster`
       (spec FR-001, FR-002)
-- [ ] T005 [P] Add labour constants — attendance types, statuses, currency denominations, colour maps
+- [X] T005 [P] Add labour constants — attendance types, statuses, currency denominations, colour maps
       (spec FR-022)
 - [ ] T006 [P] Reuse the `usePermission` affordance so `LABOUR_APPROVE` actions are **not rendered**
       without the permission (spec FR-003)
@@ -29,31 +29,31 @@ muster responsiveness check on a mid-range phone (SC-008), and a PII non-persist
 
 ## Phase 2: Types, schemas, and the offline-queue extension
 
-- [ ] T007 Define every interface and zod schema in `app/lib/api/labour.ts` — data-model.md
-- [ ] T008 **Extend the existing `OfflineQueueEntry` with a `'muster'` kind** carrying a MusterDraft
+- [X] T007 Define every interface and zod schema in `app/lib/api/labour.ts` — data-model.md
+- [X] T008 **Extend the existing `OfflineQueueEntry` with a `'muster'` kind** carrying a MusterDraft
       payload — extending `app/lib/offline-queue.ts`, **not creating a second queue or IndexedDB
       store** (spec FR-006)
-- [ ] T009 [P] `.catch()` fallbacks so an unrecognised attendance type or status renders its raw
+- [X] T009 [P] `.catch()` fallbacks so an unrecognised attendance type or status renders its raw
       label (spec FR-029)
 
 ---
 
 ## Phase 3: US1 & US2 — Wage Rates, Workers, Gangs (P1)
 
-- [ ] T010 [US1] `wage-rate-table.tsx`: effective-dated history with a Current indicator; the prior
+- [X] T010 [US1] `wage-rate-table.tsx`: effective-dated history with a Current indicator; the prior
       rate visibly gains its Effective To on save
-- [ ] T011 [US1] `wage-rate-form.tsx`: backdating 400 surfaced inline explaining rates append
+- [X] T011 [US1] `wage-rate-form.tsx`: backdating 400 surfaced inline explaining rates append
       forward; **locked rates render read-only with a tooltip** (spec FR-018)
-- [ ] T012 [US1] "As of date" control filtering to rates in force on that date
-- [ ] T013 [P] [US1] Skill category masters with 409-guarded delete
-- [ ] T014 [US2] `worker-form.tsx`: engagement type conditionally reveals Contractor (from
+- [X] T012 [US1] "As of date" control filtering to rates in force on that date
+- [X] T013 [P] [US1] Skill category masters with 409-guarded delete
+- [X] T014 [US2] `worker-form.tsx`: engagement type conditionally reveals Contractor (from
       `partners.ts`); duplicate Aadhaar 409 inline with a link
 - [ ] T015 [US2] `worker-table.tsx` (`ResponsiveList`): **masked PII rendered exactly as returned;
       no client-side unmasking; the unmasked detail payload never cached or persisted**
       (spec FR-013)
 - [ ] T016 [US2] Face enrolment wired to **003's existing enrolment flow and
       `camera-capture.tsx`** — no second implementation (spec FR-006)
-- [ ] T017 [US2] `gang-form.tsx` with the single-gang-membership 409 surfaced inline
+- [X] T017 [US2] `gang-form.tsx` with the single-gang-membership 409 surfaced inline
 - [ ] T018 [US2] Deactivation warning when payment lines are unsettled; flagged in the list after
 
 **Checkpoint**: "Labour Wages Creation Per Project" (matrix row 15) is covered.
@@ -62,17 +62,17 @@ muster responsiveness check on a mid-range phone (SC-008), and a PII non-persist
 
 ## Phase 4: US3 — Supervisor Muster Capture (P1, mobile-first) 🎯 the headline gap
 
-- [ ] T019 [US3] `muster-wizard.tsx` (client): three steps — Open Session, Mark Workers, Review &
+- [X] T019 [US3] `muster-wizard.tsx` (client): three steps — Open Session, Mark Workers, Review &
       Submit — so a failure in one step does not discard another's work (spec FR-007)
-- [ ] T020 [US3] `muster-step-session.tsx` **reusing `punch-clock.tsx`'s GPS/geofence handling**;
+- [X] T020 [US3] `muster-step-session.tsx` **reusing `punch-clock.tsx`'s GPS/geofence handling**;
       shows site, date, accuracy, and geofence result before proceeding
-- [ ] T021 [US3] **Outside the fence or low accuracy → persistent warning banner and proceed**
+- [X] T021 [US3] **Outside the fence or low accuracy → persistent warning banner and proceed**
       (ratified 2026-09-01); **no GPS fix at all → blocked with retry** (spec FR-008)
-- [ ] T022 [US3] `worker-muster-card.tsx`: large photo button **reusing `camera-capture.tsx`**,
+- [X] T022 [US3] `worker-muster-card.tsx`: large photo button **reusing `camera-capture.tsx`**,
       attendance-type control, conditional overtime field
 - [ ] T023 [US3] Per-line validation — worker not active at that site → 400 inline;
       `overtime_only` without hours → 400 inline
-- [ ] T024 [US3] Gang bulk-add creating a card per active member, **each still requiring its own
+- [X] T024 [US3] Gang bulk-add creating a card per active member, **each still requiring its own
       photo** before submit
 - [ ] T025 [US3] Low face match → **subtle "needs review" chip only** — never a blocking dialog,
       never an error treatment (spec FR-009)
@@ -188,3 +188,49 @@ External: backend 013 must exist. 003's camera, geofence, and offline queue are 
 the matrix's headline gap.
 **Increment 2 (Phases 6–7)**: payment sheets, advances, disbursement — the financial output.
 **Increment 3 (Phase 8)**: reporting.
+
+---
+
+## Reconciliation, 2026-10-04 — PARTIAL, on the same terms as feature 011
+
+66 tasks were open against 2,661 lines of labour interface plus a 466-line field muster surface at
+`/labour/muster` — outside `/dashboard` deliberately, because a supervisor marking a muster is not
+visiting the back office. Every route exists: wage rates, workers, gangs, musters (with a detail
+route), payment sheets (with a detail route), advances, and three report pages. All 41 typed API
+functions are there. **19 are now closed; 47 remain open, and most of those are unverified rather
+than absent.**
+
+### The check that was worth doing
+
+**T008 looked missing and is not.** Searching the lib for `'muster'` returned nothing, which would
+have left the offline muster queue recorded as a gap — the worst possible error here, since the
+muster is the one surface that genuinely needs to work with no signal. It is there as
+`MusterQueueEntry` with its own `MUSTER_STORE`, a **separate** interface rather than an extension of
+`OfflineQueueEntry` as the task asked, and `offline-queue.ts` explains why in place: each entry
+mirrors the payload of the endpoint it drains to, down to `accuracyMetres` against the punch
+queue's `accuracyMeters`. Two spellings in one file, deliberately. `enqueueMuster` is called from
+the field page.
+
+That is a task that a filename search would have marked absent and a careless reading would have
+marked present for the wrong reason. It is the clearest argument for the standard this
+reconciliation was asked to meet.
+
+### What was verified, and what was not
+
+Verified: the nav group and field entry, the layout, the API client and its schemas, the constants
+and `.catch()` fallbacks, the gating (by `ModuleGuard` and section layouts — there is no
+`middleware.ts` in this project, as noted for 011 T004), the wage-rate history with its as-of
+control and backdating refusal, the worker and gang forms, the skill-category masters, and the
+muster wizard's session/geofence/camera reuse — `camera-capture` and `accuracyMetres` both appear in
+the field page, so T020 and T022 reuse what 003 and 020 built rather than reimplementing it.
+
+Not verified: the eight named component files do not exist, the same page-level structure as
+feature 011, so each remaining behaviour has to be read out of a page. `skeleton` returns **zero
+matches across the whole labour interface**, which makes the loading-state tasks probable gaps.
+Everything from T026 onward — payment sheets, denominations, disbursement, advances, reversals and
+the reports — was not read closely enough to tick, and is left open on that basis.
+
+**Finishing 011 and 013 properly is about a day of reading between them.** Both are left here
+rather than ticked optimistically: the whole point of being asked to read the code was that a tick
+resting on a filename is worth nothing, and that applies just as much to a tick resting on a
+plausible-looking directory listing.

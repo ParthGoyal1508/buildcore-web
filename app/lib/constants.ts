@@ -1172,6 +1172,12 @@ export const MESSAGES = {
     `Not counted yet: ${modules}. These modules are not built, so anything due in them cannot be shown.`,
   remindersLoadFailed:
     'Could not load reminders. Nothing has been missed — try again.',
+  /**
+   * Spec FR-011's cap, surfaced (T048). The API has always returned `truncated`; the screen
+   * discarded it, so a list that stopped at 500 looked like a complete one.
+   */
+  remindersTruncated: (shown: number) =>
+    `Showing the ${shown} most urgent. More are due — narrow by module or severity to see the rest.`,
   reminderSnoozed: (until: string) => `Snoozed until ${until}.`,
   snoozeReasonRequired: 'Give a reason, so the next person to see this knows why.',
   snoozeDatePast: 'Pick a date in the future, or the reminder returns immediately.',

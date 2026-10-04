@@ -81,6 +81,24 @@ export default function RemindersList() {
 
   const hasFilters = Boolean(filters.module || filters.type || filters.severity);
 
+  /**
+   * The unavailable sources worth naming **under the current filter** (T049).
+   *
+   * With no module selected, all of them: the list claims to cover everything, so every
+   * blind spot in it is relevant. With a module selected, only that module's — reporting
+   * machinery's gap while somebody reads the documents module says something untrue about
+   * the documents module.
+   */
+  const unavailableHere = useMemo(
+    () =>
+      filters.module
+        ? (data?.unavailable ?? []).filter(
+            (u) => u.sourceModule === filters.module,
+          )
+        : (data?.unavailable ?? []),
+    [data, filters.module],
+  );
+
   if (isPending) {
     return (
       <p className="text-sm text-gray-500" role="status">
@@ -168,16 +186,34 @@ export default function RemindersList() {
           screen carries on. Stated as a note rather than a warning — nothing is
           wrong, there is simply a known blind spot, and the user should know its
           shape rather than believe the list is complete. */}
-      {data.unavailable.length > 0 && (
+      {/* T049: filtered by the active module. Viewing one module used to report every
+          pending source in the system, which reads as "this module is incomplete" about a
+          module that is fine. With a module selected, only that module's own blind spot is
+          worth mentioning — and if it has none, the note goes away entirely, which is the
+          true statement. */}
+      {unavailableHere.length > 0 && (
         <p
           className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600"
           role="note"
         >
           {MESSAGES.remindersUnavailable(
             Array.from(
-              new Set(data.unavailable.map((u) => reminderModuleLabel(u.sourceModule))),
+              new Set(unavailableHere.map((u) => reminderModuleLabel(u.sourceModule))),
             ).join(', '),
           )}
+        </p>
+      )}
+
+      {/* T048: the API has always said when it clipped the list; the screen discarded it.
+          `truncated` means there are more due than are shown, and a list that silently
+          stops at 500 reads as a complete one — the one reading under which somebody
+          stops scrolling and assumes they have seen everything. */}
+      {data.truncated && (
+        <p
+          className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          role="note"
+        >
+          {MESSAGES.remindersTruncated(data.reminders.length)}
         </p>
       )}
 

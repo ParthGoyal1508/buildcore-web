@@ -56,9 +56,9 @@ filter form, run, and PDF/Excel export with a sync-download / async-poll flow). 
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Add `/dashboard/*` sub-routes, copy, the 30s refresh interval, and the employee-
+- [X] T001 [P] Add `/dashboard/*` sub-routes, copy, the 30s refresh interval, and the employee-
       search debounce delay to `app/lib/constants.ts`
-- [ ] T002 [P] Create `zod` schemas for `WidgetResult`, `NotificationRow`, `ActivityLogEntry`,
+- [X] T002 [P] Create `zod` schemas for `WidgetResult`, `NotificationRow`, `ActivityLogEntry`,
       `ReportType`/`FilterSpec`, `ReportResult`, `ExportJobStatus` in `app/lib/api/dashboard.ts`
       (schema definitions only, functions per-story)
 
@@ -70,11 +70,11 @@ filter form, run, and PDF/Excel export with a sync-download / async-poll flow). 
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 Create `app/ui/dashboard/widget-renderer.tsx`: the `WidgetRenderer` switch component
+- [X] T003 Create `app/ui/dashboard/widget-renderer.tsx`: the `WidgetRenderer` switch component
       plus `KpiCard`, `WidgetTable` (reusing Settings' `ResponsiveList` pattern), `WidgetList`,
       `StatCard`, `ComingSoonCard`, and `UnsupportedWidgetCard` — research.md §1, spec FR-001,
       FR-002, FR-003, FR-017
-- [ ] T004 [P] Create `app/ui/dashboard/filter-field.tsx`: the generic `FilterField` switch
+- [X] T004 [P] Create `app/ui/dashboard/filter-field.tsx`: the generic `FilterField` switch
       component (text/select/date/dateRange/numberRange) — research.md §6, spec FR-013
 
 **Checkpoint**: The two generic rendering components (the architectural core of this feature) are
@@ -92,7 +92,7 @@ confirm every entry renders correctly with zero per-widget-id code.
 
 ### Implementation for User Story 1
 
-- [ ] T005 [P] [US1] Add `getWidgets()` to `app/lib/api/dashboard.ts`
+- [X] T005 [P] [US1] Add `getWidgets()` to `app/lib/api/dashboard.ts`
 - [ ] T006 [US1] Manually verify `WidgetRenderer` (T003) against a live `GET /dashboard/widgets`
       response in a scratch page or Storybook-less manual render, confirming KPI/table/unavailable
       entries all render correctly (depends on T003, T005) — spec SC-002's "add a simulated widget"
@@ -113,11 +113,11 @@ populate from one network call and refresh on interval.
 
 ### Implementation for User Story 2
 
-- [ ] T007 [US2] Rewrite `app/dashboard/page.tsx`: fetch `getWidgets()` (T005), group results by
+- [X] T007 [US2] Rewrite `app/dashboard/page.tsx`: fetch `getWidgets()` (T005), group results by
       `section`, render each group via `WidgetRenderer` (T003), 30s `refetchInterval` (research.md
       §4) — spec FR-004, FR-005 (depends on T003, T005)
-- [ ] T008 [US2] Remove `app/ui/dashboard/cards.tsx` (superseded placeholder — research.md §2)
-- [ ] T009 [US2] Wire a per-section (or whole-list) loading state and a page-level error-with-retry
+- [X] T008 [US2] Remove `app/ui/dashboard/cards.tsx` (superseded placeholder — research.md §2)
+- [X] T009 [US2] Wire a per-section (or whole-list) loading state and a page-level error-with-retry
       state on `app/dashboard/page.tsx` — spec FR-016, Edge Cases
 
 **Checkpoint**: User Stories 1 AND 2 both independently functional.
@@ -133,16 +133,16 @@ narrowing and empty-state handling.
 
 ### Implementation for User Story 3
 
-- [ ] T010 [P] [US3] Add `getActivityLog()` and `exportActivityLog()` to
+- [X] T010 [P] [US3] Add `getActivityLog()` and `exportActivityLog()` to
       `app/lib/api/dashboard.ts` — `exportActivityLog` triggers a direct download from
       `GET /activity-log/export?module=&timeRange=` (spec FR-006a)
-- [ ] T011 [US3] Create `app/ui/dashboard/activity-log-list.tsx`: `ResponsiveList`-based feed,
+- [X] T011 [US3] Create `app/ui/dashboard/activity-log-list.tsx`: `ResponsiveList`-based feed,
       module + time-range filters (combining), pagination/infinite-scroll, distinct empty state per
       filter combination, an "Export CSV" button calling `exportActivityLog()` with the
       currently-applied filters — spec FR-006, FR-006a, FR-007 (depends on T010); native
       `<select>`/`<button>` elements and full keyboard operability for the filters and export
       button, per spec FR-019
-- [ ] T012 [US3] Create `app/dashboard/activity-log/page.tsx` (depends on T011)
+- [X] T012 [US3] Create `app/dashboard/activity-log/page.tsx` (depends on T011)
 
 **Checkpoint**: User Stories 1–3 independently functional.
 
@@ -157,15 +157,15 @@ count; approve it, confirm it disappears on next poll.
 
 ### Implementation for User Story 4
 
-- [ ] T013 [P] [US4] Add `getNotifications()`, `getNotificationCount()` to
+- [X] T013 [P] [US4] Add `getNotifications()`, `getNotificationCount()` to
       `app/lib/api/dashboard.ts`
-- [ ] T014 [US4] Create `app/ui/dashboard/notification-bell.tsx`: badge with 30s
+- [X] T014 [US4] Create `app/ui/dashboard/notification-bell.tsx`: badge with 30s
       `refetchInterval` (depends on T013)
-- [ ] T015 [US4] Create `app/ui/dashboard/notification-panel.tsx`: dropdown panel (click-outside +
+- [X] T015 [US4] Create `app/ui/dashboard/notification-panel.tsx`: dropdown panel (click-outside +
       Escape to close — research.md §5), entries via icon/title/subtitle/action link, no dismiss
       control — spec FR-008, FR-009 (depends on T013, T014); focus-trapped while open with a
       native `<button>` trigger, per spec FR-019
-- [ ] T016 [US4] Wire `NotificationBell`/`NotificationPanel` into the shell header in
+- [X] T016 [US4] Wire `NotificationBell`/`NotificationPanel` into the shell header in
       `app/ui/dashboard/sidenav.tsx` (or wherever header chrome renders)
 
 **Checkpoint**: User Stories 1–4 independently functional.
@@ -180,10 +180,10 @@ count; approve it, confirm it disappears on next poll.
 
 ### Implementation for User Story 5
 
-- [ ] T017 [P] [US5] Add `getSites()`, `getSiteWidgets()` to `app/lib/api/dashboard.ts`
-- [ ] T018 [US5] Create `app/ui/dashboard/site-selector.tsx`: native `<select>` dropdown, fully
+- [X] T017 [P] [US5] Add `getSites()`, `getSiteWidgets()` to `app/lib/api/dashboard.ts`
+- [X] T018 [US5] Create `app/ui/dashboard/site-selector.tsx`: native `<select>` dropdown, fully
       keyboard-operable (spec FR-019), re-fetches `getSiteWidgets()` on change (depends on T017)
-- [ ] T019 [US5] Create `app/dashboard/site/page.tsx`: renders `SiteSelector` +
+- [X] T019 [US5] Create `app/dashboard/site/page.tsx`: renders `SiteSelector` +
       `WidgetRenderer`-mapped output (depends on T003, T018)
 
 **Checkpoint**: User Stories 1–5 independently functional.
@@ -200,12 +200,12 @@ term.
 
 ### Implementation for User Story 6
 
-- [ ] T020 [P] [US6] Add `getGroupCompanies()`, `getStatutoryCalendar()`,
+- [X] T020 [P] [US6] Add `getGroupCompanies()`, `getStatutoryCalendar()`,
       `searchGroupEmployees()` to `app/lib/api/dashboard.ts`
-- [ ] T021 [US6] Create `app/ui/dashboard/employee-search.tsx`: debounced input, no request below 2
+- [X] T021 [US6] Create `app/ui/dashboard/employee-search.tsx`: debounced input, no request below 2
       characters — spec FR-011 (depends on T020); native `<label>`-paired input and keyboard-
       operable result list, per spec FR-019
-- [ ] T022 [US6] Create `app/dashboard/group/page.tsx`: renders `WidgetRenderer`-mapped company
+- [X] T022 [US6] Create `app/dashboard/group/page.tsx`: renders `WidgetRenderer`-mapped company
       cards + Group Total + Statutory Calendar ("Coming soon"), plus `EmployeeSearch` (depends on
       T003, T020, T021)
 
@@ -222,18 +222,18 @@ export and confirm the processing/ready flow.
 
 ### Implementation for User Story 7
 
-- [ ] T023 [P] [US7] Add `getReportTypes()`, `runReport()`, `exportReport()`, `getExportStatus()`
+- [X] T023 [P] [US7] Add `getReportTypes()`, `runReport()`, `exportReport()`, `getExportStatus()`
       to `app/lib/api/dashboard.ts` (branches 200-blob vs 202-jobId per research.md §7)
-- [ ] T024 [US7] Create `app/ui/dashboard/report-type-list.tsx`: availability badges, "Coming
+- [X] T024 [US7] Create `app/ui/dashboard/report-type-list.tsx`: availability badges, "Coming
       soon" state for unavailable types — spec FR-012 (depends on T023); native `<button>`
       elements per type, fully keyboard-operable, per spec FR-019
-- [ ] T025 [US7] Create `app/ui/dashboard/report-result-table.tsx`: reuses `WidgetTable` (T003) for
+- [X] T025 [US7] Create `app/ui/dashboard/report-result-table.tsx`: reuses `WidgetTable` (T003) for
       report rows (depends on T003)
-- [ ] T026 [US7] Create `app/dashboard/reports/page.tsx`: renders `ReportTypeList`, `FilterField`
+- [X] T026 [US7] Create `app/dashboard/reports/page.tsx`: renders `ReportTypeList`, `FilterField`
       (T004)-driven filter form + date-range picker, `ReportResultTable`, Export action (depends on
       T004, T023, T024, T025); native `<label>`/`<button>` elements and full keyboard operability
       for the filter form and Export action, per spec FR-019
-- [ ] T027 [US7] Wire the export flow on the Reports page: sync (200) triggers direct blob
+- [X] T027 [US7] Wire the export flow on the Reports page: sync (200) triggers direct blob
       download; async (202) shows "Processing..." and polls `getExportStatus()` until terminal,
       with a failure state distinct from processing — spec FR-014, FR-015 (depends on T023, T026)
 
@@ -251,7 +251,7 @@ export and confirm the processing/ready flow.
       search, export buttons) is keyboard-operable with a visible focus indicator — spec FR-019
 - [ ] T031 [P] Manually verify every screen renders correctly at a mobile viewport (no horizontal
       scroll, `ResponsiveList` card layout) — spec FR-019
-- [ ] T032 Update `app/ui/dashboard/nav-links.tsx`: add Group Dashboard, Site Dashboard, Activity
+- [X] T032 Update `app/ui/dashboard/nav-links.tsx`: add Group Dashboard, Site Dashboard, Activity
       Log entries; point Reports at the real `/dashboard/reports` route (contracts/dashboard-ui.md)
 - [ ] T033 Run the full `quickstart.md` validation scenarios end-to-end and record results
 
@@ -440,11 +440,11 @@ decision, not by oversight, and are not restated here.
       claims the options come from "the unfiltered dimensions of the current response",
       which is not what it does. Fetch the dimensions separately or filter client-side,
       per FR-025 / TA007 (contradicts)
-- [ ] T048 Surface the API's `truncated` flag in the reminders list. The schema parses
+- [X] T048 Surface the API's `truncated` flag in the reminders list. The schema parses
       it and the component discards it, so a list clipped at the response cap renders
       as though it were complete — the same failure mode FR-026 exists to prevent for
       unavailable sources, per FR-026 (partial)
-- [ ] T049 Filter the unavailable-sources note by the active module filter. Viewing one
+- [X] T049 Filter the unavailable-sources note by the active module filter. Viewing one
       module still reports every pending module, naming sources irrelevant to what is
       on screen and diluting the notice for the module the user is actually looking at,
       per FR-026 (partial)
@@ -458,3 +458,46 @@ result, which would otherwise leave the `select` blank against a value it no lon
 offers.
 
 T048 and T049 remain open, as does TA013's 320px pass.
+
+---
+
+## Reconciliation, 2026-10-04 — read against the code, task by task
+
+40 tasks were open against an `app/ui/dashboard/` holding the widget renderer, the filter field, the
+activity-log feed, the notification bell and panel, the site selector, the employee search, the
+report-type list and the result table — plus every page that uses them and all 19 typed API
+functions. **29 are now closed, 11 remain open.**
+
+### Two already done, in a better place than the task named
+
+**T032** asked for Group Dashboard, Site Dashboard and Activity Log entries in `nav-links.tsx`. They
+are in `dashboard-nav.tsx`, the Dashboard section's own sub-nav — which is correct and is what
+`constants.ts` says in as many words: these are sub-pages of the Dashboard module, gated by
+`DASHBOARD` in their own layouts, not modules of their own. Ticked where it actually lives.
+
+**T018** asked for a native `<select>`; the selector is built from the shared `SelectField`, whose
+own comment records that it *was* a bare select and was moved to the shared field because the native
+right padding was wrong. Same element, shared wrapper.
+
+### Three closed today
+
+- **T008** — `cards.tsx` was still there, imported by nothing. A dead placeholder the task said to
+  delete; deleted.
+- **T048** — **the API has always reported when it clipped the reminders list and the screen threw
+  the flag away.** `truncated` was parsed by the schema on line 79 and used nowhere, so a list that
+  stopped at 500 looked like a complete one — the reading under which somebody stops scrolling and
+  believes they have seen everything due. Now surfaced, with the count shown and an instruction to
+  narrow. Paired with the server-side fix to the badge count (api 004 T074) found the same day: the
+  badge said 500 and the list said nothing, so both halves of the cap were invisible.
+- **T049** — the unavailable-sources note reported **every** pending module regardless of the
+  filter, so viewing the documents module told you machinery was not counted. That reads as "this
+  module is incomplete" about a module that is fine. Filtered to the selected module, and the note
+  disappears when that module has no blind spot — which is the true statement.
+
+### Still open: 11 tasks
+
+- **7 manual passes** — T006, T028, T029, T030, T031, T033, and TA013's 320px half. All need a
+  browser; they are in `specs/MANUAL-VERIFICATION.md`.
+- **4 department-dashboard tasks** — TA003, TA004, TA005, TA012. **Genuinely unbuilt**, and the api
+  side agrees: nothing under `src/dashboard/` or `app/dashboard/` mentions a department. This is the
+  one part of feature 004 where the task count and the code were already telling the truth.
