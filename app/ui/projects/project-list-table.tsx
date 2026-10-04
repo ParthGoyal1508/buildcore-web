@@ -47,7 +47,17 @@ export default function ProjectListTable({
       header: 'Project',
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
-          {row.name}
+          {/*
+            The name is the way in. It was plain text until 2026-10-04, when clicking a project
+            did nothing and `/portfolio/<id>` was a 404 — which is why this row had grown six
+            section links instead.
+          */}
+          <Link
+            href={ROUTES.projectsProject(row.id)}
+            className="text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            {row.name}
+          </Link>
           {row.isLocked && (
             <LockClosedIcon
               className="w-4 shrink-0 text-gray-500"
@@ -139,53 +149,20 @@ export default function ProjectListTable({
       actions={(row) => (
         <>
           {/*
-            T077's "openable from there" needs somewhere to open *from*. Readiness in the column
-            above says how far off complete a project is; this is the way to what it actually
-            holds, which is the question the client's item 3 ends on.
+            One way in, not six. Documents, BOQ, Position, Bills and Subcontractors each had a
+            link of their own here, with a comment explaining that they were "reachable from the
+            row rather than from a project detail page that does not exist". It exists now, they
+            are its tabs, and six links per row across a page of projects was a wall of grey
+            buttons in which the one anybody wanted was hard to find.
           */}
           <Link
-            href={ROUTES.projectsProjectDocuments(row.id)}
+            href={ROUTES.projectsProject(row.id)}
             className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
-            Documents
+            Open
           </Link>
-          {/*
-            The BOQ, before the money screens that depend on it. First of the four deliberately:
-            until 2026-10-03 nothing could create a schedule, so every one of the links below
-            measured against a table nothing could fill. Not gated on `PROJECT_FINANCIALS` —
-            a schedule is project work.
-          */}
-          <Link
-            href={ROUTES.projectsBoq(row.id)}
-            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
-            BOQ
-          </Link>
-          {/*
-            018's three money screens, reachable from the row rather than from a project detail
-            page that does not exist. Shown to everyone: the pages themselves refuse a caller
-            without `PROJECT_FINANCIALS`, and hiding the links here would need this table to load
-            the current user for a decision the destination already makes — at which point a reader
-            who *does* hold the permission and sees no link has no way to tell why.
-          */}
-          <Link
-            href={ROUTES.projectsSummary(row.id)}
-            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
-            Position
-          </Link>
-          <Link
-            href={ROUTES.projectsBilling(row.id)}
-            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
-            Bills
-          </Link>
-          <Link
-            href={ROUTES.projectsRaBills(row.id)}
-            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
-            Subcontractors
-          </Link>
+          {/* Kept beside Open because editing is the common errand, and it is one click
+              further inside the shell. */}
           <Link
             href={ROUTES.projectsEditProject(row.id)}
             className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"

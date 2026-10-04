@@ -77,8 +77,27 @@ export const ROUTES = {
   projects: '/dashboard/projects',
   projectsPortfolio: '/dashboard/projects/portfolio',
   projectsNewProject: '/dashboard/projects/portfolio/new',
+  /**
+   * One project's own home — the shell every section below hangs off (008 US4).
+   *
+   * Until 2026-10-04 this route did not exist and `/portfolio/<id>` was a 404: the six
+   * sections were reachable only as six links on the portfolio row, and once inside one of
+   * them the only way to another was back out to the list. US4 specified the detail page as
+   * nine hash tabs on one route; it is built as routed sections instead, so a BOQ or a bill
+   * can be linked to, reloaded and opened in a second tab.
+   */
+  projectsProject: (id: string) => `/dashboard/projects/portfolio/${id}`,
   projectsEditProject: (id: string) =>
     `/dashboard/projects/portfolio/${id}/edit`,
+  /**
+   * The three read-only sections of the shell, from the aggregate `GET /projects/:id` has
+   * always returned and this app discarded until the shell was built.
+   */
+  projectsPeople: (id: string) => `/dashboard/projects/portfolio/${id}/people`,
+  projectsMachinery: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/machinery`,
+  projectsMaterials: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/materials`,
   /** What a project holds, and what it still owes (017 FR-024). */
   projectsProjectDocuments: (id: string) =>
     `/dashboard/projects/portfolio/${id}/documents`,
@@ -3522,6 +3541,52 @@ export const PAYMENT_PROOF_COPY = {
  * named three and left eleven to prose, which ends as three mapped and eleven falling to one
  * generic message. A refusal the reader cannot act on is this whole feature's recurring defect.
  */
+/**
+ * Every word the project shell and its overview say (008 US4).
+ *
+ * The one that carries weight is `moduleUnavailable`. `GET /projects/:id` distinguishes "we
+ * asked and there is none" from "we could not ask", and the two must not read the same: a
+ * project page that says *No machinery on this project* when Plant was never consulted is
+ * stating as fact the one thing nobody knows.
+ */
+export const PROJECT_SHELL_COPY = {
+  loading: 'Loading this project…',
+  loadFailed: 'This project could not be loaded.',
+  breadcrumb: 'Portfolio',
+  tabsLabel: 'Project sections',
+
+  overviewHeading: 'Overview',
+  contractHeading: 'Contract',
+  activityHeading: 'Activity',
+  peopleHeading: 'People on this project',
+  machineryHeading: 'Machinery deployed here',
+  materialsHeading: 'Materials issued to this project',
+
+  peopleEmpty: 'Nobody is assigned to this project yet.',
+  machineryEmpty: 'No machinery is deployed to this project.',
+  materialsEmpty: 'No materials have been issued to this project.',
+
+  dwrCount: (count: number) =>
+    count === 1 ? '1 daily work report' : `${count} daily work reports`,
+  dwrNone: 'No daily work reports yet.',
+  dwrLatest: (date: string) => `Latest ${date}`,
+  billsCount: (count: number) =>
+    count === 1 ? '1 bill booked' : `${count} bills booked`,
+  revenueReceived: 'Received',
+  revenuePending: 'Pending',
+
+  /** Named modules, so the sentence says which answer is missing and why. */
+  moduleUnavailable: (modules: string[]) =>
+    `${modules.join(' and ')} could not be consulted, so anything they would contribute is missing from this page rather than absent. This is not the same as there being none.`,
+  moduleNames: {
+    plant: 'Plant & Machinery',
+    inventory: 'Inventory',
+  } as Record<string, string>,
+
+  locked:
+    'This project is locked. Its details cannot be changed until it is unlocked on the edit screen.',
+} as const;
+
 export const BOQ_COPY = {
   heading: 'Bill of Quantities',
   loading: 'Loading the schedule…',

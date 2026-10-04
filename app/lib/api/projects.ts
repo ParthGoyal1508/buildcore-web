@@ -322,13 +322,76 @@ export async function getProjects(
   return projectPageSchema.parse(raw);
 }
 
-export async function getProject(id: string): Promise<Project> {
-  // The endpoint returns `{ project, tabs, unavailableModules }`. Only `project` is
-  // read here: the tabs belong to the detail page, which is User Story 4 and not
-  // built — parsing data no screen renders would be a schema to maintain for
-  // nothing, and one more thing to go stale before it is ever used.
-  const raw = await authFetch<{ project: unknown }>(`/projects/${id}`);
-  return projectSchema.parse(raw.project);
+/**
+ * What `GET /projects/:id` has been returning all along (008 US4).
+ *
+ * Until 2026-10-04 this app parsed `raw.project` and threw the rest away, with a comment
+ * saying the tabs belonged to a detail page that was not built. The detail page is now the
+ * project shell under `portfolio/[id]/`, so the aggregate is read.
+ *
+ * `unavailableModules` is the field worth understanding before reading any of the arrays. An
+ * empty `machinery` with `plant` named in the list means **we could not ask**; an empty
+ * `machinery` without it means **we asked and there is none**. The server computes the
+ * distinction deliberately (see `ProjectDetail` in `projects.service.ts`) and a screen that
+ * renders both as "No machinery on this project" throws away the only warning that a module is
+ * missing from the deployment.
+ */
+export const projectDetailSchema = z.object({
+  project: projectSchema,
+  tabs: z.object({
+    employees: z.array(
+      z.object({
+        id: z.string(),
+        employeeCode: z.string(),
+        name: z.string(),
+        designationId: z.string().nullable(),
+      }),
+    ),
+    machinery: z.array(
+      z.object({
+        id: z.string(),
+        code: z.string(),
+        name: z.string(),
+        status: z.string(),
+        deployedSiteId: z.string().nullable(),
+        utilizationPercent: decimal,
+      }),
+    ),
+    materials: z.array(
+      z.object({
+        itemId: z.string(),
+        itemName: z.string(),
+        itemCode: z.string(),
+        unit: z.string(),
+        issuedQuantity: decimal,
+      }),
+    ),
+    dwrSummary: z.object({ count: z.number(), latestDate: nullableIsoDate }),
+    billSummary: z.object({
+      totalBills: z.number(),
+      totalExpenses: decimal,
+    }),
+    revenueSummary: z.object({
+      totalReceived: decimal,
+      totalPending: decimal,
+    }),
+  }),
+  unavailableModules: z.array(z.string()),
+});
+export type ProjectDetail = z.infer<typeof projectDetailSchema>;
+
+/**
+ * One project and everything the shell shows about it, in a single request.
+ *
+ * Fetched once by `portfolio/[id]/layout.tsx` and handed to every section through
+ * `ProjectShellContext`, so moving between Overview, BOQ, Documents and the money screens
+ * costs nothing. It keeps the `['projects', 'portfolio', id]` key the six section pages
+ * already used and that `boq-import` already invalidates — an import can set the project's
+ * quoted percentage, and the header above it must not go on showing the old one.
+ */
+export async function getProjectDetail(id: string): Promise<ProjectDetail> {
+  const raw = await authFetch<unknown>(`/projects/${id}`);
+  return projectDetailSchema.parse(raw);
 }
 
 export interface ProjectInput {

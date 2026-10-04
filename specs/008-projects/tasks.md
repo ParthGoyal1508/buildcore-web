@@ -156,22 +156,39 @@ persistent locked banner; all tabs render (empty states for no-data tabs).
 **Independent Test**: Open detail page, click all 9 tabs, confirm each renders without error;
 lock project → banner appears, action buttons disabled.
 
+> **Built 2026-10-04 as ten routed sections rather than nine hash tabs.** The independent test
+> above still applies, with "click all 9 tabs" reading as "click every tab in the strip" — each
+> is now a URL. See the implementation note at the end of this file.
+
 ### Implementation for User Story 4
 
-- [ ] T021 [P] [US4] Implement `getProject` in `app/lib/api/projects.ts` (returns
-      `ProjectDetail` with tabs aggregation)
-- [ ] T022 [US4] Create `app/dashboard/projects/portfolio/[id]/page.tsx`: `ProjectDetailPage`
-      — sticky tab strip (9 tabs, URL-hash-based navigation), `ProjectLockContext.Provider`
-      wrapping the page, locked banner (`isLocked` → persistent red/orange banner
-      "This project is locked — data entry is disabled" — FR-005)
-- [ ] T023 [P] [US4] Create `app/dashboard/projects/portfolio/[id]/tabs/OverviewTab.tsx`:
-      summary card with all project fields, Contract Value via `formatCurrency`
-- [ ] T024 [P] [US4] Create `EmployeesTab.tsx`, `MachineryTab.tsx`, `MaterialsTab.tsx`:
-      read-only lists from `ProjectDetail.tabs` aggregation; empty states if no data
-- [ ] T025 [P] [US4] Create `DWRTab.tsx`: summary count + link to `/dashboard/projects/dwr
-      ?projectId=` with "Add DWR" button (disabled when locked via `ProjectLockContext`)
-- [ ] T026 [P] [US4] Create `BillsExpensesTab.tsx`: sub-tab shell (Bills, Expenses, Work
-      Orders) — content wired in US7 (Phase 9)
+- [X] T021 [P] [US4] ✅ Done 2026-10-04 — `getProjectDetail` in `app/lib/api/projects.ts`
+      parses the whole aggregate. It replaces `getProject`, which parsed `raw.project` and
+      discarded the tabs under a comment saying the detail page was not built. Both
+      branches of `unavailableModules` were parsed against a running API before the
+      schema was trusted, the real response and a synthesised one carrying machinery and a
+      string `utilizationPercent`
+- [X] T022 [US4] ✅ Done 2026-10-04 — **as routed sections, not the specified hash tabs**, in
+      `app/dashboard/projects/portfolio/[id]/layout.tsx`. See the implementation note below
+      for why. The lock provider and the locked banner moved up here from the edit page, so
+      the lock is visible on every section it governs rather than only on the one screen
+      that can change it
+- [X] T023 [P] [US4] ✅ Done 2026-10-04 — `portfolio/[id]/page.tsx`, the project's own home.
+      `formatRupees`, not the specified `formatCurrency` — see the T003 note
+- [X] T024 [P] [US4] ✅ Done 2026-10-04 — `people/`, `machinery/` and `materials/` sections,
+      read from the shell's aggregate so none of them issues a request. The empty states of
+      the last two are **two sentences, not one**: `unavailableModules` naming the module
+      means nobody asked, and rendering that as "No machinery is deployed to this project"
+      would state as fact the one thing unknown
+- [ ] ~~T025~~ **PARTIAL — the count is built, the link has nowhere to go.** The overview
+      shows the DWR count and the latest date from `tabs.dwrSummary`. The specified link to
+      `/dashboard/projects/dwr?projectId=` is not written because that route does not exist
+      in this repository; DWR has no screen at all. A link to a 404 disabled by a lock is
+      worse than no link
+- [ ] ~~T026~~ **SUPERSEDED by feature 018** (2026-10-04) — Bills and Work Orders were built
+      as the `billing/` and `ra-bills/` sections, and they are two of the shell's tabs. The
+      sub-tab shell this task describes would be a third level of tabs over screens that
+      already exist. Expenses still has no screen anywhere
 
 **Checkpoint**: Detail page shell with all 9 tabs navigable; lock context and banner working.
 
@@ -599,3 +616,58 @@ T027–T031 above are **superseded, not deleted**; each carries a note naming it
       (FR-032). **Outstanding.**
 - [ ] T077 [US5] Record each pass beside its task. A verification whose result is not written down
       did not happen.
+
+---
+
+## Implementation note — 2026-10-04, User Story 4: the project shell
+
+Built on the client's own report: *"when we are clicking BOQ, we are getting this route. Can we
+create subroutes for all the possible cases like Documents, BOQ, Bills etc"*.
+
+The subroutes already existed — all six of them. What did not exist was anything joining them.
+Each section fetched the project for itself, drew its own breadcrumb and its own
+`<name> — <section>` heading, and offered no way to any of the other five: from the BOQ, reaching
+the documents meant going back to the portfolio list and finding the row again. `/portfolio/<id>`
+itself was a **404**, so clicking a project did nothing, and the portfolio row had grown six
+section links to compensate — with a comment in `project-list-table.tsx` saying so outright:
+*"reachable from the row rather than from a project detail page that does not exist"*.
+
+**Deviations from the task text, and why:**
+
+- **Routed sections, not the nine hash tabs T022 specifies.** Four sections had already been
+  built as routes, and a hash is not a location: it cannot be linked to from a reminder, reloaded
+  onto the tab you were reading, or opened in a second window beside the first. The tab strip is
+  the one `SectionTabs` every other module uses, so the active-tab rule — longest match, not
+  `startsWith` — is the rule already proven elsewhere. It matters here: the overview's href is a
+  prefix of all nine others.
+- **Ten sections, not nine.** Overview, BOQ, Documents, People, Machinery, Materials, Client
+  bills, Subcontractors, Position, Edit. DWR and Expenses, which the original nine included, have
+  no screen in this repository at all.
+- **The aggregate is read, finally.** `GET /projects/:id` has returned the project's people,
+  machinery, materials and three summaries since feature 008 shipped, and this app parsed the
+  first field and threw the rest away — under a comment explaining that the detail page was not
+  built. The shell fetches it once, under the `['projects', 'portfolio', id]` key the six section
+  pages already used and `boq-import` already invalidates, and hands it to every section through
+  `ProjectShellProvider`. Six duplicate requests became one, and People, Machinery and Materials
+  need no endpoint of their own.
+- **The lock moved up.** The locked banner was on the edit page only, which is the one screen
+  that can *change* the lock rather than the screens it stops. It is now on the shell, above
+  every section it governs.
+- **The portfolio row lost four links.** Documents, BOQ, Position, Bills and Subcontractors
+  became one **Open**; Edit and Delete stay. The project name is now a link, which it never was.
+
+**What the two read-only sections say when a module is absent:** `unavailableModules` distinguishes
+*we asked and there is none* from *we could not ask*, and both the overview and the two sections
+render the second as its own sentence. Collapsing them would print "No machinery is deployed to
+this project" — a statement of fact, on the one occasion nobody knows.
+
+**Verification:**
+
+- `npx tsc --noEmit` clean; `npx eslint app` 0 errors (11 pre-existing warnings); `npm run build`
+  emits all ten `/dashboard/projects/portfolio/[id]/*` routes. Prettier **not** run, per T074.
+- The `zod` schema was checked against a **running** API, not written from `data-model.md`: the
+  real `GET /projects/:id` for the client's own Whitefield Tech Park project parses, and a
+  synthesised response carrying a machinery row with a string `utilizationPercent` and both
+  modules named unavailable parses too — neither of which the real response exercised, since it
+  returned no machinery and named no module.
+- Browser pass outstanding: the strip at 320px, and the lock banner on a locked project.

@@ -1,61 +1,30 @@
 'use client';
 
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-
-import { getProject } from '@/app/lib/api/projects';
-import { ROUTES } from '@/app/lib/constants';
-import PageHeader from '@/app/ui/page-header';
 import SubjectLetters from '@/app/ui/letters/subject-letters';
 import ProjectDocumentsPanel from '@/app/ui/projects/project-documents-panel';
+import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
 /**
  * One project's papers (017 US2 T014, FR-024 T077/T078).
  *
- * A screen of its own rather than a section of the edit form, because reading what a project holds
+ * A section of its own rather than part of the edit form, because reading what a project holds
  * and changing what the project *is* are different jobs with different audiences — and the edit
  * form is behind the project lock, which has nothing to do with whether somebody may look at a
  * filed document.
  */
 export default function ProjectDocumentsPage() {
-  const params = useParams<{ id: string }>();
-  const id = params.id;
-
-  const { data: project } = useQuery({
-    queryKey: ['projects', 'portfolio', id],
-    queryFn: () => getProject(id),
-  });
+  const { project } = useProjectShell();
 
   return (
-    <main>
-      <nav aria-label="Breadcrumb" className="mb-2 text-sm text-gray-600">
-        <Link
-          href={ROUTES.projectsPortfolio}
-          className="hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-        >
-          Portfolio
-        </Link>
-        <span aria-hidden="true"> / </span>
-        <span className="text-gray-900">{project?.name ?? 'Documents'}</span>
-      </nav>
-
-      <PageHeader
-        title={project ? project.name : 'Project documents'}
-        className="mb-6"
-      />
-
-      <div className="flex flex-col gap-8">
-        <ProjectDocumentsPanel projectId={id} />
-        {/*
-          017 US6 (T029). On the same screen as the project's documents rather than a tab of its
-          own: both answer "what paperwork exists for this project", and the client's item 18 asks
-          for letters to be reachable from the project module. The subject pair is how a letter
-          names a project — `project`/`:id` — and this app never resolves it, which is why the
-          heading above belongs to the page and not to the panel.
-        */}
-        <SubjectLetters query={{ subjectType: 'project', subjectId: id }} />
-      </div>
-    </main>
+    <div className="flex flex-col gap-8">
+      <ProjectDocumentsPanel projectId={project.id} />
+      {/*
+        017 US6 (T029). On the same screen as the project's documents rather than a section of
+        its own: both answer "what paperwork exists for this project", and the client's item 18
+        asks for letters to be reachable from the project module. The subject pair is how a letter
+        names a project — `project`/`:id` — and this app never resolves it.
+      */}
+      <SubjectLetters query={{ subjectType: 'project', subjectId: project.id }} />
+    </div>
   );
 }
