@@ -3431,6 +3431,19 @@ export const DOCUMENT_COPY = {
   projectDocumentsOutstandingAdvisory: (name: string) =>
     `${name} — reported as outstanding`,
 
+  // ── Filing a document against an existing project (FR-008a) ────────────────
+  // Added 2026-10-04. Until then this panel named what was outstanding and offered no way to
+  // supply it: documents could only be attached while the project was being created, so a
+  // project that went live without its insurance could never be brought up to date.
+  projectDocumentFileThis: 'Upload',
+  projectDocumentAdd: 'Add a document',
+  projectDocumentAddHeading: 'File a document',
+  projectDocumentOwnerLabel: 'this project',
+  projectDocumentUploadHint:
+    'Filing a second document of the same kind adds it — it does not replace the first. Both stay on the project.',
+  projectDocumentUploaded: (name: string) => `${name} has been filed.`,
+  projectDocumentCancel: 'Cancel',
+
   // ── Documents on the project creation form (FR-023, FR-023a, FR-023b) ───────
   creationHeading: 'Project documents',
   creationHint:

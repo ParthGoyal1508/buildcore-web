@@ -1,17 +1,20 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
   downloadProjectDocument,
   getDocumentRequirements,
   getProjectDocuments,
+  uploadProjectDocument,
   type ProjectDocument,
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import { openStoredFile } from '@/app/lib/download-file';
+import { Button } from '@/app/ui/button';
+import { DocumentUpload, type UploadKind } from '@/app/ui/documents/document-upload';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 
 /**
@@ -43,6 +46,14 @@ export default function ProjectDocumentsPanel({
   projectId: string;
 }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  /**
+   * Which kind the upload form is open for, or `null` when it is closed.
+   *
+   * A string — the empty one meaning "open, no kind chosen for me" — rather than two pieces of
+   * state that could disagree about whether the form is showing.
+   */
+  const [uploadFor, setUploadFor] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   /**
    * No `companyId` is passed, and that is deliberate.
@@ -66,6 +77,26 @@ export default function ProjectDocumentsPanel({
   const requirements = useQuery({
     queryKey: ['projectDocumentRequirements'],
     queryFn: () => getDocumentRequirements(),
+  });
+
+  const upload = useMutation({
+    mutationFn: (input: {
+      documentTypeId?: string;
+      documentType: string;
+      data: string;
+      contentType: string;
+      fileName?: string;
+    }) => uploadProjectDocument(projectId, input),
+    onSuccess: () => {
+      setUploadFor(null);
+      void queryClient.invalidateQueries({
+        queryKey: ['project', projectId, 'documents'],
+      });
+      // The portfolio row carries this project's readiness, and it has just moved. Invalidated
+      // by its root key because the list is cached per filter and page — a readiness figure that
+      // disagrees with the project's own screen is the inconsistency 017 FR-008 exists to avoid.
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'portfolio'] });
+    },
   });
 
   const open = async (document: ProjectDocument) => {
@@ -97,6 +128,26 @@ export default function ProjectDocumentsPanel({
   const outstanding = (requirements.data?.requirements ?? []).filter(
     (requirement) => !held.has(requirement.documentTypeId),
   );
+
+  /**
+   * What may be filed here.
+   *
+   * `availableTypes` rather than `requirements`: the required set is what a project *owes*, and a
+   * project may perfectly well hold a kind nobody requires of it. Falls back to the required set
+   * for a server too old to send the wider list — an upload against the kinds it does know is
+   * better than a form with nothing in it.
+   *
+   * `expires: false` throughout, and that is not a shrug. A project document has no expiry
+   * column; the panel passes `showExpiry={false}` below for the same reason.
+   */
+  const available = requirements.data?.availableTypes ?? [];
+  const uploadKinds: UploadKind[] = (
+    available.length > 0 ? available : (requirements.data?.requirements ?? [])
+  ).map((type) => ({
+    documentTypeId: type.documentTypeId,
+    name: type.name,
+    expires: false,
+  }));
 
   if (documents.isLoading) {
     return (
@@ -205,16 +256,80 @@ export default function ProjectDocumentsPanel({
                   missing mandatory kind would have refused this project's creation, a missing
                   advisory one is paperwork still being chased. Merging them would lose that.
                 */}
-                {requirement.isMandatory
-                  ? DOCUMENT_COPY.projectDocumentsOutstandingMandatory(
-                      requirement.name,
-                    )
-                  : DOCUMENT_COPY.projectDocumentsOutstandingAdvisory(
-                      requirement.name,
-                    )}
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 break-words">
+                    {requirement.isMandatory
+                      ? DOCUMENT_COPY.projectDocumentsOutstandingMandatory(
+                          requirement.name,
+                        )
+                      : DOCUMENT_COPY.projectDocumentsOutstandingAdvisory(
+                          requirement.name,
+                        )}
+                  </span>
+                  {/*
+                    The way out of the sentence above. Naming what is missing and offering no way
+                    to supply it is what this panel did for a year.
+                  */}
+                  <RowAction
+                    type="button"
+                    onClick={() => setUploadFor(requirement.documentTypeId)}
+                  >
+                    {DOCUMENT_COPY.projectDocumentFileThis}
+                  </RowAction>
+                </span>
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {uploadKinds.length === 0 ? null : uploadFor === null ? (
+        <div>
+          <Button type="button" onClick={() => setUploadFor('')}>
+            {DOCUMENT_COPY.projectDocumentAdd}
+          </Button>
+        </div>
+      ) : (
+        <section className="rounded-lg border border-gray-200 p-4">
+          <h3 className="mb-3 text-sm font-medium text-gray-900">
+            {DOCUMENT_COPY.projectDocumentAddHeading}
+          </h3>
+          <DocumentUpload
+            /*
+              Keyed on the preselected kind so opening the form from a different outstanding row
+              remounts it. `DocumentUpload` reads `initialDocumentTypeId` into state once, which
+              is right for a form that is opened and closed and wrong for one that stays mounted
+              while the row it was opened from changes underneath it.
+            */
+            key={uploadFor}
+            kinds={uploadKinds}
+            initialDocumentTypeId={uploadFor || undefined}
+            ownerLabel={DOCUMENT_COPY.projectDocumentOwnerLabel}
+            // Neither is stored against a project document, so neither is asked for. See the
+            // note on the props themselves.
+            showDocumentNumber={false}
+            showExpiry={false}
+            hint={DOCUMENT_COPY.projectDocumentUploadHint}
+            onUpload={(input) =>
+              upload.mutateAsync({
+                documentTypeId: input.documentTypeId,
+                // The kind's own label, so the document reads the same here afterwards as it
+                // does on the creation form — and survives the kind being renamed.
+                documentType:
+                  uploadKinds.find(
+                    (kind) => kind.documentTypeId === input.documentTypeId,
+                  )?.name ?? input.documentTypeId,
+                data: input.data,
+                contentType: input.contentType,
+                fileName: input.fileName,
+              })
+            }
+          />
+          <div className="mt-3">
+            <RowAction type="button" onClick={() => setUploadFor(null)}>
+              {DOCUMENT_COPY.projectDocumentCancel}
+            </RowAction>
+          </div>
         </section>
       )}
     </section>
