@@ -318,6 +318,15 @@ on Employees.
       must explain it — an exit that will not settle with no stated reason sends somebody to a developer.
 - [ ] T054 **NOT RUN** [P] [US4] Manual pass: propose, approve, settle; and propose, reject, confirm still blocked.
 
+      **Watch for this when walking it, found 2026-10-04 by the backend e2e (api 021 T092):** the
+      waiver is written **after** the approval responds. The spine emits on its event bus once the
+      decision's transaction commits, and the bus does not await its listeners — correctly, since a
+      handler inside the transaction would apply a decision a rollback then undid. So the clearance
+      may still read *blocked* for a few milliseconds after the Director approves. If the screen
+      refetches immediately on success it can show the stale answer. If that is what you see, reload
+      once before reporting it as a defect — and if it is reproducible rather than a race, it needs a
+      refetch with a short retry rather than a single read.
+
 ### Phases 3, 4 and 6 implementation record, 2026-10-02
 
 #### The waiver control no longer claims to waive (Phase 6)
