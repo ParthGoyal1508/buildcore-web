@@ -76,7 +76,7 @@ export default function SubjectLetters({
           // Only the download. Composing belongs on the composer, and issuing belongs behind the
           // approval gate the composer already renders — putting either here would be a second
           // path to an action whose preconditions this panel does not check.
-          <RowAction type="button" onClick={() => void open(letter.id)}>
+          <RowAction intent="read" type="button" onClick={() => void open(letter.id)}>
             {LETTER_COPY.subjectOpen}
           </RowAction>
         )}

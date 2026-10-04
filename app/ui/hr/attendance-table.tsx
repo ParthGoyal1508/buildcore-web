@@ -273,7 +273,10 @@ export default function AttendanceTable() {
                 changeView(() => setDate((current) => shiftDate(current, -1)))
               }
               aria-label="Previous day"
-              className="rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              // `min-h-11 min-w-11` is 44×44px — the touch target Principle VI's mobile-critical
+              // standard requires (016 T112). `px-3` alone gave a target about 24px tall: fine with a
+              // mouse, and a supervisor on a site with one hand on a phone misses it.
+              className="min-h-11 min-w-11 rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               ‹
             </button>
@@ -293,7 +296,7 @@ export default function AttendanceTable() {
                   ),
                 )
               }
-              className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="block min-h-11 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             />
             <button
               type="button"
@@ -303,7 +306,7 @@ export default function AttendanceTable() {
               aria-label="Next day"
               disabled={isToday}
               title={isToday ? 'Today is the latest date with attendance' : undefined}
-              className="rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+              className="min-h-11 min-w-11 rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
             >
               ›
             </button>
@@ -342,7 +345,16 @@ export default function AttendanceTable() {
         error={loadError}
         emptyMessage={HR_MESSAGES.noAttendance}
         actions={(row) => (
-          <RowAction type="button" onClick={() => setEditing(row)}>
+          <RowAction
+            type="button"
+            // 016 T111. **This** is the control that must work at 320px: the reason this screen is on
+            // the mobile-critical list is a supervisor on a site fixing a day the punch refusal
+            // turned away, and raising the correction is the act. The grid beside it is wide by
+            // nature and stays a horizontal scroller — reading a grid sideways is a nuisance, being
+            // unable to reach the control is a failure.
+            className="min-h-11 w-full justify-center sm:w-auto"
+            onClick={() => setEditing(row)}
+          >
             {row.inTime || row.outTime ? 'Edit' : 'Mark'}
           </RowAction>
         )}

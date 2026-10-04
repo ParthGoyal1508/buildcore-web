@@ -5,7 +5,12 @@ import {
   ASSET_STATUSES,
   ASSET_TRACKING_MODES,
 } from '@/app/lib/constants';
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import {
+  authFetch,
+  authFetchBlob,
+  authFetchFile,
+} from '@/app/lib/session';
 
 /**
  * Every `/dashboard/assets/*` call to `buildcore-api` (feature 012).
@@ -430,8 +435,8 @@ export async function uploadAssetDocument(
 export function getAssetDocumentFile(
   assetId: string,
   documentId: string,
-): Promise<Blob> {
-  return authFetchBlob(`/assets/${assetId}/documents/${documentId}/download`);
+): Promise<StoredFile> {
+  return authFetchFile(`/assets/${assetId}/documents/${documentId}/download`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

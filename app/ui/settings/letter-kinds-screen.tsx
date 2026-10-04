@@ -10,7 +10,7 @@ import {
 } from '@/app/lib/api/letters';
 import { LETTER_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
+import LetterKindFields from '@/app/ui/settings/letter-kind-fields';
 import {
   CheckboxField,
   FormError,
@@ -29,45 +29,33 @@ const QUERY_KEY = ['letter-kinds'];
  */
 export function LetterKindsScreen() {
   const queryClient = useQueryClient();
-  const { companyId, canSwitch } = useCompanyContext();
-  /**
-   * Held until the company is settled, for a caller who can switch (FR-021).
-   *
-   * `CompanyProvider` resolves to `null` on first render and to a real id once the
-   * company list arrives. Firing in between asks the server for "my own company", which
-   * is either a different company's data shown for an instant under the selected
-   * company's name, or — for a cross-company account with no home company of its own —
-   * a refusal the screen would render as a load failure before recovering. A caller who
-   * cannot switch never waits: their `null` means "use my own", which is correct.
-   */
-  const scopeReady = !canSwitch || companyId !== null;
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
   const [requiresSignature, setRequiresSignature] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Which kind's fields are open. One at a time: two expanded lists on a phone is a scroll. */
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   /**
-   * The company is part of the key, not just the request (FR-021). Without it react-query
-   * answers a switch from its cache and shows the previous company's rows under the new
-   * company's name — the failure that looks exactly like success.
+   * No company segment any more (019 FR-005).
+   *
+   * The hazard this guarded against is real — react-query answering a switch from cache
+   * shows the previous company's rows under the new company's name, the failure that looks
+   * exactly like success. It is now handled once, centrally: the switcher clears the whole
+   * cache, so no screen has to remember to key on a company it no longer knows.
    */
-  const queryKey = [...QUERY_KEY, companyId ?? 'own'];
+  const queryKey = [...QUERY_KEY];
 
   const { data, isPending, isError } = useQuery({
     queryKey,
-    queryFn: () => getLetterKinds(companyId ?? undefined),
-    enabled: scopeReady,
+    queryFn: () => getLetterKinds(),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
 
   const create = useMutation({
     mutationFn: () =>
-      upsertLetterKind(
-        { key, label, requiresSignature },
-        undefined,
-        companyId ?? undefined,
-      ),
+      upsertLetterKind({ key, label, requiresSignature }, undefined),
     onSuccess: () => {
       setKey('');
       setLabel('');
@@ -88,7 +76,7 @@ export function LetterKindsScreen() {
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => deleteLetterKind(id, companyId ?? undefined),
+    mutationFn: (id: string) => deleteLetterKind(id),
     onSuccess: () => {
       setError(null);
       void invalidate();
@@ -127,18 +115,49 @@ export function LetterKindsScreen() {
                 {kind.requiresSignature ? ' · signed' : ''}
               </p>
             </div>
-            {/* A shipped kind belongs to every company, so this company may not edit or
-                delete it. Saying so beats a button that always fails. */}
-            {kind.isShipped ? (
-              <span className="text-xs text-gray-400">Not editable</span>
-            ) : (
+            <div className="flex shrink-0 items-center gap-2">
               <RowAction
                 type="button"
-                onClick={() => remove.mutate(kind.id)}
-                disabled={remove.isPending}
+                intent="read"
+                aria-expanded={expanded === kind.id}
+                onClick={() =>
+                  setExpanded((current) =>
+                    current === kind.id ? null : kind.id,
+                  )
+                }
               >
-                Delete
+                {expanded === kind.id ? 'Hide fields' : 'Fields'}
               </RowAction>
+              {/* A shipped kind belongs to every company, so this company may not edit or
+                  delete it. Saying so beats a button that always fails. */}
+              {kind.isShipped ? (
+                <span className="text-xs text-gray-400">Not editable</span>
+              ) : (
+                <RowAction
+                  type="button"
+                  onClick={() => remove.mutate(kind.id)}
+                  disabled={remove.isPending}
+                >
+                  Delete
+                </RowAction>
+              )}
+            </div>
+            {/*
+              017 FR-011b. Expanded in place rather than on a screen of its own: a kind's fields are
+              only meaningful beside the kind, and a separate route would make the common act —
+              define a kind, then say what goes in it — two navigations instead of one.
+
+              `intent="read"` on the toggle above because expanding writes nothing; without it the
+              control would vanish for a reader, who can legitimately look at what a kind declares.
+            */}
+            {expanded === kind.id && (
+              <div className="w-full">
+                <LetterKindFields
+                  kindId={kind.id}
+                  kindLabel={kind.label}
+                  isShipped={kind.isShipped}
+                />
+              </div>
             )}
           </li>
         ))}

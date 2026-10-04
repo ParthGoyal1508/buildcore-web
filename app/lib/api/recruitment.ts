@@ -6,7 +6,6 @@ import {
   INTERVIEW_MODES,
   INTERVIEW_OUTCOMES,
   INTERVIEW_ROUND_TYPES,
-  LETTER_TYPES,
   OFFER_STATUSES,
   REQUISITION_EMPLOYMENT_TYPES,
   REQUISITION_STATUSES,
@@ -103,10 +102,15 @@ export interface RequisitionInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   departmentId: string;
@@ -223,10 +227,15 @@ export interface CandidateInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   requisitionId: string;
@@ -500,57 +509,30 @@ export async function waiveOnboardingItem(itemId: string, reason: string): Promi
 
 // ── Letters ──────────────────────────────────────────────────────────────────
 
-const letterTemplateSchema = z.object({
-  id: z.string(),
-  letterType: z.enum(LETTER_TYPES).catch('offer'),
-  name: z.string(),
-  bodyTemplate: z.string(),
-  letterheadAssetId: z.string().nullable(),
-  isActive: z.boolean(),
-});
-export type LetterTemplate = z.infer<typeof letterTemplateSchema>;
-
-export async function getLetterTemplates(): Promise<LetterTemplate[]> {
-  return z.array(letterTemplateSchema).parse(await authFetch('/recruitment/letter-templates'));
-}
-export interface LetterTemplateInput {
-  /**
-   * The company the write belongs to.
-   *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
-   */
-  companyId?: string;
-  letterType: string;
-  name: string;
-  bodyTemplate: string;
-  isActive?: boolean;
-}
-export async function createLetterTemplate(input: LetterTemplateInput): Promise<LetterTemplate> {
-  return letterTemplateSchema.parse(
-    await authFetch('/recruitment/letter-templates', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  );
-}
-export async function updateLetterTemplate(
-  id: string,
-  input: Partial<LetterTemplateInput>,
-): Promise<LetterTemplate> {
-  return letterTemplateSchema.parse(
-    await authFetch(`/recruitment/letter-templates/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(input),
-    }),
-  );
-}
+/**
+ * The template schema and its three functions moved to `app/lib/api/letters.ts` on 2026-10-03.
+ *
+ * They were not merely relocated. The schema here parsed `letterType` as
+ * `z.enum(LETTER_TYPES).catch('offer')` — feature 011's five values, with a fallback — and 017
+ * replaced that enum with `LetterKind` rows, fifteen of them. A template for any of the other ten
+ * arrived with a key the enum rejected and **`.catch` relabelled it as an offer letter**: it was
+ * listed as "Offer Letter", and saving an edit would have sent `letterType: "offer"` back, moving a
+ * work-order template onto the offer kind. Silently, on save.
+ *
+ * Templates are 017's concern now — they are keyed to a letter kind and validated against the
+ * fields that kind declares — so they live with the rest of the letter-kind client.
+ */
 
 const letterSchema = z.object({
   id: z.string(),
-  letterType: z.enum(LETTER_TYPES).catch('offer'),
+  /**
+   * The kind's key, as a string.
+   *
+   * **Was `z.enum(LETTER_TYPES).catch('offer')`,** which relabelled a letter of any of 017's other
+   * ten kinds as an offer letter — see the note above. `recruitmentLabel()` title-cases an unknown
+   * key, so an honest string reads correctly where the coerced enum read wrongly.
+   */
+  letterType: z.string(),
   employeeId: z.string().nullable(),
   candidateId: z.string().nullable(),
   version: z.number(),
@@ -602,10 +584,15 @@ export interface ResignationInput {
   /**
    * The company the write belongs to.
    *
-   * Required from a cross-company Super Admin, who has no company of their own to
-   * fall back on — the backend refuses the write without it. Supplied by the
-   * `CompanyProvider` the recruitment layout mounts; omitted, and harmlessly ignored,
-   * for a caller pinned to a single company.
+   * **No longer sent by any screen** (019 FR-004). The backend derives it from the
+   * caller's session: `companyScope()` resolves a cross-company caller who has selected
+   * a company to that company, and a caller pinned to one company to their own.
+   *
+   * It stays on the type because the backend still accepts it, and because the case it
+   * covered is now handled better by refusing: a cross-company Super Admin with no
+   * selection gets an explicit "companyId is required", where the retired
+   * `CompanyProvider` silently supplied whichever company sorted first — so a record
+   * could be created against a company nobody chose.
    */
   companyId?: string;
   employeeId: string;

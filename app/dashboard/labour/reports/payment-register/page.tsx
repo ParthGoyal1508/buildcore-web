@@ -11,27 +11,24 @@ import { Button } from '@/app/ui/button';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function PaymentRegisterPage() {
-  const { companyId } = useCompanyContext();
   const [projectId, setProjectId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const projects = useQuery({
-    queryKey: ['projects', 'all', companyId],
+    queryKey: ['projects', 'all'],
     queryFn: () => getProjects({ pageSize: 200 }),
   });
   const report = useQuery({
-    queryKey: ['report-register', projectId, periodFrom, periodTo, companyId],
+    queryKey: ['report-register', projectId, periodFrom, periodTo],
     queryFn: () =>
       getPaymentRegister({
         projectId,
         periodFrom,
         periodTo,
-        ...(companyId ? { companyId } : {}),
       }),
     enabled: submitted && !!projectId && !!periodFrom && !!periodTo,
   });
@@ -69,6 +66,7 @@ export default function PaymentRegisterPage() {
         />
         <div className="flex items-end">
           <Button
+            intent="read"
             className="w-full justify-center"
             onClick={() => setSubmitted(true)}
             disabled={!projectId || !periodFrom || !periodTo}

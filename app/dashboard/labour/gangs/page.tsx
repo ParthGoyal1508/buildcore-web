@@ -22,20 +22,18 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function GangsPage() {
-  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
   const sites = useQuery({
-    queryKey: ['sites', 'all', companyId],
+    queryKey: ['sites', 'all'],
     queryFn: () => getSites({ pageSize: 200 }),
   });
   const gangs = useQuery({
-    queryKey: ['gangs', companyId],
-    queryFn: () => getGangs(companyId ? { companyId } : {}),
+    queryKey: ['gangs'],
+    queryFn: () => getGangs({}),
   });
 
   const siteName = (id: string) =>
@@ -93,7 +91,6 @@ function GangForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { companyId } = useCompanyContext();
   const [name, setName] = useState('');
   const [siteId, setSiteId] = useState('');
   const [gangLeaderWorkerId, setGangLeaderWorkerId] = useState('');
@@ -101,13 +98,12 @@ function GangForm({
   const [error, setError] = useState<string | null>(null);
 
   const workers = useQuery({
-    queryKey: ['workers', 'gang', siteId, companyId],
+    queryKey: ['workers', 'gang', siteId],
     queryFn: () =>
       getWorkers({
         siteId,
         status: 'active',
         pageSize: 200,
-        ...(companyId ? { companyId } : {}),
       }),
     enabled: !!siteId,
   });
@@ -115,7 +111,6 @@ function GangForm({
   const mutation = useMutation({
     mutationFn: () =>
       createGang({
-        ...(companyId ? { companyId } : {}),
         name,
         siteId,
         gangLeaderWorkerId,

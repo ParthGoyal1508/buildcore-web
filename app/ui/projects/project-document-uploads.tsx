@@ -93,6 +93,9 @@ export default function ProjectDocumentUploads({
           documentType: requirement.name,
           data: await fileToBase64(file),
           contentType: file.type || 'application/octet-stream',
+          // Carried through the staging and the promotion, so the document downloads under the
+          // name its uploader chose rather than `<kind>-<id>` with no extension.
+          fileName: file.name,
         },
         companyId,
       );

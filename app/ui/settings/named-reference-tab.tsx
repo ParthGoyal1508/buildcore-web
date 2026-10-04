@@ -8,7 +8,6 @@ import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
   FormError,
   RowAction,
@@ -38,7 +37,6 @@ export default function NamedReferenceTab({
     remove: (id: string) => Promise<void>;
   };
 }) {
-  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<NamedReference | null>(null);
@@ -48,10 +46,10 @@ export default function NamedReferenceTab({
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const queryKey = [resource, companyId] as const;
+  const queryKey = [resource] as const;
   const { data, isLoading, isError } = useQuery({
     queryKey,
-    queryFn: () => api.list(companyId ?? undefined),
+    queryFn: () => api.list(),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [resource] });
@@ -61,7 +59,6 @@ export default function NamedReferenceTab({
       editing
         ? api.update(editing.id, { name: name.trim() })
         : api.create({
-            ...(companyId ? { companyId } : {}),
             name: name.trim(),
           }),
     onSuccess: () => {

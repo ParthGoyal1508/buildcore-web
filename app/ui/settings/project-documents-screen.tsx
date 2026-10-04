@@ -11,12 +11,12 @@ import {
 import { createCompanyDocumentKind } from '@/app/lib/api/company-documents';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { Button } from '@/app/ui/button';
 import {
   DocumentKindForm,
   type DocumentKindInput,
 } from '@/app/ui/documents/document-kind-form';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
   FormError,
   RowAction,
@@ -46,7 +46,10 @@ interface Draft {
  */
 export function ProjectDocumentsScreen() {
   const queryClient = useQueryClient();
-  const { companyId, canSwitch } = useCompanyContext();
+  // Still needed here, and only here among these screens: the draft below is keyed on
+  // the company it belongs to, so a stale draft can be recognised rather than silently
+  // saved against the wrong one. Now the server's selection, not a provider's local state.
+  const companyId = useSelectedCompanyId();
   /**
    * The draft carries the company it belongs to.
    *
@@ -63,29 +66,20 @@ export function ProjectDocumentsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  /**
-   * Held until the company is settled, for a caller who can switch (FR-021).
-   *
-   * `CompanyProvider` resolves to `null` on first render and to a real id once the
-   * company list arrives. Firing in between asks the server for "my own company", which
-   * is either a different company's data shown for an instant under the selected
-   * company's name, or — for a cross-company account with no home company of its own —
-   * a refusal the screen would render as a load failure before recovering. A caller who
-   * cannot switch never waits: their `null` means "use my own", which is correct.
-   */
-  const scopeReady = !canSwitch || companyId !== null;
 
   /**
-   * The company is part of the key, not just the request (FR-021). Without it react-query
-   * answers a switch from its cache and shows the previous company's rows under the new
-   * company's name — the failure that looks exactly like success.
+   * No company segment any more (019 FR-005).
+   *
+   * The hazard this guarded against is real — react-query answering a switch from cache
+   * shows the previous company's rows under the new company's name, the failure that looks
+   * exactly like success. It is now handled once, centrally: the switcher clears the whole
+   * cache, so no screen has to remember to key on a company it no longer knows.
    */
-  const queryKey = ['project-document-requirements', companyId ?? 'own'];
+  const queryKey = ['project-document-requirements'];
 
   const { data, isPending, isError } = useQuery({
     queryKey,
-    queryFn: () => getDocumentRequirements(companyId ?? undefined),
-    enabled: scopeReady,
+    queryFn: () => getDocumentRequirements(),
   });
 
   const { data: user } = useQuery({
@@ -102,7 +96,6 @@ export function ProjectDocumentsScreen() {
           documentTypeId: r.documentTypeId,
           isMandatory: r.isMandatory,
         })),
-        companyId ?? undefined,
       ),
     onSuccess: async () => {
       setError(null);
@@ -116,7 +109,7 @@ export function ProjectDocumentsScreen() {
   /** A kind FR-007 names that this company has no type for (FR-007a). */
   const defineDeclared = useMutation({
     mutationFn: (code: string) =>
-      defineProjectDocumentKind(code, companyId ?? undefined),
+      defineProjectDocumentKind(code),
     onSuccess: async () => {
       setError(null);
       setDraft(null);
@@ -135,7 +128,7 @@ export function ProjectDocumentsScreen() {
    */
   const addKind = useMutation({
     mutationFn: (input: DocumentKindInput) =>
-      createCompanyDocumentKind(input, companyId ?? undefined),
+      createCompanyDocumentKind(input),
     onSuccess: async () => {
       setError(null);
       setDraft(null);

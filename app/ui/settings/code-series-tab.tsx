@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getCodeSeries } from '@/app/lib/api/settings';
 import { MESSAGES } from '@/app/lib/constants';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 
 /**
  * Read-only view of a company's employee code series (spec FR-019).
@@ -13,16 +13,24 @@ import { useCompanyContext } from '@/app/ui/settings/company-context';
  * be a way to mint duplicate codes. Reading it never consumes a number.
  */
 export default function CodeSeriesTab() {
-  const { companyId } = useCompanyContext();
+  // Required by `getCodeSeries`, so this one keeps naming the company — but from the server's own
+  // selection now, not from a provider that never told the server anything.
+  const companyId = useSelectedCompanyId();
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['code-series', companyId],
+    queryKey: ['code-series'],
     queryFn: () => getCodeSeries(companyId as string),
     enabled: !!companyId,
   });
 
   if (!companyId) {
-    return <p className="p-4 text-sm text-gray-500">Select a company first.</p>;
+    // A cross-company caller who has not chosen. The series belongs to one company, so there is
+    // nothing truthful to show until they pick one in the header.
+    return (
+      <p className="p-4 text-sm text-gray-500">
+        Choose a company in the header to see its employee code series.
+      </p>
+    );
   }
   if (isLoading) {
     return (
@@ -45,23 +53,29 @@ export default function CodeSeriesTab() {
         <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
           Short code
         </dt>
-        <dd className="mt-1 text-lg font-medium text-gray-900">{data.shortCode}</dd>
+        <dd className="mt-1 text-lg font-medium text-gray-900">
+          {data.shortCode}
+        </dd>
       </div>
       <div>
         <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
           Codes issued
         </dt>
-        <dd className="mt-1 text-lg font-medium text-gray-900">{data.lastNumber}</dd>
+        <dd className="mt-1 text-lg font-medium text-gray-900">
+          {data.lastNumber}
+        </dd>
       </div>
       <div>
         <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
           Next employee code
         </dt>
-        <dd className="mt-1 text-lg font-medium text-gray-900">{data.nextCode}</dd>
+        <dd className="mt-1 text-lg font-medium text-gray-900">
+          {data.nextCode}
+        </dd>
       </div>
       <p className="text-xs text-gray-500 sm:col-span-3">
-        Editing the company&apos;s short code changes the prefix of future codes only —
-        the sequence continues from where it left off.
+        Editing the company&apos;s short code changes the prefix of future codes
+        only — the sequence continues from where it left off.
       </p>
     </dl>
   );

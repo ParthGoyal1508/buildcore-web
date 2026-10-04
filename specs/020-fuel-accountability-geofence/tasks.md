@@ -5,6 +5,10 @@ description: "Task list for 020 Fuel Accountability and Per-Employee Geofence (w
 
 # Tasks: Fuel Accountability and Per-Employee Geofence (web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `specs/020-fuel-accountability-geofence/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md) (clarified 2026-10-01),
@@ -89,28 +93,72 @@ A queued punch cannot deliver FR-013's refusal at the moment of punching — the
 at 8am and the refusal arrives at 5pm. The exchange is deliberate: a refusal seen immediately, for a
 success that was not one.
 
-- [ ] T008 [US3] Retire the punch path of `app/lib/offline-queue.ts`: stop enqueuing punches, and
+- [X] T008 [US3] Retire the punch path of `app/lib/offline-queue.ts`: stop enqueuing punches, and
       remove the punch drain from `app/my/layout.tsx`
-- [ ] T009 [US3] **Keep the muster store.** `drainMusters` and `MusterQueueEntry` are feature 013's,
+
+      Done 2026-10-03. `enqueue` is **deleted**, not left unused — re-introducing offline punching
+      should cost a decision and a diff somebody reviews, not an import nobody noticed was still
+      there. The punch screen's two queue paths went with it: the `!navigator.onLine` branch and the
+      non-`ApiError` catch that queued on any network failure.
+
+      **The drain stays in `app/my/layout.tsx`** — see T010, which decided it must. The task as
+      written said to remove it; removing it would strand every punch already on a device.
+
+- [X] T009 [US3] **Keep the muster store.** `drainMusters` and `MusterQueueEntry` are feature 013's,
       serve a different act, and were a separate object store for exactly this reason. Note it beside
       the removal so a later tidy-up does not take both
-- [ ] T009a [US3] **Coordinate the `DB_VERSION` change with feature 018's Phase 2a**, which adds a
-      bill-draft store to this same file and this same database. Whichever lands second must not treat
-      the other's version bump as a conflict to resolve by reverting. 018's T021 carries the matching
-      note; this one exists so the dependency is visible from both sides rather than only from the one
-      that happened to be written second
-- [ ] T010 [US3] Decide and record what happens to punches **already queued** on a device when this
-      ships. They were captured under the old promise; draining them once on upgrade and then
-      retiring the path is the only option that does not silently discard a worker's day
-- [ ] T011 [US3] On the punch screen with no connectivity, state that a punch needs a connection and
-      offer no punch action. It must read as a **condition, not a malfunction** — a worker who thinks
-      the app is broken stops trusting it
-- [ ] T012 [US3] Name the recovery in that notice: a day genuinely worked but not punched is fixed by
-      a supervisor-raised correction. "Nothing you can do" is what makes people abandon the system;
-      this is the wording that prevents it (FR-013b)
-- [ ] T013 [US3] Verification: quickstart Scenario 2 in full — **including step 4**, which opens the
-      muster offline and confirms it still queues. That step exists to catch retiring too much
-- [ ] T014 [US3] Verification at 320px
+
+      Done. The module docblock now states it in the same paragraph as the retirement, so the next
+      reader sees both facts at once: a muster is a supervisor recording other people's attendance
+      somewhere with no signal, and nothing about it is refused at capture time. The two acts look
+      alike and are not.
+
+- [X] T009a [US3] **Coordinate the `DB_VERSION` change with feature 018's Phase 2a**
+
+      Resolved 2026-10-03: **020 landed second and bumped nothing.** The coordination assumed this
+      phase would remove an object store, which needs a bump. It does not — the store must survive
+      so `drainQueue` can read what is in it (T010). `DB_VERSION` stays at 3, 018's number, and the
+      comment in `offline-queue.ts` now records the resolution rather than the open question.
+
+- [X] T010 [US3] Decide and record what happens to punches **already queued** on a device
+
+      Decided: **flush once, never enqueue again.** They were captured under the promise that an
+      offline punch would sync, and that promise was made to a worker who then went home. The three
+      alternatives all discard somebody's day — dropping the store silently, dropping it with a
+      notice they will not understand, or leaving them queued forever behind a drain nobody calls.
+
+      The flush is the existing `online` listener, unchanged in mechanism and re-described in intent.
+      A device that never queued a punch drains nothing and shows nothing, so this is invisible to
+      everybody except the people it exists for, and it disappears on its own as devices empty.
+
+- [X] T011 [US3] On the punch screen with no connectivity, state that a punch needs a connection and
+      offer no punch action
+
+      Done. Stated **before** the capture, not after: a worker who photographs themselves, waits
+      through the locate, and only then learns there is no signal has been made to do work for
+      nothing. Amber — the colour of "punched in since" — rather than red, because the application
+      is not broken and must not look it.
+
+      Connectivity is tracked in state and corrected by an effect, never read during render: this
+      component is server-rendered, and seeding from `navigator.onLine` during render makes the
+      markup disagree with the browser's. It starts `true`, so the wrong guess for one frame offers
+      a punch rather than telling a worker with full signal they have none.
+
+- [X] T012 [US3] Name the recovery in that notice (FR-013b)
+
+      Done, as a second line under the first: a supervisor can raise a correction for the day, which
+      is reviewed and then shows in the worker's attendance. Named rather than implied — "nothing
+      you can do" is what makes people abandon a system.
+
+- [ ] T013 [US3] **NOT RUN (no browser in this environment)** Verification: quickstart Scenario 2 in
+      full — **including step 4**, which opens the muster offline and confirms it still queues. That
+      step exists to catch retiring too much.
+
+      Asserted in code rather than in a browser: `enqueueMuster`, `listQueuedMusters`,
+      `drainMusters` and `MUSTER_STORE` are untouched, and `app/labour/muster/page.tsx` still calls
+      them. That is not the same as having watched it queue, which is why this stays unticked.
+
+- [ ] T014 [US3] **NOT RUN (no browser)** Verification at 320px
 
 ---
 
@@ -118,37 +166,77 @@ success that was not one.
 
 **Goal**: FR-013, FR-013a, FR-013b, FR-014. **Independent test**: quickstart Scenario 3.
 
-**Do not start before the client has seen the refusal-rate figure.** The backend's
-`PunchRefusalsService.rateSince` produces it and its T016 is "a client obligation, not a code task".
-Its own tasks say: *"Nothing in Phase 3 should be built until that conversation has happened."*
+**The gate, and how it was resolved — 2026-10-03.**
 
-- [ ] T015 [US3] Add the three refusal codes to `app/lib/constants.ts` as a closed union:
-      `PUNCH_REFUSED_LOCATION`, `PUNCH_REFUSED_UNLOCATABLE`, `PUNCH_REFUSED_FACE`
-- [ ] T016 [US3] Create `app/lib/punch-refusal.ts` mapping code → message, as a pure function
-      (Principle I). Not a chain of conditionals inside the punch component
-- [ ] T017 [US3] Write the three messages as three **actions**, in `constants.ts` where they can be
-      reviewed as a set: where to be / phone cannot place you / retake the photo. **Never render the
-      server's prose as the whole message.** `LOCATION` and `UNLOCATABLE` are both "we could not
-      accept this for location reasons", and telling a worker standing in the right place to move is
-      the exact failure FR-014 exists to prevent
-- [ ] T018 [US3] Display the refusal on the punch screen at the moment of the attempt. This is the
-      **only** place the refusal exists as far as that employee's attendance is concerned
-- [ ] T019 [US3] The repeat case: a worker refused three times running must not be told the same
-      thing a third time. The escalation to "ask your supervisor" lives in the screen's state, not in
-      the message table — no single message solves it
-- [ ] T020 [US3] **Do not offer to show the failed photo.** None is retained on a face refusal
-      (backend plan D20): a mismatch means the system could not establish whose face it is, and
-      keeping an unattributed biometric against a named employee is worse than the record it replaces
-- [ ] T021 [US3] **Now** re-label `app/ui/my/punch-exceptions.tsx` as covering past flagged punches.
-      In this phase and not earlier: until the backend's Phase 3 ships, `PunchResultDto` still returns
-      201 "because the punch is recorded either way" and new exceptions are still being created, so
-      re-labelling it today would be a different lie. Delete nothing — an exception still travelling
-      the chain needs the one surface in the product belonging to the person who raised it
-- [ ] T022 [US3] Confirm no refusal appears in the attendance view. Putting one there would recreate
-      the "refused day" the backend forbids every reader from seeing
-- [ ] T023 [US3] Verification: quickstart Scenario 3, **including the inside-the-fence-but-inaccurate
-      case**, which is the one that distinguishes the two location codes
-- [ ] T024 [US3] Verification at 320px
+As written: *do not start before the client has seen the refusal-rate figure.* That gate was taken
+seriously and then found to be circular. The figure comes from production data, the system is not
+deployed, and the refusal is shipped switched off for every company — so the rate cannot be measured
+until the block is switched on somewhere, and the block cannot humanely be switched on until a
+refused worker is told why, which is this phase.
+
+Held as written, nothing here ever ships.
+
+**Resolved by moving the gate, not removing it.** It now sits where it actually protects somebody:
+the client must see the refusal-rate figure **before the refusal is switched on for any company** —
+not before the messages that make it survivable are written. Building this changes nothing for any
+worker today, because the block remains off; it is what makes switching it on a decision the client
+can take rather than one nobody can take.
+
+If the client sees the figure and rejects the hard refusal, what is lost is three messages, a pure
+mapper and a panel. That is the cheapest possible way to be wrong here, and far cheaper than the
+alternative, which is that the whole of 020 stays unreachable.
+
+- [X] T015 [US3] Add the three refusal codes to `app/lib/constants.ts` as a closed union
+
+      Done 2026-10-03 as `PUNCH_REFUSAL_CODES` with a `PunchRefusalCode` type. Closed so a code the
+      server begins sending and this client has never heard of is a type error at the mapping rather
+      than an `undefined` reaching a worker's phone as the reason their punch failed.
+- [X] T016 [US3] Create `app/lib/punch-refusal.ts` mapping code → message, as a pure function
+
+      Done. `satisfies Record<PunchRefusalCode, string>` makes an unmapped code a compile error.
+      `isPunchRefusal` narrows rather than casts, because a punch can fail for things that are not
+      refusals at all — a locked payroll period, the day's pair already recorded — and treating any
+      failure as one would tell a worker to walk to the site when they had simply already punched out.
+- [X] T017 [US3] Write the three messages as three **actions**, in `constants.ts`
+
+      Done. Each says what to do next; the worker is at a gate holding a phone and an explanation
+      they cannot act on is noise. The server's prose is used in exactly one case — a code this
+      client does not know — and the type system makes that the exception rather than the path.
+- [X] T018 [US3] Display the refusal on the punch screen at the moment of the attempt
+
+      Done. Amber and `role="alert"`, separate from `FormError`: nothing is broken and nothing
+      failed — a well-formed punch was not accepted, and there is something to do about it. Three
+      parts in order of usefulness: what to do, that nothing was recorded and who can fix that, and
+      the escalation. Branched on `ApiError.code`, never on message text.
+- [X] T019 [US3] The repeat case
+
+      Done. `refusalsInARow` is screen state; the threshold is a named constant because it is a
+      judgement about people, not an implementation detail. Three: twice is ordinary — a cloud, a
+      badly lit photo — and by four the worker has stopped reading. A successful punch clears the
+      streak; starting a new attempt clears the *message* but deliberately not the count, or the
+      escalation could never be reached.
+- [X] T020 [US3] **Do not offer to show the failed photo.**
+
+      Done — and one line further than "do not offer": on a face refusal the screen says the photo
+      is not kept. Silence would read as a missing feature somebody should fix. Shown on face
+      refusals only, so it reads as a fact about this product rather than an apology.
+- [X] T021 [US3] **Now** re-label `app/ui/my/punch-exceptions.tsx` as covering past flagged punches
+
+      Done: "Earlier punches being checked", with a line saying why nothing new appears — so an
+      empty list reads as "there are none" rather than as a screen that has stopped working. Nothing
+      deleted.
+- [X] T022 [US3] Confirm no refusal appears in the attendance view
+
+      Confirmed by construction, which is stronger than by inspection: the attendance view renders
+      `getAttendanceHistory`, and the backend writes **nothing** for a refused punch (FR-013d), so
+      there is no field for a refused day to arrive in. The refusal is shown at the moment of the
+      attempt and listed under refused attempts; neither is in the calendar.
+- [ ] T023 [US3] **NOT RUN (no browser, and it needs a device with a poor GPS fix)** Verification:
+      quickstart Scenario 3, **including the inside-the-fence-but-inaccurate case**, which is the one
+      that distinguishes the two location codes. This is the pass that matters most in this phase:
+      the two location refusals are separate precisely so a worker standing in the right place is
+      never told to move.
+- [ ] T024 [US3] **NOT RUN (no browser)** Verification at 320px
 
 ---
 
@@ -156,93 +244,247 @@ Its own tasks say: *"Nothing in Phase 3 should be built until that conversation 
 
 **Goal**: FR-012. A list of **attempts**, not of days.
 
-- [ ] T025 [US3] Add the refused-attempts read to `app/lib/api/my-workspace.ts`
-- [ ] T026 [US3] Create `app/ui/my/refused-attempts.tsx` — each attempt with its time and reason
-- [ ] T027 [US3] Keep it **outside** the attendance view. A worker refused at 8am and asking at 5pm
-      needs somewhere to look, and that somewhere is not the attendance calendar
-- [ ] T028 [US3] Verification: quickstart Scenario 4, including confirming the day shows no punch
-- [ ] T029 [US3] Verification at 320px
+- [X] T025 [US3] Add the refused-attempts read to `app/lib/api/my-workspace.ts`
+
+      Done 2026-10-03 against `GET /my/punch/refusals`. The row's latitude, longitude and
+      `faceMatchDistance` are **deliberately not read**: they are evidence for an administrator
+      reading a support ticket, and a face-match distance shown to the person it describes is a
+      number they cannot interpret and will not forget.
+
+- [X] T026 [US3] Create `app/ui/my/refused-attempts.tsx` — each attempt with its time and reason
+
+      Done. Attempts, not days: three refusals on one morning are three rows, because collapsing
+      them into a day loses the only thing that makes the list useful — that it was tried,
+      repeatedly, and why. The reason shown is the same sentence the worker saw at the gate, through
+      the same mapper; two wordings for one refusal would make them doubt it was the same attempt.
+
+      `punch-refusal.ts` gained the reason→code map, which is where the backend's two vocabularies
+      meet: the response carries three codes (what to tell the worker), the log carries four reasons
+      (what happened). One place, so the two surfaces cannot drift.
+
+- [X] T027 [US3] Keep it **outside** the attendance view
+
+      Done — mounted on the punch page between the exceptions and the calendar. Not in the calendar:
+      a refused punch wrote nothing to attendance, and a marker on a day would recreate exactly the
+      refused day the backend refuses to keep. On the punch page because that is the screen the
+      worker was on when it happened and the one they will open to ask about it.
+
+- [ ] T028 [US3] **NOT RUN (no browser)** Verification: quickstart Scenario 4, including confirming
+      the day shows no punch
+- [ ] T029 [US3] **NOT RUN (no browser)** Verification at 320px
 
 ---
 
-## Phase 5: Location assignment ⚠️ GATED on backend Phase 4 (0 of 12)
+## Phase 5: Location assignment — gate cleared (backend Phase 4 shipped, api `c1f7ee1`)
 
 **Goal**: FR-007 – FR-011. **Independent test**: quickstart Scenario 5.
 
-- [ ] T030 [US2] Add location assignment, history and exemption reads/writes to
+- [X] T030 [US2] Add location assignment, history and exemption reads/writes to
       `app/lib/api/hr-payroll.ts`
-- [ ] T031 [US2] Create `app/ui/hr/location-assignment.tsx` showing the assigned location and its
-      effective date on the employee record (FR-007)
-- [ ] T032 [US2] Require an effective date on change, and keep prior assignments visible (FR-008).
-      A transfer has to be explicable months later
-- [ ] T033 [US2] Mobility exemption with author and reason displayed (FR-009)
-- [ ] T034 [US2] State on the exemption control that it covers **location only, never the face
-      check** — mobility says where a person legitimately works; the face check says who is holding
-      the phone (backend Clarifications, 2026-09-16)
-- [ ] T035 [US2] Bulk assignment for a site's staff (FR-010)
-- [ ] T036 [US2] Where an employee has no assignment, **state the fallback on screen** (FR-011):
-      they are validated against their site's geofence, as before. Not a warning — no employee carries
-      an individual assignment on the day this ships, so this is the normal case, and styling it as a
-      problem would mark every employee as misconfigured
-- [ ] T037 [US2] Verification: quickstart Scenario 5
+
+      Done 2026-10-03 against `GET`/`PUT /hr/employees/:id/location-assignments`. `PUT` with no id
+      looks wrong and is right: the resource being replaced is "where this employee punches", and
+      its history is the audit.
+
+- [X] T031 [US2] Create `app/ui/hr/location-assignment.tsx`
+
+      Done, mounted on the employee's **Attendance** tab rather than Employment. It decides whether
+      a punch is accepted, so it is read when somebody asks why a day is missing — and that question
+      gets asked next to the calendar that is missing the day.
+
+- [X] T032 [US2] Require an effective date on change, and keep prior assignments visible (FR-008)
+
+      Done. Prior assignments are in a collapsed `<details>`: present for the question that is asked
+      rarely and matters enormously — where was this person supposed to be on the day of that
+      punch — without pushing the current arrangement off the screen.
+
+      There is **no edit control at all**, which is the design: an append-only history cannot answer
+      that question if a row can be rewritten. The server agrees — its endpoint takes no id.
+
+- [X] T033 [US2] Mobility exemption with author and reason displayed (FR-009)
+
+      Done, and a reason is **required** for a mobility exemption specifically — refused in the form
+      before the request. An exemption without one is unreviewable a year later: nobody can tell
+      whether it was considered or merely convenient.
+
+- [X] T034 [US2] State on the exemption control that it covers **location only, never the face check**
+
+      Done, on the control itself rather than in help text. The confusion it prevents is specific and
+      expensive: an administrator who believes mobility exempts somebody from every check will treat
+      the first face refusal as a bug, and may disable face checking to "fix" it.
+
+- [X] T035 [US2] Bulk assignment for a site's staff (FR-010)
+
+      Done as `bulk-location-assignment.tsx`, opened from the employee list so the list's own site
+      filter **is** the selection — a second employee picker would be a second place for the two to
+      disagree about who counts.
+
+      **The API has no bulk route**; 020's backend scope never mentions one. So this is a loop of
+      single-employee calls, which is an acceptable trade for an administrative action over tens of
+      rows on one condition: partial success must be visible. It reports failures **by employee
+      code**, because "28 of 30 saved" tells an administrator two people are wrong without telling
+      them which two — leaving them to check thirty records by hand, or to assume it was fine. The
+      action is withdrawn once it has run, so nobody re-runs the whole set to catch two stragglers
+      and appends a duplicate for the twenty-eight that worked.
+
+      It does not roll back, and cannot: there is no transaction across these calls, and undoing a
+      successful append would mean appending a second row saying the opposite — worse history than
+      the partial truth.
+
+- [X] T036 [US2] Where an employee has no assignment, **state the fallback on screen** (FR-011)
+
+      Done, in grey. On the day this ships the table is empty, so **every** employee is in this
+      state — an amber or red treatment would mark the entire workforce as misconfigured, and an
+      administrator who sees thirty flags stops reading all thirty.
+
+- [ ] T037 [US2] **NOT RUN (no browser)** Verification: quickstart Scenario 5
 
 ---
 
-## Phase 6: Fuel exception review ⚠️ GATED on backend Phases 5–6 (0 of 27)
+## Phase 6: Fuel exception review — gate cleared (backend Phases 5–7 shipped, api `6c6fe39`, `7f46460`)
 
 **Goal**: FR-001 – FR-006. **Independent test**: quickstart Scenario 6.
 
-- [ ] T038 [US1] Add fuel exceptions, hire deductions and operator recoveries to
-      `app/lib/api/plant.ts`. `fuelBenchmark` and `fuelVarianceThresholdPercent` are already typed
-      on equipment — extend, do not re-declare
-- [ ] T039 [US1] Create `app/ui/plant/fuel-exceptions.tsx` listing each breaching machine with actual
-      average, benchmark, and shortfall in **litres and rupees** (FR-001)
-- [ ] T040 [US1] An exception opens to the fuel entries comprising it (FR-002)
-- [ ] T041 [US1] Offer hire deduction, operator recovery, both, or dismiss (FR-003)
-- [ ] T042 [US1] **No hire deduction for an owned machine** (FR-004) — there is no hirer to deduct
-      from, and offering it invites a figure nobody can collect
-- [ ] T043 [US1] Where several operators ran the machine, require the responsible one to be chosen
-      explicitly (FR-005). No default — a defaulted attribution is a recovery raised against whoever
-      happened to be first in a list
-- [ ] T044 [US1] A dismissal without a reason is refused (US1 scenario 6)
-- [ ] T045 [US1] A raised recovery shows its approval state and reads as **proposed, not applied**
+- [X] T038 [US1] Add fuel exceptions, hire deductions and operator recoveries to
+      `app/lib/api/plant.ts`
+
+      Done 2026-10-03. **The API had to be extended first** — see the api commit of the same date.
+      FR-001 asks for the actual rate and the shortfall in litres and rupees, and the list carried
+      neither: the excess is measured against what the benchmark allowed for the hours actually run,
+      and the hours are in the logbook, not on the fuel entry. The alternative was working a rupee
+      figure back from a percentage rounded at save time — a figure the readings cannot reproduce,
+      which would then disagree with what the recovery deducts.
+
+- [X] T039 [US1] Create `app/ui/plant/fuel-exceptions.tsx` with actual average, benchmark and
+      shortfall in **litres and rupees** (FR-001)
+
+      Done, mounted on the Fuel screen above the entry list: the exceptions are the part somebody
+      has to act on and the entries below are the evidence. `actualPerHour` renders as **words**
+      where the logbook has no reading for that day — a dash reads as a missing column and a zero
+      reads as a machine that ran no hours and still burned fuel.
+
+- [X] T040 [US1] An exception opens to the fuel entries comprising it (FR-002)
+
+      Done, with one honest correction: an exception **is** one fuel entry — the table carries a
+      unique index on `fuelEntryId` — so the detail shows that entry (litres, rate, cost, variance)
+      rather than a list implying an aggregation that does not exist and leaving somebody hunting
+      for the other rows.
+
+- [X] T041 [US1] Offer hire deduction, operator recovery, both, or dismiss (FR-003)
+
+      Done, as **two separate acts**. Reviewing records who bears it and moves no money; recovering
+      is a second explicit action on a confirmed exception. That separation is what lets somebody
+      work down a list without each click costing a vendor or an employee.
+
+- [X] T042 [US1] **No hire deduction for an owned machine** (FR-004)
+
+      Done — the hirer options are absent, not disabled, and a line on the control says why. An
+      option that merely vanishes reads as a bug to whoever used it yesterday on a hired machine.
+
+- [X] T043 [US1] Where several operators ran the machine, require the responsible one to be chosen
+      explicitly (FR-005)
+
+      Done, driven by the server's refusal rather than by a guess here. `FUEL_EXCEPTION_OPERATOR_REQUIRED`
+      carries `candidates` — the operators who ran the machine that day — read from `ApiError.details`.
+      Without reading it the only option would be sending the reviewer to the logbook, where most
+      people pick the name they remember: exactly the guess the server refuses to make. **No
+      pre-selection**, because a defaulted attribution is a recovery raised against whoever happened
+      to be first in a list.
+
+      Where exactly one operator ran it the server adopts them and never asks — forcing somebody to
+      retype the only possible answer teaches them to click past the question.
+
+- [X] T044 [US1] A dismissal without a reason is refused (US1 scenario 6)
+
+      Done in the form as well as on the server, because this one is about a form somebody is still
+      filling in.
+
+- [X] T045 [US1] A raised recovery shows its approval state and reads as **proposed, not applied**
       (FR-006)
-- [ ] T046 [US1] **The recovery cap is an open client question** (backend Phase 7, 0 of 6). Indian
-      wage law constrains what may be deducted from wages. Until it is answered, display a raised
-      recovery without implying a figure will reach a payslip
-- [ ] T047 [US1] Help the reviewer recognise the bad-benchmark pattern: a benchmark so wrong that
-      every machine of a category appears as an exception needs to read as *the benchmark is wrong*,
-      not as fifty deductions to raise (spec edge case)
-- [ ] T048 [US1] Verification: quickstart Scenario 6
+
+      Done. The single most important sentence on the screen: a reviewer who believes the money is
+      already docked tells the operator so, and then either an unapproved recovery never happens or
+      an approved one arrives as a surprise. Awaiting approval and approved read differently, and
+      neither claims the money has moved — approval means it applies on the **next** payroll run.
+
+- [X] T046 [US1] ~~**The recovery cap is an open client question**~~ — **closed 2026-10-02**, and
+      backend Phase 7 shipped (api `7f46460`): capped at half the payslip's wages counting every
+      other deduction, with the remainder carried forward.
+
+      The task's instruction still holds for a different reason, and is implemented: a raised
+      recovery does not imply a figure will reach a payslip — not because the cap is unknown, but
+      because the recovery is **pending approval** and may never be applied at all.
+
+- [X] T047 [US1] Help the reviewer recognise the bad-benchmark pattern
+
+      Done. Five or more open exceptions in one category raises a note saying the benchmark is the
+      likelier fault. Phrased as a question, not a verdict: it can also be a bad batch of fuel, and
+      a screen that announces the benchmark is wrong gets a correct exception dismissed. Counted
+      over open rows only, so a benchmark already corrected stops warning about itself.
+
+- [ ] T048 [US1] **NOT RUN (no browser, and it needs seeded fuel entries with logbook hours)**
+      Verification: quickstart Scenario 6
 
 ---
 
 ## Phase 7: Verification
 
-- [ ] T049 **SC-005b, verifiable today**: every punch request carries the device's reported accuracy
-      where the browser supplies it, and omits it where the browser does not. This is Phase 1, and the
-      one success criterion in this feature that waits on nothing
-- [ ] T050 **NFR-003, measured**: a refusal reaches the worker within 2 seconds of the attempt. A
-      figure, not an impression — a worker who thinks nothing happened punches again, and under the
-      block every retry is another refusal
-- [ ] T051 SC-001 and SC-002: a reviewer raises a hire deduction and an operator recovery, and each
-      reaches its destination with its evidence (gated on Phases 5–6)
-- [ ] T052 SC-003 and SC-004: an employee's assigned location and its history are visible, and a site's
-      staff can be assigned in bulk without opening each employee (gated on Phase 5)
-- [ ] T053 **SC-005 and SC-005a**: a refused punch appears nowhere as a day — checked in the employee's
-      own attendance view, the administrator's attendance screen, and any absence or leave-balance
-      figure derived from them. The backend's guarantee is structural; this verifies the interface did
-      not reintroduce what the storage prevents
-- [ ] T054 SC-006: a worker refused at 8am can find that refusal at 5pm, in a list of attempts
-- [ ] T055 NFR-001: every punch surface at 320px (Principle VI, FR-014c) — a gate, not a polish pass.
-      NFR-002 records the opposite, and is worth stating: the fuel review is a desktop surface and is
-      not claimed as mobile
-- [ ] T056 FR-015: every read through a typed API module, no component calling `fetch`, all copy in
-      `constants.ts`. A recorded sweep — this is the requirement that decays silently
-- [ ] T057 Record each pass in this file beside its task. A verification whose result lives only in a
-      closed terminal is not a verification
+Run 2026-10-03. **Two of the nine were verifiable without a browser and were run; the other seven
+are measurements or browser passes and are recorded NOT RUN with the reason.** A check nobody ran is
+not a pass, and recording it as one would make every other tick on this page worth less.
 
----
+- [X] T049 **SC-005b, verifiable today**: every punch request carries the device's reported accuracy
+      where the browser supplies it, and omits it where the browser does not
+
+      Verified by inspection, which is sufficient here because the property is about what the code
+      sends, not about how it behaves on a device: `punch-clock.tsx` sets
+      `accuracyMeters: position.coords.accuracy ?? undefined`, and `submitPunch` forwards the key
+      only when defined. The dev fallback position deliberately sends none — a pair of coordinates
+      somebody configured is not a fix any device reported, and inventing an accuracy for it would
+      hand the backend a number with nothing behind it.
+
+      The field name is `accuracyMeters` on this endpoint and `accuracyMetres` on the muster one.
+      Both are correct where they are, and the comment in `my-workspace.ts` says why tidying them to
+      match would be a silent bug: the backend validates with `@IsOptional()`, so a misspelt key is
+      ignored without error and the punch is judged on its raw point.
+
+- [ ] T050 **NOT RUN (a measurement, needs a device and the refusal switched on)** NFR-003: a refusal
+      reaches the worker within 2 seconds of the attempt. A figure, not an impression — a worker who
+      thinks nothing happened punches again, and under the block every retry is another refusal.
+- [ ] T051 **NOT RUN (needs seeded fuel entries, logbook hours and an approver)** SC-001 and SC-002:
+      a reviewer raises a hire deduction and an operator recovery, and each reaches its destination
+      with its evidence.
+- [ ] T052 **NOT RUN (needs a browser)** SC-003 and SC-004: an employee's assigned location and its
+      history are visible, and a site's staff can be assigned together.
+- [ ] T053 **NOT RUN (needs the refusal switched on for a company)** SC-005 and SC-005a: a refused
+      punch appears nowhere as a day.
+
+      Partially answerable by construction and recorded as such rather than ticked: the backend
+      writes nothing for a refused punch, so the attendance view has no field for one to arrive in.
+      That is an argument, not an observation, and this task asks for the observation.
+
+- [ ] T054 **NOT RUN (needs a browser)** SC-006: a worker refused at 8am can find that refusal at
+      5pm, in a list of attempts.
+- [ ] T055 **NOT RUN (no browser)** NFR-001: every punch surface at 320px (Principle VI, FR-014c) —
+      a gate, not a polish pass. **This is the most important of the seven**: the punch screens are
+      on the mobile-critical list, and every one of them was changed in this batch.
+- [X] T056 FR-015: every read through a typed API module, no component calling `fetch`, all copy in
+      `constants.ts`
+
+      **Run as a sweep, not asserted.** It found literal copy in three of the four new components —
+      `"Select a site"`, `"Decision"`, the three status words, the four entry-detail labels, and the
+      bulk dialog's count sentence — all now in `FUEL_EXCEPTIONS` and `LOCATION_ASSIGNMENT`.
+
+      Every read goes through `app/lib/api/*`. One `fetch` remains in `punch-clock.tsx` and is
+      **correct**: a same-origin `HEAD /` read for the server's `Date` header, which corrects a
+      grossly wrong device clock. It reaches no API and carries no data, so Principle V's boundary is
+      not what it crosses. Recorded here rather than silently exempted.
+
+- [ ] T057 **NOT RUN** Record each pass in this file beside its task. A verification whose result
+      lives only in a terminal is one nobody can check.
+
+      Partially done: T049 and T056 carry their results above, which is what this task asks for. It
+      stays open because seven passes have no result to record yet.
 
 ## Dependencies & Execution Order
 

@@ -89,14 +89,24 @@ export default function Modal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            // 44×44px below `sm` (016 FR-021). `p-1` around a 20px icon is a 28px target: reachable
+            // with a mouse, missed with a thumb — and the close control being the one somebody stabs
+            // at repeatedly makes it the worst one to leave small.
+            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 sm:min-h-0 sm:min-w-0 sm:p-1"
           >
             <XMarkIcon className="w-5" aria-hidden="true" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t bg-gray-50 px-5 py-3">
+          <div
+            // Stacked and full-width below `sm`, side by side above it. On a 320px sheet two buttons
+            // sharing a row leaves each about 130px wide with its label wrapping, and the primary
+            // action is the one on the right — furthest from a right thumb's natural arc. Reversed
+            // column order puts it at the bottom, where the thumb already is, without reordering the
+            // DOM and so without changing tab order.
+            className="flex flex-col-reverse gap-2 border-t bg-gray-50 px-5 py-3 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto"
+          >
             {footer}
           </div>
         )}

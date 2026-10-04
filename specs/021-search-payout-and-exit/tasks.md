@@ -5,6 +5,10 @@ description: "Task list for 021 Search, Payout Communication and Exit Closure (w
 
 # Tasks: Search, Payout Communication and Exit Closure (web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `specs/021-search-payout-and-exit/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md) (clarified 2026-10-01),
@@ -136,12 +140,34 @@ importer anywhere in the app.
       employee has
 - [X] T025 [US4] Final settlement unavailable while items are outstanding, **naming them** (FR-013).
       Naming is the requirement — "cannot settle yet" with no list is an instruction nobody can act on
-- [ ] T025a [US4] ⚠️ **Still open — needs the settlement summary, not this screen.** FR-013a — the settlement summary lists every asset the employee held at exit,
-      with its outcome.** Distinct from T020's outstanding list and previously uncovered: the
-      clearance screen shows what is *still* outstanding, while the settlement summary is the record of
-      how each asset ended — returned, waived, or still held. An asset returned last week vanishes from
-      the first and must still appear in the second, which is the whole point of the client's
-      "any assets assigned to the employee should appear in the F&F summary"
+- [X] T025a [US4] FR-013a — the settlement summary lists every asset the employee held at exit,
+      with its outcome. Distinct from T020's outstanding list: the clearance screen shows what is
+      *still* outstanding, while the settlement summary is the record of how each asset ended —
+      returned, waived, or still held. An asset returned last week vanishes from the first and must
+      still appear in the second, which is the whole point of the client's "any assets assigned to
+      the employee should appear in the F&F summary".
+
+      **DONE 2026-10-03**, and the note above turned out to describe a live defect rather than only
+      a missing screen.
+
+      The api's settlement summary derived its asset list by **filtering the clearance's items**, and
+      the clearance can only ever contain open custody — so an asset returned a week before the last
+      working day was absent from the summary entirely. The summary said the employee had never been
+      given it. `FnfService`'s own docblock claimed every asset appeared "whether or not it blocked
+      the settlement", which was the intent and not the behaviour. Fixed by a second registry
+      question, `custodyHistoryFor`, returning open **and** closed allocations; seven service tests
+      cover it, including the returned-asset case.
+
+      And this client's `fnfSchema` **dropped the field**. The api had served `assets` since 021
+      shipped; zod strips unknown keys, so it arrived on every response and never reached a screen.
+      That is the eighth instance in this review of a schema quietly discarding or coercing something
+      the server sent.
+
+      The summary now lists every asset with one word for its outcome — returned with the date,
+      written off with the author's name and reason, or still held — warns when anything is still
+      held and unwaived, and states FR-018b in words rather than leaving it to be inferred from the
+      absence of a deduction line. A null asset list is rendered as "the register could not be
+      asked", never as "nothing was held": a settlement is signed off on that difference.
 - [X] T026 [US4] **No recovery value shown**, and said once in words where somebody would otherwise
       look for a figure, rather than left as a silent absence. The backend deliberately computes
       none: that needs a valuation rule the client has not chosen. Note it here so nobody adds one
@@ -169,21 +195,21 @@ importer anywhere in the app.
 
 **Goal**: FR-006 – FR-009. Sending is an **explicit action** (decision of 2026-10-01).
 
-- [ ] T028 [US2] Add slip-delivery reads and the retry to `app/lib/api/hr-payroll.ts`
-- [ ] T029 [US2] Create `app/ui/hr/slip-delivery.tsx` listing delivered, failed and undeliverable
+- [x] T028 [US2] Add slip-delivery reads and the retry to `app/lib/api/hr-payroll.ts`
+- [x] T029 [US2] Create `app/ui/hr/slip-delivery.tsx` listing delivered, failed and undeliverable
       (FR-006), mounted on `app/ui/hr/payroll-run-detail.tsx`
-- [ ] T030 [US2] An explicit **send** control. Not automatic: an explicit send can be automated later,
+- [x] T030 [US2] An explicit **send** control. Not automatic: an explicit send can be automated later,
       whereas an automatic send that was wrong has already emailed 500 people their salary slips
-- [ ] T031 [US2] A **retry that resends only failures** (FR-007), presented so it cannot be mistaken
+- [x] T031 [US2] A **retry that resends only failures** (FR-007), presented so it cannot be mistaken
       for "send all" — the difference is 12 emails or 500
-- [ ] T032 [US2] Show the **address as sent** on each row. An employee whose email is corrected after
+- [x] T032 [US2] Show the **address as sent** on each row. An employee whose email is corrected after
       a failure must not have the old failure read as though it went to the new address
-- [ ] T033 [US2] A run that is not fully approved refuses delivery; **show the reason** rather than a
+- [x] T033 [US2] A run that is not fully approved refuses delivery; **show the reason** rather than a
       disabled control with no explanation (FR-009)
-- [ ] T034 [US2] Present a run with some failures as **partial, not failed**. Failures are isolated by
+- [x] T034 [US2] Present a run with some failures as **partial, not failed**. Failures are isolated by
       design — one bad address does not stop the other 499 — and a screen that reads as a failed run
       invites somebody to re-send everything
-- [ ] T035 [US2] Verification: quickstart Scenario 3
+- [ ] T035 **NOT RUN** [US2] Verification: quickstart Scenario 3
 
 ---
 
@@ -192,16 +218,16 @@ importer anywhere in the app.
 **Goal**: FR-010, FR-011. The transaction-sheet format rests on a file the client has not supplied;
 the backend builds against one seeded mapping profile so theirs becomes a second profile.
 
-- [ ] T036 [US3] Add the bank sheet and reconciliation reads to `app/lib/api/hr-payroll.ts`
-- [ ] T036a [US3] **FR-008 — the transaction sheet upload itself**, showing matched lines, unmatched
+- [x] T036 [US3] Add the bank sheet and reconciliation reads to `app/lib/api/hr-payroll.ts`
+- [x] T036a [US3] **FR-008 — the transaction sheet upload itself**, showing matched lines, unmatched
       lines and differences. Previously implied by the display tasks below without anything actually
       uploading a file. A validated multipart upload (Principle II on the backend's side; a typed
       client on this one)
-- [ ] T037 [US3] Show advance recoveries as **named lines** (FR-010), not a netted figure
-- [ ] T038 [US3] Explain differences between the sheet and the run **line by line** (FR-011)
-- [ ] T039 [US3] An unparseable row **uploads and is reported**; the file does not fail. A parser that
+- [x] T037 [US3] Show advance recoveries as **named lines** (FR-010), not a netted figure
+- [x] T038 [US3] Explain differences between the sheet and the run **line by line** (FR-011)
+- [x] T039 [US3] An unparseable row **uploads and is reported**; the file does not fail. A parser that
       refuses on the first unrecognised row reports nothing, which is the opposite of what is wanted
-- [ ] T040 [US3] Verification: quickstart Scenario 4, once a real file exists
+- [ ] T040 **NOT RUN** [US3] Verification: quickstart Scenario 4, once a real file exists
 
 ---
 
@@ -219,8 +245,26 @@ the backend builds against one seeded mapping profile so theirs becomes a second
       settlement summary with its outcome (T020, T025a)
 - [ ] T045 NFR-001: search responds as the user types without a request per keystroke (measured, T011)
 - [ ] T046 NFR-002: dashboard search usable at 320px including keyboard selection (Principle VI)
-- [ ] T047 FR-015: every read goes through a typed API module and no component calls `fetch`; all copy
-      in `constants.ts`. A sweep, recorded — this is the requirement that decays silently
+- [X] T047 FR-015: every read goes through a typed API module and no component calls `fetch`; all copy
+      in `constants.ts`. A sweep, recorded — this is the requirement that decays silently.
+
+      **SWEPT 2026-10-03, and recorded rather than asserted.** Four checks, with what each found:
+
+      * **Every read through a typed API module.** 26 modules under `app/lib/api/`, each parsing its
+        response with zod before the app trusts it.
+      * **No component calling `fetch`.** One exists and it is not a data read:
+        `app/ui/my/punch-clock.tsx` issues `fetch('/', { method: 'HEAD' })` to read the server's
+        `Date` header and correct clock skew. No payload, no record, same origin, and it falls back
+        to the local clock on failure. Named here rather than counted as zero — a sweep that reports
+        "none" where one exists teaches the next reader to distrust it.
+      * **No inline styling.** Three `style={{…}}` uses, all computed geometry that cannot be a
+        class: a measured popover position, a progress bar's percentage width, and a chart bar's
+        height. No static styling inline.
+      * **All copy in `constants.ts`.** Checked across this feature's screens; the copy objects are
+        where the strings live.
+
+      Recorded because this is the requirement that decays silently: nothing fails when it is
+      broken, and the next person to add a screen inherits whatever the last one did.
 - [ ] T048 Record each pass in this file beside its task
 
 ---
@@ -252,3 +296,118 @@ depends on nothing.
   backend Phases 4–6; 7 are verification.
 - Both [NEEDS CLARIFICATION] markers were closed on 2026-10-01 — slips send on an explicit action,
   and waiver authority has a working default.
+
+---
+
+## Phase 6: The waiver becomes a submission (added 2026-10-02)
+
+The web half of the client's waiver answer: HR proposes, the Director countersigns. **This supersedes the
+screen shipped on 2026-10-01**, where the waiver control wrote immediately for anyone with write access
+on Employees.
+
+- [x] T049 [US4] The waiver control submits for approval rather than applying. Its label must say so —
+      "Request waiver", not "Waive" — because a control that says it has done a thing it has only
+      proposed is the kind of copy that gets an exit signed off on a waiver nobody approved.
+- [x] T050 [US4] Show the pending state on the clearance row, with who proposed it and when. Until the
+      Director decides, the obligation is still outstanding and the screen must not read as cleared.
+- [x] T051 [US4] Show a rejected waiver as rejected and the item as still outstanding. Silence after a
+      rejection reads as success.
+- [x] T052 [US4] `mayWaive` becomes "may propose a waiver". The shipped `hasWrite(user, 'EMPLOYEES')` was
+      my placeholder, and the client has now set the authority deliberately.
+- [x] T053 [US4] Settlement stays blocked while a waiver is pending. The gate is the api's, but the screen
+      must explain it — an exit that will not settle with no stated reason sends somebody to a developer.
+- [ ] T054 **NOT RUN** [P] [US4] Manual pass: propose, approve, settle; and propose, reject, confirm still blocked.
+
+      **Watch for this when walking it, found 2026-10-04 by the backend e2e (api 021 T092):** the
+      waiver is written **after** the approval responds. The spine emits on its event bus once the
+      decision's transaction commits, and the bus does not await its listeners — correctly, since a
+      handler inside the transaction would apply a decision a rollback then undid. So the clearance
+      may still read *blocked* for a few milliseconds after the Director approves. If the screen
+      refetches immediately on success it can show the stale answer. If that is what you see, reload
+      once before reporting it as a defect — and if it is reproducible rather than a race, it needs a
+      refetch with a short retry rather than a single read.
+
+### Phases 3, 4 and 6 implementation record, 2026-10-02
+
+#### The waiver control no longer claims to waive (Phase 6)
+
+"Request waiver", not "Waive"; "Send for approval", not "Record waiver". T049 is right about why:
+**a control that says it has done a thing it has only proposed is the copy that gets an exit signed
+off on a waiver nobody approved.** Somebody presses it, reads the label, and reports the obligation
+cleared.
+
+The modal says the request goes to the Director **before** the field rather than after the button —
+somebody who only learns it on success has already pressed a control they believed cleared the
+obligation.
+
+`mayWaive` became `mayPropose` on `PAYROLL` at write level (T052). `hasWrite(user, 'EMPLOYEES')` was
+a placeholder; the client set the authority deliberately, and the backend gates `waive()` on exactly
+the same value.
+
+**The pending state needed a backend change to exist.** `ClearanceItem.waiver` only appears once the
+Director has countersigned, so there was nothing for the screen to read — it would have shown the
+obligation as plainly outstanding with no sign a decision was in flight. `proposal` was added to the
+api for this, and the screen renders pending in amber (not green: a reader scanning for what is done
+must not find this row among it) and rejected in red with "it can be requested again".
+
+T053's explanation distinguishes "something is outstanding" from "a request is sitting on the
+Director's desk". The second is not an answer the first gives, and an exit that will not settle with
+no stated reason sends somebody to a developer.
+
+#### Delivery: two controls that must not be confused (Phase 3)
+
+The retry **names its count** — "Retry 3 failures" — sits apart from the send, and is **absent**
+rather than disabled when nothing failed. The difference between the two controls is twelve emails or
+five hundred, and an unlabelled "Retry" beside a "Send" is how somebody picks the wrong one. The
+server enforces it too (the retry queries `status: failed`), but a screen that invites the mistake is
+still a screen that causes it.
+
+Four tallies, not two. `undeliverable` has its own colour and its own hint saying a retry will not
+help, because these need somebody to find an address. `notAttempted` is separate because "nobody has
+tried yet" sends a different person to a different place than "it bounced".
+
+A run with some failures reads as **partial**, never failed — failures are isolated by design, and a
+banner saying "delivery failed" invites somebody to send everything again.
+
+The address column shows the address **as sent**, which is what the backend stores. Showing the
+current one would make an old failure read as though it went to the corrected address.
+
+#### Reconciliation: two kinds of gap, never one number (Phase 4)
+
+Unmatched lines and missing employees are separate sections with separate explanations. A line
+matching no employee is money that moved to somebody the run does not know about; an employee with no
+line is money that **did not move**. One "discrepancies" count sends both to whoever asked first.
+
+Missing employees are deliberately **not** rows in the main table: they are not lines in the sheet,
+and putting them there would make "lines in sheet" a number that did not match the file.
+
+Differences are not coloured by sign, and the hint says why: a transfer short by an advance recovery
+is correct, and a red row would have somebody chasing the bank about a deduction the company made on
+purpose.
+
+#### One thing worth recording about the upload
+
+`fileToBase64` reads an `ArrayBuffer` and chunks it through `String.fromCharCode`, not `btoa` over a
+string. `btoa` on a file read as text corrupts every byte above 0x7F — which is most of a zip
+archive, and an `.xlsx` is one. The chunking is because spreading a megabyte-long array into
+`fromCharCode` exceeds the argument limit and throws, on exactly the large files somebody would
+upload.
+
+#### The two fields that had no home
+
+`bankAccountHolderName` and `payrollDebitAccountNumber` reached the api's schema with its Phase 9 and
+had no DTO and no form, so the transfer sheet would have refused every row and every file — correctly,
+with no way for anybody to fix it. Both are now on the employee pay tab and the company payroll tab.
+The debit account is a **text** field: `z.coerce.number()` on `09310400000819` yields
+`9310400000819`, zero gone, transfer rejected.
+
+#### Verification
+
+`npx tsc --noEmit`, `npx eslint app` (0 errors) and `npm run build` all clean.
+
+**T035, T040 and T054 NOT RUN** — all three are browser passes against a running API with a seeded
+run and a provisioned Director. No test framework here (`TODO(TESTING_STANDARD)`).
+
+**Prettier was deliberately not run on any file in this repository.** There is no config here, so its
+defaults would reformat whatever it touched — the mistake that produced a 2,400-line diff in untouched
+code on 2026-10-01.

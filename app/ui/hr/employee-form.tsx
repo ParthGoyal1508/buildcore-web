@@ -28,6 +28,7 @@ import {
   ROUTES,
   hrLabel,
 } from '@/app/lib/constants';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import { Button } from '@/app/ui/button';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
@@ -126,6 +127,7 @@ const employeeFormSchema = z
     bankBranch: optionalText,
     bankAccountNumber: optionalText,
     ifscCode: optionalText,
+    bankAccountHolderName: optionalText,
 
     // Contact
     mobile: optionalText,
@@ -259,6 +261,7 @@ function defaultsFrom(employee?: Employee): EmployeeFormValues {
     bankBranch: employee.bankBranch ?? '',
     bankAccountNumber: '',
     ifscCode: employee.ifscCode ?? '',
+    bankAccountHolderName: employee.bankAccountHolderName ?? '',
 
     mobile: employee.mobile ?? '',
     alternateMobile: employee.alternateMobile ?? '',
@@ -344,6 +347,15 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
 
+  /**
+   * Lets a company switch warn before it discards this form (019 FR-006).
+   *
+   * The `beforeunload` guard above cannot cover it: switching company is a client-side state change,
+   * so the browser never fires a navigation event. This registration is what makes the switcher's
+   * confirmation name this screen instead of saying nothing.
+   */
+  useUnsavedChanges('Employee form', isDirty);
+
   const mutation = useMutation({
     mutationFn: (values: EmployeeFormOutput) => {
       const input = values as unknown as EmployeeInput;
@@ -377,7 +389,13 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
     identity: ['firstName', 'lastName', 'dob'],
     employment: ['siteId', 'shiftId', 'dailyRate', 'hoursPerDay'],
     statutory: ['uan', 'pfNumber', 'esicNumber', 'aadhaar', 'pan'],
-    pay: ['basic', 'hra', 'ifscCode', 'bankAccountNumber'],
+    pay: [
+      'basic',
+      'hra',
+      'ifscCode',
+      'bankAccountNumber',
+      'bankAccountHolderName',
+    ],
     contact: ['mobile', 'email'],
     documents: [],
     letters: [],
@@ -698,6 +716,12 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             {...register('bankAccountNumber')}
           />
           <TextField id="ifscCode" label="IFSC" {...register('ifscCode')} />
+          <TextField
+            id="bankAccountHolderName"
+            label="Account holder name (as the bank has it)"
+            hint="Often not spelt the way HR spells it. The bank transfer sheet uses this, and refuses a row without it — a name the bank does not recognise gets the payment returned."
+            {...register('bankAccountHolderName')}
+          />
         </div>
       </TabPanel>
 

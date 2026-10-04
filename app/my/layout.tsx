@@ -40,10 +40,15 @@ import SectionTabs from '@/app/ui/section-tabs';
  * `md:hidden`), never a JS viewport read: both navigations are in the markup, so
  * there is no hydration mismatch and no flash of the wrong shell.
  *
- * It also owns the single `online` listener that drains the offline punch queue
- * (research.md §5). Here, not on the Punch screen, because a worker who regains
- * signal while looking at their leave balance should still have their queued
- * punches sync — the layout is the one thing mounted for the whole visit.
+ * It also owns the single `online` listener that flushes the **legacy** punch queue (020 T010).
+ * Nothing enqueues a punch any more — Phase 2 retired offline punching, because a queued punch
+ * delivers its refusal hours after the worker could act on it. What remains on devices was captured
+ * under the old promise, and honouring that promise once is the only option that does not silently
+ * discard a day somebody worked. On a device that never queued one, none of this renders.
+ *
+ * Here, not on the Punch screen, because a worker who regains signal while looking at their leave
+ * balance should still have those punches sent — the layout is the one thing mounted for the whole
+ * visit.
  */
 export default function MyWorkspaceLayout({
   children,
@@ -90,9 +95,7 @@ export default function MyWorkspaceLayout({
       if (result.failures.length > 0) {
         setSyncNotice(MESSAGES.punchSyncFailed(result.failures[0].reason));
       } else if (result.synced > 0) {
-        setSyncNotice(
-          `${result.synced} queued punch${result.synced === 1 ? '' : 'es'} synced.`,
-        );
+        setSyncNotice(MESSAGES.punchSyncedCount(result.synced));
       }
       await refreshCount();
     };

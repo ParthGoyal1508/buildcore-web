@@ -269,3 +269,86 @@ container. PASS.
 
 - [ ] Mobile spot-check every chart; `npx tsc --noEmit`
 - [ ] Confirm target actuals reconcile with approved DWR measurements (SC-A01)
+
+---
+
+## Amendment 2026-10-03 — The BOQ screens (FR-025 – FR-032)
+
+**What changed in this plan**: Phase 5 above stands in shape and is corrected in three specifics.
+`BOQAlertTabs` has four tabs, not three. The tree has to render a heading as a heading and an
+unplanned column as unplanned. And the import report has to show what the import *understood*,
+not just how many rows it accepted. Nothing else is touched: US1–US4, US6–US8 and the 2026-09-01
+amendment are unchanged.
+
+**Why now**: 018's billing screens shipped against a BOQ no screen can create. The backend half is
+planned in `buildcore-api/specs/008-projects-backend/plan.md`, Amendment 2026-10-03, and lands
+first — there is nothing to call until it does.
+
+### Verified before planning
+
+- **No BOQ surface exists.** `find app -iname '*boq*'` returns nothing, and `app/lib/api/projects.ts`
+  carries clients, sites and projects only. The single BOQ reference in the whole repository is
+  `billing.ts`'s `/projects/client-bills/boq` read, which lists lines to bill against.
+- **So this is new work, not a retrofit** — the one piece of good news in the finding.
+
+### Phase B1: Types and reads
+
+- [ ] Extend `app/lib/api/projects.ts` — not a new module: groups and items are project data and a
+      second module would split the project's own types across two files. `getBOQ`, `createBOQGroup`,
+      `createBOQItem`, `deleteBOQItem`, `getBOQAlerts`, `validateBOQImport`, `confirmBOQImport`.
+- [ ] **zod schemas with the programme fields `.nullable()`**, and the import report's
+      `quotedPercentage` as `.nullable()` too. This is the sixth time in this project that a schema
+      has silently dropped or rejected a field the server sent; a nullable the schema treats as
+      required fails the whole read, and a nullable the schema omits loses the distinction FR-026
+      exists to show.
+- [ ] One type for the validation report, mirroring the contract exactly, including `warnings` as
+      separate from `errors` — a line grouped under the sheet name is not a rejected row.
+
+### Phase B2: The tree
+
+- [ ] `app/ui/projects/boq-tree.tsx` — collapsible groups, keyboard-operable, scrolling in its own
+      `overflow-x-auto` container so the page never scrolls sideways (FR-032).
+- [ ] **A heading renders as a heading** (FR-025). A group's quantity cell is neither blank nor `0`:
+      blank reads as missing data and `0` reads as a real figure, and the row is in fact a section
+      title. It is rendered as a spanning label.
+- [ ] **Unplanned is explicit** (FR-026): programme columns show the word, not an em dash and not a
+      zero. 312 unplanned lines is the normal state of a freshly imported tender, so the empty state
+      is the common case and must not read as an error.
+- [ ] Add Group / Add Item forms with the four programme fields optional and labelled as such.
+- [ ] Controls absent — not disabled — on a locked project, matching how the rest of this
+      application shows a lock.
+
+### Phase B3: The import, and the report that justifies it
+
+- [ ] `app/ui/projects/boq-import.tsx` — upload, then a report, then a separate confirm.
+- [ ] **The report carries what the import understood** (FR-027): lines read, groups they fell
+      under, both derived totals beside the two the file states with the difference, the percentage
+      found or plainly not found, every rejected row with its row number, column and reason, and
+      warnings listed apart from errors.
+- [ ] **A missing percentage is a condition, not a zero** (FR-028). Shown as something to resolve
+      before confirming, with the consequence named in the copy: on this client's own file the
+      silence is ₹7.37 lakh.
+- [ ] **A whole-file refusal names its condition** (FR-029). `BOQ_WORKBOOK_UNREADABLE`,
+      `BOQ_WORKBOOK_EMPTY`, `BOQ_NO_SCHEDULE_ROWS`, `BOQ_TOO_MANY_ROWS` each get their own sentence.
+      A success state beside "0 rows" is prohibited, because that is exactly what the old library
+      would have produced for the real file.
+- [ ] **Units display as typed** (FR-030). No tidying of `R. mtr`: the client reconciles against
+      their own sheet, and a difference they cannot trace is worse than an inconsistency they can.
+- [ ] **Confirm is unavailable twice** (FR-031): while the report shows the file would be rejected,
+      and after a successful confirm. A `BOQ_BATCH_NOT_FOUND` from a double submit is shown as
+      "already imported", not as a failure — the schedule is in, which is what the person wanted.
+- [ ] All copy in `app/lib/constants`, per the convention the FR-015 sweep enforces.
+
+### Phase B4: Alerts
+
+- [ ] `app/ui/projects/boq-alert-tabs.tsx` with **four** tabs: Today, Delayed, To Be Delayed,
+      Unplanned. Three tabs would mean an unplanned line is silently absent from a screen whose
+      whole claim is to show what needs attention.
+- [ ] Mount the tree, the import and the alerts in the project detail page's BOQ tab.
+
+### Phase B5: Verification
+
+- [ ] `npx tsc --noEmit`, `npx eslint app`, `npm run build`. **Never `prettier --write`** — there is
+      no prettier config in this repository, so its defaults reformat untouched files.
+- [ ] The browser passes and the 320px pass are recorded as outstanding with their reason, in line
+      with every other feature here, rather than asserted.

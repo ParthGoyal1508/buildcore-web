@@ -5,7 +5,6 @@ import { useState } from 'react';
 
 import { getSignatories, upsertSignatory } from '@/app/lib/api/letters';
 import { Button } from '@/app/ui/button';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
 
 const QUERY_KEY = ['signatories'];
@@ -36,34 +35,24 @@ function readAsBase64(file: File): Promise<string> {
  */
 export function SignatoriesScreen() {
   const queryClient = useQueryClient();
-  const { companyId, canSwitch } = useCompanyContext();
-  /**
-   * Held until the company is settled, for a caller who can switch (FR-021).
-   *
-   * `CompanyProvider` resolves to `null` on first render and to a real id once the
-   * company list arrives. Firing in between asks the server for "my own company", which
-   * is either a different company's data shown for an instant under the selected
-   * company's name, or — for a cross-company account with no home company of its own —
-   * a refusal the screen would render as a load failure before recovering. A caller who
-   * cannot switch never waits: their `null` means "use my own", which is correct.
-   */
-  const scopeReady = !canSwitch || companyId !== null;
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * The company is part of the key, not just the request (FR-021). Without it react-query
-   * answers a switch from its cache and shows the previous company's rows under the new
-   * company's name — the failure that looks exactly like success.
+   * No company segment any more (019 FR-005).
+   *
+   * The hazard this guarded against is real — react-query answering a switch from cache
+   * shows the previous company's rows under the new company's name, the failure that looks
+   * exactly like success. It is now handled once, centrally: the switcher clears the whole
+   * cache, so no screen has to remember to key on a company it no longer knows.
    */
-  const queryKey = [...QUERY_KEY, companyId ?? 'own'];
+  const queryKey = [...QUERY_KEY];
 
   const { data, isPending, isError } = useQuery({
     queryKey,
-    queryFn: () => getSignatories(companyId ?? undefined),
-    enabled: scopeReady,
+    queryFn: () => getSignatories(),
   });
 
   const create = useMutation({
@@ -77,7 +66,6 @@ export function SignatoriesScreen() {
           contentType: file.type || 'image/png',
         },
         undefined,
-        companyId ?? undefined,
       );
     },
     onSuccess: () => {

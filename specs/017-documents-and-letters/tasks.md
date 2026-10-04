@@ -5,6 +5,10 @@ description: "Task list for 017 Documents and Letters (web)"
 
 # Tasks: Documents and Letters (web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `specs/017-documents-and-letters/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md) (clarified 2026-09-15),
@@ -84,6 +88,19 @@ exist.
   which has nothing to do with whether somebody may look at a filed document. Linked from the
   portfolio list's row actions, since T077's "openable from there" needs somewhere to open from.
 
+  **Half of this tick was wrong for three days, and the task text said so.** "Reusing
+  `document-upload.tsx`" was not done: the panel listed documents, named what was outstanding, and
+  mounted no upload control at all, so a document could only ever be attached while the project was
+  being *created*. A project that went live without its insurance could never be brought up to date,
+  and the panel went on reporting it outstanding for ever. The client found it by looking for the
+  button. Completed 2026-10-04, with two new props on the shared component — a project document has
+  no number and no expiry, and asking for an expiry the API discards is worse than not asking.
+
+  Worth naming the mechanism, because it is the one this file keeps catching: the tick was applied
+  to the *screen*, and the screen existed. Nothing checks that a task's own sentence was satisfied,
+  so the clause after the comma went unread by everyone including the person writing the note
+  directly underneath it.
+
 - [X] T015 [US2] Show readiness **in the project list**, from the batch endpoint. One request for the
       whole list, never one per row
 
@@ -112,9 +129,25 @@ exist.
 ## Phase 6: US5 — The template builder (P2)
 
 - [X] T022 [US5] Build `app/dashboard/settings/letter-kinds/page.tsx` — kind CRUD
-- [ ] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
+- [X] T023 [US5] Build the template editor: **structured fields and fixed text, not arbitrary
       markup** (spec Assumptions). This is a form, not an editor, and that constraint is what keeps it
-      tractable
+      tractable.
+
+  **DONE 2026-10-03.** `app/dashboard/recruitment/letter-templates/page.tsx` is now keyed to
+  `LetterKind` and draws its variable list from `GET /letter-kinds/:id/fields`. Still a form: fixed
+  text with `{{variables}}` inserted from a list, which is what makes validation possible at all.
+
+  The blockage described in the 2026-10-01 note below was real and is gone. The api gained
+  `LetterKindField`, the three endpoints that serve it, and validation against the fields a kind
+  **declares** rather than against a hardcoded map. One more api change was needed on the day and was
+  made: the recruitment template endpoints still ran the old `LETTER_TOKENS` pre-check *before* the
+  new one, so a field an administrator added to a shipped kind was declared, offered by this editor,
+  and then refused by a list written before that endpoint existed.
+
+  Found while rewriting this screen: the list schema parsed `letterType` as
+  `z.enum(LETTER_TYPES).catch('offer')`. A template for any of 017's other ten kinds was **silently
+  relabelled an offer letter**, and saving an edit would have moved it onto the offer kind. The
+  seventh instance of that pattern in this review.
 
   **Blocked on backend work, and the 2026-09-16 note above was wrong about why** (investigated
   2026-10-01). That note said "the API modules and shared components they need are built and typed;
@@ -137,8 +170,15 @@ exist.
   table) and serving it. That is not in api 017's tasks or its spec, so it is a gap in both halves
   rather than a sequencing problem. Left open and unstarted rather than half-built.
 
-- [ ] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
-      response includes one (FR-013a). Belt and braces, because the cost here is legal
+- [X] T024 [US5] Restricted document types must not appear in the field picker, even if a malformed
+      response includes one (FR-013a). Belt and braces, because the cost here is legal.
+
+  **DONE 2026-10-03, and now meaningful.** The picker is fed by a server response, which is the case
+  the 2026-10-01 note said this task was waiting for. The api refuses to *declare* a field whose path
+  names regulated personal data (`LETTER_FIELD_PATH_FORBIDDEN`), so a restricted field should not
+  exist to be offered; the editor filters again on token and path anyway. Belt and braces, as the
+  task asked, because the cost of offering an Aadhaar token in a letter template is legal rather
+  than cosmetic.
 
   **Not currently violated, and not yet meaningful.** The picker is fed by the hardcoded list
   described under T023, which contains no Aadhaar and no document type at all — so FR-013a holds by
@@ -581,3 +621,89 @@ Phase 11 is independent of Phase 10.
 **T069-T073** — the creation form's mandatory uploads with values preserved across a refusal. That is
 bug 3's actual ask ("Project Managers cannot create a project without them"), and T073 is what keeps
 the gate from being the thing people complain about.
+
+---
+
+## Phase 8: The field-declaration editor (added 2026-10-02)
+
+FR-014 of this specification already required "define a new letter kind, **its variable fields** and its
+fixed terms, without a developer". The requirement was here all along; the api had no way to store a
+kind's fields, so the editor could only offer the five shipped types' hard-coded lists and a
+company-defined kind got an empty one. The api half is 017 Phase 10.
+
+- [X] T133 [US5] Let a kind's fields be defined alongside it: add, remove and name each, with where its
+      value comes from. This is what makes FR-014 true rather than merely written.
+
+  **Already built when this was checked on 2026-10-03** — `app/ui/settings/letter-kind-fields.tsx`,
+  shipped with the api half earlier the same day. Recorded rather than silently ticked: the task file
+  said outstanding and the code said otherwise, which is the third time in this review a task file
+  has been wrong in our favour.
+- [X] T134 [US5] Offer **only that kind's** declared fields in the template editor. The shared-list
+      alternative was declined by the client precisely so an offer letter's editor cannot offer
+      exit-settlement fields.
+
+  **DONE 2026-10-03.** Every list on the editor is scoped to the template's own kind, fetched by that
+  kind's id. The kind is fixed once a template is saved, for the same reason: moving a template to
+  another kind would leave every variable in it undeclared.
+- [X] T135 [US5] Name the field that fails validation when a template references one the kind does not
+      declare. "Invalid template" on a screen whose whole content is a template tells the author nothing.
+
+  **DONE 2026-10-03, in two places that cannot disagree.** The editor names every undeclared token
+  while the author types, and the api's own refusal (`LETTER_FIELD_NOT_DECLARED`, carrying the tokens
+  in `fields`) is shown verbatim on save. Both read the same declared-field list, so the screen
+  cannot promise something the server then refuses.
+- [X] T136 [US5] Warn before removing a field that live templates reference, naming them — the same shape
+      FR-015 already uses for template deletion.
+
+  **DONE 2026-10-03**, with one api addition it needed: `GET /letter-kinds/:id/fields/:token/usage`.
+  The list could not be derived in the browser — this screen's caller holds `SETTINGS` and the
+  template endpoints require `RECRUITMENT`, so a browser computing it would be refused for exactly
+  the administrator most likely to be tidying a kind.
+
+  The removal is still not blocked, which is the api's deliberate choice: an administrator tidying a
+  kind should not be stopped by a draft somebody abandoned, and the refusal belongs at issue time
+  where the person affected is the one issuing. So this names the templates, marks which are live,
+  and says what will happen — then lets them decide. A failed usage check says so and still offers
+  the removal, rather than implying nothing will break.
+- [ ] T137 [P] [US5] Manual pass: define a kind, declare its fields, write a template using them, issue a
+      letter, and read the rendered values. End to end, because every intermediate step passed before and
+      the feature still did not work.
+
+---
+
+## Phase 10: A letter kind declares its own fields (added 2026-10-02, item 18)
+
+Built 2026-10-02 alongside the api's `LetterKindField`.
+
+**FR-014 already required this half** — "define a new letter kind, **its variable fields** and its
+fixed terms" — and only the kind itself was built. The api keyed its token sets to the five shipped
+letter types, so a kind defined here got an empty field list and the template editor then refused
+every field it used. Both halves were individually satisfied, and together they produced nothing
+usable. That is why this is an **editor** rather than a read-only list.
+
+- [x] T039 Add the field read, the upsert and the withdraw to `app/lib/api/letters.ts`, with the five
+      sources as a `z.enum` so a sixth arriving from the API fails loudly rather than rendering blank.
+- [x] T040 `app/ui/settings/letter-kind-fields.tsx` — the editor. Every field names **where its value
+      comes from**: a field that is only a label is a placeholder that renders blank, and a blank in a
+      signed letter is indistinguishable from a deliberate omission.
+- [x] T041 The path input is **absent** for a `manual` field, not disabled. A disabled path field reads
+      as "required and you cannot fill it"; its absence says the true thing — a value typed at issue
+      time reads no record.
+- [x] T042 A kind with no fields says so in amber, not as a neutral "none yet". Somebody about to write
+      a template needs to know it cannot use a single variable **before** they write it.
+- [x] T043 Shipped kinds are listed read-only. Their fields are what every live template already
+      references, and letting one company rename a token would break letters other companies issued.
+- [x] T044 Expanded in place on the kinds screen rather than on a route of its own: a kind's fields are
+      only meaningful beside the kind, and a separate route makes the common act — define a kind, then
+      say what goes in it — two navigations instead of one. One open at a time, because two expanded
+      lists on a phone is a scroll.
+- [x] T045 The toggle carries `intent="read"`, so it survives for a reader. Looking at what a kind
+      declares is legitimately a read, and without the marker 019's write gate would have hidden it.
+- [x] T046 Every api refusal is shown verbatim — `LETTER_FIELD_PATH_FORBIDDEN` in particular, which
+      names the regulated path. A generic "could not save" throws away the only part that says what to
+      do instead.
+- [ ] T047 **NOT RUN** Browser pass: define a kind, declare its fields, write a template using them,
+      issue a letter, and confirm the values appear. Needs a running API.
+
+`npx tsc --noEmit`, `npx eslint app` (0 errors) and `npm run build` all clean. Prettier deliberately
+not run — no config in this repository.

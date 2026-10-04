@@ -56,7 +56,7 @@ export default function MastersPage() {
   const [showRate, setShowRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Scoped to the company `CompanyProvider` selected in the layout above. A
+  // Scoped to the company the session is in (019 FR-004). A
   // cross-company administrator otherwise sees every tenant's masters in one list,
   // which reads as the same ten categories repeated once per company.
   const companyId = usePlantCompanyId();
@@ -82,7 +82,9 @@ export default function MastersPage() {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not delete that category.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not delete that category.',
       ),
   });
 
@@ -309,8 +311,8 @@ export default function MastersPage() {
             )}
           />
           <p className="text-xs text-gray-500">
-            Document types cannot be deleted: every document already attached to a
-            machine takes its expiry window from one. Retire a type instead.
+            Document types cannot be deleted: every document already attached to
+            a machine takes its expiry window from one. Retire a type instead.
           </p>
         </>
       )}
@@ -355,9 +357,9 @@ export default function MastersPage() {
             )}
           />
           <p className="text-xs text-gray-500">
-            Rates are a timeline, not a setting. A new rate closes the one before it
-            the day before it starts, so a hire bill for an earlier period still
-            resolves the rate that was in force then.
+            Rates are a timeline, not a setting. A new rate closes the one
+            before it the day before it starts, so a hire bill for an earlier
+            period still resolves the rate that was in force then.
           </p>
         </>
       )}

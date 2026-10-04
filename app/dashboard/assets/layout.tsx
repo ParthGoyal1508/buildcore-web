@@ -7,7 +7,6 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { ASSETS_PERMISSIONS, MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import AssetsNav from '@/app/ui/assets/assets-nav';
-import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 /**
  * The per-section permission check `/dashboard/assets/*` needs beyond the module
@@ -80,7 +79,7 @@ export default function AssetsLayout({
         all for everyone else. Without it their lists show every tenant's rows at
         once — see `use-asset-refs.ts` for what that looks like on the masters screen.
       */}
-      <CompanyProvider>{children}</CompanyProvider>
+      {children}
     </div>
   );
 }

@@ -19,6 +19,8 @@ export interface DocumentUploadInput {
   documentTypeId: string;
   data: string;
   contentType: string;
+  /** The uploader's own file name, so the download is what they recognise. */
+  fileName: string;
   documentNumber?: string;
   expiresAt?: string;
 }
@@ -35,6 +37,20 @@ interface DocumentUploadProps {
   ownerLabel: string;
   /** Preselect a kind, when the control is opened from a specific missing row. */
   initialDocumentTypeId?: string;
+  /**
+   * Whether the owner's documents carry a printed number and an expiry.
+   *
+   * Both default to true, which is the company-documents case this component was written for.
+   * **Project documents store neither** — `ProjectDocument` has no column for either and the
+   * upload DTO has no field for them — so the project screen turns them off. Collecting an
+   * insurance policy's expiry into a form that discards it is a failure that looks exactly like
+   * success, and the reminder nobody gets is the whole point of recording an expiry.
+   */
+  showDocumentNumber?: boolean;
+  showExpiry?: boolean;
+  /** The line under the button. Defaults to the supersede hint, which is a company-documents
+   * rule: filing twice there supersedes, filing twice against a project files two documents. */
+  hint?: string;
   onDone?: () => void;
 }
 
@@ -63,12 +79,20 @@ function readAsBase64(file: File): Promise<string> {
  * server refuses it with `DOCUMENT_EXPIRY_REQUIRED` regardless, but asking first means
  * nobody is told off for something the form could have requested — the same reasoning as
  * 016's mandatory reason box for reject and return.
+ *
+ * It really is shared as of 2026-10-04. It said so from the day it was written and was mounted
+ * on the company screen alone for a year, because nothing in this repository could file a
+ * document against a project that already existed — the panel listed what was outstanding and
+ * offered no way to supply it.
  */
 export function DocumentUpload({
   kinds,
   onUpload,
   ownerLabel,
   initialDocumentTypeId,
+  showDocumentNumber = true,
+  showExpiry = true,
+  hint = DOCUMENT_COPY.supersedeHint,
   onDone,
 }: DocumentUploadProps) {
   const [documentTypeId, setDocumentTypeId] = useState(
@@ -84,7 +108,9 @@ export function DocumentUpload({
     () => kinds.find((k) => k.documentTypeId === documentTypeId) ?? null,
     [kinds, documentTypeId],
   );
-  const expiryRequired = selected?.expires ?? false;
+  // A kind cannot require an expiry on a screen that does not ask for one. Without this the
+  // form would refuse to submit over a field nobody can see.
+  const expiryRequired = showExpiry && (selected?.expires ?? false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -105,6 +131,7 @@ export function DocumentUpload({
         documentTypeId,
         data: await readAsBase64(file),
         contentType: file.type || 'application/octet-stream',
+        fileName: file.name,
         documentNumber: documentNumber.trim() || undefined,
         expiresAt: expiresAt || undefined,
       });
@@ -162,22 +189,26 @@ export function DocumentUpload({
         />
       </div>
 
-      <TextField
-        id="document-number"
-        label="Document number"
-        hint="The number printed on it — GSTIN, PAN, licence number."
-        value={documentNumber}
-        onChange={(e) => setDocumentNumber(e.target.value)}
-      />
+      {showDocumentNumber && (
+        <TextField
+          id="document-number"
+          label="Document number"
+          hint="The number printed on it — GSTIN, PAN, licence number."
+          value={documentNumber}
+          onChange={(e) => setDocumentNumber(e.target.value)}
+        />
+      )}
 
-      <TextField
-        id="document-expiry"
-        type="date"
-        label={expiryRequired ? 'Expiry date (required)' : 'Expiry date'}
-        hint={expiryRequired ? DOCUMENT_COPY.expiryRequired : undefined}
-        value={expiresAt}
-        onChange={(e) => setExpiresAt(e.target.value)}
-      />
+      {showExpiry && (
+        <TextField
+          id="document-expiry"
+          type="date"
+          label={expiryRequired ? 'Expiry date (required)' : 'Expiry date'}
+          hint={expiryRequired ? DOCUMENT_COPY.expiryRequired : undefined}
+          value={expiresAt}
+          onChange={(e) => setExpiresAt(e.target.value)}
+        />
+      )}
 
       <FormError message={error} />
 
@@ -185,7 +216,7 @@ export function DocumentUpload({
         <Button type="submit" disabled={busy}>
           {busy ? 'Uploading…' : 'Upload'}
         </Button>
-        <p className="text-xs text-gray-500">{DOCUMENT_COPY.supersedeHint}</p>
+        {hint && <p className="text-xs text-gray-500">{hint}</p>}
       </div>
     </form>
   );

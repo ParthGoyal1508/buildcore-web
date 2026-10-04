@@ -16,9 +16,12 @@ import {
   type PaymentSheetLine,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
+import HiddenAmount from '@/app/ui/hidden-amount';
+import { useCashRights } from '@/app/lib/cash-entry';
 import {
   CASH_DENOMINATIONS,
   labourLabel,
+  MESSAGES,
   RATE_SOURCE_LABELS,
 } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
@@ -55,6 +58,9 @@ export default function PaymentSheetDetailPage() {
   });
 
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
+  // 019 FR-017a, FR-017d. Two separate rights, and neither is inferred from the company's
+  // hiding setting — see `app/lib/cash-entry.ts`.
+  const { mayEnterCash, maySeeCashBreakup } = useCashRights();
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['payment-sheet', id] });
 
@@ -162,8 +168,15 @@ export default function PaymentSheetDetailPage() {
                 </td>
                 <td className="px-3 py-2">{rupees(l.grossWage)}</td>
                 <td className="px-3 py-2">
-                  {rupees(
-                    l.deductions.reduce((sum, d) => sum + d.amount, 0),
+                  {/* A nulled deduction is a hidden one, not a zero: summing it as zero would
+                      understate the column by the value of every concealed deduction, which is
+                      the exact arithmetic the backend nulls rather than zeroes to prevent. */}
+                  {l.deductions.some((d) => d.amount === null) ? (
+                    <HiddenAmount />
+                  ) : (
+                    rupees(
+                      l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0),
+                    )
                   )}
                 </td>
                 <td className="px-3 py-2">{rupees(l.netPayable)}</td>
@@ -190,7 +203,7 @@ export default function PaymentSheetDetailPage() {
         </table>
       </div>
 
-      {s.engagementType === 'direct' && breakup && (
+      {s.engagementType === 'direct' && breakup && maySeeCashBreakup && (
         <div className="rounded-lg border border-gray-100 p-4">
           <h2 className="mb-2 text-sm font-semibold text-gray-900">
             Cash Denomination Breakup
@@ -218,8 +231,18 @@ export default function PaymentSheetDetailPage() {
         </div>
       )}
 
+      {s.engagementType === 'direct' && breakup && !maySeeCashBreakup && (
+        // FR-014. The alternative is a sheet that simply ends after the table, which reads as a
+        // screen that failed to finish loading. Naming the permission is what lets the reader
+        // decide between reporting a bug and asking for access.
+        <p className="rounded-lg border border-gray-100 p-4 text-xs text-gray-500">
+          {MESSAGES.cashBreakupHidden}
+        </p>
+      )}
+
       {disbursing && (
         <DisburseModal
+          mayEnterCash={mayEnterCash}
           line={disbursing}
           onClose={() => setDisbursing(null)}
           onSaved={() => {
@@ -243,14 +266,21 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 function DisburseModal({
   line,
+  mayEnterCash,
   onClose,
   onSaved,
 }: {
   line: PaymentSheetLine;
+  mayEnterCash: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [paymentMode, setPaymentMode] = useState<'cash' | 'bank'>('cash');
+  // Defaults to cash for a holder, because that is what a site cashier opening this is almost
+  // always doing — and to bank for everyone else, because a mode they cannot submit must not be
+  // the one the form arrives holding.
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'bank'>(
+    mayEnterCash ? 'cash' : 'bank',
+  );
   const [paidOn, setPaidOn] = useState('');
   const [paidAmount, setPaidAmount] = useState(String(line.netPayable));
   const [shortPaymentReason, setShortPaymentReason] = useState('');
@@ -303,9 +333,14 @@ function DisburseModal({
           value={paymentMode}
           onChange={(e) => setPaymentMode(e.target.value as 'cash' | 'bank')}
         >
-          <option value="cash">Cash</option>
+          {mayEnterCash && <option value="cash">Cash</option>}
           <option value="bank">Bank</option>
         </SelectField>
+        {!mayEnterCash && (
+          <p className="text-xs text-gray-500">
+            {MESSAGES.cashEntryUnavailable}
+          </p>
+        )}
         <TextField
           id="dis-date"
           label="Paid on"

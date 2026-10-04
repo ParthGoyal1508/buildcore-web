@@ -25,20 +25,18 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 export default function PaymentSheetsPage() {
-  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
   const projects = useQuery({
-    queryKey: ['projects', 'all', companyId],
+    queryKey: ['projects', 'all'],
     queryFn: () => getProjects({ pageSize: 200 }),
   });
   const sheets = useQuery({
-    queryKey: ['payment-sheets', companyId],
-    queryFn: () => getPaymentSheets(companyId ? { companyId } : {}),
+    queryKey: ['payment-sheets'],
+    queryFn: () => getPaymentSheets({}),
   });
 
   const projectName = (id: string) =>
@@ -85,7 +83,7 @@ export default function PaymentSheetsPage() {
         emptyMessage="No payment sheets yet."
         actions={(s) => (
           <Link href={ROUTES.labourPaymentSheet(s.id)}>
-            <RowAction>Open</RowAction>
+            <RowAction intent="read">Open</RowAction>
           </Link>
         )}
       />
@@ -113,7 +111,6 @@ function GenerateSheetForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { companyId } = useCompanyContext();
   const [projectId, setProjectId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
@@ -125,7 +122,6 @@ function GenerateSheetForm({
   const mutation = useMutation({
     mutationFn: () =>
       generatePaymentSheet({
-        ...(companyId ? { companyId } : {}),
         projectId,
         periodFrom,
         periodTo,

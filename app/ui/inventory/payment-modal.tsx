@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import { createPayment, getVendorBills } from '@/app/lib/api/inventory';
+import { useCashRights } from '@/app/lib/cash-entry';
 import { MESSAGES, PAYMENT_MODES, inventoryLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import {
@@ -31,6 +32,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function PaymentModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const vendors = useVendors();
+  // 019 FR-017a. Hidden, not disabled: a disabled option invites a support call, and the
+  // client's intent is that the machinery of cash is not visible at all to an office viewer.
+  const { mayEnterCash } = useCashRights();
+  const offeredModes = mayEnterCash
+    ? PAYMENT_MODES
+    : PAYMENT_MODES.filter((mode) => mode !== 'cash');
 
   const [vendorId, setVendorId] = useState('');
   const [amount, setAmount] = useState('');
@@ -143,12 +150,21 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
             setPaymentMode(event.target.value as (typeof PAYMENT_MODES)[number])
           }
         >
-          {PAYMENT_MODES.map((mode) => (
+          {offeredModes.map((mode) => (
             <option key={mode} value={mode}>
               {inventoryLabel(mode)}
             </option>
           ))}
         </SelectField>
+
+        {!mayEnterCash && (
+          // FR-014: a screen that loses a control must say so. Without this the mode list is
+          // simply one item shorter and the viewer has no way to tell a missing permission from
+          // a missing feature.
+          <p className="sm:col-span-2 text-xs text-gray-500">
+            {MESSAGES.cashEntryUnavailable}
+          </p>
+        )}
 
         <div className="sm:col-span-2">
           <TextField

@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+
 import {
   getEquipment,
   getEquipmentCategories,
@@ -10,7 +12,6 @@ import {
 } from '@/app/lib/api/plant';
 import { getVendors } from '@/app/lib/api/partners';
 import { getSites } from '@/app/lib/api/projects';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 /**
  * The dropdown sources every plant form needs.
@@ -19,18 +20,23 @@ import { useCompanyContext } from '@/app/ui/settings/company-context';
  * active-only filters — and so the whole module shares one cache entry per source
  * rather than refetching the machine list once per open modal.
  *
- * Every one is scoped to the company selected in `CompanyProvider`, which the plant
- * layout mounts. Without that, a cross-company administrator sees every tenant's
- * rows mixed together in one list — ten equipment categories across three companies
- * renders as thirty rows named in triplicate, with nothing saying which is which.
- * `companyScope()` on the backend widens deliberately for such a caller; naming the
- * company is how the client narrows it back.
+ * Every one is scoped to the company the **session** is in, read through
+ * `useSelectedCompanyId()`. Without any scoping a cross-company administrator sees every
+ * tenant's rows mixed together — ten equipment categories across three companies renders
+ * as thirty rows named in triplicate, with nothing saying which is which.
  *
- * `companyId` is part of every query key, so switching company refetches rather than
- * showing the previous company's list from cache.
+ * This used to come from `CompanyProvider`, which held it in `useState` and never told the
+ * server, so the interface and the data could disagree about which company was current.
+ * The hook is kept as the seam rather than removed: fourteen plant screens read it, and
+ * re-pointing one function at the server was the smaller and safer change than editing all
+ * of them. What it returns is now the server's own answer, so the id these queries send is
+ * no longer a second opinion — `companyScope()` validates it either way.
+ *
+ * `companyId` stays in every query key, which is belt to the brace of the cache clear a
+ * company switch performs.
  */
 export function usePlantCompanyId(): string | null {
-  return useCompanyContext().companyId;
+  return useSelectedCompanyId();
 }
 
 /** Every machine, for the equipment pickers. One page large enough to hold them all:
@@ -38,9 +44,8 @@ export function usePlantCompanyId(): string | null {
 export function usePlantEquipment() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'equipment', 'all', companyId],
-    queryFn: () =>
-      getEquipment({ pageSize: 200, ...(companyId ? { companyId } : {}) }),
+    queryKey: ['plant', 'equipment', 'all'],
+    queryFn: () => getEquipment({ pageSize: 200 }),
     select: (page) => page.items,
   });
 }
@@ -50,8 +55,8 @@ export function usePlantEquipment() {
 export function usePlantCategories() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'categories', companyId],
-    queryFn: () => getEquipmentCategories(companyId ?? undefined),
+    queryKey: ['plant', 'categories'],
+    queryFn: () => getEquipmentCategories(),
     select: (rows) => rows.filter((row) => row.active),
   });
 }
@@ -60,8 +65,8 @@ export function usePlantCategories() {
 export function usePlantDocTypes() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'doc-types', companyId],
-    queryFn: () => getEquipmentDocTypes(companyId ?? undefined),
+    queryKey: ['plant', 'doc-types'],
+    queryFn: () => getEquipmentDocTypes(),
     select: (rows) => rows.filter((row) => row.active),
   });
 }
@@ -69,9 +74,8 @@ export function usePlantDocTypes() {
 export function usePlantSpareParts() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'spare-parts', 'all', companyId],
-    queryFn: () =>
-      getSpareParts({ pageSize: 200, ...(companyId ? { companyId } : {}) }),
+    queryKey: ['plant', 'spare-parts', 'all'],
+    queryFn: () => getSpareParts({ pageSize: 200 }),
     select: (page) => page.items.filter((row) => row.active),
   });
 }

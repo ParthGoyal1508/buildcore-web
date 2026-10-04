@@ -77,13 +77,62 @@ export const ROUTES = {
   projects: '/dashboard/projects',
   projectsPortfolio: '/dashboard/projects/portfolio',
   projectsNewProject: '/dashboard/projects/portfolio/new',
+  /**
+   * One project's own home — the shell every section below hangs off (008 US4).
+   *
+   * Until 2026-10-04 this route did not exist and `/portfolio/<id>` was a 404: the six
+   * sections were reachable only as six links on the portfolio row, and once inside one of
+   * them the only way to another was back out to the list. US4 specified the detail page as
+   * nine hash tabs on one route; it is built as routed sections instead, so a BOQ or a bill
+   * can be linked to, reloaded and opened in a second tab.
+   */
+  projectsProject: (id: string) => `/dashboard/projects/portfolio/${id}`,
   projectsEditProject: (id: string) =>
     `/dashboard/projects/portfolio/${id}/edit`,
+  /**
+   * The three read-only sections of the shell, from the aggregate `GET /projects/:id` has
+   * always returned and this app discarded until the shell was built.
+   */
+  projectsPeople: (id: string) => `/dashboard/projects/portfolio/${id}/people`,
+  projectsMachinery: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/machinery`,
+  projectsMaterials: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/materials`,
   /** What a project holds, and what it still owes (017 FR-024). */
   projectsProjectDocuments: (id: string) =>
     `/dashboard/projects/portfolio/${id}/documents`,
   projectsClients: '/dashboard/projects/clients',
   projectsSites: '/dashboard/projects/sites',
+
+  /**
+   * The BOQ for one project — the schedule every bill below is measured against (008 US5,
+   * amended 2026-10-03).
+   *
+   * Gated on `PROJECTS` and not `PROJECT_FINANCIALS`, unlike the money screens below: a schedule
+   * carries rates but it is the list of what is to be built, and a site engineer who may not open
+   * a bill may certainly need to read it.
+   */
+  projectsBoq: (id: string) => `/dashboard/projects/portfolio/${id}/boq`,
+
+  // --- Projects: billing and the P&L (feature 018, `bugs.md` items 11 and 14) ---
+  // Gated on `PROJECT_FINANCIALS`, not `PROJECTS` — see `PROJECTS_PERMISSIONS`. Billing
+  // and the summary are money screens and the backend guards them separately.
+  /** Every client bill on a project, and the sheet that composes the next one (FR-001). */
+  projectsBilling: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/billing`,
+  /** One client bill, at the rates it was billed at (FR-006). */
+  projectsClientBill: (projectId: string, billId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/billing/${billId}`,
+  /** Subcontractor RA bills measured against a work order's award (FR-007). */
+  projectsRaBills: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/ra-bills`,
+  projectsRaBill: (projectId: string, billId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/ra-bills/${billId}`,
+  /** Revenue and cost by category, monthly and cumulative, for one project (FR-010). */
+  projectsSummary: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/summary`,
+  /** Every project's position side by side, with the company total (FR-013). */
+  projectsPnlBoard: '/dashboard/projects/pnl',
 
   // --- Dashboard: Reminders centre (feature 004, US9) ---
   // Not a NAV_MODULES entry: Reminders is part of the Dashboard module, not a
@@ -259,14 +308,38 @@ export const CLEARANCE_COPY = {
    */
   returnElsewhere: 'Returned in the asset register, not here.',
   cancel: 'Cancel',
-  waive: 'Waive',
-  waiveHeading: 'Stop pursuing this',
+  /**
+   * "Request waiver", not "Waive" (021 FR-016, task T049 — changed 2026-10-02).
+   *
+   * HR proposes and the Director countersigns, so the control does not waive anything. **A control
+   * that says it has done a thing it has only proposed is the copy that gets an exit signed off on
+   * a waiver nobody approved** — somebody presses it, reads "Waive", and reports the obligation
+   * cleared.
+   */
+  waive: 'Request waiver',
+  waiveHeading: 'Request a waiver',
   /** FR-014: the reason is required, and the backend enforces a real minimum. */
   waiveReasonLabel: 'Why the company is not pursuing this',
   waiveReasonShort: (min: number) =>
     `A reason of at least ${min} characters is required — this writes off company money.`,
-  waiveSubmit: 'Record waiver',
-  waiveFailed: 'The waiver could not be recorded.',
+  waiveSubmit: 'Send for approval',
+  waiveFailed: 'The waiver request could not be sent.',
+  /** Said in the modal, before it is sent, so nobody expects the item to clear. */
+  waiveNeedsApproval:
+    'This goes to the Director for approval. The obligation stays outstanding until they agree, and the exit cannot be settled before then.',
+  /** The pending state on the row (T050). */
+  waiverPending: (name: string, at: string) =>
+    `Waiver requested by ${name} on ${at} — awaiting the Director's approval.`,
+  waiverPendingStill:
+    'Still outstanding. Nothing has been written off yet.',
+  /** The rejected state (T051). Silence after a rejection reads as success. */
+  waiverRejected: (name: string, at: string) =>
+    `A waiver requested by ${name} on ${at} was not approved.`,
+  waiverRejectedStill:
+    'The obligation stands and the exit cannot be settled. It can be requested again with a fuller reason.',
+  /** Who countersigned, beside who asked (T090's two facts). */
+  waiverApprovedBy: (name: string, at: string) =>
+    `Approved by ${name} on ${at}`,
   /**
    * A waiver is **not** a discharge. The backend is explicit: an asset waived here stays
    * open in the asset register, because marking it returned would put a false fact in the
@@ -275,6 +348,15 @@ export const CLEARANCE_COPY = {
   waivedBy: (name: string, at: string) => `Waived by ${name} on ${at}`,
   waivedNotReturned: 'Waived — not returned. The obligation stands on the record.',
   settleBlocked: 'Final settlement is unavailable while anything above is outstanding.',
+  /**
+   * Said when the only thing in the way is a waiver nobody has decided yet (T053).
+   *
+   * The gate is the api's, but an exit that will not settle with no stated reason sends somebody to
+   * a developer — and "something is outstanding" is not an answer when the thing outstanding is a
+   * request already made.
+   */
+  settleBlockedPending:
+    'Final settlement is waiting on a waiver request the Director has not decided yet.',
   settleReady: 'Nothing is outstanding. Final settlement may proceed.',
   /**
    * "Could not ask" is not "nothing held", and the difference is somebody leaving with a
@@ -477,6 +559,568 @@ export function reminderTypeLabel(type: string): string {
     .join(' ');
 }
 
+/**
+ * The company switcher's own copy (019 FR-001 – FR-006).
+ *
+ * Its own block rather than keys inside `MESSAGES`, which is where sign-in and session copy lives.
+ * Principle III keeps strings out of components; it does not ask for one bucket.
+ */
+export const COMPANY_SWITCHER = {
+  label: 'Company',
+  /**
+   * Named screens, not "you have unsaved changes".
+   *
+   * Somebody switching company has usually forgotten the half-filled form two tabs back, and that is
+   * the whole reason to ask. A message that cannot say what is at risk gets dismissed as noise.
+   */
+  confirmDiscard: (screens: string) =>
+    `Switching company will discard unsaved changes on: ${screens}. Continue?`,
+  switchFailed:
+    'Could not switch company. You are still working in the previous one.',
+  /**
+   * What a cross-company caller sees before they have chosen (019 FR-010).
+   *
+   * Not a prompt - a description. In this state the backend scopes nothing, so every
+   * list genuinely is showing every company at once, and naming one company here would
+   * caption three companies' figures with one company's name.
+   */
+  allCompanies: 'All companies',
+} as const;
+
+/**
+ * Slip delivery (021 FR-006 to FR-009) — `bugs.md` item 8.
+ *
+ * The retry's label **names its count**, and that is not decoration: the difference between it and
+ * the send is twelve emails or five hundred, and an unlabelled "Retry" beside a "Send" is how
+ * somebody picks the wrong one.
+ */
+export const SLIP_DELIVERY_COPY = {
+  heading: 'Payslip delivery',
+  hint: 'Emails each employee their payslip for this run, as an attachment. Sending is deliberate rather than automatic.',
+  loading: 'Checking who has been sent their payslip…',
+  loadFailed: 'Could not load the delivery status for this run.',
+  send: 'Email payslips',
+  sendRemaining: (count: number) =>
+    count === 0 ? 'Email payslips' : `Email the remaining ${count}`,
+  sendFailed: 'The payslips could not be sent.',
+  retry: (count: number) =>
+    count === 1 ? 'Retry 1 failure' : `Retry ${count} failures`,
+  retryFailed: 'The failed payslips could not be resent.',
+  noneYet: 'Nobody has been sent their payslip for this run yet.',
+  tally: {
+    sent: 'Sent',
+    failed: 'Failed',
+    undeliverable: 'No address',
+    notAttempted: 'Not tried',
+  },
+  statusLabels: {
+    sent: 'Sent',
+    failed: 'Failed',
+    undeliverable: 'No address',
+    pending: 'Pending',
+  } as Record<string, string>,
+  // Says what to do, because a retry will not fix these — they have no address to retry to.
+  undeliverableHint:
+    'Some employees have no email address on file, so there is nothing to retry. Add an address on their record, then send again.',
+  columns: {
+    employee: 'Employee',
+    address: 'Sent to',
+    status: 'Status',
+    detail: 'When / why',
+  },
+} as const;
+
+/**
+ * Reconciling the bank's returned sheet (021 FR-008 to FR-011) — `bugs.md` item 8.
+ *
+ * Two kinds of gap, named separately throughout: a line matching no employee is money that moved to
+ * somebody the run does not know about; an employee with no line is money that **did not move**.
+ * Different people chase each, and one "discrepancies" count would send both to whoever asked first.
+ */
+export const RECONCILIATION_COPY = {
+  heading: 'Bank transaction sheet',
+  hint: 'Upload the sheet the bank returned. Rows it cannot read are reported rather than rejected — the upload succeeds and the reconciliation is what is incomplete.',
+  upload: 'Upload the bank’s sheet',
+  uploading: 'Reading the sheet…',
+  uploadFailed: 'That file could not be read as a spreadsheet.',
+  noneYet: 'No transaction sheet has been uploaded for this run.',
+  tally: {
+    total: 'Lines in sheet',
+    matched: 'Matched',
+    unmatched: 'Unmatched',
+    missing: 'Not in sheet',
+  },
+  unmatchedHint:
+    'These lines name an account no employee in this run has. Money moved to somebody the run does not know about.',
+  missingHint:
+    'These employees are in the run and have no line in the sheet. That money did not move.',
+  differenceHint:
+    'A difference is reported, not judged: a transfer short by an advance recovery is correct, and this screen does not know which differences were intended.',
+  columns: {
+    row: 'Row',
+    beneficiary: 'Beneficiary',
+    account: 'Account',
+    sheetAmount: 'In sheet',
+    runAmount: 'In run',
+    difference: 'Difference',
+    matched: 'Matched to',
+    reason: 'Why not',
+    employee: 'Employee',
+  },
+} as const;
+
+/**
+ * Declaring a letter kind's fields (017 FR-011b, FR-011c) — `bugs.md` item 18.
+ *
+ * The copy repeatedly says **where a value comes from**, because that is the requirement rather than
+ * a nicety: a field that is only a label is a placeholder that renders blank, and a blank in a signed
+ * letter is indistinguishable from a deliberate omission.
+ */
+/**
+ * Every word the template editor says (017 US5, FR-014) — `bugs.md` item 18.
+ *
+ * Principle III: no string below is written at a call site. The ones that carry weight are the
+ * refusals — an author looking at a screen that is entirely one template needs to be told *which*
+ * field is the problem, and "invalid template" tells them nothing they can act on.
+ */
+export const TEMPLATE_COPY = {
+  title: 'Letter Templates',
+  // Says what the editor is keyed to now. It used to say "one active template per type", and "type"
+  // was the five-value enum 017 replaced with fifteen kinds.
+  description:
+    'One active template per letter kind. The variables a template may use are the fields its kind declares.',
+  newTemplate: 'New template',
+  edit: 'Edit',
+  none: 'No templates yet.',
+  loading: 'Loading templates…',
+  loadFailed: 'Could not load the templates.',
+  editHeading: 'Edit template',
+  newHeading: 'New template',
+  kindLabel: 'Letter kind',
+  // The kind cannot change after the first save: the body is validated against that kind's declared
+  // fields, and moving a template to another kind would leave every field in it undeclared.
+  kindFixedHint:
+    'Fixed once saved — a template’s variables are validated against its kind’s fields.',
+  nameLabel: 'Name',
+  bodyLabel: 'Body',
+  bodyHint:
+    'Fixed text with {{variables}}. Insert a variable from the list rather than typing it, so it cannot be misspelled.',
+  fieldsHeading: 'Variables this kind declares',
+  fieldsLoading: 'Loading this kind’s variables…',
+  fieldsFailed:
+    'Could not load this kind’s variables, so the editor cannot tell you which are valid. Saving is disabled until it can.',
+  // Not a neutral empty state. A kind with no declared fields cannot have a template using any
+  // variable at all, and the remedy is on another screen — so it is named.
+  fieldsNone:
+    'This kind declares no variables yet. Declare them on the letter kind first, in Settings → Letter kinds — a template may only use fields its kind declares.',
+  requiredMark: 'required',
+  manualSource: 'typed at issue time',
+  insert: 'Insert',
+  undeclaredHeading: (count: number) =>
+    count === 1
+      ? 'One variable is not declared by this kind'
+      : `${count} variables are not declared by this kind`,
+  // Named, every one of them. This is T135's whole requirement.
+  undeclaredBody: (tokens: string[]) =>
+    `${tokens.map((token) => `{{${token}}}`).join(', ')} — either declare ${
+      tokens.length === 1 ? 'it' : 'them'
+    } on the letter kind, or remove ${
+      tokens.length === 1 ? 'it' : 'them'
+    } from the body. A letter cannot be issued with a variable nothing supplies, because a blank where a value belongs cannot be told apart from a deliberate omission.`,
+  activeLabel: 'Active — deactivates any other active template for this kind',
+  save: 'Save',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  saveFailed: 'Could not save the template.',
+  activeBadge: 'Active',
+} as const;
+
+/**
+ * The asset record on a settlement summary (021 FR-018a, FR-018b) — `bugs.md` item 10.
+ *
+ * Principle III: no string below is written at a call site. The one that carries the most weight is
+ * `noDeduction` — the client asked for assets on the F&F summary and did not say what an unreturned
+ * one is worth, and a summary that said nothing about valuation would be read as "nothing was
+ * recovered because nothing was due".
+ */
+export const SETTLEMENT_ASSET_COPY = {
+  heading: 'Assets held at exit',
+  // Says why the list is here and why it is longer than the clearance above it.
+  hint: 'Every asset this employee was given, including ones already returned. The clearance above lists only what is still outstanding.',
+  loading: 'Loading the asset record…',
+  // Not "no assets". This is the state where feature 012 could not be asked, and reporting it as
+  // "held nothing" would have somebody sign off a settlement on a question nobody answered.
+  unavailable:
+    'The asset register could not be asked, so this settlement cannot say what the employee held. Do not read the empty list as "nothing outstanding".',
+  none: 'No assets were ever allocated to this employee.',
+  outcomes: {
+    returned: 'Returned',
+    waived: 'Written off',
+    outstanding: 'Still held',
+  } as Record<string, string>,
+  returnedOn: (date: string) => `returned ${date}`,
+  waivedBy: (name: string) => `written off by ${name}`,
+  // FR-018b, stated rather than left to be inferred from the absence of a deduction line.
+  noDeduction:
+    'No asset value is deducted from the payable. Original cost, book value and replacement cost give three different figures and none has been agreed, so an unreturned asset is written off by name rather than priced by a rule nobody chose.',
+  stillHeldWarning: (count: number) =>
+    count === 1
+      ? 'One asset is still held and not written off.'
+      : `${count} assets are still held and not written off.`,
+} as const;
+
+export const LETTER_FIELD_COPY = {
+  heading: (kind: string) => `Fields for ${kind}`,
+  hint: 'What this kind’s templates may use as {{variables}}. Each field says where its value is read from — a field with no source renders blank, and a blank in a signed letter cannot be told apart from a deliberate omission.',
+  loading: 'Loading fields…',
+  loadFailed: 'Could not load this kind’s fields.',
+  // Not a neutral "none yet": a kind with no fields has templates that cannot use a single variable.
+  noneYet:
+    'This kind declares no fields, so its templates cannot use any variables yet. Add the fields a letter of this kind needs.',
+  notEditable: 'Not editable',
+  remove: 'Remove',
+  removeFailed: 'That field could not be removed.',
+  saveFailed: 'That field could not be saved.',
+  requiredMark: 'required',
+  manualSource: 'typed at issue time',
+  addHeading: 'Add a field',
+  tokenLabel: 'Variable name',
+  tokenHint: 'Used in the template as {{name}}. Letters, digits and underscores only.',
+  labelLabel: 'Label',
+  labelHint: 'What the template editor calls it — “Site name”, not siteName.',
+  sourceLabel: 'Value comes from',
+  sourceHint: 'Which record the value is read from when a letter is issued.',
+  sourceLabels: {
+    employee: 'The employee record',
+    candidate: 'The candidate record',
+    project: 'The project record',
+    company: 'The company record',
+    manual: 'Typed when the letter is issued',
+  } as Record<string, string>,
+  pathLabel: 'Field in that record',
+  pathHint: 'A dotted path — designation.name, basic, dateOfJoining. Aadhaar, PAN and bank details are refused: a letter kind grants no way past that.',
+  requiredLabel: 'Refuse to issue a letter if this has no value',
+  requiredHint:
+    'An optional field with no value renders empty, which is often right. A required one stops the letter — use it where a blank would change what the letter says.',
+  add: 'Add field',
+  adding: 'Adding…',
+  // T136. The api does not refuse the removal — an administrator tidying a kind should not be
+  // blocked by a draft somebody abandoned — so this warning is the only thing between a tidy-up and
+  // a letter that refuses to issue a fortnight later. It names the templates, because "some
+  // templates use this" leaves somebody opening every one.
+  usageChecking: 'Checking which templates use it…',
+  usageNone: (field: string) =>
+    `No template uses ${field}. Removing it now breaks nothing.`,
+  usageWarning: (field: string, count: number) =>
+    count === 1
+      ? `One template uses ${field}:`
+      : `${count} templates use ${field}:`,
+  usageConsequence:
+    'Removing it does not change those templates, and they will refuse to issue until the variable is taken out of them or declared again.',
+  usageFailed:
+    'Could not check which templates use this field. Removing it may break a template that references it.',
+  usageActive: 'active',
+  usageConfirm: 'Remove anyway',
+  usageCancel: 'Keep the field',
+} as const;
+
+/**
+ * Every word the billing sheets say (018 US1, US2 — `bugs.md` items 11 and 12).
+ *
+ * Principle III: no string below is written at a call site. The ones that matter most are the
+ * explanations — an over-measured line and an unpriced line are both states a biller will meet while
+ * typing, and a sheet that only colours them red teaches people to ignore the colour.
+ */
+export const BILLING_COPY = {
+  // --- The BOQ sheet ---
+  boqHeading: 'Bill of quantities',
+  boqHint:
+    'Enter what was measured this period. Line and bill totals follow as you type — nothing is saved until you compose the bill.',
+  boqLoading: 'Loading the schedule…',
+  boqLoadFailed: 'Could not load this project’s bill of quantities.',
+  boqEmpty:
+    'This project has no bill of quantities yet, so there is nothing to bill against. Enter the BOQ first — a bill that references nothing cannot be reconciled against anything.',
+  columns: {
+    boqNo: 'Item',
+    task: 'Description',
+    unit: 'Unit',
+    scopeQty: 'Contracted',
+    billedQty: 'Billed to date',
+    remainingQty: 'Remaining',
+    rate: 'Rate',
+    quantity: 'This bill',
+    amount: 'Amount',
+  },
+  /** Both totals, because the quoted figure is the estimated one plus the bidder's percentage. */
+  estimatedTotal: 'Schedule total',
+  quotedTotal: 'Quoted total',
+  quotedPercentageNote: (percent: string) =>
+    `The quoted total is the schedule total plus the quoted excess of ${percent}, applied once to the total rather than line by line.`,
+  // --- States a biller meets while typing ---
+  unpriced: 'No rate',
+  unpricedHint:
+    'Nobody has priced this line yet, so it cannot be billed. A bill carrying it would be quietly short and would look finished.',
+  unpricedCount: (count: number) =>
+    count === 1
+      ? '1 line has no rate and cannot be billed.'
+      : `${count} lines have no rate and cannot be billed.`,
+  overQuantity: 'Past contracted',
+  /** FR-003: flagged at the line, and the bill is still submittable. */
+  overQuantityHint:
+    'This measurement goes past the contracted quantity. That is often correct — the bill can still be composed — but submitting it needs a reason.',
+  overQuantityReasonLabel: 'Why this goes past the contracted quantity',
+  overQuantityReasonMissing:
+    'A line past its contracted quantity needs a reason before the bill can be submitted.',
+  // --- Deductions, each in its own right ---
+  gross: 'Gross',
+  retention: 'Retention',
+  retentionBasis: (percent: string) => `${percent} of gross, withheld by the client`,
+  advanceRecovery: 'Advance recovery',
+  advanceRecoveryBasis: 'Money already advanced, coming back',
+  otherDeductions: 'Other deductions',
+  deductionTotal: 'Total deductions',
+  net: 'Net',
+  netPayable: 'Net payable',
+  /**
+   * The four-way distinction, said on the screen and not only in the code.
+   *
+   * A reader who drills from the summary's cost figure into a bill lands on a deduction line, and
+   * without this would reasonably conclude the project spent it.
+   */
+  deductionsAreNotCost:
+    'Retention is money withheld and an advance recovery is money already paid. Neither is project spend, which is why the summary reads gross rather than net.',
+  // --- Composing and submitting ---
+  compose: 'Compose bill',
+  composing: 'Composing…',
+  composeFailed: 'That bill could not be composed.',
+  submit: 'Submit bill',
+  submitting: 'Submitting…',
+  submitFailed: 'That bill could not be submitted.',
+  billNumberLabel: 'Bill number',
+  billingDateLabel: 'Billing date',
+  descriptionLabel: 'Description',
+  retentionPercentLabel: 'Retention withheld (%)',
+  nothingMeasured:
+    'Nothing has been measured yet. Enter a quantity against at least one line.',
+  // --- A bill read back ---
+  billsHeading: 'Bills raised',
+  billsEmpty: 'No bills have been raised on this project yet.',
+  historicalRatesNote:
+    'Shown at the rates it was billed at. A rate revised afterwards does not restate a bill that was already sent.',
+  certified: 'Certified',
+  certifiedShort: (variance: string) =>
+    `The client certified ${variance} less than was billed. Both figures are kept — the variance is the thing to chase, and overwriting the billed amount would erase the fact that there was one.`,
+  statusLabels: {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    certified: 'Certified',
+    approved: 'Approved',
+  } as Record<string, string>,
+  // --- Drafts recovered locally (FR-005) ---
+  draftFound: 'An unsaved draft of this sheet was found on this device.',
+  draftFoundHint:
+    'It was not sent to the server. Restoring it replaces what is on screen; discarding it cannot be undone.',
+  draftRestore: 'Restore draft',
+  draftDiscard: 'Discard draft',
+  draftSaved: (when: string) => `Draft kept on this device at ${when}`,
+  // --- RA bills (US2) ---
+  raHeading: 'Subcontractor bill',
+  raHint:
+    'Measured against what the work order awarded. Each deduction is shown with its basis — a deduction whose basis is hidden is imposed rather than arguable.',
+  raColumns: {
+    description: 'Awarded item',
+    unit: 'Unit',
+    awardedQty: 'Awarded',
+    toDateQty: 'Measured to date',
+    remainingQty: 'Remaining',
+    rate: 'Rate',
+    thisPeriodQty: 'This bill',
+    amount: 'Amount',
+  },
+  raEmpty: 'This work order has no awarded lines to measure against.',
+  exceedsAward:
+    'This measures more than the work order awarded. Raise a variation to the award first — paying above an award is the company agreeing to work it never ordered, and there is nobody downstream to catch it.',
+  // --- Revising a certified bill (FR-009) ---
+  reviseHeading: 'Revise measured quantities',
+  /** The warning IS the requirement: it comes before the edit, never as a toast after it. */
+  reviseWarning:
+    'This bill has been certified. Changing its quantities withdraws that certification and sends the bill for approval again — the existing approval is kept as a record of what was signed, and it will not apply to the new figures.',
+  reviseWarningPending:
+    'This bill is waiting on an approval. Changing its quantities replaces that request with a new one, so nobody is left deciding a version that no longer exists.',
+  reviseReasonLabel: 'Why the quantities changed',
+  reviseReasonHint:
+    'Required. Somebody has to decide this bill a second time, and “why” is the first thing they will ask.',
+  revise: 'Save and re-submit',
+  revising: 'Saving…',
+  reviseFailed: 'That revision could not be saved.',
+  /** FR-009's eventual consistency — see the note beside it in the sheet. */
+  reviseDone:
+    'Saved and sent for approval again. The approval queue may take a moment to catch up.',
+  // --- Conflict (FR-014) ---
+  conflictHeading: 'Somebody else changed this bill',
+  conflictHint:
+    'Your entry is still here and has not been sent. Open the bill’s current state in another tab, decide what should stand, and save again — nothing you typed has been discarded.',
+  conflictReload: 'Show me the current figures',
+  conflictKeep: 'Keep my entry',
+  // --- Recording what the client certified (FR-005) ---
+  certifyLabel: 'Amount the client certified',
+  certifyHint:
+    'Kept alongside the billed amount, never instead of it. The variance between the two is the thing to chase, and overwriting the billed figure would erase the fact that there was one.',
+  statusHeader: 'Status',
+  certifyOpen: 'Record certification',
+  certifySave: 'Save certification',
+  certifySaving: 'Saving…',
+  cancel: 'Cancel',
+  loading: 'Loading…',
+} as const;
+
+/**
+ * Work orders and award capture (018 US2).
+ *
+ * Separate from `BILLING_COPY` because this surface is **feature 008 User Story 6's**, delivered
+ * minimally so an RA bill is reachable at all. When 008 builds it properly these strings move with
+ * it, and keeping them in their own block is what makes that a move rather than an extraction.
+ */
+export const WORK_ORDER_COPY = {
+  heading: 'Work orders',
+  loading: 'Loading work orders…',
+  loadFailed: 'Could not load this project’s work orders.',
+  empty:
+    'No work order has been raised on this project yet. A subcontractor bill is measured against a work order’s award, so one has to exist first.',
+  summary: (retentionPercent: string, awardLines: number, bills: number) =>
+    `Retention ${retentionPercent} · ${awardLines} award line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
+  newHeading: 'New work order — what the subcontractor is doing',
+  retentionLabel: 'Retention (%)',
+  retentionHint:
+    'Cannot be changed once a bill has been raised: the retention on an issued bill is already withheld at the old rate, and moving the basis would make the subcontractor’s copy disagree with ours about money already held.',
+  raise: 'Raise work order',
+  raising: 'Raising…',
+  raiseFailed: 'That work order could not be raised.',
+  // --- Award capture ---
+  awardHeading: 'Capture the award',
+  awardHint:
+    'One line per awarded item: description, unit, quantity, rate — separated by a tab or a pipe. Paste it from the order; nothing is saved until you choose to.',
+  awardPlaceholder: 'RCC M25 in foundations | Cum | 100 | 4500',
+  awardLabel: 'Awarded lines',
+  awardSave: 'Save award',
+  awardSaving: 'Saving…',
+  /** Said rather than silently ignoring unparseable rows — a half-read award is worse than none. */
+  awardUnparseable:
+    'No usable lines were found. Each line needs a description, a unit, a quantity and a rate, separated by a tab or a pipe.',
+  awardMissing:
+    'This work order has no award captured yet, so there is nothing to measure against.',
+} as const;
+
+/**
+ * Every word the project summary and the P&L board say (018 US3, US4).
+ *
+ * The two most important strings here are `unavailable` and `notItemised`. A category nobody could
+ * ask about and a category with nothing in it are different facts, and a director acts differently on
+ * each — the first is a deployment problem, the second is a project running under budget.
+ */
+export const PNL_COPY = {
+  heading: 'Revenue, cost and budget',
+  loading: 'Loading the position…',
+  loadFailed: 'Could not load this project’s position.',
+  monthLabel: 'Month',
+  columns: {
+    line: 'Line',
+    monthly: 'This month',
+    cumulative: 'To date',
+    budget: 'Budget',
+    variance: 'Variance',
+  },
+  revenue: 'Revenue billed',
+  totalCost: 'Total cost',
+  margin: 'Margin',
+  categories: {
+    labour: 'Labour',
+    materials: 'Materials',
+    machinery: 'Machinery',
+    fuel: 'Fuel',
+    subcontractors: 'Subcontractors',
+    overheads: 'Overheads',
+  } as Record<string, string>,
+  /** FR-010: named, never reported as zero. */
+  unavailable: 'Not available',
+  unavailableHint: (categories: string) =>
+    `Nobody can say what was spent on ${categories}, so those figures are left out of the totals rather than counted as zero. Counting them as zero is how a project looks profitable because half its costs are invisible.`,
+  overScopeWarning:
+    'This month’s revenue includes a bill measured past its contracted quantity.',
+  // --- Drilling in (FR-011, FR-012) ---
+  drillHeading: (figure: string) => `What makes up ${figure}`,
+  drillLoading: 'Opening the records…',
+  drillFailed: 'Could not open the records behind this figure.',
+  drillEmpty: 'Nothing was recorded against this figure in the selected month.',
+  /** The spec's edge case: never an empty list where the answer is "we cannot show you". */
+  drillNotItemised:
+    'This figure is measured, but the module behind it reports a period total without listing the records inside it — so there is nothing to open here yet. The figure on the summary stands.',
+  drillRefused:
+    'You do not have access to the records behind this figure. It is shown here because it is part of a total you may see; what is inside it is not.',
+  drillColumns: {
+    reference: 'Reference',
+    date: 'Date',
+    amount: 'Amount',
+    status: 'Status',
+    description: 'Note',
+  },
+  drillTotal: 'Total of these records',
+  drillReconciles: 'Adds up to the figure it was opened from.',
+  drillDiffers: (difference: string) =>
+    `These records come to ${difference} less than the figure they were opened from. Treat both as suspect and report it.`,
+  // --- The monthly labour register (FR-010a) ---
+  labourHeading: 'Labour wages, by worker',
+  labourHint:
+    'Every payment sheet overlapping the calendar month, by worker. Read-only — wages are computed and corrected on the payment sheet, and a second place to change them would be a second answer to what somebody was paid.',
+  labourLoading: 'Loading the wage register…',
+  labourLoadFailed: 'Could not load the month’s wages.',
+  labourEmpty: 'No approved payment sheet overlaps this month.',
+  labourColumns: {
+    worker: 'Worker',
+    code: 'Code',
+    daysWorked: 'Days',
+    rate: 'Rate',
+    gross: 'Gross',
+    deductions: 'Deductions',
+    net: 'Net',
+  },
+  /** The spec's edge case: a contractor month has no per-worker disbursement to list. */
+  labourContractorOnly:
+    'This month’s labour was engaged through a contractor, so there is no per-worker disbursement to list. The sheet is the contractor’s basis of payment and its totals are below.',
+  labourApportioned: 'Apportioned',
+  labourApportionedHint:
+    'A payment sheet crossing the month boundary contributes only the days worked inside this month, taken from the approved muster — not a share of elapsed calendar days.',
+  labourDraftSheets: (count: number) =>
+    count === 1
+      ? '1 payment sheet overlapping this month is still in draft and is not counted.'
+      : `${count} payment sheets overlapping this month are still in draft and are not counted.`,
+  labourSheetsHeading: 'Payment sheets behind these figures',
+  // --- Export (FR-010c) ---
+  exportLabel: 'Export this month',
+  exporting: 'Preparing…',
+  exportFailed: 'That export could not be produced.',
+  exportHint:
+    'The same figures as the screen, carrying the project, the month and the time it was produced. The production time is what tells two exports of the same month apart after a payment sheet is reopened.',
+  exportPdf: 'PDF',
+  exportExcel: 'Excel',
+  // --- The group board (US4) ---
+  boardHeading: 'Every project’s position',
+  boardLoading: 'Loading positions…',
+  boardLoadFailed: 'Could not load the group position.',
+  boardEmpty: 'No projects to show for the selected month.',
+  boardColumns: {
+    project: 'Project',
+    revenue: 'Revenue to date',
+    cost: 'Cost to date',
+    margin: 'Margin',
+  },
+  boardTotal: 'Company total',
+  /** FR-013's visibility rule, said out loud rather than left to be inferred. */
+  boardTotalNote:
+    'The total is the sum of the rows above it. Projects you may not see appear in neither.',
+  boardOpen: 'Open',
+} as const;
+
 export const MESSAGES = {
   invalidCredentials: 'Invalid email or password',
   welcomeBack: (name: string) => `Welcome back, ${name}!`,
@@ -496,6 +1140,16 @@ export const MESSAGES = {
   // whoever has to diagnose it, because this code almost always means a deployment
   // fault rather than anything the user did.
   sessionCookieMissing: 'Your session has ended. Please sign in again.',
+
+  // --- Cash entry (019 FR-017a, FR-017d) ---
+  // A screen that loses its cash controls must say so (FR-014): a payment form with no cash
+  // option and no explanation reads as a broken screen, and the person meeting it cannot tell
+  // whether to report a bug or ask for access. Which is why these name the permission — "ask an
+  // administrator" sends somebody to ask for they-know-not-what.
+  cashEntryUnavailable:
+    'Cash is not offered here because your role does not include Cash Entry. Other payment modes are unaffected.',
+  cashBreakupHidden:
+    'The cash denomination breakup is visible to roles with Cash Entry.',
 
   // --- Settings (feature 002) ---
   accessDeniedTitle: 'You do not have access to this page',
@@ -537,6 +1191,12 @@ export const MESSAGES = {
     `Not counted yet: ${modules}. These modules are not built, so anything due in them cannot be shown.`,
   remindersLoadFailed:
     'Could not load reminders. Nothing has been missed — try again.',
+  /**
+   * Spec FR-011's cap, surfaced (T048). The API has always returned `truncated`; the screen
+   * discarded it, so a list that stopped at 500 looked like a complete one.
+   */
+  remindersTruncated: (shown: number) =>
+    `Showing the ${shown} most urgent. More are due — narrow by module or severity to see the rest.`,
   reminderSnoozed: (until: string) => `Snoozed until ${until}.`,
   snoozeReasonRequired: 'Give a reason, so the next person to see this knows why.',
   snoozeDatePast: 'Pick a date in the future, or the reminder returns immediately.',
@@ -591,15 +1251,94 @@ export const MESSAGES = {
     'Location is unavailable over an insecure connection. Open this site over HTTPS (or on localhost) to punch in.',
   locationInaccurate: (accuracy: number) =>
     `Your location is only accurate to about ${Math.round(accuracy)}m, which is not precise enough to confirm you are on site. Wait a moment and try again.`,
-  punchQueued:
-    'Queued — this punch will sync automatically when you are back online.',
+  /**
+   * Punching now requires a connection (020 Phase 2, FR-013).
+   *
+   * **A condition, not a malfunction.** A worker who reads this as "the app is broken" stops
+   * trusting it and stops using it, and the wording is the only thing deciding which of the two
+   * they conclude. So it says what is true of the moment — there is no signal here — rather than
+   * anything about the application.
+   *
+   * The exchange it pays for: a queued punch cannot be refused at the gate. The worker saw a
+   * success at 8am and the refusal arrived at 5pm, by which time the day was lost and nobody could
+   * tell them why. Immediate refusal is worth more than a success that was not one.
+   */
+  punchNeedsConnection:
+    'Punching needs a connection, and your phone has no signal right now. Move to where you have signal and punch there.',
+  /**
+   * FR-013b. The way back, named rather than implied.
+   *
+   * "Nothing you can do" is what makes people abandon a system. A day genuinely worked but never
+   * punched is fixed by somebody, and saying who — before the worker has to ask — is the
+   * difference between a process and a dead end.
+   */
+  punchNeedsConnectionRecovery:
+    'If you work a day and cannot punch at all, tell your supervisor: they can raise a correction for that day, which is reviewed and then shows in your attendance.',
   punchQueuedCount: (count: number) =>
-    `${count} punch${count === 1 ? '' : 'es'} queued — will sync when you are back online.`,
+    `${count} punch${count === 1 ? '' : 'es'} queued on this device from before — syncing now.`,
   punchSyncFailed: (reason: string) => `A queued punch could not be synced: ${reason}`,
+  /**
+   * The end of the legacy queue, said once.
+   *
+   * Phase 2 retired offline punching, so this can only ever report punches captured before that
+   * shipped. It was an inline template in the layout; here because Principle III puts copy in one
+   * place, and because this one is about to stop appearing at all and should be easy to find then.
+   */
+  punchSyncedCount: (count: number) =>
+    `${count} punch${count === 1 ? '' : 'es'} queued on this device ${count === 1 ? 'has' : 'have'} now been sent.`,
   punchExceptionFlagged:
     'Punch recorded, but it needs review — your face or location did not match. Your supervisor has been notified; you do not need to punch again.',
   payrollLocked:
     'This period is closed for payroll. Punches and leave changes dated inside it can no longer be recorded.',
+
+  /**
+   * What a refused punch tells the worker (020 FR-013a, T017).
+   *
+   * **Three actions, not three explanations.** Each says what to do next, because the worker is
+   * standing at a gate holding a phone and an explanation they cannot act on is noise.
+   *
+   * `LOCATION` and `UNLOCATABLE` must never collapse into one. Both are "we could not accept this
+   * for location reasons", and the single merged message tells a worker standing in exactly the
+   * right place to go somewhere else — which is the failure FR-014 exists to prevent, and the one
+   * that destroys trust fastest, because the worker knows they are where they should be.
+   *
+   * Reviewed as a set here rather than written at three call sites, so the moment two of them start
+   * saying the same thing is visible.
+   */
+  punchRefusedLocation:
+    'You are too far from your site for this punch to count. Walk to the site and punch again there.',
+  punchRefusedUnlocatable:
+    'Your phone could not work out where you are precisely enough. Step into the open, away from walls and roofs, wait a few seconds and punch again.',
+  punchRefusedFace:
+    'This photo did not match your enrolled face. Take it again in better light, looking straight at the camera.',
+  /**
+   * Said once, under the message, for every refusal.
+   *
+   * FR-013d means the day will read as a day with no punch — not as a refused one — so a worker who
+   * walks away now has nothing to point at later. Naming the correction here is what stops a refused
+   * punch becoming an unpaid day.
+   */
+  punchRefusedRecovery:
+    'Nothing has been recorded for this attempt. If you cannot get a punch accepted today, tell your supervisor — they can raise a correction for the day.',
+  /**
+   * The third refusal in a row (T019).
+   *
+   * Escalation belongs to the screen, not to the message table: no single message can know it is
+   * being read for the third time, and a worker told the same sentence three times concludes the
+   * product is stuck. Three because twice is ordinary — a cloud, a bad photo — and four is somebody
+   * who has already given up.
+   */
+  punchRefusedRepeatedly:
+    'That is three attempts in a row. Stop trying for now and tell your supervisor what the screen said — they can record the day for you.',
+  /**
+   * Shown where a refused attempt would otherwise look like a missing feature (FR-012, T020).
+   *
+   * There is no photo to show. A face refusal stores none, because keeping an unattributed
+   * biometric against a named employee is worse than the record it replaces — so the screen must
+   * not offer to show one, and must not read as though the photo were merely unavailable.
+   */
+  punchRefusedNoPhoto:
+    'The photo from a refused attempt is not kept.',
   notEnrolled: 'Enrol your face before punching in.',
   enrolmentConsent:
     'I consent to my facial data being captured and stored for attendance verification.',
@@ -994,6 +1733,13 @@ export const PROJECTS_PERMISSIONS = {
   portfolio: 'PROJECTS',
   clients: 'PROJECTS',
   sites: 'PROJECTS',
+  // 018. The P&L board is its own section and is a money screen: the backend guards
+  // `GET projects/pnl` with `PROJECT_FINANCIALS`, so a `PROJECTS` holder with no
+  // financial access would get a page whose every request 403s. The billing and summary
+  // screens sit *under* `portfolio/:id/`, so this per-section map cannot reach them —
+  // they check `PROJECT_FINANCIALS` on the page, which is the same arrangement the
+  // portfolio's document tab already uses.
+  pnl: 'PROJECT_FINANCIALS',
 } as const;
 
 export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;
@@ -1242,6 +1988,26 @@ export const PII_FIELD_LABELS: Record<PiiField, string> = {
 
 // --- Enum value lists, mirroring buildcore-api's prisma schema exactly ---
 
+/**
+ * The codes a refused punch can carry (020 FR-013, T015).
+ *
+ * A closed union, mirroring the backend's `PUNCH_REFUSAL_CODES`. Closed so that a code the server
+ * starts sending and this client has never heard of is a type error at the mapping, not an
+ * `undefined` reaching a worker's phone as the reason their punch failed.
+ *
+ * Three codes, four backend reasons: `face_mismatch` and `no_face_detected` both arrive as
+ * `PUNCH_REFUSED_FACE` because the advice is identical — retake the photo — and the difference
+ * between "no face in the picture" and "a face that is not yours" is worth detecting on our side,
+ * not worth explaining to the person holding the camera.
+ */
+export const PUNCH_REFUSAL_CODES = [
+  'PUNCH_REFUSED_LOCATION',
+  'PUNCH_REFUSED_UNLOCATABLE',
+  'PUNCH_REFUSED_FACE',
+] as const;
+
+export type PunchRefusalCode = (typeof PUNCH_REFUSAL_CODES)[number];
+
 export const GENDERS = ['male', 'female', 'other'] as const;
 export const MARITAL_STATUSES = ['single', 'married', 'divorced', 'widowed'] as const;
 export const EMPLOYMENT_TYPES = ['full_time', 'contract', 'daily_wage'] as const;
@@ -1438,6 +2204,17 @@ export const MY_ATTENDANCE_MESSAGES = {
 } as const;
 
 export const HR_MESSAGES = {
+  /**
+   * 021 FR-009. The reason rather than a disabled control.
+   *
+   * A draft run has no publishable figures, so there is nothing to email — and saying so is what
+   * stops somebody waiting for an email that was never going to be sent.
+   */
+  deliveryNeedsProcessedRun:
+    'Payslips can be emailed once this run has been processed. A draft run’s figures are still allowed to move.',
+  reconciliationNeedsProcessedRun:
+    'A bank sheet can be reconciled once this run has been processed and a transfer has been made against it.',
+
   // Employees
   employeeSaved: 'Employee saved.',
   employeeLoadFailed: 'Could not load this employee.',
@@ -1498,6 +2275,20 @@ export const HR_MESSAGES = {
   // Leave
   rejectNeedsRemarks: 'A rejection needs a reason — the employee sees this remark.',
   leaveDecided: 'Application updated.',
+
+  /**
+   * What stands in an Employee column when the name cannot be resolved.
+   *
+   * Never the employee id. The leave queue rendered a cuid for months because the
+   * client-side roster join fell back to it, and an id in a column headed "Employee"
+   * reads as data — nobody reports it as a failure, they report it as "the names are
+   * wrong". A phrase that admits it is missing gets reported as what it is.
+   *
+   * Two phrasings because two different things go wrong, and they call for different
+   * actions: the roster has not arrived yet, or this person is not in it.
+   */
+  employeeNameLoading: 'Loading…',
+  employeeNameUnavailable: 'Name unavailable',
 
   // Payroll
   runLocked:
@@ -2157,8 +2948,236 @@ export const APPROVAL_RESUBMIT = {
  * than a level label they have no way to interpret. The one thing they must understand
  * is when the item is waiting on *them*, which is what the resubmit copy says.
  */
+/**
+ * The worker's own refused punches (020 FR-012).
+ *
+ * Its own block rather than entries in `MY_PUNCH_EXCEPTIONS`, because the two lists are opposites
+ * and sharing copy would blur them: an exception is a punch that was *recorded* and is being
+ * checked by somebody; a refusal is a punch that does not exist and that nobody will check.
+ */
+/**
+ * Where an employee may punch (020 FR-007 – FR-011).
+ *
+ * The hardest copy in this feature is `noAssignment`. On the day this ships **every** employee has
+ * no individual assignment, because the table is empty — so a sentence that reads as a warning
+ * marks the entire workforce as misconfigured, and an administrator who sees thirty red flags stops
+ * reading all thirty. It states the fallback as the ordinary thing it is.
+ */
+/**
+ * Turning a fuel alert into a decision with a name against it (020 FR-001 – FR-006).
+ *
+ * Every string here is read by somebody about to cost a vendor or an employee money, which is why
+ * the proposal wording is laboured: a recovery raised is not a recovery taken, and a reviewer who
+ * believes otherwise either hesitates to raise a correct one or assumes a wrong one is already
+ * fixed.
+ */
+/**
+ * Choosing what a role may do (019 FR-018 – FR-021).
+ *
+ * **Said in terms of records, not of the permission model.** An administrator choosing here is
+ * deciding whether somebody can change things; "read" and "write" are this system's words for that,
+ * not theirs, and a screen that uses them makes the safer option sound like the technical one.
+ */
+export const ROLE_LEVELS = {
+  legend: 'What this role can do in each area',
+  /**
+   * The hint that makes the whole control worth having.
+   *
+   * Until 2026-10-03 every role created here held both levels, because the screen could not express
+   * anything else. Somebody arriving now needs to know the choice exists and that it is per area.
+   */
+  hint: 'Tick an area to give access, then choose whether this role can only look at it or can also change it. Decide per area — a role can be able to change one thing and only view another.',
+  viewOnly: 'View only',
+  viewOnlyHint: 'Can open and read it. Nothing in it can be added, edited or deleted.',
+  viewAndChange: 'View and change',
+  viewAndChangeHint: 'Can read it and can add, edit and delete within it.',
+  /** FR-020. Not an error message — the control cannot express the state at all. */
+  writeImpliesRead:
+    'Changing always includes viewing, so there is no "change but not view".',
+} as const;
+
+export const FUEL_EXCEPTIONS = {
+  heading: 'Fuel exceptions',
+  subheading:
+    'Machines that burned more than their category benchmark allowed for the hours they ran. Confirming one records who bears it; recovering it is a separate step.',
+  empty: 'No fuel exceptions. Nothing has breached its benchmark.',
+  loadFailed: 'Fuel exceptions could not be loaded.',
+
+  columnMachine: 'Machine',
+  columnDate: 'Date',
+  columnActual: 'Actual',
+  columnBenchmark: 'Benchmark',
+  columnShortfall: 'Excess',
+  columnStatus: 'Status',
+
+  /** FR-001's units, stated once so two columns cannot disagree about them. */
+  perHour: (value: number) => `${value} l/hr`,
+  litres: (value: number) => `${value} l`,
+  /**
+   * Null actual, said in words.
+   *
+   * The fuel was issued and the machine's hours were never entered. A dash would read as a missing
+   * column; a zero would read as a machine that ran no hours and still burned fuel.
+   */
+  noReading: 'No logbook reading for that day',
+  noBenchmark: 'No benchmark set for this category',
+
+  review: 'Review',
+  confirm: 'Confirm',
+  dismiss: 'Dismiss',
+  decision: 'Decision',
+  /** The three states, as a reader sees them. Past tense for the two that are decisions. */
+  statusOpen: 'Open',
+  statusConfirmed: 'Confirmed',
+  statusDismissed: 'Dismissed',
+  entryIssued: 'Issued',
+  entryRate: 'Rate',
+  entryCost: 'Cost',
+  entryOverBenchmark: 'Over benchmark',
+  cancel: 'Cancel',
+  attribution: 'Who bears this',
+  attributionHirer: 'The hirer — deduct from their hire bill',
+  attributionOperator: 'The operator — recover from their salary',
+  attributionBoth: 'Both',
+  attributionNeither: 'Nobody — the variance was genuine and is not being pursued',
+  /**
+   * FR-004, said rather than silently hidden.
+   *
+   * Offering a hire deduction on a machine the company owns invites a figure nobody can collect.
+   * The option is absent and this explains the absence — an option that merely vanishes reads as a
+   * bug to the person who used it yesterday on a hired machine.
+   */
+  ownedNoHirer:
+    'This machine is owned, so there is no hirer to deduct from. Only an operator recovery is available.',
+  reasonLabel: 'Why',
+  reasonRequiredToDismiss:
+    'A dismissal needs a reason. Without one an exception register becomes a list everybody clears without reading.',
+  attributionRequired: 'Say who bears this before confirming.',
+  /**
+   * FR-005. The refusal that matters most on this screen.
+   *
+   * Several people ran the machine that day, and the server refuses to guess — because guessing is
+   * how the wrong person's wages get docked. The candidates come back in the refusal itself.
+   */
+  operatorRequired:
+    'Several operators ran this machine that day. Choose the one who bears this — it is never assumed.',
+  operatorNoneRecorded:
+    'No operator is recorded against this machine for that day. The logbook has to say who ran it before a recovery can name them.',
+  operatorLabel: 'Operator',
+
+  recoverHireBill: 'Deduct from hire bill',
+  recoverOperator: 'Propose salary recovery',
+  recoveredHireBill: (amount: string) => `Deducted from the hire bill: ${amount}`,
+  /**
+   * FR-006, T045. **Proposed, not applied** — the single most important sentence here.
+   *
+   * The recovery reaches no payslip until the chain approves it. A reviewer who thinks the money is
+   * already taken will tell the operator so, and then either an unapproved recovery never happens
+   * or an approved one arrives as a surprise.
+   */
+  recoveryProposed: (amount: string) =>
+    `${amount} proposed as a salary recovery. It is waiting for approval and has not been deducted from anyone's pay.`,
+  recoveryAwaitingApproval: 'Awaiting approval — not yet deducted',
+  recoveryApproved: 'Approved — applies on the next payroll run',
+
+  /**
+   * T047. The pattern worth catching before fifty deductions are raised.
+   *
+   * When nearly every machine of a category breaches at once, the likely fault is the benchmark,
+   * not fifty operators. Stated as a question rather than a verdict — it can also be a genuinely
+   * bad batch of fuel, and a screen that announces the benchmark is wrong would get a correct
+   * exception dismissed.
+   */
+  benchmarkSuspect: (count: number, category: string) =>
+    `${count} machines in ${category} breached together. That is usually a benchmark that needs correcting rather than ${count} separate recoveries — check the category's benchmark before raising any.`,
+} as const;
+
+export const LOCATION_ASSIGNMENT = {
+  heading: 'Where this employee punches',
+  noAssignment:
+    'No individual assignment. Punches are checked against this employee’s own site geofence, which is the normal arrangement.',
+  current: 'In force now',
+  history: 'Earlier assignments',
+  mobile: 'Mobile — exempt from location checks',
+  /**
+   * FR-014, stated on the control itself rather than in a help page.
+   *
+   * The confusion it prevents is specific and expensive: an administrator who believes mobility
+   * exempts somebody from *all* checks will raise a support ticket the first time that person is
+   * refused for a bad photo, and may well disable face checking to "fix" it.
+   */
+  mobileScope:
+    'Mobility covers location only, never the photo check. A mobile employee is still refused if the photo does not match — where someone works and who is holding the phone are different questions.',
+  effectiveFrom: 'In force from',
+  effectiveFromRequired:
+    'Give the date this takes effect — a punch is judged by the assignment in force on its own day.',
+  saving: 'Saving…',
+  effectiveFromHint:
+    'A punch is judged by the assignment in force on the day it was taken, so backdating this changes how past days are read.',
+  reason: 'Why',
+  reasonRequiredForMobile:
+    'A mobility exemption needs a reason — a year from now, nobody can tell whether it was considered or merely convenient.',
+  siteRequired: 'Choose a site, or mark the employee mobile.',
+  siteLabel: 'Site',
+  sitePlaceholder: 'Select a site',
+  cancel: 'Cancel',
+  close: 'Close',
+  bulkCount: (count: number) =>
+    `${count} employee${count === 1 ? '' : 's'} in the current list`,
+  assign: 'Assign location',
+  assignedBy: 'Assigned by',
+  bulkHeading: 'Assign a site’s staff together',
+  bulkHint:
+    'Everyone selected gets the same assignment, from the same date. They are recorded one at a time, so if some fail the rest still stand.',
+  bulkNobodySelected: 'Select at least one employee.',
+  bulkDone: (ok: number) =>
+    `${ok} employee${ok === 1 ? '' : 's'} assigned.`,
+  /**
+   * Partial failure, named rather than summarised.
+   *
+   * "28 of 30 saved" tells an administrator that two people are wrong and not which two, which
+   * leaves them to check thirty records by hand or — far more likely — to assume it was fine.
+   */
+  bulkPartial: (ok: number, failed: string[]) =>
+    `${ok} assigned. ${failed.length} could not be: ${failed.join(', ')}. Those employees keep their previous arrangement.`,
+} as const;
+
+export const REFUSED_ATTEMPTS = {
+  heading: 'Refused attempts',
+  /**
+   * Says the two things a worker needs before reading a single row: nothing was recorded, and there
+   * is a way to fix a day. Without the first they assume the attempt counted for something; without
+   * the second they assume the day is simply lost.
+   */
+  subheading:
+    'Punches that were not accepted. Nothing was recorded for these attempts — if a day you worked has no punch, ask your supervisor to raise a correction.',
+  /** Good news, and said as such: being refused is the exception, not the norm. */
+  empty: 'No punches of yours have been refused.',
+  loadFailed: 'Your refused attempts could not be loaded.',
+  columnWhen: 'When',
+  columnType: 'Punch',
+  columnReason: 'Why it was not accepted',
+  punchIn: 'In',
+  punchOut: 'Out',
+} as const;
+
 export const MY_PUNCH_EXCEPTIONS = {
-  heading: 'Punches being checked',
+  /**
+   * Re-labelled in 020 Phase 3 (T021), and **not before**.
+   *
+   * This list is now history. A punch that fails the fence or the face check is refused outright
+   * and creates no exception, so nothing new arrives here — what remains are punches flagged under
+   * the old behaviour, still travelling a chain that somebody has to finish. Nothing is deleted:
+   * an exception in flight needs the one surface in the product belonging to the person who
+   * raised it.
+   *
+   * The timing was the point. Re-labelling this before the backend's refusal shipped would have
+   * been a different lie — exceptions were still being created then, and calling them "earlier"
+   * would have hidden the live ones.
+   */
+  heading: 'Earlier punches being checked',
+  subheading:
+    'Punches flagged before checks moved to the moment of punching. Nothing new is added here.',
   /** Shown when the list is empty — the ordinary case, and good news. */
   empty: 'None of your punches need checking.',
   loadFailed: 'Your flagged punches could not be loaded.',
@@ -2412,6 +3431,19 @@ export const DOCUMENT_COPY = {
   projectDocumentsOutstandingAdvisory: (name: string) =>
     `${name} — reported as outstanding`,
 
+  // ── Filing a document against an existing project (FR-008a) ────────────────
+  // Added 2026-10-04. Until then this panel named what was outstanding and offered no way to
+  // supply it: documents could only be attached while the project was being created, so a
+  // project that went live without its insurance could never be brought up to date.
+  projectDocumentFileThis: 'Upload',
+  projectDocumentAdd: 'Add a document',
+  projectDocumentAddHeading: 'File a document',
+  projectDocumentOwnerLabel: 'this project',
+  projectDocumentUploadHint:
+    'Filing a second document of the same kind adds it — it does not replace the first. Both stay on the project.',
+  projectDocumentUploaded: (name: string) => `${name} has been filed.`,
+  projectDocumentCancel: 'Cancel',
+
   // ── Documents on the project creation form (FR-023, FR-023a, FR-023b) ───────
   creationHeading: 'Project documents',
   creationHint:
@@ -2512,4 +3544,195 @@ export const PAYMENT_PROOF_COPY = {
   replace: 'Replace proof',
   view: 'View proof',
   missingFilterLabel: 'Missing proof only',
+} as const;
+
+/**
+ * BOQ entry, the tree, the alert tabs and the tender import (008 US5, amended 2026-10-03).
+ *
+ * The refusal strings are the point of this block. Fourteen conditions, fourteen sentences —
+ * enumerated against the API contract rather than described, because the first draft of the task
+ * named three and left eleven to prose, which ends as three mapped and eleven falling to one
+ * generic message. A refusal the reader cannot act on is this whole feature's recurring defect.
+ */
+/**
+ * Every word the project shell and its overview say (008 US4).
+ *
+ * The one that carries weight is `moduleUnavailable`. `GET /projects/:id` distinguishes "we
+ * asked and there is none" from "we could not ask", and the two must not read the same: a
+ * project page that says *No machinery on this project* when Plant was never consulted is
+ * stating as fact the one thing nobody knows.
+ */
+export const PROJECT_SHELL_COPY = {
+  loading: 'Loading this project…',
+  loadFailed: 'This project could not be loaded.',
+  breadcrumb: 'Portfolio',
+  tabsLabel: 'Project sections',
+
+  overviewHeading: 'Overview',
+  contractHeading: 'Contract',
+  activityHeading: 'Activity',
+  peopleHeading: 'People on this project',
+  machineryHeading: 'Machinery deployed here',
+  materialsHeading: 'Materials issued to this project',
+
+  peopleEmpty: 'Nobody is assigned to this project yet.',
+  machineryEmpty: 'No machinery is deployed to this project.',
+  materialsEmpty: 'No materials have been issued to this project.',
+
+  dwrCount: (count: number) =>
+    count === 1 ? '1 daily work report' : `${count} daily work reports`,
+  dwrNone: 'No daily work reports yet.',
+  dwrLatest: (date: string) => `Latest ${date}`,
+  billsCount: (count: number) =>
+    count === 1 ? '1 bill booked' : `${count} bills booked`,
+  revenueReceived: 'Received',
+  revenuePending: 'Pending',
+
+  /** Named modules, so the sentence says which answer is missing and why. */
+  moduleUnavailable: (modules: string[]) =>
+    `${modules.join(' and ')} could not be consulted, so anything they would contribute is missing from this page rather than absent. This is not the same as there being none.`,
+  moduleNames: {
+    plant: 'Plant & Machinery',
+    inventory: 'Inventory',
+  } as Record<string, string>,
+
+  locked:
+    'This project is locked. Its details cannot be changed until it is unlocked on the edit screen.',
+} as const;
+
+export const BOQ_COPY = {
+  heading: 'Bill of Quantities',
+  loading: 'Loading the schedule…',
+  subheading: 'The schedule every bill is measured against.',
+  empty: 'No BOQ yet. Enter sections and lines, or import a tender workbook.',
+  loadFailed: 'The BOQ could not be loaded.',
+
+  // The tree
+  columnBoqNo: 'BOQ No.',
+  columnTask: 'Item',
+  columnUnit: 'Unit',
+  columnScope: 'Scope qty',
+  columnDone: 'Done',
+  columnPending: 'Pending',
+  columnPerDay: 'Per day',
+  columnAvgPerDay: 'Avg / day',
+  columnDaysLeft: 'Days to finish',
+  columnFinish: 'Finish by',
+  /**
+   * What an unplanned programme column reads (FR-026).
+   *
+   * The word, not an em dash and not a zero. A 312-line imported tender is entirely unplanned on
+   * the day it arrives, so this is the screen's normal state rather than an exception in it — and
+   * a zero per-day target reads as "achieving nothing", which is a different claim.
+   */
+  unplanned: 'Not planned',
+  /** A section heading carries no quantity, because it is a title and not a line. */
+  sectionLabel: 'Section',
+  variation: 'Variation',
+
+  // Entry
+  addSection: 'Add section',
+  addLine: 'Add line',
+  sectionName: 'Section name',
+  taskName: 'Item description',
+  unitLabel: 'Unit',
+  unitHint: 'As it appears on your schedule — it is stored exactly as typed.',
+  scopeQty: 'Scope quantity',
+  rate: 'Rate',
+  rateHint: 'Leave blank and the line stays unpriced; a bill will refuse it rather than bill it free.',
+  startDate: 'Start date (optional)',
+  finishDate: 'Finish date (optional)',
+  duration: 'Working days (optional)',
+  perDay: 'Per-day target (optional)',
+  programmeHint: 'Dates are optional. A line without them is simply not planned yet.',
+  save: 'Save',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  deleteLine: 'Delete',
+  deleteBlocked: 'This line cannot be deleted because work has been recorded against it.',
+
+  // Alert tabs — four, not three
+  alertsHeading: 'What needs attention',
+  tabToday: 'Due today',
+  tabDelayed: 'Overdue',
+  tabToBeDelayed: 'At risk',
+  tabUnplanned: 'Not planned',
+  tabEmpty: 'Nothing here.',
+  unplannedExplainer:
+    'These lines have no finish date, so they are neither on time nor late. Plan them to see them in the other tabs.',
+
+  // Import
+  importHeading: 'Import a tender workbook',
+  importHint: 'Excel (.xls or .xlsx). Nothing is saved until you confirm.',
+  importChoose: 'Choose file',
+  importReading: 'Reading the workbook…',
+  importConfirm: 'Confirm import',
+  importConfirming: 'Importing…',
+  importDiscard: 'Discard',
+  importDone: (groups: number, lines: number) =>
+    `Imported ${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}.`,
+
+  // The report
+  reportHeading: 'What the import understood',
+  reportLines: (lines: number, groups: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}`,
+  reportSheet: (sheet: string) => `Read from sheet “${sheet}”`,
+  reportScheduleTotal: 'Schedule total',
+  reportQuotedTotal: 'Quoted total',
+  reportStated: 'Stated in the file',
+  reportDifference: 'Difference',
+  reportTolerance: (tolerance: string) => `within ${tolerance} allowed`,
+  reportReconciles: 'Both totals agree with the figures in your file.',
+  reportDoesNotReconcile:
+    'The totals do not agree with the figures stated in your file. Check the schedule before confirming.',
+  reportPercentage: 'Quoted percentage',
+  /**
+   * Shown where the percentage was not found (FR-028).
+   *
+   * A condition to resolve, never a zero. The consequence is named because it is invisible
+   * otherwise: on the client's own file the silence is ₹7.37 lakh across the project.
+   */
+  reportPercentageMissing:
+    'Not found in this file. Every bill will be raised at the schedule rate, with no percentage added — on a ₹3 crore tender a missing 2.46% is about ₹7.4 lakh. Set it on the project before billing.',
+  reportUnits: 'Units found',
+  reportUnitsHint: 'Shown as your file spells them. Matching ignores case, spacing and full stops.',
+  reportErrors: (count: number) =>
+    `${count} row${count === 1 ? '' : 's'} could not be imported`,
+  reportWarnings: (count: number) =>
+    `${count} note${count === 1 ? '' : 's'} about rows that were imported`,
+  reportColumnRow: 'Row',
+  reportColumnColumn: 'Column',
+  reportColumnReason: 'Reason',
+  reportNothingWritten: 'Nothing has been saved yet.',
+
+  /** One sentence per refusal (FR-029). A generic message here is a refusal nobody can act on. */
+  refusals: {
+    BOQ_FILE_TOO_LARGE:
+      'That file is too large to read. A BOQ schedule is normally well under 1MB — check you have uploaded the schedule and not a folder of drawings.',
+    BOQ_WORKBOOK_UNREADABLE:
+      'That file is not an Excel workbook. Upload the .xls or .xlsx itself — a PDF, a CSV or a renamed file of another kind cannot be read.',
+    BOQ_WORKBOOK_EMPTY:
+      'The workbook opened but has no sheets with any content. If it came from a tender portal, open it in Excel and save it again before uploading.',
+    BOQ_NO_SCHEDULE_BLOCK:
+      'No schedule could be found. The sheet needs a header row naming an item description, a quantity, a unit and a rate.',
+    BOQ_NO_SCHEDULE_ROWS: 'The schedule has a header row but no items beneath it.',
+    BOQ_NO_IMPORTABLE_ROWS:
+      'Every row in the schedule was rejected, so there is nothing to import. The reasons are listed above.',
+    BOQ_TOO_MANY_ROWS:
+      'This schedule has more rows than one import can take. Import its sections separately.',
+    BOQ_TOO_MANY_BATCHES:
+      'Too many imports are waiting to be confirmed. Confirm or discard one of them, then try again.',
+    BOQ_ALREADY_POPULATED:
+      'This project already has a BOQ. Importing again would add a second copy rather than replace the first, and the existing lines cannot be removed automatically because bills may already measure against them. Add or revise lines instead.',
+    BOQ_BATCH_NOT_FOUND: 'That import is no longer available. Upload the file again.',
+    BOQ_BATCH_EXPIRED:
+      'This import was prepared a while ago and has expired. Nothing was saved — upload the file again.',
+    /** Not a failure: the schedule is on its way in, which is what the person wanted. */
+    BOQ_BATCH_IN_PROGRESS: 'This schedule is being imported now. Reload the project in a moment.',
+    /** Not a failure either: it already worked. */
+    BOQ_BATCH_ALREADY_CONFIRMED: 'Already imported. Nothing further is needed.',
+    BOQ_BATCH_NOT_YOURS:
+      'This import was prepared by someone else, or for a different project. Upload the file again here.',
+  } as const,
+  refusalFallback: 'The workbook could not be imported.',
 } as const;

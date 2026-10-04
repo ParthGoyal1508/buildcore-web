@@ -156,22 +156,39 @@ persistent locked banner; all tabs render (empty states for no-data tabs).
 **Independent Test**: Open detail page, click all 9 tabs, confirm each renders without error;
 lock project → banner appears, action buttons disabled.
 
+> **Built 2026-10-04 as ten routed sections rather than nine hash tabs.** The independent test
+> above still applies, with "click all 9 tabs" reading as "click every tab in the strip" — each
+> is now a URL. See the implementation note at the end of this file.
+
 ### Implementation for User Story 4
 
-- [ ] T021 [P] [US4] Implement `getProject` in `app/lib/api/projects.ts` (returns
-      `ProjectDetail` with tabs aggregation)
-- [ ] T022 [US4] Create `app/dashboard/projects/portfolio/[id]/page.tsx`: `ProjectDetailPage`
-      — sticky tab strip (9 tabs, URL-hash-based navigation), `ProjectLockContext.Provider`
-      wrapping the page, locked banner (`isLocked` → persistent red/orange banner
-      "This project is locked — data entry is disabled" — FR-005)
-- [ ] T023 [P] [US4] Create `app/dashboard/projects/portfolio/[id]/tabs/OverviewTab.tsx`:
-      summary card with all project fields, Contract Value via `formatCurrency`
-- [ ] T024 [P] [US4] Create `EmployeesTab.tsx`, `MachineryTab.tsx`, `MaterialsTab.tsx`:
-      read-only lists from `ProjectDetail.tabs` aggregation; empty states if no data
-- [ ] T025 [P] [US4] Create `DWRTab.tsx`: summary count + link to `/dashboard/projects/dwr
-      ?projectId=` with "Add DWR" button (disabled when locked via `ProjectLockContext`)
-- [ ] T026 [P] [US4] Create `BillsExpensesTab.tsx`: sub-tab shell (Bills, Expenses, Work
-      Orders) — content wired in US7 (Phase 9)
+- [X] T021 [P] [US4] ✅ Done 2026-10-04 — `getProjectDetail` in `app/lib/api/projects.ts`
+      parses the whole aggregate. It replaces `getProject`, which parsed `raw.project` and
+      discarded the tabs under a comment saying the detail page was not built. Both
+      branches of `unavailableModules` were parsed against a running API before the
+      schema was trusted, the real response and a synthesised one carrying machinery and a
+      string `utilizationPercent`
+- [X] T022 [US4] ✅ Done 2026-10-04 — **as routed sections, not the specified hash tabs**, in
+      `app/dashboard/projects/portfolio/[id]/layout.tsx`. See the implementation note below
+      for why. The lock provider and the locked banner moved up here from the edit page, so
+      the lock is visible on every section it governs rather than only on the one screen
+      that can change it
+- [X] T023 [P] [US4] ✅ Done 2026-10-04 — `portfolio/[id]/page.tsx`, the project's own home.
+      `formatRupees`, not the specified `formatCurrency` — see the T003 note
+- [X] T024 [P] [US4] ✅ Done 2026-10-04 — `people/`, `machinery/` and `materials/` sections,
+      read from the shell's aggregate so none of them issues a request. The empty states of
+      the last two are **two sentences, not one**: `unavailableModules` naming the module
+      means nobody asked, and rendering that as "No machinery is deployed to this project"
+      would state as fact the one thing unknown
+- [ ] ~~T025~~ **PARTIAL — the count is built, the link has nowhere to go.** The overview
+      shows the DWR count and the latest date from `tabs.dwrSummary`. The specified link to
+      `/dashboard/projects/dwr?projectId=` is not written because that route does not exist
+      in this repository; DWR has no screen at all. A link to a 404 disabled by a lock is
+      worse than no link
+- [ ] ~~T026~~ **SUPERSEDED by feature 018** (2026-10-04) — Bills and Work Orders were built
+      as the `billing/` and `ra-bills/` sections, and they are two of the shell's tabs. The
+      sub-tab shell this task describes would be a third level of tabs over screens that
+      already exist. Expenses still has no screen anywhere
 
 **Checkpoint**: Detail page shell with all 9 tabs navigable; lock context and banner working.
 
@@ -188,22 +205,27 @@ report "4 valid, 1 error" + download link with nothing written yet, click Confir
 
 ### Implementation for User Story 5
 
-- [ ] T027 [P] [US5] Implement `getBOQ`, `createBOQGroup`, `createBOQItem`, `validateBOQImport`,
+- [ ] ~~T027~~ **SUPERSEDED by T059–T061** (2026-10-03) — the schemas take the programme fields as nullable now, and the report shape grew.
+  Original: [P] [US5] Implement `getBOQ`, `createBOQGroup`, `createBOQItem`, `validateBOQImport`,
       `confirmBOQImport`, `getBOQAlerts` in `app/lib/api/projects.ts`
-- [ ] T028 [P] [US5] Create `app/ui/projects/BOQTree.tsx`: collapsible tree table
+- [ ] ~~T028~~ **SUPERSEDED by T062–T065** (2026-10-03) — a heading must render as a heading and an unplanned column as unplanned.
+  Original: [P] [US5] Create `app/ui/projects/BOQTree.tsx`: collapsible tree table
       (`ResponsiveList`-based, keyboard-operable — FR-014; group rows expand to show items),
       columns (BOQ No., Task Name, Unit, Scope Qty, Done Qty, Pending Qty, Per Day Qty,
       Avg Qty/Day, Days to Complete), inline Add Group/Add Item forms at the
       bottom; disabled when locked (`ProjectLockContext`)
-- [ ] T029 [P] [US5] Create `app/ui/projects/BOQImportButton.tsx`: two-step flow — file input for
+- [ ] ~~T029~~ **SUPERSEDED by T066–T070** (2026-10-03) — `.xlsx` only is wrong — the client's file is `.xls` — and the report must carry what the import understood, not a valid/error count.
+  Original: [P] [US5] Create `app/ui/projects/BOQImportButton.tsx`: two-step flow — file input for
       `.xlsx` uploads via `validateBOQImport`, on complete shows "N valid rows. M errors." with
       "Download Error Report" anchor link to `errorReportUrl` and a "Confirm Import" button
       (disabled until validation completes); clicking it calls `confirmBOQImport(batchId)` and
       shows "N rows imported"; progress indicator during both calls — FR-004
-- [ ] T030 [US5] Create `app/ui/projects/BOQAlertTabs.tsx`: three-tab card (Today Task,
+- [ ] ~~T030~~ **SUPERSEDED by T071** (2026-10-03) — four tabs, not three (FR-048).
+  Original: [US5] Create `app/ui/projects/BOQAlertTabs.tsx`: three-tab card (Today Task,
       Delayed, To Be Delayed) each showing a list of BOQ items with their context (BOQ No.,
       Task Name, Pending Qty, deadline info); auto-refreshes when BOQ query is invalidated
-- [ ] T031 [US5] Integrate BOQ section into project detail (new tab or within existing DWR tab
+- [ ] ~~T031~~ **SUPERSEDED by T072** (2026-10-03) — unchanged in intent; renumbered with the block.
+  Original: [US5] Integrate BOQ section into project detail (new tab or within existing DWR tab
       area) and wire `@tanstack/react-query` BOQ queries
 
 **Checkpoint**: BOQ tree, import, and alerts fully functional.
@@ -502,3 +524,150 @@ and the `TA*` amendment are correctly unbuilt and are not reported here.
       matching the settings and HR layouts. Amend FR-013 to describe the layout boundary,
       so the next feature does not inherit the same impossible requirement — feature 014
       already had to reason its way out of it once.
+
+---
+
+## Amendment 2026-10-03 — The BOQ screens (T059 – T077)
+
+Sources: `spec.md` Amendment 2026-10-03 (FR-025 – FR-032); `plan.md` phases B1–B5. The backend half
+(`buildcore-api` 008 T061–T096) lands first — there is nothing to call until it does.
+
+T027–T031 above are **superseded, not deleted**; each carries a note naming its replacement.
+
+### Phase B1: Types and reads
+
+- [X] T059 [P] [US5] ✅ Done — added to `app/lib/api/projects.ts`, and the module's own header note corrected: it said BOQ had no functions because the endpoints did not exist, which stopped being true on 2026-10-03 Extend `app/lib/api/projects.ts` — not a new module, because groups and items
+      are project data and a second module would split the project's own types across two files:
+      `getBOQ`, `createBOQGroup`, `createBOQItem`, `deleteBOQItem`, `getBOQAlerts`,
+      `validateBOQImport`, `confirmBOQImport`.
+- [X] T060 [P] [US5] ✅ Done — `perDayQty`, `avgQtyPerDay`, `daysToComplete`, both dates and `quotedPercentage` all `.nullable()` with the reason on the type zod schemas with the programme fields `.nullable()` and the report's
+      `quotedPercentage` `.nullable()` too. **Sixth occurrence of this class of defect** in this
+      project: a nullable the schema treats as required fails the whole read, and one the schema
+      omits loses exactly the distinction FR-026 exists to draw. Asserted, not assumed.
+- [X] T061 [P] [US5] ✅ Done — `warnings` separate from `errors`, both totals with their differences and the tolerance, the percentage with its found flag, and the alert preview One type for the validation report mirroring the contract exactly — both
+      totals with their differences and the tolerance, the percentage with its found flag, the alert
+      preview, and **`warnings` as a separate field from `errors`**: a line grouped under the sheet
+      name is not a rejected row.
+
+### Phase B2: The tree
+
+- [X] T062 [US5] ✅ Done — `app/ui/projects/boq-tree.tsx`, scrolling in its own `overflow-x-auto` container; eleven columns, so the page body must not be what moves `app/ui/projects/boq-tree.tsx` — collapsible groups, keyboard-operable, scrolling
+      in its own `overflow-x-auto` container so the page body never scrolls sideways (FR-032).
+- [X] T063 [US5] ✅ Done — a section spans with `colSpan` and a `rowgroup` scope, collapsible, with its line count **A heading renders as a heading** (FR-025): a group's quantity cell is neither
+      blank nor `0` — blank reads as missing data, `0` reads as a real figure, and the row is in fact
+      a section title. Rendered as a spanning label.
+- [X] T064 [US5] ✅ Done — "Not planned" in grey, never an em dash and never a zero; grey rather than amber because this is the state of all 231 lines of a fresh tender and styling the normal case as a warning teaches people to ignore warnings **Unplanned is explicit** (FR-026): programme columns show the word, not an em dash
+      and not a zero. 312 unplanned lines is the normal state of a freshly imported tender, so this
+      is the common case and must not read as an error.
+- [X] T065 [US5] ✅ Done — `boq-entry.tsx`; the four programme fields labelled optional and each sent only when it has a value; both controls **absent** on a locked project Add Group / Add Item forms with the four programme fields optional and labelled as
+      optional; controls **absent**, not disabled, on a locked project, matching how the rest of this
+      application shows a lock.
+
+### Phase B3: The import, and the report that justifies it
+
+- [X] T066 [US5] ✅ Done — `boq-import.tsx`, `.xls` first in the accept list because the client's own tender is the legacy format `app/ui/projects/boq-import.tsx` — upload, then a report, then a separate confirm.
+      The file input accepts `.xls` **and** `.xlsx`: the client's own tender is the former, which is
+      the whole reason this amendment exists.
+- [X] T067 [US5] ✅ Done — lines, groups, the sheet name, both derived totals beside the file's own two with difference and tolerance, the percentage, units as typed with counts, and errors and warnings in separate collapsible tables The report carries what the import **understood** (FR-027): lines read, groups they
+      fell under, both derived totals beside the two the file states with the difference and the
+      tolerance, the percentage found or plainly not found, every rejected row with its row number,
+      column and reason, and warnings listed apart from errors.
+- [X] T068 [US5] ✅ Done — shown as an `role="alert"` condition naming the consequence in rupees, never as a zero **A missing percentage is a condition, not a zero** (FR-028): shown as something to
+      resolve before confirming, with the consequence in the copy — on the client's own file the
+      silence is ₹7.37 lakh.
+- [X] T069 [US5] ✅ Done — all fourteen codes mapped in `BOQ_COPY.refusals`; the fallback is reached only when the API sends no code **Every whole-file refusal gets its own sentence** (FR-029). Enumerated against
+      the api contract rather than described, because the 2026-10-03 analysis pass found this task
+      naming three codes and leaving eleven to prose — which ends as three mapped and eleven falling
+      to a generic message. All fourteen: `BOQ_FILE_TOO_LARGE`, `BOQ_WORKBOOK_UNREADABLE`,
+      `BOQ_WORKBOOK_EMPTY`, `BOQ_NO_SCHEDULE_BLOCK`, `BOQ_NO_SCHEDULE_ROWS`,
+      `BOQ_NO_IMPORTABLE_ROWS`, `BOQ_TOO_MANY_ROWS`, `BOQ_TOO_MANY_BATCHES`,
+      `BOQ_ALREADY_POPULATED` (naming the existing count), `BOQ_BATCH_NOT_FOUND`,
+      `BOQ_BATCH_EXPIRED`, `BOQ_BATCH_IN_PROGRESS`, `BOQ_BATCH_ALREADY_CONFIRMED`,
+      `BOQ_BATCH_NOT_YOURS`. A success state beside "0 rows" is prohibited — that is exactly what
+      the old library would have produced for the client's real file.
+- [X] T070 [US5] ✅ Done — confirm disabled while the report does not reconcile; a second confirm resolves to the already-imported sentence rather than an error; units rendered verbatim Confirm unavailable twice (FR-031): while the report shows the file would be
+      rejected, and after a successful confirm. `BOQ_BATCH_ALREADY_CONFIRMED` is shown as "already
+      imported" and `BOQ_BATCH_IN_PROGRESS` as "being imported now" — neither as a failure, because
+      the schedule is in or on its way, which is what the person wanted. `BOQ_BATCH_EXPIRED` says so
+      and offers the upload again. Units display exactly as typed (FR-030): no tidying `R. mtr`,
+      because the client reconciles against their own sheet.
+
+### Phase B4: Alerts and mounting
+
+- [X] T071 [US5] ✅ Done — `boq-alert-tabs.tsx`, four tabs with counts, proper `tablist`/`tab`/`tabpanel` roles, and the unplanned tab explaining itself inline `app/ui/projects/boq-alert-tabs.tsx` with **four** tabs — Today, Delayed, To Be
+      Delayed, Unplanned. Three would mean an unplanned line is silently absent from the one screen
+      whose claim is to show what needs attention.
+- [X] T072 [US5] ✅ Done — `/dashboard/projects/portfolio/[id]/boq`, linked from the portfolio row **before** the three money screens, since until today they all measured against a table nothing could fill. The confirm invalidates the tree, the alerts and the project itself, the last because an import may set its quoted percentage Mount the tree, the import and the alerts in the project detail page's BOQ tab and
+      wire the TanStack Query keys, invalidating the BOQ tree and the alerts together after a
+      confirm.
+- [X] T073 [US5] ✅ Done, with a correction to this note. All screen copy is in `BOQ_COPY`, and **the sweep was run rather than asserted** — it found two literals: `Portfolio` in the new page's breadcrumb and `BOQ` as the portfolio row's link label. Both are left as they are, because the files around them do exactly the same: the billing page's breadcrumb is a literal `Portfolio`, and `project-list-table.tsx` carries `Documents`, `Position`, `Bills` and `Subcontractors` as literals. Matching the surrounding code is the right call for short navigation labels; what is wrong is the claim this note originally made, which was that the sweep found nothing All copy into `app/lib/constants`, per the convention the FR-015 sweep enforces —
+      and run the sweep rather than asserting it, since it has twice found literals that assertion
+      would have missed.
+
+### Verification
+
+- [X] T074 [US5] ✅ Done 2026-10-03 — `tsc --noEmit` clean, `eslint app` 0 errors (11 pre-existing warnings), `next build` compiles with the new route present. Prettier **not** run, per the standing note `npx tsc --noEmit`, `npx eslint app`, `npm run build`. **Never
+      `npx prettier --write`** — there is no prettier config in this repository, so its defaults
+      reformat untouched files (2,400-line diff, 1 October).
+- [ ] T075 [P] [US5] Browser pass: import the client's file, read the report, confirm, and check the
+      tree shows 83 groups and ~312 lines with every programme column reading unplanned.
+      **Outstanding — needs a browser and a running API.**
+- [ ] T076 [P] [US5] Browser pass at 320px on the tree, the import report and the alert tabs
+      (FR-032). **Outstanding.**
+- [ ] T077 [US5] Record each pass beside its task. A verification whose result is not written down
+      did not happen.
+
+---
+
+## Implementation note — 2026-10-04, User Story 4: the project shell
+
+Built on the client's own report: *"when we are clicking BOQ, we are getting this route. Can we
+create subroutes for all the possible cases like Documents, BOQ, Bills etc"*.
+
+The subroutes already existed — all six of them. What did not exist was anything joining them.
+Each section fetched the project for itself, drew its own breadcrumb and its own
+`<name> — <section>` heading, and offered no way to any of the other five: from the BOQ, reaching
+the documents meant going back to the portfolio list and finding the row again. `/portfolio/<id>`
+itself was a **404**, so clicking a project did nothing, and the portfolio row had grown six
+section links to compensate — with a comment in `project-list-table.tsx` saying so outright:
+*"reachable from the row rather than from a project detail page that does not exist"*.
+
+**Deviations from the task text, and why:**
+
+- **Routed sections, not the nine hash tabs T022 specifies.** Four sections had already been
+  built as routes, and a hash is not a location: it cannot be linked to from a reminder, reloaded
+  onto the tab you were reading, or opened in a second window beside the first. The tab strip is
+  the one `SectionTabs` every other module uses, so the active-tab rule — longest match, not
+  `startsWith` — is the rule already proven elsewhere. It matters here: the overview's href is a
+  prefix of all nine others.
+- **Ten sections, not nine.** Overview, BOQ, Documents, People, Machinery, Materials, Client
+  bills, Subcontractors, Position, Edit. DWR and Expenses, which the original nine included, have
+  no screen in this repository at all.
+- **The aggregate is read, finally.** `GET /projects/:id` has returned the project's people,
+  machinery, materials and three summaries since feature 008 shipped, and this app parsed the
+  first field and threw the rest away — under a comment explaining that the detail page was not
+  built. The shell fetches it once, under the `['projects', 'portfolio', id]` key the six section
+  pages already used and `boq-import` already invalidates, and hands it to every section through
+  `ProjectShellProvider`. Six duplicate requests became one, and People, Machinery and Materials
+  need no endpoint of their own.
+- **The lock moved up.** The locked banner was on the edit page only, which is the one screen
+  that can *change* the lock rather than the screens it stops. It is now on the shell, above
+  every section it governs.
+- **The portfolio row lost four links.** Documents, BOQ, Position, Bills and Subcontractors
+  became one **Open**; Edit and Delete stay. The project name is now a link, which it never was.
+
+**What the two read-only sections say when a module is absent:** `unavailableModules` distinguishes
+*we asked and there is none* from *we could not ask*, and both the overview and the two sections
+render the second as its own sentence. Collapsing them would print "No machinery is deployed to
+this project" — a statement of fact, on the one occasion nobody knows.
+
+**Verification:**
+
+- `npx tsc --noEmit` clean; `npx eslint app` 0 errors (11 pre-existing warnings); `npm run build`
+  emits all ten `/dashboard/projects/portfolio/[id]/*` routes. Prettier **not** run, per T074.
+- The `zod` schema was checked against a **running** API, not written from `data-model.md`: the
+  real `GET /projects/:id` for the client's own Whitefield Tech Park project parses, and a
+  synthesised response carrying a machinery row with a string `utilizationPercent` and both
+  modules named unavailable parses too — neither of which the real response exercised, since it
+  returned no machinery and named no module.
+- Browser pass outstanding: the strip at 320px, and the lock banner on a locked project.

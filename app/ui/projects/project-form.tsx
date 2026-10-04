@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { ApiError } from '@/app/lib/api/client';
 import { listEmployees } from '@/app/lib/api/hr-payroll';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import ProjectDocumentUploads, {
   unstagedMandatory,
   type StagedUploads,
@@ -73,13 +74,10 @@ export const projectSchema = z
   // Cross-field, so it cannot live on either field alone. Reported on the end date
   // because that is the one the user most likely mistyped — the start date was
   // entered first and is usually the fixed one.
-  .refine(
-    (v) => !v.expectedEndDate || v.expectedEndDate >= v.startDate,
-    {
-      message: 'Expected end date cannot be before the start date.',
-      path: ['expectedEndDate'],
-    },
-  );
+  .refine((v) => !v.expectedEndDate || v.expectedEndDate >= v.startDate, {
+    message: 'Expected end date cannot be before the start date.',
+    path: ['expectedEndDate'],
+  });
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 
@@ -117,15 +115,14 @@ export default function ProjectForm({ project }: { project?: Project }) {
    * against a project that exists through its own documents screen. Asking here on an edit would
    * render upload controls that answer a requirement already satisfied or already waived.
    */
-/**
- * No `companyId` is passed, and that is deliberate.
- *
- * Nothing else in the projects tree mounts `CompanyProvider`, so `useCompanyContext` would throw on
- * render — a crash a type-check and a build both pass straight over. The server resolves the company
- * from the caller (and, since 019, narrows it to their selected company), which is how every other
- * screen under `/dashboard/projects` already behaves. Introducing the provider here would make this
- * subtree the only one with a company selector, for no requirement that asked for one.
- */
+  /**
+   * No `companyId` is passed, and that is deliberate.
+   *
+   * The server resolves the company from the caller's session and narrows it to their selected company
+   * (019 FR-004), so there is nothing for a screen to send. This was already how every screen under
+   * `/dashboard/projects` behaved; as of 019 Phase 4 it is how the whole application behaves, and the
+   * provider that made it unusual here no longer exists.
+   */
   const { data: requirementSet } = useQuery({
     queryKey: ['projectDocumentRequirements'],
     queryFn: () => getDocumentRequirements(),
@@ -194,6 +191,15 @@ export default function ProjectForm({ project }: { project?: Project }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
 
+  /**
+   * Lets a company switch warn before it discards this form (019 FR-006).
+   *
+   * The `beforeunload` guard above cannot cover it: switching company is a client-side state change,
+   * so the browser never fires a navigation event. This registration is what makes the switcher's
+   * confirmation name this screen instead of saying nothing.
+   */
+  useUnsavedChanges('Project form', isDirty);
+
   const wasLocked = project?.isLocked ?? false;
   // `useWatch` rather than `watch()`: the latter returns a fresh function on every
   // render, which makes React Compiler skip memoizing this whole component.
@@ -224,11 +230,16 @@ export default function ProjectForm({ project }: { project?: Project }) {
         description: values.description,
       };
       if (project) {
-        return updateProject(project.id, { ...payload, isLocked: values.isLocked });
+        return updateProject(project.id, {
+          ...payload,
+          isLocked: values.isLocked,
+        });
       }
       // Omitted rather than sent empty, so the server allocates from the company
       // PROJECTS series. Sending '' would be a caller-supplied code of no characters.
-      const withCode = values.code ? { ...payload, code: values.code } : payload;
+      const withCode = values.code
+        ? { ...payload, code: values.code }
+        : payload;
       const ids = Object.values(staged).map((file) => file.stagedDocumentId);
       // Omitted when empty for the same reason as `code`: an empty array is a statement that no
       // documents were staged, which is only worth making when the server would otherwise assume

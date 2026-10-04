@@ -12,13 +12,13 @@ import {
   type CompanyDocument,
 } from '@/app/lib/api/company-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
+import { openStoredFile } from '@/app/lib/download-file';
 import { CompletenessPanel } from '@/app/ui/documents/completeness-panel';
 import {
   DocumentUpload,
   type UploadKind,
 } from '@/app/ui/documents/document-upload';
 import { RestrictedNotice } from '@/app/ui/documents/restricted-badge';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
   DocumentKindForm,
   type DocumentKindInput,
@@ -34,35 +34,23 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
  */
 export function CompanyDocumentsScreen() {
   const queryClient = useQueryClient();
-  const { companyId, canSwitch } = useCompanyContext();
-  /**
-   * Held until the company is settled, for a caller who can switch (FR-021).
-   *
-   * `CompanyProvider` resolves to `null` on first render and to a real id once the
-   * company list arrives. Firing in between asks the server for "my own company", which
-   * is either a different company's data shown for an instant under the selected
-   * company's name, or — for a cross-company account with no home company of its own —
-   * a refusal the screen would render as a load failure before recovering. A caller who
-   * cannot switch never waits: their `null` means "use my own", which is correct.
-   */
-  const scopeReady = !canSwitch || companyId !== null;
   const [uploadFor, setUploadFor] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [defineError, setDefineError] = useState<string | null>(null);
 
   /**
-   * The company is part of the key, not just the request (FR-021).
+   * No company segment any more (019 FR-005).
    *
-   * Without it react-query answers a switch from its cache and shows the previous
-   * company's documents under the new company's name — the failure mode that looks
-   * exactly like success until somebody uploads against it.
+   * The hazard this guarded against is real — react-query answering a switch from cache
+   * shows the previous company's rows under the new company's name, the failure that looks
+   * exactly like success. It is now handled once, centrally: the switcher clears the whole
+   * cache, so no screen has to remember to key on a company it no longer knows.
    */
-  const queryKey = ['company-documents', companyId ?? 'own'];
+  const queryKey = ['company-documents'];
 
   const { data, isPending, isError } = useQuery({
     queryKey,
-    queryFn: () => getCompanyDocuments(companyId ?? undefined),
-    enabled: scopeReady,
+    queryFn: () => getCompanyDocuments(),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
@@ -83,7 +71,7 @@ export function CompanyDocumentsScreen() {
    * the certificate they have in their hand.
    */
   const define = useMutation({
-    mutationFn: (code: string) => defineRequiredKind(code, companyId ?? undefined),
+    mutationFn: (code: string) => defineRequiredKind(code),
     onSuccess: async (created) => {
       setDefineError(null);
       await invalidate();
@@ -100,8 +88,7 @@ export function CompanyDocumentsScreen() {
    * certificate in their hand.
    */
   const addKind = useMutation({
-    mutationFn: (input: DocumentKindInput) =>
-      createCompanyDocumentKind(input, companyId ?? undefined),
+    mutationFn: (input: DocumentKindInput) => createCompanyDocumentKind(input),
     onSuccess: async (created) => {
       setDefineError(null);
       await invalidate();
@@ -138,12 +125,7 @@ export function CompanyDocumentsScreen() {
   const open = async (doc: CompanyDocument) => {
     setDownloadError(null);
     try {
-      const blob = await downloadCompanyDocument(doc.id, companyId ?? undefined);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      // Revoked on a timer rather than immediately: the new tab needs the URL to
-      // survive long enough to start reading it.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      openStoredFile(await downloadCompanyDocument(doc.id), `${doc.code}-${doc.id}`);
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       setDownloadError(
@@ -161,10 +143,7 @@ export function CompanyDocumentsScreen() {
       <RowAction type="button" onClick={() => void open(doc)}>
         Download
       </RowAction>
-      <RowAction
-        type="button"
-        onClick={() => setUploadFor(doc.documentTypeId)}
-      >
+      <RowAction type="button" onClick={() => setUploadFor(doc.documentTypeId)}>
         Replace
       </RowAction>
     </>
@@ -259,9 +238,7 @@ export function CompanyDocumentsScreen() {
           kinds={kinds}
           ownerLabel="this company"
           initialDocumentTypeId={uploadFor ?? undefined}
-          onUpload={(input) =>
-            upload.mutateAsync({ ...input, companyId: companyId ?? undefined })
-          }
+          onUpload={(input) => upload.mutateAsync({ ...input })}
           onDone={() => setUploadFor(null)}
         />
         <p className="mt-3 text-xs text-gray-500">

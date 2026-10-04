@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
 import { companyQuery } from '@/app/lib/api/company-query';
 
 /**
@@ -120,14 +121,46 @@ export async function downloadProjectDocument(
   projectId: string,
   documentId: string,
   companyId?: string,
-): Promise<Blob> {
-  return authFetchBlob(
+): Promise<StoredFile> {
+  return authFetchFile(
     `/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(
       documentId,
     )}/download${companyQuery(companyId)}`,
   );
 }
 
+
+/**
+ * Files a document against a project that already exists (backend FR-008a).
+ *
+ * Missing until 2026-10-04, which meant a project's documents could only be attached while it
+ * was being *created*: the panel named what was outstanding and offered no way to supply it, and
+ * a project that went live without its insurance could never be brought up to date. The endpoint
+ * had been there since 017.
+ *
+ * `documentType` is the kind's own label, sent alongside the id because the server stores both —
+ * the id is what readiness matches on, the label is what the document reads as on screen, and it
+ * survives the kind being renamed afterwards.
+ */
+export async function uploadProjectDocument(
+  projectId: string,
+  input: {
+    documentTypeId?: string;
+    documentType: string;
+    /** Base64, without a data-URL prefix. */
+    data: string;
+    contentType: string;
+    fileName?: string;
+    remark?: string;
+  },
+  companyId?: string,
+): Promise<ProjectDocument> {
+  const raw = await authFetch<unknown>(
+    `/projects/${encodeURIComponent(projectId)}/documents${companyQuery(companyId)}`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return projectDocumentSchema.parse(raw);
+}
 
 /**
  * Brings a declared project kind into existence (backend FR-007a).
@@ -207,6 +240,8 @@ export async function stageProjectDocument(
     /** Base64, without a data-URL prefix. */
     data: string;
     contentType: string;
+    /** The uploader's own file name, so the download is what they recognise. */
+    fileName?: string;
   },
   companyId?: string,
 ): Promise<{ stagedDocumentId: string }> {

@@ -90,3 +90,67 @@ export async function apiFetchBlob(
 
   return res.blob();
 }
+
+/** A stored file and the name the server says it has. */
+export interface StoredFile {
+  blob: Blob;
+  /** Null when the response carried no `Content-Disposition` the browser could read. */
+  filename: string | null;
+}
+
+/**
+ * The filename out of a `Content-Disposition` header.
+ *
+ * Handles both spellings a server may send: `filename*=UTF-8''…` (RFC 5987, percent-encoded,
+ * which is how a name with an em dash or a Devanagari character survives) and the plain
+ * `filename="…"`. The starred form wins where both are present, which is what the RFC says.
+ */
+export function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+
+  const extended = /filename\*=\s*([^']*)'[^']*'([^;]+)/i.exec(header);
+  if (extended) {
+    try {
+      return decodeURIComponent(extended[2].trim());
+    } catch {
+      // A malformed percent-escape must not lose the download; fall through to the plain form.
+    }
+  }
+
+  const plain = /filename=\s*"?([^";]+)"?/i.exec(header);
+  return plain ? plain[1].trim() : null;
+}
+
+/**
+ * `apiFetchBlob`, keeping the name the server gave the file.
+ *
+ * A blob URL has no name of its own — the browser invents one from the URL, which is why
+ * downloaded documents arrived as `524169d0-0cbe-4c5f-85f3-464b4da3c673` with no extension and
+ * opened in a text editor. The name is only in the header, and only if the server also sends
+ * `Access-Control-Expose-Headers: Content-Disposition`, which both document routes now do.
+ */
+export async function apiFetchFile(
+  path: string,
+  init?: RequestInit,
+): Promise<StoredFile> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: { ...init?.headers },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(
+      body.message || res.statusText,
+      res.status,
+      body.code,
+      body,
+    );
+  }
+
+  return {
+    blob: await res.blob(),
+    filename: filenameFromDisposition(res.headers.get('Content-Disposition')),
+  };
+}

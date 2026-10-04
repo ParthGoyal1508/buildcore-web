@@ -1,5 +1,18 @@
 /**
- * The offline punch queue (research.md §5, spec FR-009).
+ * The offline capture queues.
+ *
+ * **The punch store is drain-only since 020 Phase 2 (2026-10-03).** Nothing enqueues a punch any
+ * more: a queued punch cannot carry FR-013's refusal back to the worker at the moment they punched,
+ * so they saw a success at 8am and learnt at 5pm that the day did not count. `enqueue` is gone;
+ * `drainQueue` stays, because punches captured under the old promise are still sitting on devices
+ * and discarding them would throw away days people actually worked. See `drainQueue` below.
+ *
+ * The muster store (013 FR-006) is **unaffected and still enqueues**. It was a separate object
+ * store for exactly this reason. A muster is a supervisor recording other people's attendance in a
+ * place that frequently has no signal, and nothing about it is refused at capture time — the two
+ * acts look similar and are not.
+ *
+ * Original note (research.md §5, spec FR-009):
  *
  * Native IndexedDB, no wrapper library: this is one object store and three
  * operations, and a dependency for that would cost more than it saves.
@@ -12,7 +25,20 @@
  */
 
 const DB_NAME = 'buildcore-my-workspace';
-const DB_VERSION = 2;
+/**
+ * 3 since feature 018: the bill-draft store was added (`app/lib/bill-drafts.ts`).
+ *
+ * **A bump is required for a new object store and for nothing else.** An object store holds no
+ * column list, so a new *field* on an existing entry needs no bump — which is why
+ * `accuracyMeters` arrived without one.
+ *
+ * **020 Phase 2 landed second (2026-10-03) and did not bump it** — T009a's coordination point,
+ * resolved. Retiring the punch *writer* removes no object store: the store itself must stay, because
+ * punches queued under the old promise are still on devices and `drainQueue` has to read them. A
+ * version is a high-water mark and reverting it leaves browsers that already opened the database at
+ * the higher version unable to open it at all, so neither feature touches the other's number.
+ */
+const DB_VERSION = 3;
 const STORE = 'punch-queue';
 /**
  * Muster capture queue (feature 013 FR-006).
@@ -25,6 +51,20 @@ const STORE = 'punch-queue';
  * other's payloads; both are driven by the identical logic below.
  */
 const MUSTER_STORE = 'muster-queue';
+
+/**
+ * Bill drafts (018 FR-005), owned by `app/lib/bill-drafts.ts`.
+ *
+ * A third store in the same database, for the reason the muster store is a second one: the
+ * mechanics here — `openDb`, `promisify`, the version ladder — are the thing worth sharing, and a
+ * second IndexedDB implementation in the same app would be two upgrade paths to keep in step.
+ *
+ * **This store is never drained to the server**, and that is the one thing to know before touching
+ * it. The punch and muster queues hold work that has not happened yet and must reach the API; a
+ * bill draft holds what somebody had typed, to offer back when the sheet reopens. Wiring it into a
+ * drain loop would submit half-finished bills.
+ */
+export const BILL_DRAFT_STORE = 'bill-drafts';
 
 /** One punch captured with no connectivity, awaiting sync. */
 export interface OfflineQueueEntry {
@@ -80,7 +120,7 @@ export interface MusterQueueEntry {
 
 /** Resolves null where IndexedDB is unavailable (SSR, or a browser with storage
  * disabled) so callers can degrade rather than crash. */
-function openDb(): Promise<IDBDatabase | null> {
+export function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') {
     return Promise.resolve(null);
   }
@@ -94,6 +134,11 @@ function openDb(): Promise<IDBDatabase | null> {
       if (!db.objectStoreNames.contains(MUSTER_STORE)) {
         db.createObjectStore(MUSTER_STORE, { keyPath: 'id', autoIncrement: true });
       }
+      // Keyed by the sheet it belongs to, not auto-incremented: there is exactly one draft per
+      // bill sheet, and the second save must replace the first rather than accumulate.
+      if (!db.objectStoreNames.contains(BILL_DRAFT_STORE)) {
+        db.createObjectStore(BILL_DRAFT_STORE, { keyPath: 'key' });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     // A queue that cannot be opened must not take the punch screen down with it —
@@ -102,25 +147,20 @@ function openDb(): Promise<IDBDatabase | null> {
   });
 }
 
-function promisify<T>(request: IDBRequest<T>): Promise<T> {
+export function promisify<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-/** Stores a punch for later submission. */
-export async function enqueue(entry: OfflineQueueEntry): Promise<void> {
-  const db = await openDb();
-  if (!db) throw new Error('Offline storage is unavailable on this device.');
-  const tx = db.transaction(STORE, 'readwrite');
-  // `id` is autoIncrement; passing an explicit undefined would set the key path to
-  // undefined rather than letting the store assign one.
-  const { id: _id, ...record } = entry;
-  void _id;
-  await promisify(tx.objectStore(STORE).add(record));
-  db.close();
-}
+/*
+ * `enqueue` was here, and is deliberately gone (020 T008).
+ *
+ * Removed rather than left unused, so that re-introducing offline punching takes a decision and a
+ * diff somebody reviews, instead of an import nobody noticed was still available. `enqueueMuster`
+ * below is the one that remains, and it is a different act.
+ */
 
 /** Every queued punch, oldest capture first. */
 export async function listQueued(): Promise<OfflineQueueEntry[]> {
@@ -163,7 +203,12 @@ export interface DrainResult {
 }
 
 /**
- * Submits every queued punch in capture order.
+ * Submits every punch still queued from before 020 Phase 2, in capture order.
+ *
+ * **A flush, not a queue drain.** Nothing writes to this store any more (T010): these entries were
+ * captured under the old promise that an offline punch would sync, and the only option that does
+ * not silently discard a worker's day is to honour that promise once and then let the store stay
+ * empty. A device that never had a queued punch drains nothing and shows nothing.
  *
  * Order matters: the backend enforces one open punch-in at a time, so replaying an
  * out before its in would be rejected outright.

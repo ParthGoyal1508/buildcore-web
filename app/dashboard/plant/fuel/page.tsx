@@ -12,6 +12,7 @@ import {
 import { MESSAGES, formatVariance } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import Pager from '@/app/ui/inventory/pager';
+import FuelExceptions from '@/app/ui/plant/fuel-exceptions';
 import FuelModal from '@/app/ui/plant/fuel-modal';
 import {
   usePlantEquipment,
@@ -227,6 +228,13 @@ export default function FuelPage() {
           />
         </div>
       </div>
+
+      {/* 020 FR-001 – FR-006 (`bugs.md` item 13). Above the entry list and below the summary:
+          the exceptions are the part of this screen somebody has to act on, and the entries below
+          are the evidence. A register nobody scrolls to is a register nobody clears. */}
+      <section className="rounded-lg border border-gray-200 bg-white p-4">
+        <FuelExceptions />
+      </section>
 
       <ResponsiveList
         columns={columns}

@@ -14,7 +14,6 @@ import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import {
   FormError,
   RowAction,
@@ -37,7 +36,6 @@ const EMPTY: FormState = {
 };
 
 export default function ShiftTab() {
-  const { companyId } = useCompanyContext();
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<Shift | null>(null);
@@ -48,15 +46,15 @@ export default function ShiftTab() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['shifts', companyId],
-    queryFn: () => listShifts(companyId ?? undefined),
+    queryKey: ['shifts'],
+    queryFn: () => listShifts(),
   });
 
   const save = useMutation({
     mutationFn: () =>
       editing
         ? updateShift(editing.id, form)
-        : createShift({ ...(companyId ? { companyId } : {}), ...form }),
+        : createShift({ ...form }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       close();

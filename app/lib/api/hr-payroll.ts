@@ -198,6 +198,17 @@ export const employeeSchema = z.object({
   bankBranch: z.string().nullable(),
   bankAccountNumber: z.string().nullable(),
   ifscCode: z.string().nullable(),
+  /**
+   * The name the **bank** holds against the account (021 FR-008e).
+   *
+   * Not the employee's name as HR spells it, and often not even close: in the client's own bank
+   * sample these are "Arivnd" and "Rosan". A transfer is matched on the account number, but a name
+   * disagreeing with the bank's gets the payment returned — so the transfer sheet refuses a row
+   * without this rather than substituting the employee's name.
+   *
+   * `.nullable().default(null)` so an employee record saved before the field existed still parses.
+   */
+  bankAccountHolderName: z.string().nullable().default(null),
 
   mobile: z.string().nullable(),
   alternateMobile: z.string().nullable(),
@@ -827,6 +838,21 @@ export const leaveApplicationSchema = z.object({
   status: enumOf(LEAVE_APPLICATION_STATUSES),
   adminRemarks: z.string().nullable().optional(),
   decidedAt: nullableIsoDate.optional(),
+
+  /**
+   * The employee, resolved by the server (api `src/hr/employee-name.ts`).
+   *
+   * `.optional()` as well as `.nullable()`, and that is not belt-and-braces: a server
+   * predating the field omits the key entirely, and a schema demanding it would turn a
+   * missing name into a failed parse — the whole list vanishing because one column
+   * could not be filled. Null means the server looked and could not say; absent means
+   * it was never asked.
+   *
+   * The two are separately nullable. A code with a null name is somebody with no name
+   * on record; both null is somebody outside the caller's scope.
+   */
+  employeeCode: z.string().nullable().optional(),
+  employeeName: z.string().nullable().optional(),
 });
 
 export type LeaveApplication = z.infer<typeof leaveApplicationSchema>;
@@ -1464,9 +1490,51 @@ const fnfSchema = z.object({
   netPayable: decimal,
   /** Surfaced verbatim above the figures — each one is a reason to stop. */
   warnings: z.array(z.string()),
+  /**
+   * Every asset the leaver held, with how each one ended (021 FR-018a) — `bugs.md` item 10.
+   *
+   * **The api has served this since 021 shipped and this schema dropped it.** Zod strips unknown
+   * keys, so `assets` arrived on every response and never reached a screen — the settlement summary
+   * showed the figures and said nothing about the laptop. That is why web T025a stayed open, and it
+   * is the eighth time in this review a schema has been found quietly discarding or coercing
+   * something the server sent.
+   *
+   * `null` means the asset module is not deployed and the question went unanswered. **Not an empty
+   * list**: "could not ask" and "held nothing" are different facts, and a settlement is signed off
+   * on the difference.
+   */
+  assets: z
+    .array(
+      z.object({
+        allocationId: z.string(),
+        label: z.string(),
+        detail: z.string().nullable().default(null),
+        /** `returned` with a date, `waived` with an author, or nobody has decided. */
+        outcome: z.enum(['returned', 'waived', 'outstanding']),
+        returnedOn: z.string().nullable().default(null),
+        waivedByName: z.string().nullable().default(null),
+        waiverReason: z.string().nullable().default(null),
+      }),
+    )
+    .nullable()
+    .default(null),
+  /** True when `assets` is null because the asset module could not be asked. */
+  assetsUnavailable: z.boolean().default(false),
+  /** False while the clearance still has something outstanding and unwaived (FR-013). */
+  clearanceSettleable: z.boolean().default(false),
+  /**
+   * Always null, and said rather than omitted (FR-018b).
+   *
+   * No asset value is recovered from the final payable. Original cost, depreciated book value and
+   * replacement cost give three different figures, the client has chosen none, and a deduction
+   * computed from an unstated rule is worse than none — so a waiver records the write-off with a
+   * name against it instead.
+   */
+  assetValueRecovered: z.number().nullable().default(null),
 });
 
 export type FnfComputation = z.infer<typeof fnfSchema>;
+export type FnfAsset = NonNullable<FnfComputation['assets']>[number];
 
 export async function computeFnf(employeeId: string) {
   return fnfSchema.parse(
@@ -1611,3 +1679,271 @@ export async function listSites() {
 }
 
 export type SiteOption = z.infer<typeof siteOptionSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slip delivery (021 FR-005 to FR-007 — `bugs.md` item 8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SLIP_DELIVERY_STATUSES = [
+  'pending',
+  'sent',
+  'failed',
+  'undeliverable',
+] as const;
+export type SlipDeliveryStatus = (typeof SLIP_DELIVERY_STATUSES)[number];
+
+const slipDeliveryRowSchema = z.object({
+  employeeId: z.string(),
+  employeeCode: z.string(),
+  employeeName: z.string(),
+  /**
+   * The address **as sent**, not as it stands now.
+   *
+   * The backend stores it rather than joining it at read time, and the screen must show what it
+   * stores: an employee whose email was corrected after a failure must not have the old failure read
+   * as though it went to the new address.
+   */
+  address: z.string(),
+  status: z.enum(SLIP_DELIVERY_STATUSES),
+  failureReason: z.string().nullable(),
+  sentAt: z.string().nullable(),
+});
+export type SlipDeliveryRow = z.infer<typeof slipDeliveryRowSchema>;
+
+export const slipDeliverySummarySchema = z.object({
+  runId: z.string(),
+  period: z.string(),
+  sent: z.number(),
+  failed: z.number(),
+  undeliverable: z.number(),
+  /**
+   * Employees in the run with no delivery row at all.
+   *
+   * "Nobody has tried yet" is a different thing to say from "it failed", and a screen that conflated
+   * them sends somebody retrying what was never attempted.
+   */
+  notAttempted: z.number(),
+  rows: z.array(slipDeliveryRowSchema),
+});
+export type SlipDeliverySummary = z.infer<typeof slipDeliverySummarySchema>;
+
+export async function getSlipDeliveries(
+  runId: string,
+): Promise<SlipDeliverySummary> {
+  return slipDeliverySummarySchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/slip-deliveries`),
+  );
+}
+
+/** Sends to everybody not already sent to. Skips the rest, so pressing twice sends once. */
+export async function sendSlipDeliveries(
+  runId: string,
+): Promise<SlipDeliverySummary> {
+  return slipDeliverySummarySchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/slip-deliveries`, {
+      method: 'POST',
+    }),
+  );
+}
+
+/** Resends **only** the failures. Never the undeliverable ones — they have no address. */
+export async function retrySlipDeliveries(
+  runId: string,
+): Promise<SlipDeliverySummary> {
+  return slipDeliverySummarySchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/slip-deliveries/retry`, {
+      method: 'POST',
+    }),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transaction sheet reconciliation (021 FR-008 to FR-011 — `bugs.md` item 8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const reconciledLineSchema = z.object({
+  rowNumber: z.number(),
+  beneficiaryName: z.string().nullable(),
+  beneficiaryAccount: z.string().nullable(),
+  ifsc: z.string().nullable(),
+  sheetAmount: nullableDecimal,
+  matchedEmployeeId: z.string().nullable(),
+  matchedEmployeeCode: z.string().nullable(),
+  runAmount: nullableDecimal,
+  /**
+   * Sheet minus run. Positive means the bank moved more than the run said.
+   *
+   * Reported, not judged — a transfer short by an advance recovery is correct, and the server does
+   * not know which differences are expected. The screen says the same.
+   */
+  difference: nullableDecimal,
+  unmatchedReason: z.string().nullable(),
+});
+export type ReconciledLine = z.infer<typeof reconciledLineSchema>;
+
+export const reconciliationSchema = z.object({
+  runId: z.string(),
+  period: z.string(),
+  totalLines: z.number(),
+  matched: z.number(),
+  unmatched: z.number(),
+  /**
+   * Employees in the run with no line in the sheet — money that did **not** move.
+   *
+   * A separate list from the unmatched lines, deliberately: this is the half somebody chases the
+   * bank about and the other half is the half somebody chases HR about.
+   */
+  missingFromSheet: z.array(
+    z.object({
+      employeeId: z.string(),
+      employeeCode: z.string(),
+      runAmount: decimal,
+    }),
+  ),
+  lines: z.array(reconciledLineSchema),
+});
+export type Reconciliation = z.infer<typeof reconciliationSchema>;
+
+/**
+ * Uploads the bank's returned sheet and reconciles it.
+ *
+ * Base64 in a JSON body, matching every other upload in this product. **An unparseable row uploads
+ * and is reported**: the only refusal is a file that cannot be opened as a workbook, because there
+ * the remedy is a different file rather than a report.
+ */
+export async function uploadTransactionSheet(
+  runId: string,
+  file: File,
+): Promise<Reconciliation> {
+  const data = await fileToBase64(file);
+  return reconciliationSchema.parse(
+    await authFetch(`/hr/payroll/runs/${runId}/transaction-sheet`, {
+      method: 'POST',
+      body: JSON.stringify({ data, contentType: file.type }),
+    }),
+  );
+}
+
+/**
+ * A file as base64, without its data-URL prefix.
+ *
+ * `FileReader` rather than `btoa` over a string: a spreadsheet is binary, and `btoa` on a string read
+ * as text corrupts every byte above 0x7F — which is most of a zip archive, and an `.xlsx` is one.
+ */
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  // Chunked, because `String.fromCharCode(...bytes)` on a megabyte-long array exceeds the argument
+  // limit and throws — on exactly the large files somebody would upload.
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Where an employee may punch (020 FR-007 – FR-011 — `bugs.md` items 2, 15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const locationAssignmentSchema = z.object({
+  id: z.string(),
+  employeeId: z.string(),
+  /** Null on a mobility exemption: there is no fence, which is the point of one. */
+  siteId: z.string().nullable(),
+  isMobile: z.boolean(),
+  effectiveFrom: isoDate,
+  reason: z.string().nullable(),
+  assignedByUserId: z.string().nullable(),
+  createdAt: isoDate,
+});
+
+export type LocationAssignment = z.infer<typeof locationAssignmentSchema>;
+
+/**
+ * Every assignment this employee has had, newest effective date first.
+ *
+ * **An empty list is not a misconfiguration.** It means the employee is validated against their own
+ * site's geofence, which is what every employee does today — so the screen says that as the normal
+ * case rather than styling it as a problem (FR-011). On the day this ships, every single employee
+ * is in this state.
+ */
+export async function getLocationAssignments(employeeId: string) {
+  return z
+    .array(locationAssignmentSchema)
+    .parse(
+      await authFetch<unknown>(
+        `/hr/employees/${employeeId}/location-assignments`,
+      ),
+    );
+}
+
+export interface AssignLocationInput {
+  /** Required unless `isMobile` — an assignment naming no site and claiming no exemption validates nothing. */
+  siteId?: string;
+  isMobile?: boolean;
+  /** `YYYY-MM-DD`. Resolution keys on the punch's own day, so this is never "now". */
+  effectiveFrom: string;
+  reason?: string;
+}
+
+/**
+ * Records a new assignment. **Appends — a prior row is never altered.**
+ *
+ * `PUT` with no id, which looks odd and is right: the resource being replaced is "where this
+ * employee punches", and its history is the audit. A transfer six months ago has to stay
+ * explicable, and a mutable current value cannot answer that.
+ */
+export async function assignLocation(
+  employeeId: string,
+  input: AssignLocationInput,
+) {
+  return locationAssignmentSchema.parse(
+    await authFetch<unknown>(
+      `/hr/employees/${employeeId}/location-assignments`,
+      { method: 'PUT', body: JSON.stringify(input) },
+    ),
+  );
+}
+
+/** One employee's outcome in a bulk assignment. */
+export interface BulkAssignmentOutcome {
+  employeeId: string;
+  error?: string;
+}
+
+/**
+ * Assigns the same location to several employees (FR-010).
+ *
+ * **Sequential single-employee calls, because the API has no bulk route** — 020's backend scope
+ * never mentions one. A loop here rather than a new endpoint is the right trade for an
+ * administrative action over tens of rows, on one condition: partial success must be *visible*.
+ * Hiding it behind a single "saved" is how an administrator comes to believe a site is assigned
+ * when four of its thirty staff are not.
+ *
+ * Sequential rather than parallel so the failures come back in a stable order, and so a company
+ * with a large site does not open thirty connections at once for a once-a-quarter action.
+ *
+ * It does not roll back. There is no transaction across these calls to roll back *with*, and
+ * undoing a successful append would mean writing a second append that says the opposite — which is
+ * worse history than the partial truth.
+ */
+export async function assignLocationToMany(
+  employeeIds: string[],
+  input: AssignLocationInput,
+): Promise<BulkAssignmentOutcome[]> {
+  const outcomes: BulkAssignmentOutcome[] = [];
+  for (const employeeId of employeeIds) {
+    try {
+      await assignLocation(employeeId, input);
+      outcomes.push({ employeeId });
+    } catch (error) {
+      outcomes.push({
+        employeeId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+  return outcomes;
+}

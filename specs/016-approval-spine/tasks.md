@@ -1,5 +1,9 @@
 # Tasks: Approval Spine (Web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `/specs/016-approval-spine/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md),
@@ -889,3 +893,86 @@ Phases 8 and 9 are independent of each other.
 what to what. It is the client's own sentence in bug 2 ("it should also reflect in the attendance of
 the affected employee"), it is mobile-critical, and it is the half of bug 2 that no screen currently
 shows at all.
+
+---
+
+## Phase 9: The two new mobile-critical screens (added 2026-10-02)
+
+**Prerequisite met:** web constitution v2.2.0 (2026-10-02) adds the approvals queue and site attendance
+review to Principle VI's mobile-critical list. Principle VI is NON-NEGOTIABLE and its own "Changing the
+list" clause requires an amendment, which no feature spec may make — so that amendment, not this task
+list, was the gate on item 22.
+
+The client declined widening Principle VI wholesale and named these two instead. Plant logbook, fuel
+entry, material indents and inventory issue were offered and not chosen; they keep the 320px breakage
+floor and nothing stronger.
+
+Mobile-critical is a higher bar than "not broken": 44×44px touch targets, primary actions reachable
+one-handed, no action gated behind hover, and no layout break between 320px and 428px.
+
+- [x] T108 [US4] Bring the approvals queue to the mobile-critical standard at 320px. **The reason it is
+      on the list is a Director deciding a payment release from a phone**, so approve, reject and return
+      are the controls that must be reachable one-handed — not the filters.
+- [x] T109 [US4] Audit the queue for hover-gated actions. A row-hover action menu is the usual way an
+      otherwise-responsive list becomes unusable by touch, and it passes every desktop check.
+- [x] T110 [US4] Make the item detail readable at 320px without the page body scrolling sideways. An
+      approver who cannot read what they are approving will approve it anyway, which is worse than a
+      broken layout.
+- [x] T111 [US1] Bring site attendance review and correction to the same standard. **Its reason is a
+      supervisor on a site fixing a day the punch refusal turned away**, so raising a correction is the
+      control that must work, and the attendance grid is the hard part — it is wide by nature.
+- [x] T112 [US1] The correction form at 320px: a form that submits a day's attendance from a phone is the
+      whole point, and a date picker or a reason field that is unreachable there fails the requirement
+      while the page looks fine.
+- [ ] T113 **NOT RUN** [P] Manual pass at 320px and again at desktop for both screens, per the constitution's
+      pre-merge check. No automated framework exists (`TODO(TESTING_STANDARD)`), so this is a person with
+      device emulation and it is **not done until somebody has actually done it**.
+- [ ] T114 **NOT RUN** [P] Keyboard operability on both, which Principle VI scopes to every screen regardless of
+      viewport and which a touch-target pass does not cover.
+
+### Phase 10 implementation record, 2026-10-02 — the two mobile-critical screens
+
+#### The approvals queue stopped being a horizontally scrolling table
+
+It used `DataTable`, which wraps a table in `overflow-x-auto`. That meets the **breakage floor** and
+fails the mobile-critical standard, and the reason is specific: the decision controls were the last
+column, which at 320px is off-screen to the right. **An approver who has to scroll sideways to find
+Approve is an approver who approves without reading** — and the client put this screen on the list
+precisely because a Director decides a payment release from a phone.
+
+It now renders through `ResponsiveList`: cards below `md`, the same columns as a table above it. The
+decision controls are `actions` rather than a column, which is what gets them the card's full width in
+their own footer instead of the cramped right half of a `<dt>`/`<dd>` row.
+
+#### T109 — the hover audit found nothing, and that is the finding
+
+`grep` for `group-hover`, `opacity-0` and `invisible` across every `.tsx` in the application returns
+three matches, all of them the word "invisible" in prose. **No action anywhere in this product is
+gated behind hover.** Recorded rather than ticked silently, because the task exists to catch a thing
+that passes every desktop check and the honest result is that it was never introduced.
+
+#### Attendance: the grid stays wide, the control does not
+
+T111 says the grid "is wide by nature", and it is left as a horizontal scroller deliberately. Reading
+a grid sideways is a nuisance; being unable to reach the control is a failure. So the work went into
+the control: the Mark/Edit action is full-width and 44px tall below `sm`, and the day-navigation
+arrows — which were `px-3` with no height, about 24px of target — are 44×44.
+
+The correction form was already single-column below `sm`. What it lacked was reach.
+
+#### Three shared components changed, and that is the right blast radius
+
+`Button`, `SecondaryButton` and `Modal` now give 44px targets below `sm` and keep the design's 40px
+from `sm` up. Done there rather than on the two screens, because **the mobile-critical list is closed
+today and the next addition to it should not have to remember this.** The modal's close control was a
+28px target around a 20px icon — the worst one to leave small, since it is what somebody stabs at
+repeatedly — and its footer now stacks full-width in reverse order below `sm`, putting the primary
+action at the bottom where a thumb already is without changing DOM order and so without changing tab
+order.
+
+#### T113 and T114 NOT RUN
+
+Both are browser passes: device emulation at 320px and 428px, and a keyboard walk. The constitution's
+pre-merge check names a person doing it, there is no automated framework here
+(`TODO(TESTING_STANDARD)`), and the work above is **built for** the standard rather than measured
+against it. Saying so is more useful than a tick.

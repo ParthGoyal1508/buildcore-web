@@ -13,7 +13,8 @@ import {
   SERVICE_SCHEDULE_STATUSES,
   SPARE_PART_MOVEMENT_TYPES,
 } from '@/app/lib/constants';
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/dashboard/plant/*` call to `buildcore-api` (feature 006).
@@ -401,8 +402,8 @@ export async function uploadEquipmentDocument(
 export async function getEquipmentDocumentFile(
   equipmentId: string,
   documentId: string,
-): Promise<Blob> {
-  return authFetchBlob(
+): Promise<StoredFile> {
+  return authFetchFile(
     `/plant/equipment/${equipmentId}/documents/${documentId}/download`,
   );
 }
@@ -1069,4 +1070,151 @@ export async function payServiceBill(
 
 export async function deleteServiceBill(id: string): Promise<void> {
   await authFetch<void>(`/plant/service-bills/${id}`, { method: 'DELETE' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fuel exceptions and recovery (020 FR-001 – FR-006 — `bugs.md` item 13)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const FUEL_EXCEPTION_STATUSES = ['open', 'confirmed', 'dismissed'] as const;
+export type FuelExceptionStatus = (typeof FUEL_EXCEPTION_STATUSES)[number];
+
+/** Who bears a confirmed loss. `neither` is a real answer, not an absence of one. */
+export const FUEL_ATTRIBUTIONS = ['hirer', 'operator', 'both', 'neither'] as const;
+export type FuelAttribution = (typeof FUEL_ATTRIBUTIONS)[number];
+
+export const fuelExceptionSchema = z.object({
+  id: z.string(),
+  status: z.enum(FUEL_EXCEPTION_STATUSES),
+  attribution: z.enum(FUEL_ATTRIBUTIONS).nullable(),
+  operatorEmployeeId: z.string().nullable(),
+  reason: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  createdAt: isoDate,
+
+  fuelEntry: z.object({
+    id: z.string(),
+    equipmentId: z.string(),
+    date: isoDate,
+    quantity: decimal,
+    rate: decimal,
+    amount: decimal,
+    /** Computed and rounded at save time. Shown, never used to derive money — see `shortfallAmount`. */
+    variancePercent: nullableDecimal,
+    equipment: z.object({
+      id: z.string(),
+      code: z.string(),
+      name: z.string(),
+      ownership: z.enum(EQUIPMENT_OWNERSHIPS),
+      categoryId: z.string(),
+    }),
+  }),
+
+  /** Litres per meter unit the category expects. Null where nobody has set one. */
+  benchmark: nullableDecimal,
+  /**
+   * What was actually burned per meter unit.
+   *
+   * **Null is not zero.** Null means the logbook has no reading for that day — the fuel was issued
+   * and nobody entered the machine's hours — and rendering it as zero would read as a machine that
+   * ran no hours and still burned fuel, which is an accusation rather than a gap.
+   */
+  actualPerHour: nullableDecimal,
+  /** The excess over what the benchmark allowed for the hours actually run (FR-001). */
+  shortfallQuantity: decimal,
+  /** That excess at the entry's own fuel rate, not today's. */
+  shortfallAmount: decimal,
+
+  /** Present once recovered. Both absent is the ordinary state for a confirmed exception. */
+  hireBillDeduction: z
+    .object({ id: z.string(), amount: decimal })
+    .nullable()
+    .optional(),
+  operatorRecovery: z
+    .object({
+      id: z.string(),
+      amount: decimal,
+      status: z.string(),
+      employeeId: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+export type FuelException = z.infer<typeof fuelExceptionSchema>;
+
+export async function listFuelExceptions(status?: FuelExceptionStatus) {
+  const query = status ? `?status=${status}` : '';
+  return z
+    .array(fuelExceptionSchema)
+    .parse(await authFetch<unknown>(`/plant/fuel/exceptions${query}`));
+}
+
+/**
+ * Raises an exception for every alerted reading that has none.
+ *
+ * Idempotent on the server — a unique index on the fuel entry means running it twice raises nothing
+ * the second time — so the screen can offer it without guarding against a double click.
+ */
+export async function raiseFuelExceptions() {
+  return z
+    .object({ raised: z.number() })
+    .parse(await authFetch<unknown>('/plant/fuel/exceptions/raise', { method: 'POST' }));
+}
+
+export interface ReviewFuelExceptionInput {
+  status: 'confirmed' | 'dismissed';
+  attribution?: FuelAttribution;
+  operatorEmployeeId?: string;
+  reason?: string;
+}
+
+/**
+ * Confirms with an attribution, or dismisses with a reason. **Moves no money.**
+ *
+ * Its refusals carry codes — `FUEL_EXCEPTION_REASON_REQUIRED`,
+ * `FUEL_EXCEPTION_ATTRIBUTION_REQUIRED`, `FUEL_EXCEPTION_NOT_HIRED`,
+ * `FUEL_EXCEPTION_OPERATOR_REQUIRED` — and the last one also carries `candidates`, the operators
+ * who ran the machine that day. Read it from `ApiError.details`; the screen offers them rather than
+ * sending somebody to the logbook to look them up.
+ */
+export async function reviewFuelException(
+  id: string,
+  input: ReviewFuelExceptionInput,
+) {
+  return fuelExceptionSchema
+    .partial()
+    .parse(
+      await authFetch<unknown>(`/plant/fuel/exceptions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    );
+}
+
+/**
+ * Deducts a confirmed loss from the hire bill (FR-003, FR-004).
+ *
+ * No approval chain: a hire bill is a document the company is still assembling, and an adjustment
+ * before payment is not money leaving. A paid bill is never adjusted — the server carries the
+ * recovery to the next unpaid bill for the same equipment and vendor.
+ */
+export async function recoverFromHireBill(exceptionId: string) {
+  return authFetch<unknown>(
+    `/plant/fuel-exceptions/${exceptionId}/recover/hire-bill`,
+    { method: 'POST' },
+  );
+}
+
+/**
+ * Recovers a confirmed loss from the operator's salary (FR-005, FR-006).
+ *
+ * **Raises a proposal, not a deduction.** It reaches no payroll line until the chain approves it,
+ * which is a property of the payroll query rather than a check somebody could omit.
+ */
+export async function recoverFromOperator(exceptionId: string) {
+  return authFetch<unknown>(
+    `/plant/fuel-exceptions/${exceptionId}/recover/operator`,
+    { method: 'POST' },
+  );
 }

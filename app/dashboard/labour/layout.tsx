@@ -7,7 +7,6 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import LabourNav from '@/app/ui/labour/labour-nav';
-import { CompanyProvider } from '@/app/ui/settings/company-context';
 
 /**
  * The one place `/dashboard/labour/*` adds a permission check beyond the module
@@ -65,7 +64,7 @@ export default function LabourLayout({
         two companies' six skill categories arrived as twelve entries listed in pairs
         with nothing on screen saying which was which.
       */}
-      <CompanyProvider>{children}</CompanyProvider>
+      {children}
     </div>
   );
 }

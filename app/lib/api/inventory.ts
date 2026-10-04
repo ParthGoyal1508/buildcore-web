@@ -7,7 +7,13 @@ import {
   PURCHASE_BILL_STATUSES,
   TRANSFER_STATUSES,
 } from '@/app/lib/constants';
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import {
+  authFetch,
+  authFetchBlob,
+  authFetchFile,
+} from '@/app/lib/session';
+import { amountHidden, hideableDecimal } from './cash-hiding';
 
 /**
  * Every `/dashboard/inventory/*` call to `buildcore-api` (feature 009).
@@ -481,7 +487,9 @@ export const paymentSchema = z.object({
   id: z.string(),
   vendorId: z.string(),
   vendorName: z.string(),
-  amount: decimal,
+  // Nullable because a cash payment's amount is `null` when the company hides cash — see
+  // `cash-hiding.ts`. This was `decimal`, and the list threw rather than rendered.
+  amount: hideableDecimal,
   date: isoDate,
   paymentMode: z.enum(PAYMENT_MODES),
   referenceNumber: z.string(),
@@ -496,6 +504,7 @@ export const paymentSchema = z.object({
    */
   hasProof: z.boolean().default(false),
   proofUploadedAt: z.coerce.date().nullable().default(null),
+  amountHidden,
 });
 export type Payment = z.infer<typeof paymentSchema>;
 
@@ -546,8 +555,10 @@ export async function attachPaymentProof(
  * Audit-logged server-side before the bytes are sent: a payment advice names an account
  * number, and who looked at it is worth knowing.
  */
-export async function downloadPaymentProof(paymentId: string): Promise<Blob> {
-  return authFetchBlob(
+export async function downloadPaymentProof(
+  paymentId: string,
+): Promise<StoredFile> {
+  return authFetchFile(
     `/inventory/payments/${encodeURIComponent(paymentId)}/proof`,
   );
 }

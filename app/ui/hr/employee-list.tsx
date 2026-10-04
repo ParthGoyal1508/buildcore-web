@@ -14,12 +14,18 @@ import { listDepartments, listDesignations } from '@/app/lib/api/settings';
 import {
   EMPLOYEE_PAGE_SIZE,
   HR_MESSAGES,
+  LOCATION_ASSIGNMENT,
   MESSAGES,
   ROUTES,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
-import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import {
+  SecondaryButton,
+  SelectField,
+  TextField,
+} from '@/app/ui/settings/form-fields';
+import BulkLocationAssignment from '@/app/ui/hr/bulk-location-assignment';
 
 /** Falls back to the code when an employee has no name recorded yet. */
 function displayName(employee: Employee): string {
@@ -34,6 +40,7 @@ export default function EmployeeList() {
   const [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [siteId, setSiteId] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [page, setPage] = useState(1);
 
@@ -169,12 +176,20 @@ export default function EmployeeList() {
             <option value="inactive">Inactive</option>
           </SelectField>
         </div>
-        <Link href={`${ROUTES.hrEmployees}/new`}>
-          <Button type="button">
-            <PlusIcon className="mr-2 w-4" aria-hidden="true" />
-            Add Employee
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* 020 FR-010. Beside the filters rather than on a screen of its own: "a site's staff"
+              is already expressible here, and a second employee picker would be a second place
+              for the two to disagree about who counts. */}
+          <SecondaryButton type="button" onClick={() => setBulkOpen(true)}>
+            {LOCATION_ASSIGNMENT.bulkHeading}
+          </SecondaryButton>
+          <Link href={`${ROUTES.hrEmployees}/new`}>
+            <Button type="button">
+              <PlusIcon className="mr-2 w-4" aria-hidden="true" />
+              Add Employee
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <DataTable
@@ -214,6 +229,19 @@ export default function EmployeeList() {
             </button>
           </div>
         </nav>
+      )}
+
+      {/* The page the administrator is looking at, not every employee who matches the filter.
+          Assigning people who are not on screen is how somebody assigns a site they cannot see,
+          and the count in the dialog is the honest one either way. */}
+      {bulkOpen && (
+        <BulkLocationAssignment
+          employees={(data?.items ?? []).map((employee) => ({
+            id: employee.id,
+            employeeCode: employee.employeeCode,
+          }))}
+          onClose={() => setBulkOpen(false)}
+        />
       )}
     </div>
   );

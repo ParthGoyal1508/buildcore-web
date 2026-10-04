@@ -27,7 +27,6 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 import PageHeader from '@/app/ui/page-header';
 
 export default function ResignationsPage() {
@@ -99,7 +98,6 @@ export default function ResignationsPage() {
 function ResignationForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   // The company a cross-company Super Admin has selected; null for everyone else,
   // who is pinned to their own company by the backend anyway.
-  const { companyId } = useCompanyContext();
   const [employeeId, setEmployeeId] = useState('');
   const [resignationDate, setResignationDate] = useState('');
   const [reasonCategory, setReasonCategory] = useState('better_opportunity');
@@ -122,7 +120,6 @@ function ResignationForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
         reasonCategory,
         reasonDetail,
         noticePeriodDays: Number(noticePeriodDays),
-        ...(companyId ? { companyId } : {}),
       }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not record the resignation.'),

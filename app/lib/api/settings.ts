@@ -34,6 +34,15 @@ export const companySchema = z.object({
   esicEmployerRate: z.number(),
   gratuityRate: z.number(),
   bonusRate: z.number(),
+  /**
+   * The account the payroll transfer is debited from (021 FR-008a).
+   *
+   * A **string**: an account number's leading zero is part of it, and the client's own sample debits
+   * `09310400000819`. Parsing it as a number would destroy the zero before any screen saw it.
+   *
+   * `.nullable().default(null)` so a company saved before the field existed still parses.
+   */
+  payrollDebitAccountNumber: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -89,10 +98,33 @@ export async function getCodeSeries(companyId: string): Promise<CodeSeriesView> 
 
 // -------------------------------------------------------------------- Roles
 
+/** The two levels an area can be held at. Write implies read; the backend refuses write alone. */
+export const ACCESS_LEVELS = ['read', 'write'] as const;
+export type AccessLevel = (typeof ACCESS_LEVELS)[number];
+
+export const roleGrantSchema = z.object({
+  permission: z.string(),
+  level: z.enum(ACCESS_LEVELS),
+});
+export type RoleGrant = z.infer<typeof roleGrantSchema>;
+
 export const roleSchema = z.object({
   id: z.string(),
   name: z.string(),
   permissions: z.array(z.string()),
+  /**
+   * What level each area is held at (019 FR-019).
+   *
+   * **This was being discarded.** The server sends it, the guard enforces it, and this schema
+   * dropped it on the floor — so the editor had nothing to render, sent `permissions` alone, and
+   * every role it saved came back holding read **and** write on everything. That is the sixth time
+   * in this codebase a server field has been silently lost to a schema, and the first where the
+   * loss was a security-relevant default rather than a missing label.
+   *
+   * `.default([])` so a server predating the field still parses: an empty list means "no levels
+   * named", which is exactly what the backend treats as read+write.
+   */
+  grants: z.array(roleGrantSchema).default([]),
   isProtected: z.boolean(),
   assignedUserCount: z.number(),
   createdAt: z.string(),
@@ -104,9 +136,18 @@ export async function listRoles(): Promise<Role[]> {
   return z.array(roleSchema).parse(await authFetch('/settings/roles'));
 }
 
+/**
+ * Creating or editing a role (019 FR-018).
+ *
+ * `grants` is optional on the wire and means something specific when omitted: **read and write on
+ * everything in `permissions`**, which is what holding a permission meant before levels existed and
+ * what the Phase 1 backfill gave every role. Sending it is how anything narrower is expressed, so
+ * the editor always sends it — omitting it quietly widens a role that was read-only.
+ */
 export async function createRole(input: {
   name: string;
   permissions: string[];
+  grants?: RoleGrant[];
 }): Promise<Role> {
   return roleSchema.parse(
     await authFetch('/settings/roles', {
@@ -118,7 +159,7 @@ export async function createRole(input: {
 
 export async function updateRole(
   id: string,
-  input: { name?: string; permissions?: string[] },
+  input: { name?: string; permissions?: string[]; grants?: RoleGrant[] },
 ): Promise<Role> {
   return roleSchema.parse(
     await authFetch(`/settings/roles/${id}`, {
@@ -351,4 +392,41 @@ export async function updateShift(id: string, input: ShiftInput): Promise<Shift>
 
 export async function deleteShift(id: string): Promise<void> {
   await authFetch(`/settings/shifts/${id}`, { method: 'DELETE' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cash visibility (019 FR-012 to FR-015 — `bugs.md` item 16)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether cash amounts are hidden for this company.
+ *
+ * A **display** control, which is the whole of its design: nothing is deleted or altered while it
+ * is on, and turning it off restores every figure exactly. The API nulls a cash amount and sets
+ * `amountHidden` beside it rather than zeroing it — see `app/lib/api/cash-hiding.ts` for why that
+ * distinction has to survive all the way to the screen.
+ */
+export const cashVisibilitySchema = z.object({
+  hideCashTransactions: z.boolean(),
+});
+export type CashVisibility = z.infer<typeof cashVisibilitySchema>;
+
+export async function getCashVisibility(
+  companyId?: string,
+): Promise<CashVisibility> {
+  return cashVisibilitySchema.parse(
+    await authFetch(withCompany('/settings/cash-visibility', companyId)),
+  );
+}
+
+export async function setCashVisibility(
+  hideCashTransactions: boolean,
+  companyId?: string,
+): Promise<CashVisibility> {
+  return cashVisibilitySchema.parse(
+    await authFetch(withCompany('/settings/cash-visibility', companyId), {
+      method: 'PATCH',
+      body: JSON.stringify({ hideCashTransactions }),
+    }),
+  );
 }

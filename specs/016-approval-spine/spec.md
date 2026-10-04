@@ -326,16 +326,25 @@ as awaiting the director rather than applied, with the previous state still in f
 Both markers raised when this specification was written are answered and recorded under
 Clarifications above. The client's re-stated requirement list re-opened two, reviewed on 2026-09-29:
 
-- **[NEEDS CLARIFICATION: which action types are director-final?]** *(item 7)* The backend names four
-  as a proposal, not as the client's answer. User Story 4 exists so the client can read the full list
-  and amend it. **Not blocking** — the screen is buildable whatever the list contains.
-- **[NEEDS CLARIFICATION: is Principle VI to be amended?]** *(item 22)* The client asks that the whole
-  admin portal be fully functional on Android and iOS. Principle VI is NON-NEGOTIABLE and closes the
-  mobile-critical list to punch, attendance viewing and leave; constitution v2.1.0 already moved every
-  other screen's breakage floor to 320px, which may or may not be what "fully functional" means to the
-  client. Reviewed on 2026-09-29 and **deliberately left for a separate decision**: widening the
-  principle is a MAJOR version bump affecting every web feature shipped and unshipped, and no feature
-  specification may amend a constitution. NFR-001 here states the 320px floor and nothing stronger.
+- **RESOLVED 2026-10-02: the four are confirmed.** Payment release, payroll run approval,
+  money-committing letters (work order, LOI, purchase order), and final settlement on exit. User Story
+  4's screen still exists for exactly the reason it was written — the set is configurable and the
+  client can read and amend it — but it now renders a confirmed list rather than a proposal.
+- **RESOLVED 2026-10-02: Principle VI stands; two screens join the mobile-critical list.** The client
+  chose to keep desktop-first rather than widen the principle, and named **the approvals queue** and
+  **site attendance review and corrections** as the screens that must work properly on a phone.
+
+  That is a **MINOR constitution amendment** — two additions to a closed list — not the MAJOR bump that
+  widening the rule would have been. It still cannot be made by this specification: Principle VI is
+  NON-NEGOTIABLE, so the constitution has to be amended on its own terms before the two screens are
+  built to that standard. **This is now the gating step for item 22**, and it is a document change
+  rather than development.
+
+  The approvals queue earns it twice over: items 7 and 21 put a Director in the path of payment
+  releases and payroll runs, and a Director who can only approve at a desk is why approvals sit for
+  days. Attendance review pairs with the punch refusal — the person who fixes a wrongly refused day is
+  standing on a site. Plant logbook, fuel entry, material indents and inventory issue were offered and
+  not chosen, so they keep the 320px floor and nothing stronger.
 
 **Migration order**, settled: attendance exceptions first. It is the client's first note, the
 exceptions are already detected and already have a resolution path to replace, and each one is a

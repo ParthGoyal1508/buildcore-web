@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+
 import {
   getAssetCategories,
   getAssetDocTypes,
@@ -11,7 +13,6 @@ import {
 import { getProjects, getSites } from '@/app/lib/api/projects';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { getVendors } from '@/app/lib/api/partners';
-import { useCompanyContext } from '@/app/ui/settings/company-context';
 
 /**
  * The dropdown sources and permission checks every Assets screen needs.
@@ -21,13 +22,14 @@ import { useCompanyContext } from '@/app/ui/settings/company-context';
  * rather than refetching the category list once per open modal. Directly modelled on
  * `use-plant-refs.ts`.
  *
- * Every one is scoped to the company `CompanyProvider` selected in the layout.
+ * Every one is scoped to the company the session is in, read through
+ * `useSelectedCompanyId()` — see `use-plant-refs.ts` for why that hook is kept as the seam.
  * Without that a cross-company administrator sees every tenant's rows mixed together
  * — seven asset categories across three companies renders as twenty-one rows named
  * in triplicate, with nothing saying which is which.
  */
 export function useAssetsCompanyId(): string | null {
-  return useCompanyContext().companyId;
+  return useSelectedCompanyId();
 }
 
 /**
@@ -61,8 +63,8 @@ export function useAssetsMastersAccess(): boolean {
 export function useAssetCategories() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'categories', companyId],
-    queryFn: () => getAssetCategories(companyId ?? undefined),
+    queryKey: ['assets', 'categories'],
+    queryFn: () => getAssetCategories(),
     select: (rows) => rows.filter((row) => row.active),
   });
 }
@@ -72,16 +74,16 @@ export function useAssetCategories() {
 export function useAllAssetCategories() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'categories', 'all', companyId],
-    queryFn: () => getAssetCategories(companyId ?? undefined),
+    queryKey: ['assets', 'categories', 'all'],
+    queryFn: () => getAssetCategories(),
   });
 }
 
 export function useAssetDocTypes() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'doc-types', companyId],
-    queryFn: () => getAssetDocTypes(companyId ?? undefined),
+    queryKey: ['assets', 'doc-types'],
+    queryFn: () => getAssetDocTypes(),
     select: (rows) => rows.filter((row) => row.active),
   });
 }
@@ -91,8 +93,8 @@ export function useAssetDocTypes() {
 export function useConditionGrades() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'condition-grades', companyId],
-    queryFn: () => getConditionGrades(companyId ?? undefined),
+    queryKey: ['assets', 'condition-grades'],
+    queryFn: () => getConditionGrades(),
     select: (rows) => rows.filter((row) => row.active),
   });
 }
@@ -102,9 +104,8 @@ export function useConditionGrades() {
 export function useAllAssets() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'register', 'all', companyId],
-    queryFn: () =>
-      getAssets({ pageSize: 200, ...(companyId ? { companyId } : {}) }),
+    queryKey: ['assets', 'register', 'all'],
+    queryFn: () => getAssets({ pageSize: 200 }),
     select: (page) => page.items,
   });
 }

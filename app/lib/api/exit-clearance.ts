@@ -34,8 +34,34 @@ const clearanceItemSchema = z.object({
       /** Added to the backend on 2026-10-01: FR-014 needs a name, not an id. */
       waivedByName: z.string(),
       waivedAt: z.string(),
+      /**
+       * Who countersigned, added with the 2026-10-02 waiver change.
+       *
+       * `.nullable().default(null)` rather than required: a waiver applied before the
+       * countersignature existed has none, and a required field here would make every historical
+       * clearance fail to parse. That is the fifth time this cycle a schema and the server have had
+       * to be reconciled — read the raw response, not the model.
+       */
+      approvedByName: z.string().nullable().default(null),
+      approvedAt: z.string().nullable().default(null),
     })
     .nullable(),
+  /**
+   * A waiver **proposed and not yet decided**, or one that was refused (FR-016).
+   *
+   * Separate from `waiver`, and read as separate: until the Director decides, the obligation is
+   * still outstanding and still blocks a settlement. A screen that rendered a proposal as a waiver
+   * would show an exit as clearable that is not.
+   */
+  proposal: z
+    .object({
+      status: z.enum(['pending', 'rejected']),
+      reason: z.string(),
+      proposedByName: z.string(),
+      proposedAt: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 
 export type ClearanceItem = z.infer<typeof clearanceItemSchema>;
@@ -89,7 +115,15 @@ export interface WaiveInput {
 /** The backend's own minimum, mirrored so the form refuses before the request does. */
 export const WAIVER_REASON_MIN_LENGTH = 10;
 
-export async function waiveClearanceItem(
+/**
+ * **Requests** a waiver; writes nothing (FR-016, changed 2026-10-02).
+ *
+ * The response carries the clearance — still blocked — and the pending approval item. Named
+ * `requestClearanceWaiver` rather than `waiveClearanceItem` because the old name described what the
+ * endpoint used to do, and a function whose name claims more authority than it has is how a screen
+ * ends up reporting a decision nobody made.
+ */
+export async function requestClearanceWaiver(
   employeeId: string,
   input: WaiveInput,
 ): Promise<unknown> {

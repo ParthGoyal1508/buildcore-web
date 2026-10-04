@@ -9,7 +9,7 @@ import {
   CLEARANCE_KINDS,
   WAIVER_REASON_MIN_LENGTH,
   getExitClearance,
-  waiveClearanceItem,
+  requestClearanceWaiver,
   type ClearanceItem,
   type ClearanceKind,
 } from '@/app/lib/api/exit-clearance';
@@ -61,18 +61,22 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
   });
 
   /**
-   * `EMPLOYEES` at **write**, not merely held.
+   * `PAYROLL` at **write** — may *propose* a waiver (T052, changed 2026-10-02).
    *
-   * The backend splits this clearance's read from its waiver on the verb — "which is exactly
-   * right here, since waiving writes off company money". `permissions` cannot express that:
-   * it means "holds the area at some level" by design, so gating on it would offer the waiver
-   * to every reader with the server's 403 as the only thing stopping them. This is the first
-   * real consumer of feature 019's `grants`.
+   * `hasWrite(user, 'EMPLOYEES')` was a placeholder chosen while building, and the client has now
+   * set the authority deliberately: proposing is an HR act. Write access on employee records is held
+   * by more people than HR, and a write-off of company money is not something a site administrator
+   * should be able to put in front of the Director alone. `PAYROLL` is the HR-office permission in
+   * this product — it is what gates the salary data a waived advance comes out of — and the backend
+   * gates `waive()` on exactly the same value.
    *
-   * Absent, not disabled. A disabled button still advertises an authority the reader has not
-   * got.
+   * At **write**, not merely held: `permissions` means "holds the area at some level" by design, so
+   * gating on it would offer the control to every reader with the server's 403 as the only thing
+   * stopping them.
+   *
+   * Absent, not disabled. A disabled button still advertises an authority the reader has not got.
    */
-  const mayWaive = hasWrite(user, 'EMPLOYEES');
+  const mayPropose = hasWrite(user, 'PAYROLL');
 
   const clearance = useQuery({
     queryKey: ['hr', 'employee', employeeId, 'exit-clearance'],
@@ -84,7 +88,7 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
 
   const waive = useMutation({
     mutationFn: (item: ClearanceItem) =>
-      waiveClearanceItem(employeeId, {
+      requestClearanceWaiver(employeeId, {
         kind: item.kind,
         ref: item.ref,
         reason: reason.trim(),
@@ -199,10 +203,56 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
                           <p className="mt-0.5 break-words text-xs italic text-gray-600">
                             {item.waiver.reason}
                           </p>
+                          {/* The countersignature, named separately (T090's two facts). A waiver
+                              applied before this existed has none, and says nothing rather than
+                              claiming an approver it never had. */}
+                          {item.waiver.approvedByName &&
+                            item.waiver.approvedAt && (
+                              <p className="mt-0.5 text-xs text-gray-700">
+                                {CLEARANCE_COPY.waiverApprovedBy(
+                                  item.waiver.approvedByName,
+                                  dateTimeLabel(item.waiver.approvedAt),
+                                )}
+                              </p>
+                            )}
                           {/* Said explicitly, because "waived" reads as "dealt with" and
                               the obligation is still open in its own module. */}
                           <p className="mt-0.5 text-xs text-amber-800">
                             {CLEARANCE_COPY.waivedNotReturned}
+                          </p>
+                        </>
+                      ) : item.proposal?.status === 'pending' ? (
+                        /*
+                          T050. The pending state, and it must not read as cleared: the obligation is
+                          still outstanding and still blocks the settlement. Amber rather than green
+                          for that reason — a reader scanning this list for what is done should not
+                          find this row among it.
+                        */
+                        <>
+                          <p className="mt-1 text-xs text-amber-900">
+                            {CLEARANCE_COPY.waiverPending(
+                              item.proposal.proposedByName,
+                              dateTimeLabel(item.proposal.proposedAt),
+                            )}
+                          </p>
+                          <p className="mt-0.5 break-words text-xs italic text-gray-600">
+                            {item.proposal.reason}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-700">
+                            {CLEARANCE_COPY.waiverPendingStill}
+                          </p>
+                        </>
+                      ) : item.proposal?.status === 'rejected' ? (
+                        /* T051. Silence after a rejection reads as success. */
+                        <>
+                          <p className="mt-1 text-xs text-red-800">
+                            {CLEARANCE_COPY.waiverRejected(
+                              item.proposal.proposedByName,
+                              dateTimeLabel(item.proposal.proposedAt),
+                            )}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-700">
+                            {CLEARANCE_COPY.waiverRejectedStill}
                           </p>
                         </>
                       ) : (
@@ -223,7 +273,9 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
                           {CLEARANCE_COPY.openAllocation}
                         </Link>
                       )}
-                      {mayWaive && !item.waiver && (
+                      {mayPropose &&
+                        !item.waiver &&
+                        item.proposal?.status !== 'pending' && (
                         <RowAction
                           type="button"
                           onClick={() => {
@@ -232,9 +284,9 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
                             setError(null);
                           }}
                         >
-                          {CLEARANCE_COPY.waive}
-                        </RowAction>
-                      )}
+                            {CLEARANCE_COPY.waive}
+                          </RowAction>
+                        )}
                     </div>
                   </li>
                 ))}
@@ -267,7 +319,17 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
       >
         {data.settleable
           ? CLEARANCE_COPY.settleReady
-          : CLEARANCE_COPY.settleBlocked}
+          : /*
+              T053. The gate is the api's, but an exit that will not settle with no stated reason
+              sends somebody to a developer — and "something is outstanding" is not an answer when
+              the thing outstanding is a request already made and sitting on somebody's desk.
+            */
+            data.items.some(
+                (item) =>
+                  !item.waiver && item.proposal?.status === 'pending',
+              )
+            ? CLEARANCE_COPY.settleBlockedPending
+            : CLEARANCE_COPY.settleBlocked}
       </p>
 
       {waiving && (
@@ -277,6 +339,11 @@ export default function ExitClearance({ employeeId }: { employeeId: string }) {
         >
           <div className="flex flex-col gap-3">
             <p className="text-sm text-gray-700">{waiving.label}</p>
+            {/* Before the field, not after the button. Somebody who reads this only on success has
+                already pressed a control they believed cleared the obligation. */}
+            <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+              {CLEARANCE_COPY.waiveNeedsApproval}
+            </p>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-gray-700">
                 {CLEARANCE_COPY.waiveReasonLabel}

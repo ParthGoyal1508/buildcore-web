@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { amountOrHidden } from '@/app/lib/api/cash-hiding';
+import HiddenAmount from '@/app/ui/hidden-amount';
 import { ApiError } from '@/app/lib/api/client';
 import { deletePayment, getPayments, type Payment } from '@/app/lib/api/inventory';
 import {
@@ -78,7 +80,15 @@ export default function PaymentsPage() {
     {
       key: 'amount',
       header: 'Amount',
-      render: (row) => formatRupees(row.amount),
+      // "Hidden", not an em dash: an em dash is what this table shows for a figure that was
+      // never recorded, and a reader cannot be left unable to tell the two apart. The component
+      // rather than the string, so the cell carries the explanation on hover.
+      render: (row) =>
+        row.amount === null && row.amountHidden ? (
+          <HiddenAmount />
+        ) : (
+          amountOrHidden(row.amount, row.amountHidden, formatRupees)
+        ),
     },
     {
       key: 'mode',

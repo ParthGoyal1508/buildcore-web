@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 import { companyQuery as scope } from '@/app/lib/api/company-query';
 
 /**
@@ -151,6 +152,8 @@ export interface UploadCompanyDocumentInput {
   /** The file, base64-encoded — the transport 015 established for punch photos. */
   data: string;
   contentType: string;
+  /** The uploader's own file name, so the download is not `<code>-<id>` with no extension. */
+  fileName?: string;
   documentNumber?: string;
   /** Required when the kind expires; the form asks first so the server need not refuse. */
   expiresAt?: string;
@@ -197,7 +200,7 @@ export async function getCompanyDocumentHistory(
 /**
  * The file itself.
  *
- * Reuses `authFetchBlob` rather than adding a transport: an expired token has to be
+ * Reuses `authFetchFile` rather than adding a transport: an expired token has to be
  * renewed the same way whatever the response body turns out to be. Every retrieval is
  * audit-logged server-side **before** the bytes are sent (backend FR-024), which is why
  * a restricted kind has no inline preview — there is no way to look at one without the
@@ -206,8 +209,8 @@ export async function getCompanyDocumentHistory(
 export async function downloadCompanyDocument(
   id: string,
   companyId?: string,
-): Promise<Blob> {
-  return authFetchBlob(
+): Promise<StoredFile> {
+  return authFetchFile(
     `/company-documents/${encodeURIComponent(id)}/download${scope(companyId)}`,
   );
 }

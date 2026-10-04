@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { CompanyProvider } from '@/app/ui/settings/company-context';
 import CodeSeriesTab from '@/app/ui/settings/code-series-tab';
 import DepartmentTab from '@/app/ui/settings/department-tab';
 import DesignationTab from '@/app/ui/settings/designation-tab';
@@ -20,7 +19,7 @@ const TABS = [
 /**
  * The five per-company Employee Setup masters.
  *
- * All five live under one `CompanyProvider`, so switching company in the selector
+ * All five read the company from the session, so switching company in the header
  * re-scopes every tab at once rather than each keeping its own idea of which
  * company is in view.
  */
@@ -32,7 +31,6 @@ export default function EmployeeSetupPage() {
     <main>
       <PageHeader title="Employee Setup" className="mb-6" />
 
-      <CompanyProvider>
         <div
           role="tablist"
           aria-label="Employee setup sections"
@@ -57,7 +55,6 @@ export default function EmployeeSetupPage() {
         </div>
 
         {current.render()}
-      </CompanyProvider>
     </main>
   );
 }

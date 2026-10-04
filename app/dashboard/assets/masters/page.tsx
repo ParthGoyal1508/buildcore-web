@@ -61,7 +61,7 @@ export default function AssetMastersPage() {
   const [showGrade, setShowGrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Scoped to the company `CompanyProvider` selected in the layout above. A
+  // Scoped to the company the session is in (019 FR-004). A
   // cross-company administrator otherwise sees every tenant's masters in one list.
   const categories = useQuery({
     queryKey: ['assets', 'categories', 'all', companyId],

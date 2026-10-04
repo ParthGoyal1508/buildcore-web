@@ -12,7 +12,7 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
 import { DEV_FALLBACK_POSITION, MESSAGES } from '@/app/lib/constants';
-import { enqueue } from '@/app/lib/offline-queue';
+import { isPunchRefusal, punchRefusalMessage } from '@/app/lib/punch-refusal';
 import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
@@ -20,6 +20,15 @@ import CameraCapture from '@/app/ui/my/camera-capture';
 
 /** HTTP 423 — the backend's status for a write into a closed payroll period. */
 const HTTP_LOCKED = 423;
+
+/**
+ * Refusals in a row before the screen stops repeating itself and names a person (T019).
+ *
+ * Three: twice is ordinary — a cloud over the GPS, a badly lit photo — and by four the worker has
+ * usually stopped reading. A named constant rather than a literal because it is a judgement about
+ * people, not an implementation detail, and somebody will want to argue with it.
+ */
+const REFUSALS_BEFORE_ESCALATING = 3;
 
 const two = (n: number) => String(n).padStart(2, '0');
 const clockText = (date: Date) =>
@@ -61,7 +70,29 @@ export default function PunchClock() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
-  const [queuedNotice, setQueuedNotice] = useState(false);
+  /**
+   * Whether the device has a connection, tracked rather than read at tap time (020 T011).
+   *
+   * Read during render, so it cannot be `navigator.onLine` directly: the server renders this
+   * component and has no navigator, and seeding state from it during render would make the markup
+   * disagree with the browser's. It starts optimistic — `true` — and the effect below corrects it
+   * on mount. Optimistic rather than pessimistic because the wrong guess for one frame should be
+   * "offer the punch", not "tell a worker with perfect signal they have none".
+   */
+  const [isOnline, setIsOnline] = useState(true);
+  /**
+   * The refusal to show, and how many have come in a row (020 FR-013, T018, T019).
+   *
+   * Held here rather than in `error` because a refusal is not an error in the sense that one is:
+   * the request succeeded, the server understood it, and nothing is broken — the punch simply was
+   * not accepted. It also needs two lines and a count, which `FormError` does not carry.
+   *
+   * The count is screen state and belongs nowhere else. No message in a table can know it is being
+   * read for the third time, and a worker told the same sentence three times concludes the product
+   * is stuck rather than that they should do something different.
+   */
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusalsInARow, setRefusalsInARow] = useState(0);
   // Which step of the capture -> locate -> submit sequence is running. Locating can
   // take many seconds (and on a device that cannot get a fix, the better part of
   // half a minute before it gives up), during which the screen previously showed
@@ -123,6 +154,21 @@ export default function PunchClock() {
       active = false;
       clearTimeout(firstPaint);
       clearInterval(tick);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setIsOnline(navigator.onLine);
+    // Scheduled, not called in the effect body, for the reason the clock's first paint is:
+    // writing state synchronously there forces an immediate second render pass, which
+    // `react-hooks/set-state-in-effect` exists to prevent.
+    const first = setTimeout(sync, 0);
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      clearTimeout(first);
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
     };
   }, []);
 
@@ -204,33 +250,24 @@ export default function PunchClock() {
       const input = { type, photo, capturedAt, ...coords };
       setPhase('submitting');
 
-      // Offline (US6, T031): queue rather than fail. The punch already happened —
-      // the worker is standing at the gate — and the only thing missing is a
-      // network, so refusing it would lose a real attendance event.
-      if (!navigator.onLine) {
-        await enqueue(input);
-        return 'queued' as const;
-      }
-
-      try {
-        return await submitPunch(input);
-      } catch (err) {
-        // A network-level failure is indistinguishable from being offline as far as
-        // the punch is concerned. An ApiError means the server answered and had a
-        // reason, which the worker needs to see rather than have silently queued.
-        if (err instanceof ApiError) throw err;
-        await enqueue(input);
-        return 'queued' as const;
-      }
+      /**
+       * No queue (020 T008). A punch that cannot reach the server cannot be refused by it, and
+       * under FR-013 a refusal has to arrive while the worker is still standing at the gate —
+       * a queued punch delivered its refusal eight hours later, when nothing could be done.
+       *
+       * A network failure here surfaces as an error rather than being swallowed into a queue,
+       * which is the same thing the screen now says before the attempt: punching needs a
+       * connection. Nothing is lost that was not already lost, because the alternative was a
+       * success the worker believed and the system later discarded.
+       */
+      return await submitPunch(input);
     },
-    onSuccess: (result) => {
+    onSuccess: (punchResult: PunchResult) => {
       setPendingType(null);
-      if (result === 'queued') {
-        setQueuedNotice(true);
-        setNotice(MESSAGES.punchQueued);
-        return;
-      }
-      const punchResult = result as PunchResult;
+      // The streak ends on anything that was accepted. A worker refused twice and then accepted is
+      // not one attempt away from being told to find their supervisor.
+      setRefusal(null);
+      setRefusalsInARow(0);
       // A flagged punch is still a recorded punch (FR-007/FR-005). The notice is
       // informational, not an error, because there is nothing for the worker to
       // redo — punching again would only create a second exception.
@@ -279,6 +316,23 @@ export default function PunchClock() {
         setError(MESSAGES.payrollLocked);
         return;
       }
+      /**
+       * A refused punch (020 FR-013). **This is the only place the worker learns what happened.**
+       *
+       * Under FR-013d nothing is written to attendance, so unlike every other failure on this
+       * screen there is no record to go back to: the day will read as a day with no punch. The
+       * refusal is shown here and listed under "Refused attempts"; it is deliberately absent from
+       * the attendance view, which would recreate the refused day the backend refuses to keep.
+       *
+       * Branched on `code`, never on the message text — the convention this feature set, and the
+       * reason the backend sends a code at all.
+       */
+      if (err instanceof ApiError && isPunchRefusal(err.code)) {
+        setRefusal(punchRefusalMessage(err.code, err.message));
+        setRefusalsInARow((count) => count + 1);
+        queryClient.invalidateQueries({ queryKey: ['my', 'punch-refusals'] });
+        return;
+      }
       // 409 is the day's own state refusing the punch (backend FR-008) — already
       // punched in, already punched out, nothing to punch out from. The server's
       // message says which, and is more useful than any generic copy here.
@@ -289,7 +343,10 @@ export default function PunchClock() {
   function startPunch(type: 'in' | 'out') {
     setError(null);
     setNotice(null);
-    setQueuedNotice(false);
+    // The previous refusal goes as soon as the worker acts on it. `refusalsInARow` deliberately
+    // does not: it is the count of attempts, and resetting it here would mean the escalation could
+    // never be reached, since every attempt starts by clearing what the last one said.
+    setRefusal(null);
     setPendingType(type);
   }
 
@@ -360,14 +417,36 @@ export default function PunchClock() {
 
       <FormError message={error} />
 
+      {/* The refusal (020 FR-013, T018–T020).
+          Amber rather than red, and separate from `FormError`: nothing is broken and nothing
+          failed — a well-formed punch was not accepted, and the worker has something to do about
+          it. Three parts, in the order they are useful: what to do, that nothing was recorded and
+          who can fix that, and — only after three in a row — to stop and find a supervisor.
+
+          No offer to show the photo (T020). A face refusal keeps none: an unattributed biometric
+          held against a named employee is worse than the record it replaces. The line saying so is
+          shown on a face refusal only, so it reads as a fact about this product rather than as an
+          apology for a missing feature. */}
+      {refusal && (
+        <div
+          role="alert"
+          className="space-y-2 rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-900"
+        >
+          <p className="font-medium">{refusal}</p>
+          <p className="text-amber-800">{MESSAGES.punchRefusedRecovery}</p>
+          {refusal === MESSAGES.punchRefusedFace && (
+            <p className="text-amber-700">{MESSAGES.punchRefusedNoPhoto}</p>
+          )}
+          {refusalsInARow >= REFUSALS_BEFORE_ESCALATING && (
+            <p className="font-medium">{MESSAGES.punchRefusedRepeatedly}</p>
+          )}
+        </div>
+      )}
+
       {notice && (
         <p
           role="status"
-          className={
-            queuedNotice
-              ? 'rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800'
-              : 'rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800'
-          }
+          className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
         >
           {notice}
         </p>
@@ -393,10 +472,24 @@ export default function PunchClock() {
         </p>
       )}
 
+      {/* No connection, no punch control (020 T011, T012).
+          Stated before the capture rather than after it: a worker who photographs themselves,
+          waits through the locate, and only then learns there is no signal has been made to do
+          work for nothing. Styled as a condition — the amber of "punched in since", not the red
+          of an error — because the application is not broken and must not look it. */}
+      {!isOnline && !dayIsComplete && (
+        <div className="space-y-2 rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
+          <p role="status">{MESSAGES.punchNeedsConnection}</p>
+          <p className="text-amber-700">
+            {MESSAGES.punchNeedsConnectionRecovery}
+          </p>
+        </div>
+      )}
+
       {/* Nothing to offer once the day's pair is recorded (FR-019c) — the boxes
           above already show what happened, and the only control that could appear
           here is one the server would refuse. */}
-      {dayIsComplete ? null : pendingType ? (
+      {dayIsComplete || !isOnline ? null : pendingType ? (
         <CameraCapture
           captureLabel={`Confirm punch ${pendingType}`}
           disabled={punch.isPending}
