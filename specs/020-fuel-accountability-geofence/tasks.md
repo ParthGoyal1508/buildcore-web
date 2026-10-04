@@ -5,6 +5,10 @@ description: "Task list for 020 Fuel Accountability and Per-Employee Geofence (w
 
 # Tasks: Fuel Accountability and Per-Employee Geofence (web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `specs/020-fuel-accountability-geofence/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md) (clarified 2026-10-01),

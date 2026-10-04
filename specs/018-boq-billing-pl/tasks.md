@@ -5,6 +5,10 @@ description: "Task list for 018 BOQ, Billing and Project P&L (web)"
 
 # Tasks: BOQ, Billing and Project P&L (web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `specs/018-boq-billing-pl/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md) (clarified 2026-10-01),

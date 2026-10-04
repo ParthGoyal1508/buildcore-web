@@ -5,6 +5,10 @@ description: "Task list for 017 Documents and Letters (web)"
 
 # Tasks: Documents and Letters (web)
 
+> **Every open task in this file is a browser pass.** They are collected, in walkable order with
+> the setup done once, in [`specs/MANUAL-VERIFICATION.md`](../MANUAL-VERIFICATION.md). Record the
+> result **here**, next to the task — that is what the recording task at the end of this file is.
+
 **Input**: Design documents from `specs/017-documents-and-letters/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md) (clarified 2026-09-15),
