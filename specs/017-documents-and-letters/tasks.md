@@ -88,6 +88,19 @@ exist.
   which has nothing to do with whether somebody may look at a filed document. Linked from the
   portfolio list's row actions, since T077's "openable from there" needs somewhere to open from.
 
+  **Half of this tick was wrong for three days, and the task text said so.** "Reusing
+  `document-upload.tsx`" was not done: the panel listed documents, named what was outstanding, and
+  mounted no upload control at all, so a document could only ever be attached while the project was
+  being *created*. A project that went live without its insurance could never be brought up to date,
+  and the panel went on reporting it outstanding for ever. The client found it by looking for the
+  button. Completed 2026-10-04, with two new props on the shared component — a project document has
+  no number and no expiry, and asking for an expiry the API discards is worse than not asking.
+
+  Worth naming the mechanism, because it is the one this file keeps catching: the tick was applied
+  to the *screen*, and the screen existed. Nothing checks that a task's own sentence was satisfied,
+  so the clause after the comma went unread by everyone including the person writing the note
+  directly underneath it.
+
 - [X] T015 [US2] Show readiness **in the project list**, from the batch endpoint. One request for the
       whole list, never one per row
 
