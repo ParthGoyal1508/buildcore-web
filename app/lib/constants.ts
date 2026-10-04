@@ -3722,6 +3722,11 @@ export const BOQ_COPY = {
       'This schedule has more rows than one import can take. Import its sections separately.',
     BOQ_TOO_MANY_BATCHES:
       'Too many imports are waiting to be confirmed. Confirm or discard one of them, then try again.',
+    // 2026-10-04. The condition existed and had no name: a confirm that outran its transaction
+    // budget arrived as a bare 500, which answered neither "what happened" nor the only question
+    // that matters at that moment — whether half the tender is now on the project.
+    BOQ_IMPORT_WRITE_INTERRUPTED:
+      'The database did not finish writing this schedule in time, so nothing was saved and the project is exactly as it was. The import is still held — press Confirm again. If it fails a second time, import the schedule’s sections separately.',
     BOQ_ALREADY_POPULATED:
       'This project already has a BOQ. Importing again would add a second copy rather than replace the first, and the existing lines cannot be removed automatically because bills may already measure against them. Add or revise lines instead.',
     BOQ_BATCH_NOT_FOUND: 'That import is no longer available. Upload the file again.',
