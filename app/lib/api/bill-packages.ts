@@ -563,6 +563,23 @@ export async function downloadWorkbook(
   return { blob, filename: `${label}.xlsx` };
 }
 
+/**
+ * The same bill as a PDF (025 FR-042).
+ *
+ * The `.xlsx` is what a client edits before signing; this is what gets attached to an email and
+ * filed — a form nobody can alter after it was sent. Both are rendered from the same stored
+ * figures, so the two cannot disagree.
+ */
+export async function downloadBillPdf(
+  packageId: string,
+  label: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const blob = await authFetchBlob(
+    `/projects/bill-packages/${packageId}/bill.pdf`,
+  );
+  return { blob, filename: `${label}.pdf` };
+}
+
 export async function getUnderstatementReport(
   projectId: string,
 ): Promise<UnderstatementReport> {

@@ -21,6 +21,7 @@ import {
   setCheckList,
   abandonBillPackage,
   applyDebit,
+  downloadBillPdf,
   recordDebit,
   reviseBillPackage,
   setClaim,
@@ -121,23 +122,39 @@ export default function BillPackageDetail({
     },
   });
 
+  /** One place that turns a blob into a named download, so the two buttons cannot differ. */
+  const save = (blob: Blob, filename: string) => {
+    // A blob URL carries no filename, so the `download` attribute is the only way to say what the
+    // file is called — the reason `download-file.ts` exists and uses an anchor rather than
+    // `window.open`.
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPdf = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await downloadBillPdf(
+        packageId,
+        pkg?.label ?? 'bill',
+      );
+      save(blob, filename);
+    },
+    onError: (err: unknown) => setError(describe(err)),
+  });
+
   const download = useMutation({
     mutationFn: async () => {
       const { blob, filename } = await downloadWorkbook(
         packageId,
         pkg?.label ?? 'bill',
       );
-      // A blob URL carries no filename, so the `download` attribute is the only way to say what the
-      // file is called — the reason `download-file.ts` exists and uses an anchor rather than
-      // `window.open`.
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      save(blob, filename);
     },
     onError: (err: unknown) => setError(describe(err)),
   });
@@ -179,6 +196,14 @@ export default function BillPackageDetail({
             disabled={download.isPending}
           >
             {download.isPending ? 'Producing…' : 'Download the workbook'}
+          </Button>
+          {/* 025 FR-042. The same bill, rendered from the same stored figures — the workbook is
+              what a client edits before signing, the PDF is what gets emailed and filed. */}
+          <Button
+            onClick={() => downloadPdf.mutate()}
+            disabled={downloadPdf.isPending}
+          >
+            {downloadPdf.isPending ? 'Producing…' : 'Download the PDF'}
           </Button>
           {editable && (
             <Button onClick={() => issue.mutate()} disabled={issue.isPending}>
