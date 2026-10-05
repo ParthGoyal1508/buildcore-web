@@ -18,6 +18,29 @@ const config = [
   },
   ...coreWebVitals,
   ...typescript,
+  {
+    // The three fetch primitives in `app/lib/api/client.ts` send no access token. Only
+    // `app/lib/session.ts` may call them, because that is where the token is attached and where a
+    // 401 is turned into one refresh-and-retry rather than a failed screen. An api module that
+    // imports them directly compiles, type-checks, and answers 401 for every signed-in user — which
+    // is how `downloadDwrAttachment` shipped reporting that an attachment could not be opened.
+    files: ['app/lib/api/**', 'app/ui/**', 'app/dashboard/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/app/lib/api/client',
+              importNames: ['apiFetch', 'apiFetchBlob', 'apiFetchFile'],
+              message:
+                'Use authFetch / authFetchBlob / authFetchFile from @/app/lib/session — the client primitives attach no access token.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default config;

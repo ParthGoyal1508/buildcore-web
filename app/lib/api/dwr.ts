@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { apiFetchFile, type StoredFile } from '@/app/lib/api/client';
-import { authFetch } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every daily-work-report call to `buildcore-api` — the fourteen routes under `projects/dwr` (feature 022, 024 FR-001).
@@ -455,11 +455,17 @@ export async function addDwrAttachment(
   );
 }
 
-/** Flat, not nested under the report — an attachment id is unique on its own. */
+/**
+ * Flat, not nested under the report — an attachment id is unique on its own.
+ *
+ * `authFetchFile`, not the bare `apiFetchFile` this first shipped with: the raw client sends no
+ * access token, so every download answered 401 and the screen reported only that the file could
+ * not be opened. A download is an authenticated read like any other.
+ */
 export async function downloadDwrAttachment(
   attachmentId: string,
 ): Promise<StoredFile> {
-  return apiFetchFile(`/projects/dwr/attachments/${attachmentId}`);
+  return authFetchFile(`/projects/dwr/attachments/${attachmentId}`);
 }
 
 async function fileToBase64(file: File): Promise<string> {
