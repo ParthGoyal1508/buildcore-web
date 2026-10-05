@@ -1971,6 +1971,44 @@ export function partnersLabel(value: string | null | undefined): string {
  * for tidiness would cost real bytes for no benefit; `NavModuleId` keeps that record
  * exhaustive instead.
  */
+/**
+ * Where each read-only project tab's contents actually come from (027).
+ *
+ * People, machinery and material all reach a project **through its sites** — an employee posted to
+ * one, a machine deployed to one, stock issued from one. The three tabs are mirrors of that, with
+ * no way to add from here on purpose: a roster editable from two places is two places for it to
+ * disagree.
+ *
+ * What was missing was any statement of that. The tabs showed an empty list and no indication that
+ * the thing to do was somewhere else entirely, so "there is nothing here" and "you add this in HR"
+ * looked identical. Naming the source is the whole job; the link saves the hunt.
+ */
+export const PROJECT_TAB_SOURCES = {
+  /** Shown instead of the per-tab note. Without a site, none of the three can ever populate. */
+  noSites:
+    'This project has no sites yet. People, machinery and material all reach a project through its sites, so nothing can appear on these tabs until one exists.',
+  noSitesLink: 'Add a site',
+  sitesLabel: (names: string) => `This project’s sites: ${names}.`,
+
+  people:
+    'People are not added here. An employee belongs to this project by being posted to one of its sites, which is set on the employee’s Employment tab in HR.',
+  peopleLink: 'Open HR → Employees',
+
+  machinery:
+    'Machinery is not added here. A machine joins this project when its “Deployed at” site is one of this project’s, which is set on the machine in Plant & Machinery.',
+  machineryLink: 'Open Plant → Equipment',
+
+  /**
+   * Two steps, and saying so matters: the Store list offers every site, so picking this project's
+   * is easy — and the Item list beneath it is then empty, with nothing explaining that the store
+   * holds no stock. That dead end is the one worth warning about in advance.
+   */
+  materials:
+    'Material is not added here. It appears once stock is issued from one of this project’s sites. The store has to hold the stock first — receive it on a purchase, or transfer it in — because the issue form offers only what that store actually has.',
+  materialsLink: 'Open Inventory → Issues',
+  materialsSecondLink: 'Open Inventory → Purchases',
+} as const;
+
 export const NAV_MODULES = [
   {
     id: 'dashboard',

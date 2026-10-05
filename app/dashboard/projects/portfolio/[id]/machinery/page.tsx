@@ -1,9 +1,14 @@
 'use client';
 
-import { PROJECT_SHELL_COPY } from '@/app/lib/constants';
+import {
+  PROJECT_SHELL_COPY,
+  PROJECT_TAB_SOURCES,
+  ROUTES,
+} from '@/app/lib/constants';
 import StatusBadge from '@/app/ui/status-badge';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import TabSourceNote from '@/app/ui/projects/tab-source-note';
 
 type Machine = ReturnType<typeof useProjectShell>['tabs']['machinery'][number];
 
@@ -16,7 +21,7 @@ type Machine = ReturnType<typeof useProjectShell>['tabs']['machinery'][number];
  * is deployed to this project* is a statement of fact, and nobody asked.
  */
 export default function ProjectMachineryPage() {
-  const { tabs, unavailableModules } = useProjectShell();
+  const { project, tabs, unavailableModules } = useProjectShell();
   const couldNotAsk = unavailableModules.includes('plant');
 
   const columns: Column<Machine>[] = [
@@ -50,6 +55,12 @@ export default function ProjectMachineryPage() {
       <h2 className="mb-3 text-sm font-semibold text-gray-900">
         {PROJECT_SHELL_COPY.machineryHeading}
       </h2>
+      <TabSourceNote
+        projectId={project.id}
+        explanation={PROJECT_TAB_SOURCES.machinery}
+        linkLabel={PROJECT_TAB_SOURCES.machineryLink}
+        href={ROUTES.plantEquipment}
+      />
       {couldNotAsk && (
         <p
           role="status"
