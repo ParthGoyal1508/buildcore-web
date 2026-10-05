@@ -13,6 +13,7 @@ import {
 import { ROUTES } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import { FieldLabelSpacer } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 
 const DIRECTION_LABEL: Record<BillDirection, string> = {
@@ -89,7 +90,7 @@ export default function BillPackagesPanel({
       </header>
 
       <form
-        className="grid gap-4 rounded-md border border-gray-200 p-4 sm:grid-cols-2 lg:grid-cols-5"
+        className="grid items-start gap-4 rounded-md border border-gray-200 p-4 sm:grid-cols-2 lg:grid-cols-5"
         onSubmit={(event) => {
           event.preventDefault();
           compose.mutate();
@@ -173,7 +174,12 @@ export default function BillPackagesPanel({
           </label>
         )}
 
-        <div className="flex items-end">
+        {/* Grid cells stretch to the tallest in the row — here the Direction field, whose hint
+            runs to three lines — so `items-end` dropped this button to the bottom of that cell,
+            well below the inputs it sits beside. `items-start` on the grid holds every control on
+            one line, and the spacer stands in for the label this button does not have. */}
+        <div>
+          <FieldLabelSpacer />
           <Button type="submit" disabled={compose.isPending}>
             {compose.isPending ? 'Composing…' : 'Compose'}
           </Button>
