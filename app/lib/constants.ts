@@ -983,6 +983,20 @@ export const BILLING_COPY = {
     'This bill has been certified. Changing its quantities withdraws that certification and sends the bill for approval again — the existing approval is kept as a record of what was signed, and it will not apply to the new figures.',
   reviseWarningPending:
     'This bill is waiting on an approval. Changing its quantities replaces that request with a new one, so nobody is left deciding a version that no longer exists.',
+  /**
+   * A draft is edited, not revised (027).
+   *
+   * The sheet showed every non-approved bill the *pending* warning — "this bill is waiting on an
+   * approval" — over a draft that was waiting on nobody, and asked for a reason explaining a change
+   * to a document no one had seen. Three statuses, three behaviours: a draft is simply edited, a
+   * submitted bill replaces its pending request, an approved one withdraws a signature.
+   */
+  editHeading: 'Edit measured quantities',
+  editHint:
+    'This bill is still a draft. It has not been sent to anybody, so changing it changes nothing anyone has seen.',
+  edit: 'Save changes',
+  editing: 'Saving…',
+  editDone: 'Saved. The bill is still a draft.',
   reviseReasonLabel: 'Why the quantities changed',
   reviseReasonHint:
     'Required. Somebody has to decide this bill a second time, and “why” is the first thing they will ask.',
@@ -992,6 +1006,23 @@ export const BILLING_COPY = {
   /** FR-009's eventual consistency — see the note beside it in the sheet. */
   reviseDone:
     'Saved and sent for approval again. The approval queue may take a moment to catch up.',
+  // --- Reading a bill back (027) ---
+  /**
+   * A bill could only be opened for editing, so looking at one meant opening the sheet that
+   * changes it — and on a submitted bill, reading past a warning about withdrawing an approval.
+   */
+  viewBill: 'View bill',
+  hideBill: 'Hide bill',
+  viewColumns: {
+    description: 'Item',
+    unit: 'Unit',
+    quantity: 'Quantity',
+    rate: 'Rate',
+    amount: 'Amount',
+  },
+  viewNoLines:
+    'This bill has no measured lines. It predates work-order awards, or its lines were removed.',
+  viewDeductions: 'Deductions',
   // --- Conflict (FR-014) ---
   conflictHeading: 'Somebody else changed this bill',
   conflictHint:

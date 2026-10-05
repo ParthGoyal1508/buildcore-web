@@ -19,6 +19,7 @@ import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import AwardEditor from '@/app/ui/projects/award-editor';
 import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
+import RaBillView from '@/app/ui/projects/ra-bill-view';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import SearchableSelect, {
   type SearchableOption,
@@ -326,6 +327,9 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                 className="rounded border border-gray-200 p-3 text-sm"
               >
                 <BillSummary bill={bill} />
+                {/* No actions: these are measured against no award, so there is nothing to revise
+                    them against. Reading one is the whole of what can be done with it. */}
+                <RaBillView bill={bill} />
               </li>
             ))}
           </ul>
@@ -570,6 +574,9 @@ function BillsTab({
   onError: (message: string | null) => void;
 }) {
   const queryClient = useQueryClient();
+  /** Which bills are expanded. A set, because reading two side by side is how they get compared. */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+
   const submit = useMutation({
     mutationFn: (id: string) => submitRaBill(id),
     onSuccess: () =>
@@ -615,6 +622,21 @@ function BillsTab({
               >
                 <BillSummary bill={bill} />
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <SecondaryButton
+                    type="button"
+                    aria-expanded={opened.has(bill.id)}
+                    onClick={() =>
+                      setOpened((current) => {
+                        const next = new Set(current);
+                        if (!next.delete(bill.id)) next.add(bill.id);
+                        return next;
+                      })
+                    }
+                  >
+                    {opened.has(bill.id)
+                      ? BILLING_COPY.hideBill
+                      : BILLING_COPY.viewBill}
+                  </SecondaryButton>
                   {bill.status === 'draft' && (
                     <RowAction
                       type="button"
@@ -627,13 +649,15 @@ function BillsTab({
                       {BILLING_COPY.submit}
                     </RowAction>
                   )}
-                  <SecondaryButton
-                    type="button"
-                    onClick={() => onRevise(bill)}
-                  >
-                    {BILLING_COPY.reviseHeading}
+                  {/* A draft is edited; a bill somebody has acted on is revised. Saying "revise"
+                      over a draft promised a formality that does not apply to it. */}
+                  <SecondaryButton type="button" onClick={() => onRevise(bill)}>
+                    {bill.status === 'draft'
+                      ? BILLING_COPY.editHeading
+                      : BILLING_COPY.reviseHeading}
                   </SecondaryButton>
                 </div>
+                {opened.has(bill.id) && <RaBillView bill={bill} />}
               </li>
             ))}
           </ul>

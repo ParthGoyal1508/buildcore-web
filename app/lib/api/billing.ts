@@ -330,8 +330,13 @@ export interface ComposeRaBillInput {
 
 export interface ReviseRaBillInput {
   lines: MeasureLineInput[];
-  /** Required. Somebody has to decide this bill a second time. */
-  reason: string;
+  /**
+   * Why the quantities changed. **Required once the bill has left draft, and only then** (027).
+   *
+   * A draft has been decided by nobody, so there is no second decider to read it. Omit it there —
+   * an empty string is not omission, and would fail the DTO's `MinLength(3)`.
+   */
+  reason?: string;
   advanceRecovery?: number;
   otherDeductions?: number;
 }

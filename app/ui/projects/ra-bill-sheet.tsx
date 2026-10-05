@@ -55,6 +55,16 @@ export default function RaBillSheet({
   revising?: RaBill;
 }) {
   const queryClient = useQueryClient();
+
+  /**
+   * Editing a bill nobody has seen (027).
+   *
+   * `revising` only says *a bill is open*; it says nothing about whether anybody has acted on it.
+   * Treating those as the same thing is why a draft was shown "this bill is waiting on an approval"
+   * and asked to justify a change to a document that had been sent to no one.
+   */
+  const isDraftEdit = revising?.status === 'draft';
+
   const award = useQuery({
     // The bill being revised is excluded from its own to-date figure, or reducing a quantity on a
     // fully-measured award is refused for exceeding the award it is reducing.
@@ -125,7 +135,12 @@ export default function RaBillSheet({
         otherDeductions: otherDeductions ? Number(otherDeductions) : undefined,
       };
       return revising
-        ? reviseRaBill(revising.id, { ...payload, reason: reason.trim() })
+        ? reviseRaBill(revising.id, {
+            ...payload,
+            // Omitted on a draft rather than sent empty: the DTO's `@IsOptional()` skips
+            // `undefined`, and `''` would fail its `MinLength(3)` instead of reading as "none".
+            ...(isDraftEdit ? {} : { reason: reason.trim() }),
+          })
         : // `billNumber` is deliberately absent: the server allocates it. Sending an empty
           // string would be refused — `@IsOptional()` skips `undefined`, not `''`.
           composeRaBill({
@@ -139,7 +154,13 @@ export default function RaBillSheet({
       void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] });
       void queryClient.invalidateQueries({ queryKey: ['raAward', workOrderId] });
       // Not "the approval has been invalidated" — see the class comment. The queue is eventual.
-      setDone(revising ? BILLING_COPY.reviseDone : null);
+      setDone(
+        !revising
+          ? null
+          : isDraftEdit
+            ? BILLING_COPY.editDone
+            : BILLING_COPY.reviseDone,
+      );
       if (!revising) setQuantities({});
     },
     onError: (err) => {
@@ -176,17 +197,28 @@ export default function RaBillSheet({
     <section className="space-y-4">
       <div>
         <h2 className="text-base font-semibold text-gray-900">
-          {revising ? BILLING_COPY.reviseHeading : BILLING_COPY.raHeading}
+          {!revising
+            ? BILLING_COPY.raHeading
+            : isDraftEdit
+              ? BILLING_COPY.editHeading
+              : BILLING_COPY.reviseHeading}
         </h2>
-        <p className="mt-1 text-sm text-gray-600">{BILLING_COPY.raHint}</p>
+        <p className="mt-1 text-sm text-gray-600">
+          {isDraftEdit ? BILLING_COPY.editHint : BILLING_COPY.raHint}
+        </p>
       </div>
 
       {/*
         The warning comes before the edit, which is the requirement itself (FR-009). A certified
         bill and a pending one are different warnings: one withdraws a signature, the other
         replaces a request nobody has answered.
+
+        A **draft gets neither**, because there is nothing to withdraw and no request to replace.
+        It used to get the pending one — this was `status === 'approved' ? … : …`, which made
+        "not approved" stand in for "submitted" and told the author of an unsent draft that
+        somebody was waiting on it.
       */}
-      {revising && (
+      {revising && !isDraftEdit && (
         <div
           className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
           role="alert"
@@ -371,7 +403,10 @@ export default function RaBillSheet({
         />
       </div>
 
-      {revising && (
+      {/* The reason is for whoever decides the bill a second time. A draft has no first decision,
+          so asking for one makes somebody invent a justification — and an invented reason devalues
+          the field on the bills where it carries weight. The server agrees as of 027. */}
+      {revising && !isDraftEdit && (
         <TextField
           id="ra-revise-reason"
           label={BILLING_COPY.reviseReasonLabel}
@@ -422,7 +457,7 @@ export default function RaBillSheet({
           disabled={
             measured.length === 0 ||
             save.isPending ||
-            (revising ? reason.trim().length < 3 : false)
+            (revising && !isDraftEdit ? reason.trim().length < 3 : false)
           }
           onClick={() => {
             setError(null);
@@ -431,12 +466,16 @@ export default function RaBillSheet({
           }}
         >
           {save.isPending
-            ? revising
-              ? BILLING_COPY.revising
-              : BILLING_COPY.composing
-            : revising
-              ? BILLING_COPY.revise
-              : BILLING_COPY.compose}
+            ? !revising
+              ? BILLING_COPY.composing
+              : isDraftEdit
+                ? BILLING_COPY.editing
+                : BILLING_COPY.revising
+            : !revising
+              ? BILLING_COPY.compose
+              : isDraftEdit
+                ? BILLING_COPY.edit
+                : BILLING_COPY.revise}
         </Button>
       </div>
     </section>
