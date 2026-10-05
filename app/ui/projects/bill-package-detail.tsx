@@ -18,10 +18,15 @@ import {
   issueBillPackage,
   proposalLabel,
   setCheckList,
+  abandonBillPackage,
+  applyDebit,
+  recordDebit,
+  reviseBillPackage,
   setClaim,
 } from '@/app/lib/api/bill-packages';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import MeasurementSheet from '@/app/ui/projects/measurement-sheet';
 import StatusBadge from '@/app/ui/status-badge';
 
 /**
@@ -53,6 +58,8 @@ export default function BillPackageDetail({
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Which line's measurement sheet is open. One at a time: two expanded sheets is a scroll. */
+  const [sheetFor, setSheetFor] = useState<string | null>(null);
 
   const { data: pkg, isLoading } = useQuery({
     queryKey: ['billPackage', packageId],
@@ -177,6 +184,49 @@ export default function BillPackageDetail({
               {issue.isPending ? 'Issuing…' : 'Issue'}
             </Button>
           )}
+          {editable && (
+            // 025 FR-030. A draft composed for the wrong period or the wrong counterparty had no
+            // way out; the endpoint has existed since 023 and nothing called it. Abandoned rather
+            // than deleted — the period stays accounted for.
+            <Button
+              intent="write"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Abandon this draft? The period stays recorded as one somebody opened and chose not to bill.',
+                  )
+                ) {
+                  abandonBillPackage(packageId)
+                    .then(() => {
+                      setNotice('Abandoned.');
+                      refresh();
+                    })
+                    .catch((err: unknown) => setError(describe(err)));
+                }
+              }}
+            >
+              Abandon
+            </Button>
+          )}
+          {!editable && pkg.status === 'issued' && (
+            <Button
+              onClick={() => {
+                const reason = window.prompt(
+                  'Why is this issued bill being revised? The revision is visible as a revision, not as a new bill.',
+                );
+                if (reason) {
+                  reviseBillPackage(packageId, reason)
+                    .then(() => {
+                      setNotice('Revised. The figures are editable again.');
+                      refresh();
+                    })
+                    .catch((err: unknown) => setError(describe(err)));
+                }
+              }}
+            >
+              Revise
+            </Button>
+          )}
           {!editable && pkg.status === 'issued' && (
             <Button
               onClick={() => {
@@ -253,6 +303,15 @@ export default function BillPackageDetail({
                   key={claim.id}
                   claim={claim}
                   editable={editable}
+                  packageId={packageId}
+                  sheetOpen={sheetFor === claim.scheduleLineId}
+                  onToggleSheet={() =>
+                    setSheetFor(
+                      sheetFor === claim.scheduleLineId
+                        ? null
+                        : claim.scheduleLineId,
+                    )
+                  }
                   onSave={async (claimedQty, reason) => {
                     try {
                       await setClaim(packageId, claim.id, {
@@ -368,6 +427,7 @@ export default function BillPackageDetail({
             Recovered on this bill: {register.recoveredOnThisPackage} of{' '}
             {register.total}.
           </p>
+          {editable && <RecordDebit projectId={pkg.projectId} onDone={refresh} />}
           {register.groups.length === 0 ? (
             <p className="text-sm text-gray-600">No debits on this project.</p>
           ) : (
@@ -392,6 +452,29 @@ export default function BillPackageDetail({
                             {row.recoveredOn
                               ? `debited in ${row.recoveredOn}`
                               : 'not yet recovered'}
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            {/* 025 FR-029. A debit is recovered on exactly one bill; the server
+                                refuses a second application by name, so the control is offered and
+                                its refusal is shown rather than guessed at here. */}
+                            {editable && !row.recoveredOnPackageId && (
+                              <Button
+                                onClick={() => {
+                                  applyDebit(row.id, packageId)
+                                    .then(() => {
+                                      setNotice(
+                                        'Recovered on this bill. It cannot be recovered on another.',
+                                      );
+                                      refresh();
+                                    })
+                                    .catch((err: unknown) =>
+                                      setError(describe(err)),
+                                    );
+                                }}
+                              >
+                                Recover here
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -468,8 +551,14 @@ export default function BillPackageDetail({
 function ClaimRow({
   claim,
   editable,
+  packageId,
+  sheetOpen,
+  onToggleSheet,
   onSave,
 }: {
+  packageId: string;
+  sheetOpen: boolean;
+  onToggleSheet: () => void;
   claim: BillPackageClaim;
   editable: boolean;
   onSave: (claimedQty: string, reason?: string) => Promise<void>;
@@ -484,8 +573,20 @@ function ClaimRow({
   const needsReason = differsFromProposal && Number(claimed) !== 0;
 
   return (
+    <>
     <tr className={claim.overClaimed ? 'bg-amber-50' : undefined}>
-      <td className="px-3 py-2 whitespace-nowrap">{claim.boqNo}</td>
+      <td className="px-3 py-2 whitespace-nowrap">
+        {/* 025 FR-028. Until now this existed only inside the downloaded workbook, so answering
+            "where did this figure come from?" meant producing a document. */}
+        <button
+          type="button"
+          onClick={onToggleSheet}
+          className="font-medium text-blue-700 hover:underline"
+          aria-expanded={sheetOpen}
+        >
+          {claim.boqNo}
+        </button>
+      </td>
       <td className="max-w-md px-3 py-2">
         <span className="line-clamp-2">{claim.description}</span>
         {claim.overClaimed && (
@@ -558,6 +659,17 @@ function ClaimRow({
         )}
       </td>
     </tr>
+    {sheetOpen && (
+      <tr className="bg-gray-50">
+        <td colSpan={8} className="px-3 py-3">
+          <MeasurementSheet
+            packageId={packageId}
+            scheduleLineId={claim.scheduleLineId}
+          />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 
@@ -577,5 +689,120 @@ function describe(err: unknown): string {
     anyErr?.details?.message ??
     anyErr?.message ??
     'The request was refused and the server gave no reason.'
+  );
+}
+
+/**
+ * Raising a debit against a counterparty (025 FR-029).
+ *
+ * The endpoint has existed since 023 with no caller, so the register could be read and never
+ * written: every debit in the system had to be inserted by hand. Four fields, because four are
+ * required — the rest of the register's columns (location, dimensions, unit) are optional on the
+ * API and a form that demanded them would refuse a debit nobody measured.
+ *
+ * **The amount with tax is entered, not derived.** A debit against a subcontractor is raised at a
+ * figure somebody agreed, and computing it here from a rate this screen does not know would produce
+ * a number that disagrees with the note already sent to them.
+ */
+function RecordDebit({
+  projectId,
+  onDone,
+}: {
+  projectId: string;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [heading, setHeading] = useState('');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [amountWithTax, setAmountWithTax] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  if (!open) {
+    return (
+      <Button className="mb-3" onClick={() => setOpen(true)}>
+        Raise a debit
+      </Button>
+    );
+  }
+
+  return (
+    <form
+      className="mb-3 flex flex-wrap items-end gap-3 rounded-md border border-gray-200 p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setSaving(true);
+        recordDebit(projectId, {
+          ...(heading.trim() ? { groupHeading: heading.trim() } : {}),
+          description: description.trim(),
+          rate: amount.trim(),
+          amount: amount.trim(),
+          amountWithTax: amountWithTax.trim() || amount.trim(),
+        })
+          .then(() => {
+            setError(null);
+            setOpen(false);
+            setDescription('');
+            setAmount('');
+            setAmountWithTax('');
+            onDone();
+          })
+          .catch((err: unknown) => setError(describe(err)))
+          .finally(() => setSaving(false));
+      }}
+    >
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">Heading</span>
+        <input
+          value={heading}
+          onChange={(event) => setHeading(event.target.value)}
+          placeholder="Debit against the ATMS equipment missing at site"
+          className="w-72 rounded-md border border-gray-300 px-3 py-2"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">Description</span>
+        <input
+          required
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          className="w-72 rounded-md border border-gray-300 px-3 py-2"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">Amount</span>
+        <input
+          required
+          inputMode="decimal"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          className="w-32 rounded-md border border-gray-300 px-3 py-2"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">With tax</span>
+        <input
+          inputMode="decimal"
+          value={amountWithTax}
+          onChange={(event) => setAmountWithTax(event.target.value)}
+          placeholder="same as amount"
+          className="w-32 rounded-md border border-gray-300 px-3 py-2"
+        />
+      </label>
+      <div className="flex items-center gap-2 pb-1">
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Record'}
+        </Button>
+        <Button type="button" intent="write" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+      {error && (
+        <p className="w-full text-sm text-red-800" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
