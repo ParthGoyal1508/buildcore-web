@@ -9,7 +9,6 @@ import {
   getRaBills,
   getWorkOrders,
   updateWorkOrder,
-  setAward,
   submitRaBill,
   type RaBill,
   type WorkOrder,
@@ -18,6 +17,7 @@ import { getVendors } from '@/app/lib/api/partners';
 import { BILLING_COPY, WORK_ORDER_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import AwardEditor from '@/app/ui/projects/award-editor';
 import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import SearchableSelect, {
@@ -254,6 +254,7 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
 
                 {tab === 'award' && (
                   <AwardTab
+                    projectId={projectId}
                     order={chosen}
                     onError={setError}
                     onSaved={() => {
@@ -506,68 +507,24 @@ function RaiseForm({
 }
 
 /**
- * The award: what the subcontractor was given, and the thing every bill is measured against.
+ * The award tab: a thin frame over {@link AwardEditor}.
  *
- * ## Pasted, not typed line by line
- *
- * `description | unit | quantity | rate` per line, because a subcontract award arrives as a table
- * in an email or a PDF and re-typing it into four inputs per line is how a 60-line award does not
- * get entered at all. Deliberately not a file import: the award's shape varies by subcontractor,
- * and an importer that guessed wrong would be worse than a paste the person can see before saving.
- *
- * ## Replaceable until a bill exists (027)
- *
- * This used to be offered only while `awardLineCount` was 0, which meant a mistyped award was
- * permanent from the moment it was saved. The server's actual rule is narrower — it refuses once
- * lines have been *billed* — so a correction before the first bill is allowed here too, with the
- * replacement said plainly beforehand because a person pasting one corrected line expects it to be
- * added rather than to become the whole award.
+ * The editing itself moved out when the award stopped being a paste box — see `award-editor.tsx`
+ * for why there are three ways to enter a line and why the subcontractor's rate is never prefilled.
+ * What stays here is the one fact the editor cannot know on its own: whether a bill exists, which
+ * is what the server refuses a replacement on.
  */
 function AwardTab({
+  projectId,
   order,
   onSaved,
   onError,
 }: {
+  projectId: string;
   order: WorkOrder;
   onSaved: () => void;
   onError: (message: string | null) => void;
 }) {
-  const [awardText, setAwardText] = useState('');
-  const locked = order.billCount > 0;
-
-  const capture = useMutation({
-    mutationFn: () => {
-      const lines = awardText
-        .split('\n')
-        .map((row) => row.split(/\t|\|/).map((cell) => cell.trim()))
-        .filter((cells) => cells.length >= 4 && cells[0])
-        .map((cells) => ({
-          description: cells[0],
-          unit: cells[1],
-          awardedQty: Number(cells[2]),
-          rate: Number(cells[3]),
-        }))
-        .filter(
-          (line) =>
-            Number.isFinite(line.awardedQty) && Number.isFinite(line.rate),
-        );
-      if (lines.length === 0) {
-        throw new ApiError(WORK_ORDER_COPY.awardUnparseable, 400);
-      }
-      return setAward(order.id, lines);
-    },
-    onSuccess: () => {
-      setAwardText('');
-      onSaved();
-    },
-    onError: (err) =>
-      onError(
-        err instanceof ApiError
-          ? err.message
-          : WORK_ORDER_COPY.awardUnparseable,
-      ),
-  });
-
   return (
     <div className="space-y-3">
       {order.awardLineCount > 0 && (
@@ -575,41 +532,13 @@ function AwardTab({
           {WORK_ORDER_COPY.awardCaptured(order.awardLineCount)}
         </p>
       )}
-
-      {locked ? (
-        <p className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
-          {WORK_ORDER_COPY.awardLockedByBills}
-        </p>
-      ) : (
-        <>
-          <p className="text-sm text-gray-600">{WORK_ORDER_COPY.awardHint}</p>
-          {order.awardLineCount > 0 && (
-            <p className="text-sm font-medium text-amber-900">
-              {WORK_ORDER_COPY.awardReplaceWarning}
-            </p>
-          )}
-          <textarea
-            value={awardText}
-            onChange={(event) => setAwardText(event.target.value)}
-            rows={6}
-            aria-label={WORK_ORDER_COPY.awardLabel}
-            className="w-full rounded border border-gray-300 p-2 font-mono text-xs"
-            placeholder={WORK_ORDER_COPY.awardPlaceholder}
-          />
-          <Button
-            type="button"
-            disabled={!awardText.trim() || capture.isPending}
-            onClick={() => {
-              onError(null);
-              capture.mutate();
-            }}
-          >
-            {capture.isPending
-              ? WORK_ORDER_COPY.awardSaving
-              : WORK_ORDER_COPY.awardSave}
-          </Button>
-        </>
-      )}
+      <AwardEditor
+        projectId={projectId}
+        workOrderId={order.id}
+        locked={order.billCount > 0}
+        onSaved={onSaved}
+        onError={onError}
+      />
     </div>
   );
 }

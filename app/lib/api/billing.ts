@@ -234,6 +234,15 @@ export async function certifyClientBill(
 export const raBillLineSchema = z.object({
   id: z.string(),
   workOrderBoqItemId: z.string(),
+  /**
+   * The client BOQ line this award line corresponds to, where it corresponds to one.
+   *
+   * Null is a real answer: a subcontract can cover work the client's BOQ itemises differently, and
+   * forcing a match would make somebody invent one. But it is also what the award editor must read
+   * back to **preserve** a link it did not create — re-saving an award without it unlinks every
+   * line, and an unlinked line drops out of the floor a daily-work reversal is checked against.
+   */
+  boqTaskItemId: z.string().nullable(),
   description: z.string(),
   unit: z.string(),
   awardedQty: decimal,

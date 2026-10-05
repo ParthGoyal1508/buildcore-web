@@ -1089,6 +1089,54 @@ export const WORK_ORDER_COPY = {
   settingsSave: 'Save the correction',
   settingsSaved: 'Saved.',
   detailField: 'What the subcontractor is doing',
+  // --- 027: the award editor ---
+  /** Three ways in, because one award is three different jobs. */
+  awardAddFromBoq: 'Add from the BOQ',
+  awardAddBlank: 'Add a blank line',
+  awardPasteDisclosure: 'Paste several lines at once',
+  awardPasteAdd: 'Add these lines',
+  awardBoqPickerLabel: 'BOQ line',
+  awardBoqPickerPlaceholder: 'Search the BOQ by number, description or unit',
+  awardBoqEmpty: 'Choose a BOQ line',
+  awardBoqAlreadyAdded: 'already on this award',
+  awardBoqLoading: 'Loading the BOQ…',
+  awardBoqUnavailable:
+    'The project BOQ could not be loaded, so lines cannot be picked from it. Typing and pasting still work.',
+  awardNoBoq:
+    'This project has no BOQ yet, so there is nothing to pick from. Type the lines or paste them.',
+  awardColumns: {
+    boq: 'BOQ',
+    description: 'Description',
+    unit: 'Unit',
+    quantity: 'Quantity',
+    boqRate: 'BOQ rate',
+    rate: 'Their rate',
+    amount: 'Amount',
+    remove: '',
+  },
+  awardEmptyRows:
+    'No lines yet. Add one from the BOQ, type one, or paste a block of them.',
+  awardUnlinked: '—',
+  /**
+   * Why the subcontractor's rate is never prefilled from the BOQ.
+   *
+   * The BOQ rate is what the **client** pays. The difference between the two is the margin on the
+   * work, and a prefilled field is one somebody accepts — which would make the margin zero without
+   * anybody deciding it should be. Shown beside, never in the box.
+   */
+  awardRateHint:
+    'What you pay the subcontractor, which is not the BOQ rate — the BOQ rate is what the client pays you, and the difference is the margin. Shown beside for reference, never filled in for you.',
+  awardLinkedHint:
+    'A line picked from the BOQ stays tied to it, so work recorded against that BOQ line counts towards this award. A typed line is not tied to anything, which is correct when the subcontract covers work the BOQ itemises differently.',
+  awardRowIncomplete: (row: number) =>
+    `Line ${row} needs a description, a unit, a quantity and a rate.`,
+  awardNothingToSave: 'Add at least one line before saving.',
+  awardSaveChanges: 'Save award',
+  awardDiscard: 'Discard changes',
+  awardRemoveRow: 'Remove this line',
+  awardTotal: 'Award total',
+  awardLoading: 'Loading the award…',
+
   /** Bills whose work order was never recorded. Listed rather than hidden by the master–detail. */
   orphanBillsHeading: 'Bills not attached to a work order',
   orphanBillsHint:
