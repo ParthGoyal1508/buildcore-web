@@ -423,6 +423,55 @@ export async function setClaim(
   );
 }
 
+/**
+ * The fields a bill's recoveries and deductions are entered through (025 FR-044).
+ *
+ * Declared here rather than in the form so the screen and the request cannot name different
+ * columns — every one of these was printed on the bill and settable nowhere until now.
+ */
+export const BILL_ADJUSTMENTS = [
+  { key: 'releaseWithheld', label: 'Release of withheld amount', block: 'A' },
+  { key: 'recoveryDiesel', label: 'Recovery of diesel', block: 'B' },
+  { key: 'debitAgainstCivil', label: 'Debit against civil', block: 'B' },
+  { key: 'otherRecoveries', label: 'Other recoveries', block: 'B' },
+  { key: 'mechanicalDebit', label: 'Mechanical debit', block: 'B' },
+  { key: 'mobilizationAdvance', label: 'Mobilisation advance', block: 'C' },
+  { key: 'performanceSecurity', label: 'Performance security', block: 'C' },
+  {
+    key: 'theftWithheld',
+    label: 'Amount withheld for theft items (incl. GST)',
+    block: 'C',
+  },
+] as const;
+
+/** The two one-time recoveries' contract totals, which make "fully recovered" a fact. */
+export const BILL_ADJUSTMENT_TOTALS = [
+  { key: 'mobilizationAdvanceTotal', of: 'mobilizationAdvance' },
+  { key: 'performanceSecurityTotal', of: 'performanceSecurity' },
+] as const;
+
+export type BillAdjustmentKey =
+  | (typeof BILL_ADJUSTMENTS)[number]['key']
+  | (typeof BILL_ADJUSTMENT_TOTALS)[number]['key'];
+
+/**
+ * Sets the month's entered figures. **Draft only** — issue freezes them.
+ *
+ * Only the keys passed are written; a column left out is unchanged, and `'0'` sets it to zero. The
+ * form posts just what the person edited for that reason.
+ */
+export async function setBillAdjustments(
+  packageId: string,
+  input: Partial<Record<BillAdjustmentKey, string>>,
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-packages/${packageId}/adjustments`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+    ),
+  );
+}
+
 export async function abandonBillPackage(packageId: string): Promise<void> {
   await authFetch<unknown>(`/projects/bill-packages/${packageId}/abandon`, {
     method: 'POST',

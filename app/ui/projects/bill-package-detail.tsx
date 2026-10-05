@@ -27,6 +27,7 @@ import {
   setClaim,
 } from '@/app/lib/api/bill-packages';
 import { dateLabel } from '@/app/lib/format';
+import BillAdjustments from '@/app/ui/projects/bill-adjustments';
 import { Button } from '@/app/ui/button';
 import MeasurementSheet from '@/app/ui/projects/measurement-sheet';
 import StatusBadge from '@/app/ui/status-badge';
@@ -358,6 +359,20 @@ export default function BillPackageDetail({
           </table>
         </div>
       </section>
+
+      {/* ── The month's entered figures (025 FR-044) ──────────────────── */}
+      {editable && abstract && (
+        <BillAdjustments
+          packageId={packageId}
+          abstract={abstract}
+          debitTotal={register?.recoveredOnThisPackage ?? null}
+          onSaved={() => {
+            setError(null);
+            setNotice('Figures saved. The abstract below has moved with them.');
+            refresh();
+          }}
+        />
+      )}
 
       {/* ── The abstract ──────────────────────────────────────────────── */}
       {abstract && (
