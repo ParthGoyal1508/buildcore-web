@@ -7,6 +7,7 @@ import { useState } from 'react';
 import {
   type DwrSummary,
   approveDwr,
+  deleteDwr,
   listDwrs,
   returnDwr,
   reverseDwr,
@@ -61,11 +62,14 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
 
   const act = useMutation({
     mutationFn: async (job: {
-      kind: 'submit' | 'approve' | 'return' | 'reverse';
+      kind: 'submit' | 'approve' | 'return' | 'reverse' | 'delete';
       dwrId: string;
       reason?: string;
     }) => {
       if (job.kind === 'submit') return submitDwr(job.dwrId);
+      // Only a draft; the server refuses anything else by name, naming the reversal path for an
+      // approved report rather than letting a day's record be deleted out from under a bill.
+      if (job.kind === 'delete') return deleteDwr(job.dwrId);
       if (job.kind === 'approve') return approveDwr(job.dwrId);
       if (job.kind === 'return')
         return returnDwr(job.dwrId, job.reason ?? '');
@@ -76,6 +80,8 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
       setNotice(
         job.kind === 'approve'
           ? 'Approved. The executed quantity on each BOQ line has moved.'
+          : job.kind === 'delete'
+            ? 'Deleted. Nothing had moved, because only a draft can be.'
           : job.kind === 'reverse'
             ? 'Reversed. Exactly what the approval added has been taken back.'
             : job.kind === 'submit'
@@ -191,7 +197,7 @@ function ReportRow({
   currentUserId: string | undefined;
   busy: boolean;
   onAct: (
-    kind: 'submit' | 'approve' | 'return' | 'reverse',
+    kind: 'submit' | 'approve' | 'return' | 'reverse' | 'delete',
     reason?: string,
   ) => void;
 }) {
@@ -237,9 +243,28 @@ function ReportRow({
       <td className="px-3 py-2">
         <div className="flex flex-wrap justify-end gap-2">
           {report.status === 'draft' || report.status === 'returned' ? (
-            <Button disabled={busy} onClick={() => onAct('submit')}>
-              Submit
-            </Button>
+            <>
+              <Button disabled={busy} onClick={() => onAct('submit')}>
+                Submit
+              </Button>
+              {/* 025 FR-026. A draft entered against the wrong project or the wrong day had no way
+                  out: the endpoint has existed since 022 and nothing called it. */}
+              <Button
+                disabled={busy}
+                intent="write"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'Delete this draft? Nothing has moved yet, so nothing is taken back.',
+                    )
+                  ) {
+                    onAct('delete');
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </>
           ) : null}
 
           {report.status === 'submitted' && (

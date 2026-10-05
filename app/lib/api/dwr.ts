@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { apiFetchFile, type StoredFile } from '@/app/lib/api/client';
 import { authFetch } from '@/app/lib/session';
 
 /**
@@ -113,6 +114,17 @@ const dwrLineSchema = z
   })
   .passthrough();
 
+const attachmentSchema = z
+  .object({
+    id: z.string(),
+    fileName: z.string(),
+    mimeType: z.string(),
+    sizeBytes: z.number(),
+  })
+  .passthrough();
+
+export type DwrAttachment = z.infer<typeof attachmentSchema>;
+
 /**
  * A fact the API reports **beside** a success, never instead of one (022 FR-025).
  *
@@ -163,6 +175,7 @@ const dwrSchema = z
     reversalCount: z.number().optional(),
     tasks: z.array(dwrLineSchema).optional(),
     lines: z.array(dwrLineSchema).optional(),
+    attachments: z.array(attachmentSchema).optional(),
   })
   .passthrough();
 
@@ -407,6 +420,106 @@ export async function reverseDwr(dwrId: string, reason: string): Promise<DwrActi
       body: JSON.stringify({ reason }),
     }),
   );
+}
+
+/** Correcting a draft, rather than deleting the day and entering it again (025 FR-026). */
+export async function updateDwr(
+  dwrId: string,
+  input: Partial<CreateDwrInput>,
+): Promise<DwrActionResult> {
+  return dwrActionSchema.parse(
+    await authFetch<unknown>(`/projects/dwr/${dwrId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+/**
+ * Attaches evidence to a report (025 FR-025).
+ *
+ * **Base64 in JSON rather than `FormData`**, matching every other upload in this application. The
+ * server detects the content type from the bytes rather than trusting the claim, and stores the
+ * name as the uploader spelled it, so the download arrives named and openable.
+ */
+export async function addDwrAttachment(
+  dwrId: string,
+  file: File,
+): Promise<DwrAttachment> {
+  const data = await fileToBase64(file);
+  return attachmentSchema.parse(
+    await authFetch<unknown>(`/projects/dwr/${dwrId}/attachments`, {
+      method: 'POST',
+      body: JSON.stringify({ data, fileName: file.name }),
+    }),
+  );
+}
+
+/** Flat, not nested under the report — an attachment id is unique on its own. */
+export async function downloadDwrAttachment(
+  attachmentId: string,
+): Promise<StoredFile> {
+  return apiFetchFile(`/projects/dwr/attachments/${attachmentId}`);
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+const reconciliationSchema = z
+  .object({
+    lines: z.array(
+      z
+        .object({
+          boqItemId: z.string(),
+          boqNo: z.string(),
+          doneQty: quantity,
+          approvedSum: quantity,
+          /** `doneQty − approvedSum`. Exactly 0 when the cache agrees with the record. */
+          difference: quantity,
+        })
+        .passthrough(),
+    ),
+    discrepancies: z.number(),
+  })
+  .passthrough();
+
+export type DwrReconciliation = z.infer<typeof reconciliationSchema>;
+
+/**
+ * Where the stored executed quantity disagrees with the sum of approved measurement (025 FR-027).
+ *
+ * At an **exact** tolerance — every increment is exact decimal, so any non-zero difference is a
+ * defect rather than rounding. The approved sum is authoritative; the counter is a cache of it.
+ */
+export async function getReconciliation(
+  projectId: string,
+): Promise<DwrReconciliation> {
+  return reconciliationSchema.parse(
+    await authFetch<unknown>(`/projects/${projectId}/dwr/reconciliation`),
+  );
+}
+
+/**
+ * Sets a drifted counter back to the approved measurement.
+ *
+ * **Never automatic**, which is why this is a function a person calls rather than something the
+ * report does on load: a discrepancy is the only symptom of whatever moved the counter without a
+ * report, and a silent self-heal destroys that evidence every time it runs.
+ */
+export async function repairReconciliation(
+  projectId: string,
+  boqItemIds: string[],
+  reason: string,
+): Promise<{ repaired: { boqNo: string; from: string; to: string }[] }> {
+  return authFetch(`/projects/${projectId}/dwr/reconciliation/repair`, {
+    method: 'POST',
+    body: JSON.stringify({ boqItemIds, reason }),
+  });
 }
 
 export async function deleteDwr(dwrId: string): Promise<void> {

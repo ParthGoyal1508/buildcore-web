@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 
 import { getDwr, quantityOf } from '@/app/lib/api/dwr';
+import DwrAttachments from '@/app/ui/projects/dwr-attachments';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import SectionGuard from '@/app/ui/projects/section-guard';
 import StatusBadge from '@/app/ui/status-badge';
@@ -157,6 +158,11 @@ export default function DwrReportPage() {
             </div>
           )}
         </section>
+
+        <DwrAttachments
+          dwrId={params.dwrId}
+          attachments={report.attachments ?? []}
+        />
       </div>
     </SectionGuard>
   );
