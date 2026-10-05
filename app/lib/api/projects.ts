@@ -300,6 +300,12 @@ export const projectSchema = z.object({
   purchaseLimit: nullableDecimal,
   orderNumber: z.string().nullable(),
   cgstApplicable: z.boolean(),
+  /**
+   * The client contract's retention term as a **fraction** — `0.05` is 5%, and `null` means no
+   * term has been recorded, which is not the same as zero: composing a bill to the client is
+   * refused until it is set.
+   */
+  clientRetentionFraction: decimal.nullable().optional(),
   description: z.string().nullable(),
 });
 export type Project = z.infer<typeof projectSchema>;
@@ -416,6 +422,8 @@ export interface ProjectInput {
   purchaseLimit?: number;
   orderNumber?: string;
   cgstApplicable?: boolean;
+  /** A fraction — the form collects a percentage and divides by 100 before sending. */
+  clientRetentionFraction?: number;
   description?: string;
   isLocked?: boolean;
   /**

@@ -1,4 +1,5 @@
 import {
+  BanknotesIcon,
   BuildingOffice2Icon,
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
@@ -79,6 +80,14 @@ export const SETTINGS_SECTIONS: {
     description:
       'The kinds of letter this company issues. New kinds are added here, not in a release.',
     icon: PencilSquareIcon,
+  },
+  {
+    key: 'billing-rates',
+    href: ROUTES.settingsBillingRates,
+    title: 'Billing Rates',
+    description:
+      'CGST, SGST, IGST and TDS. They start at today’s statute; a bill already issued keeps the rates it was issued at.',
+    icon: BanknotesIcon,
   },
   {
     key: 'signatories',

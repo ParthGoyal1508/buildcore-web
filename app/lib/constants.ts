@@ -33,6 +33,8 @@ export const ROUTES = {
   settingsLetterKinds: '/dashboard/settings/letter-kinds',
   /** Named signatories and their signature graphics (017 US4). */
   settingsSignatories: '/dashboard/settings/signatories',
+  /** The four statutory rates a running-account bill is computed at (025 US4). */
+  settingsBillingRates: '/dashboard/settings/billing-rates',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -1593,6 +1595,9 @@ export const SETTINGS_PERMISSIONS = {
   'project-documents': 'SETTINGS',
   'letter-kinds': 'SETTINGS',
   signatories: 'SETTINGS',
+  // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
+  // computed at, guarded by the same permission as the registration numbers beside them.
+  'billing-rates': 'COMPANY_SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
