@@ -169,14 +169,22 @@ export default function DwrForm({
   // Three fields rather than one joined string: the picker searches all of them and shows the
   // number apart from the description, which is what makes `91.05` and `91.06` tellable apart in a
   // list where both descriptions run to forty words.
-  const boqOptions: SearchableOption[] = (boqGroups ?? []).flatMap((group) =>
-    group.items.map((item) => ({
-      id: item.id,
-      label: item.boqNo,
-      sublabel: item.taskName,
-      note: item.unit,
-    })),
-  );
+  //
+  // The contract schedule only (027). A project can carry an internal estimate as well, describing
+  // the same work in the same words, and the two were listed together — every item twice, with
+  // nothing to tell them apart. Measuring against the costing twin moves a `doneQty` no bill draws
+  // on and the alerts deliberately ignore, so the day's work would be recorded and then absent from
+  // progress. The API refuses one by BOQ number; this keeps it off the list that offers it.
+  const boqOptions: SearchableOption[] = (boqGroups ?? [])
+    .filter((group) => !group.isEstimate)
+    .flatMap((group) =>
+      group.items.map((item) => ({
+        id: item.id,
+        label: item.boqNo,
+        sublabel: item.taskName,
+        note: item.unit,
+      })),
+    );
 
   const save = useMutation({
     // The work date is split off rather than conditionally built into the payload: `UpdateDwrDto`
