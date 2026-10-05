@@ -179,7 +179,13 @@ export interface ComposeBillLineInput {
 
 export interface ComposeBillInput {
   projectId: string;
-  billNumber: string;
+  /**
+   * Omit to have the server allocate it: `RA-01`, `RA-02`… in sequence on this project (027).
+   *
+   * Send it only for an import carrying numbers that already exist on paper. An empty string is
+   * **not** omission — the DTO's `@IsOptional()` skips `undefined`, and `''` fails its `MinLength`.
+   */
+  billNumber?: string;
   description?: string;
   billingDate: string;
   lines: ComposeBillLineInput[];

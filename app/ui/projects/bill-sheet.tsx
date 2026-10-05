@@ -88,7 +88,6 @@ export default function BillSheet({ projectId }: { projectId: string }) {
   const quantitiesRef = useRef<Record<string, number>>({});
   const reasonsRef = useRef<Record<string, string>>({});
 
-  const [billNumber, setBillNumber] = useState('');
   const [billingDate, setBillingDate] = useState(todayIso());
   const [description, setDescription] = useState('');
   const [retentionPercent, setRetentionPercent] = useState('');
@@ -109,7 +108,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
    * across renders. A callback whose identity changed on every header keystroke would be new props
    * on 300 memoized rows — the same defect as a shared form object, arriving through the back door.
    */
-  const headerRef = useRef({ billNumber: '', billingDate: todayIso(), description: '' });
+  const headerRef = useRef({ billingDate: todayIso(), description: '' });
 
   // --- Draft recovery (FR-005) -----------------------------------------------
   const draftKey = clientDraftKey(projectId);
@@ -206,7 +205,8 @@ export default function BillSheet({ projectId }: { projectId: string }) {
     mutationFn: () =>
       composeClientBill({
         projectId,
-        billNumber: billNumber.trim(),
+        // `billNumber` is deliberately absent: the server allocates it. Sending an empty string
+        // would be refused — `@IsOptional()` skips `undefined`, not `''`.
         billingDate,
         description: description.trim() || undefined,
         retentionPercent: retentionPercent
@@ -225,8 +225,6 @@ export default function BillSheet({ projectId }: { projectId: string }) {
       reasonsRef.current = {};
       setQuantities({});
       setReasons({});
-      setBillNumber('');
-      headerRef.current = { ...headerRef.current, billNumber: '' };
       void queryClient.invalidateQueries({ queryKey: ['clientBills', projectId] });
       void queryClient.invalidateQueries({ queryKey: ['billableBoq', projectId] });
     },
@@ -324,11 +322,11 @@ export default function BillSheet({ projectId }: { projectId: string }) {
                 setQuantities({ ...draft.quantities });
                 setReasons({ ...(draft.reasons ?? {}) });
                 headerRef.current = {
-                  billNumber: draft.header?.billNumber ?? '',
                   billingDate: draft.header?.billingDate ?? todayIso(),
                   description: draft.header?.description ?? '',
                 };
-                setBillNumber(headerRef.current.billNumber);
+                // A draft saved before 027 may still carry a `billNumber`; it is ignored rather
+                // than migrated, because the number is no longer the person's to choose.
                 setBillingDate(headerRef.current.billingDate);
                 setDescription(headerRef.current.description);
                 // Changing the rows' keys remounts them, which is the only way to replace row-local
@@ -440,16 +438,16 @@ export default function BillSheet({ projectId }: { projectId: string }) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <TextField
-          id="bill-number"
-          label={BILLING_COPY.billNumberLabel}
-          value={billNumber}
-          onChange={(event) => {
-            setBillNumber(event.target.value);
-            headerRef.current.billNumber = event.target.value;
-          }}
-          onBlur={persistDraft}
-        />
+        {/* 027: the number is allocated by the server, so this says so rather than asking.
+            Not previewed either — working the next number out here would be a second
+            implementation of a server rule, and the two drifting apart is how this module's
+            last defect started. */}
+        <div>
+          <span className="mb-1 block text-sm font-medium text-gray-700">
+            {BILLING_COPY.billNumberLabel}
+          </span>
+          <p className="text-sm text-gray-600">{BILLING_COPY.billNumberAuto}</p>
+        </div>
         <TextField
           id="billing-date"
           type="date"
@@ -525,7 +523,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
         <Button
           type="button"
           disabled={
-            measured.length === 0 || !billNumber.trim() || compose.isPending
+            measured.length === 0 || compose.isPending
           }
           onClick={() => {
             setError(null);
