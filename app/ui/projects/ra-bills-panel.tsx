@@ -19,6 +19,7 @@ import { Button } from '@/app/ui/button';
 import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import {
+  FieldLabelSpacer,
   FormError,
   RowAction,
   SecondaryButton,
@@ -176,47 +177,55 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
           </ul>
         )}
 
-        <div className="grid gap-3 rounded border border-gray-200 p-3 sm:grid-cols-3">
-          <TextField
-            id="wo-detail"
-            label={WORK_ORDER_COPY.newHeading}
-            value={newOrder.workDetail}
-            onChange={(event) =>
-              setNewOrder((previous) => ({
-                ...previous,
-                workDetail: event.target.value,
-              }))
-            }
-          />
-          <TextField
-            id="wo-retention"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            label={WORK_ORDER_COPY.retentionLabel}
-            hint={WORK_ORDER_COPY.retentionHint}
-            value={newOrder.retention}
-            onChange={(event) =>
-              setNewOrder((previous) => ({
-                ...previous,
-                retention: event.target.value,
-              }))
-            }
-          />
-          <div className="flex items-end">
-            <Button
-              type="button"
-              disabled={!newOrder.workDetail.trim() || raise.isPending}
-              onClick={() => {
-                setError(null);
-                raise.mutate();
-              }}
-            >
-              {raise.isPending
-                ? WORK_ORDER_COPY.raising
-                : WORK_ORDER_COPY.raise}
-            </Button>
+        <div className="rounded border border-gray-200 p-3">
+          <h4 className="mb-3 text-sm font-semibold text-gray-900">
+            {WORK_ORDER_COPY.newHeading}
+          </h4>
+          <div className="grid items-start gap-3 sm:grid-cols-3">
+            <TextField
+              id="wo-detail"
+              label={WORK_ORDER_COPY.detailLabel}
+              value={newOrder.workDetail}
+              onChange={(event) =>
+                setNewOrder((previous) => ({
+                  ...previous,
+                  workDetail: event.target.value,
+                }))
+              }
+            />
+            <TextField
+              id="wo-retention"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              label={WORK_ORDER_COPY.retentionLabel}
+              hint={WORK_ORDER_COPY.retentionHint}
+              value={newOrder.retention}
+              onChange={(event) =>
+                setNewOrder((previous) => ({
+                  ...previous,
+                  retention: event.target.value,
+                }))
+              }
+            />
+            <div>
+              {/* The retention field's hint runs to three lines, so an `items-end` row dropped this
+                  button to the bottom of it, a long way under the inputs it belongs to. */}
+              <FieldLabelSpacer />
+              <Button
+                type="button"
+                disabled={!newOrder.workDetail.trim() || raise.isPending}
+                onClick={() => {
+                  setError(null);
+                  raise.mutate();
+                }}
+              >
+                {raise.isPending
+                  ? WORK_ORDER_COPY.raising
+                  : WORK_ORDER_COPY.raise}
+              </Button>
+            </div>
           </div>
         </div>
       </section>

@@ -1014,7 +1014,15 @@ export const WORK_ORDER_COPY = {
     'No work order has been raised on this project yet. A subcontractor bill is measured against a work order’s award, so one has to exist first.',
   summary: (retentionPercent: string, awardLines: number, bills: number) =>
     `Retention ${retentionPercent} · ${awardLines} award line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
-  newHeading: 'New work order — what the subcontractor is doing',
+  /**
+   * A heading above the row, and a label on the field — not one string doing both.
+   *
+   * It read "New work order — what the subcontractor is doing" as a single label, which wrapped to
+   * two lines in its column and pushed that field's input a line below its neighbours'. A label
+   * that wraps is a row that does not line up.
+   */
+  newHeading: 'New work order',
+  detailLabel: 'What the subcontractor is doing',
   retentionLabel: 'Retention (%)',
   retentionHint:
     'Cannot be changed once a bill has been raised: the retention on an issued bill is already withheld at the old rate, and moving the basis would make the subcontractor’s copy disagree with ours about money already held.',

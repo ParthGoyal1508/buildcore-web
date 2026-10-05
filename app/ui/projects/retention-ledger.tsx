@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getRetention, releaseRetention } from '@/app/lib/api/billing';
 import { dateLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import { FieldLabelSpacer } from '@/app/ui/settings/form-fields';
 
 /**
  * What a work order still holds back, and recording money going back (025 FR-032).
@@ -105,8 +106,10 @@ export default function RetentionLedger({
         </ul>
       )}
 
+      {/* `items-start`, not `items-end`: the date field carries a hint, and bottom-aligning the
+          row pushed its input up while dropping every neighbouring label below it. */}
       <form
-        className="flex flex-wrap items-end gap-3"
+        className="flex flex-wrap items-start gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           release.mutate();
@@ -145,7 +148,8 @@ export default function RetentionLedger({
             className="w-72 rounded-md border border-gray-300 px-3 py-2"
           />
         </label>
-        <div className="pb-1">
+        <div>
+          <FieldLabelSpacer />
           <Button type="submit" disabled={release.isPending}>
             {release.isPending ? 'Recording…' : 'Record the release'}
           </Button>

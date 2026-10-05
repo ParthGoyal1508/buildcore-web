@@ -80,6 +80,26 @@ export function TextField({
   );
 }
 
+/**
+ * Reserves the height of a field's label, so a bare control sits level with the inputs beside it.
+ *
+ * A row of fields aligned with `items-end` is thrown out by the first field that carries a hint:
+ * the hint makes that column taller, bottom-aligning pushes that field's input *up*, and every
+ * neighbouring label drops. Aligning the row to the top instead keeps the inputs on one line and
+ * lets hints hang below where they belong — and then a button, which has no label, needs this to
+ * land on that line rather than at the top of the row.
+ *
+ * A non-breaking space rather than a fixed height: it tracks whatever the label's type and spacing
+ * are, so the two cannot drift apart.
+ */
+export function FieldLabelSpacer() {
+  return (
+    <span aria-hidden="true" className="mb-1 block text-sm font-medium">
+      &nbsp;
+    </span>
+  );
+}
+
 /** A labelled select. */
 export function SelectField({
   id,
