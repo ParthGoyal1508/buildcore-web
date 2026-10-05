@@ -181,6 +181,11 @@ export default function BillPackagesPanel({
                   value={order.id}
                   disabled={order.awardLineCount === 0}
                 >
+                  {/* The number leads, because it is what the work order is called everywhere
+                      else — on the order itself, and in what the subcontractor quotes back.
+                      Null on the work orders raised before 027 numbered them, which read by
+                      their detail alone rather than by an empty prefix. */}
+                  {order.code ? `${order.code} — ` : ''}
                   {order.workDetail}
                   {` — retention ${(Number(order.retentionPercent) * 100).toFixed(2)}%`}
                   {order.awardLineCount === 0

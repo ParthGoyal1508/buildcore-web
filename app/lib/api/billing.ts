@@ -413,6 +413,12 @@ export const workOrderSchema = z.object({
   projectId: z.string(),
   /** `partners.Vendor.id`. Resolved to a name through the partners endpoints, not here. */
   partnerId: z.string().nullable(),
+  /**
+   * `PRPL-WO-0001`. **Null on every work order raised before 027 numbered them** — the column was
+   * added to a populated table, and inventing numbers for the existing rows would print figures on
+   * documents nobody issued. Render the absence, never an empty string.
+   */
+  code: z.string().nullable(),
   workDetail: z.string(),
   terms: z.string().nullable(),
   requirements: z.string().nullable(),
@@ -431,6 +437,7 @@ export type WorkOrder = z.infer<typeof workOrderSchema>;
 
 export interface WorkOrderInput {
   projectId: string;
+  /** The subcontractor. Optional: a work order can be raised before the vendor is settled. */
   partnerId?: string;
   workDetail: string;
   terms?: string;

@@ -1042,6 +1042,57 @@ export const WORK_ORDER_COPY = {
     'No usable lines were found. Each line needs a description, a unit, a quantity and a rate, separated by a tab or a pipe.',
   awardMissing:
     'This work order has no award captured yet, so there is nothing to measure against.',
+  /**
+   * Saving an award replaces it — the server deletes the old lines and writes the new ones. Said
+   * before the save, because a person pasting a corrected line expects it to be *added*.
+   */
+  awardReplaceWarning:
+    'Saving replaces the award entirely. Paste every line, not just the ones you are correcting.',
+  awardCaptured: (lines: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} captured. Bills are measured against these.`,
+  /** Refused by the server, so said here rather than discovered on the save. */
+  awardLockedByBills:
+    'Bills have been raised against this award, so it can no longer be replaced — the remaining quantity on a bill already issued would move, and the subcontractor’s copy would then disagree with ours. Raise a variation instead.',
+
+  // --- 027: the number, the vendor, and the master–detail frame ---
+  /** Shown where a code would be, for the work orders raised before 027 numbered them. */
+  unnumbered: 'Not numbered',
+  unnumberedHint:
+    'Raised before work orders carried numbers. It keeps reading by its detail; everything raised since is numbered.',
+  vendorLabel: 'Subcontractor',
+  vendorHint:
+    'From your Partners register. Leave it blank if the vendor is not settled yet — it can be set later under Settings.',
+  vendorNone: 'Not chosen yet',
+  vendorUnknown: 'Unknown vendor',
+  vendorTruncated: (shown: number, total: number) =>
+    `Showing ${shown} of ${total} vendors. Narrow the list in Partners if the one you want is missing.`,
+  vendorLoading: 'Loading vendors…',
+
+  /** The list is the master; one of these fills the panel beside it. */
+  pickPrompt: 'Pick a work order to see its award, its bills and its retention.',
+  raiseNew: 'Raise a work order',
+  raiseCancel: 'Cancel',
+  tabs: {
+    award: 'Award',
+    bills: 'Bills',
+    retention: 'Retention',
+    settings: 'Settings',
+  },
+  /** Each tab says in one line what it is for, so the four names are not guessed at. */
+  tabHints: {
+    award: 'What this subcontractor was given: the item, the quantity and their rate. Bills are measured against it.',
+    bills: 'Running account bills measured against the award — what was done this period, and what is payable after deductions.',
+    retention: 'Money withheld from each bill as security, and every release of it back to the subcontractor.',
+    settings: 'Correcting the detail, the subcontractor and the retention basis on this work order.',
+  },
+  settingsHeading: 'Correct this work order',
+  settingsSave: 'Save the correction',
+  settingsSaved: 'Saved.',
+  detailField: 'What the subcontractor is doing',
+  /** Bills whose work order was never recorded. Listed rather than hidden by the master–detail. */
+  orphanBillsHeading: 'Bills not attached to a work order',
+  orphanBillsHint:
+    'These were raised against the project rather than a work order, so they appear here instead of under one.',
 } as const;
 
 /**
