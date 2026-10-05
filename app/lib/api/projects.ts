@@ -628,6 +628,33 @@ export async function createBOQItem(projectId: string, input: BoqItemInput) {
   });
 }
 
+/**
+ * Gives an existing line its programme (025 FR-009).
+ *
+ * **`null` clears a field; leaving it out leaves the field alone.** The two are different
+ * intentions and the API keeps them apart, so this signature does too: `undefined` is never sent,
+ * and a `null` reaching the wire is a deliberate clear.
+ *
+ * Only these four. Scope, rate, unit and description are not accepted by the endpoint at all — a
+ * programme is *when* the work happens, and those are *what the work is*.
+ */
+export async function planBOQItem(
+  projectId: string,
+  itemId: string,
+  input: {
+    startDate?: string | null;
+    finishDate?: string | null;
+    duration?: number | null;
+    perDayQty?: string | null;
+  },
+): Promise<BoqItem> {
+  const raw = await authFetch<unknown>(
+    `/projects/${projectId}/boq/items/${itemId}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+  return boqItemSchema.parse(raw);
+}
+
 export async function deleteBOQItem(projectId: string, itemId: string): Promise<void> {
   await authFetch<unknown>(`/projects/${projectId}/boq/items/${itemId}`, {
     method: 'DELETE',

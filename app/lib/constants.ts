@@ -3666,6 +3666,9 @@ export const BOQ_COPY = {
   saving: 'Saving…',
   cancel: 'Cancel',
   deleteLine: 'Delete',
+  planLine: 'Plan',
+  planHint:
+    'Dates only. Leave a box empty to clear what is there — scope, rate and description are edited nowhere near a programme.',
   deleteBlocked: 'This line cannot be deleted because work has been recorded against it.',
 
   // Alert tabs — four, not three

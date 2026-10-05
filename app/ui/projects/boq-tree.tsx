@@ -1,10 +1,17 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as React from 'react';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { deleteBOQItem, getBOQ, type BoqGroup } from '@/app/lib/api/projects';
+import {
+  deleteBOQItem,
+  getBOQ,
+  planBOQItem,
+  type BoqGroup,
+  type BoqItem,
+} from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
@@ -30,10 +37,38 @@ export default function BoqTree({ projectId }: { projectId: string }) {
   const { isLocked } = useProjectLock();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [planning, setPlanning] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['projects', projectId, 'boq'],
     queryFn: () => getBOQ(projectId),
+  });
+
+  /**
+   * Giving a line its programme (025 FR-009), in place on the row it belongs to.
+   *
+   * **This is the only way an imported line can ever be planned.** A tender schedule carries no
+   * dates and the importer reads none, so every line arrives unplanned; until the API grew a PATCH
+   * there was no update of any kind for a BOQ item, and the only route to a finish date was to
+   * delete the line and add it again — impossible once a day's work has been measured against it.
+   */
+  const plan = useMutation({
+    mutationFn: ({
+      itemId,
+      input,
+    }: {
+      itemId: string;
+      input: Parameters<typeof planBOQItem>[2];
+    }) => planBOQItem(projectId, itemId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq'] });
+      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq-alerts'] });
+      setPlanning(null);
+      setError(null);
+    },
+    // The server names every refusal it gives — a finish date before the start date says which two
+    // dates contradict each other — so its sentence is worth more than anything written here.
+    onError: (err: Error) => setError(err.message),
   });
 
   const remove = useMutation({
@@ -98,6 +133,10 @@ export default function BoqTree({ projectId }: { projectId: string }) {
                 collapsed={collapsed.has(group.id)}
                 onToggle={() => toggle(group.id)}
                 onDelete={isLocked ? null : (itemId) => remove.mutate(itemId)}
+                planningId={planning}
+                onPlanOpen={isLocked ? null : setPlanning}
+                onPlanSave={(itemId, input) => plan.mutate({ itemId, input })}
+                planSaving={plan.isPending}
               />
             ))}
           </tbody>
@@ -112,12 +151,20 @@ function GroupRows({
   collapsed,
   onToggle,
   onDelete,
+  planningId,
+  onPlanOpen,
+  onPlanSave,
+  planSaving,
 }: {
   group: BoqGroup;
   collapsed: boolean;
   onToggle: () => void;
   /** Null when the project is locked: the control is absent, not disabled. */
   onDelete: ((itemId: string) => void) | null;
+  planningId: string | null;
+  onPlanOpen: ((itemId: string | null) => void) | null;
+  onPlanSave: (itemId: string, input: Parameters<typeof planBOQItem>[2]) => void;
+  planSaving: boolean;
 }) {
   const columns = onDelete ? 11 : 10;
 
@@ -149,7 +196,8 @@ function GroupRows({
 
       {!collapsed &&
         group.items.map((item) => (
-          <tr key={item.id} className="border-t border-gray-100">
+          <React.Fragment key={item.id}>
+          <tr className="border-t border-gray-100">
             <td className="px-3 py-2 text-gray-500 tabular-nums">{item.boqNo}</td>
             <td className="px-3 py-2 text-gray-900">
               {item.taskName}
@@ -177,10 +225,34 @@ function GroupRows({
             </td>
             {onDelete && (
               <td className="px-3 py-2">
-                <RowAction onClick={() => onDelete(item.id)}>{BOQ_COPY.deleteLine}</RowAction>
+                <div className="flex justify-end gap-2">
+                  {onPlanOpen && (
+                    <RowAction
+                      onClick={() =>
+                        onPlanOpen(planningId === item.id ? null : item.id)
+                      }
+                    >
+                      {BOQ_COPY.planLine}
+                    </RowAction>
+                  )}
+                  <RowAction onClick={() => onDelete(item.id)}>{BOQ_COPY.deleteLine}</RowAction>
+                </div>
               </td>
             )}
           </tr>
+          {planningId === item.id && onPlanOpen && (
+            <tr className="bg-gray-50">
+              <td colSpan={columns} className="px-3 py-3">
+                <PlanRow
+                  item={item}
+                  saving={planSaving}
+                  onCancel={() => onPlanOpen(null)}
+                  onSave={(input) => onPlanSave(item.id, input)}
+                />
+              </td>
+            </tr>
+          )}
+          </React.Fragment>
         ))}
     </>
   );
@@ -205,4 +277,91 @@ function Programme({ value }: { value: number | null }) {
  */
 function Unplanned() {
   return <span className="text-xs text-gray-400">{BOQ_COPY.unplanned}</span>;
+}
+
+/**
+ * The three programme fields, on the row they belong to (025 FR-009, FR-011, FR-014).
+ *
+ * **An empty box clears the field; it does not leave it alone.** The form starts from what the line
+ * already carries, so an untouched box sends back what was there and a box the planner empties
+ * sends `null` — which is what the API distinguishes, and what a planner removing a wrong finish
+ * date has no other way to say.
+ *
+ * **The start date is here because `Avg / day` is derived from it.** That column reported *Not
+ * planned* on every line of every project, including hand-added ones, because nothing in this
+ * application ever set a start date — the API has accepted one since 008.
+ */
+function PlanRow({
+  item,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  item: BoqItem;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (input: Parameters<typeof planBOQItem>[2]) => void;
+}) {
+  const asDay = (value: string | null) => (value ? value.slice(0, 10) : '');
+  const [startDate, setStartDate] = useState(asDay(item.startDate));
+  const [finishDate, setFinishDate] = useState(asDay(item.finishDate));
+  const [perDayQty, setPerDayQty] = useState(
+    item.perDayQty === null ? '' : String(item.perDayQty),
+  );
+
+  return (
+    <form
+      className="flex flex-wrap items-end gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave({
+          startDate: startDate || null,
+          finishDate: finishDate || null,
+          perDayQty: perDayQty.trim() || null,
+        });
+      }}
+    >
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">{BOQ_COPY.startDate}</span>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(event) => setStartDate(event.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">{BOQ_COPY.finishDate}</span>
+        <input
+          type="date"
+          value={finishDate}
+          onChange={(event) => setFinishDate(event.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-gray-700">{BOQ_COPY.perDay}</span>
+        <input
+          inputMode="decimal"
+          value={perDayQty}
+          onChange={(event) => setPerDayQty(event.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2"
+          placeholder={item.unit}
+        />
+      </label>
+
+      <div className="flex items-center gap-2 pb-1">
+        <RowAction type="submit" disabled={saving}>
+          {saving ? BOQ_COPY.saving : BOQ_COPY.save}
+        </RowAction>
+        <RowAction type="button" intent="read" onClick={onCancel}>
+          {BOQ_COPY.cancel}
+        </RowAction>
+      </div>
+
+      <p className="w-full text-xs text-gray-500">{BOQ_COPY.planHint}</p>
+    </form>
+  );
 }
