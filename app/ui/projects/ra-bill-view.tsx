@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { type RaBill } from '@/app/lib/api/billing';
 import { BILLING_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
@@ -28,6 +30,21 @@ import { dateLabel, rupees } from '@/app/lib/format';
  * `netPayable` cannot answer. The same reason the sheet shows them separately while composing.
  */
 export default function RaBillView({ bill }: { bill: RaBill }) {
+  const [showAllLines, setShowAllLines] = useState(false);
+
+  /**
+   * What this bill measured. A package-composed bill carries a line for **every** award line,
+   * because 023's measurement sheet has to let a claim be made against any of them — so a bill
+   * measuring two items can arrive holding sixty rows, of which fifty-eight are the award.
+   *
+   * `!== 0` rather than `> 0`: a negative correction is still a line this bill acted on.
+   */
+  const measured = bill.lines.filter(
+    (line) => Number(line.thisPeriodQty) !== 0,
+  );
+  const hidden = bill.lines.length - measured.length;
+  const lines = showAllLines ? bill.lines : measured;
+
   return (
     <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
       <p className="text-xs text-gray-500">
@@ -35,8 +52,15 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
         {bill.description ? ` · ${bill.description}` : ''}
       </p>
 
+      {/* Three states, not two: a bill with no lines at all, a bill whose lines all carry
+          nothing, and a bill to render. Collapsing the middle one into the first would tell a
+          reader the lines were removed when they are sitting right there at zero. */}
       {bill.lines.length === 0 ? (
         <p className="text-sm text-gray-600">{BILLING_COPY.viewNoLines}</p>
+      ) : lines.length === 0 ? (
+        <p className="text-sm text-gray-600">
+          {BILLING_COPY.nothingBilledOnThisBill}
+        </p>
       ) : (
         /* Scrolls inside itself, so a long description never widens the page around it. */
         <div className="overflow-x-auto rounded border border-gray-200">
@@ -59,7 +83,7 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
               </tr>
             </thead>
             <tbody>
-              {bill.lines.map((line) => (
+              {lines.map((line) => (
                 <tr key={line.id} className="border-t border-gray-100">
                   <td className="px-2 py-1.5 text-gray-900">
                     {line.description}
@@ -80,6 +104,23 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {hidden > 0 && (
+        <div className="flex flex-wrap items-baseline gap-2">
+          <p className="text-xs text-gray-500">
+            {BILLING_COPY.linesHidden(hidden, measured.length)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowAllLines((current) => !current)}
+            className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            {showAllLines
+              ? BILLING_COPY.showBilledLines
+              : BILLING_COPY.showAllLines}
+          </button>
         </div>
       )}
 

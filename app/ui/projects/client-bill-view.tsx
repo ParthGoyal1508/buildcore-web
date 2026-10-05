@@ -56,6 +56,7 @@ export default function ClientBillView({
   const [error, setError] = useState<string | null>(null);
   const [certifying, setCertifying] = useState(false);
   const [certifiedAmount, setCertifiedAmount] = useState('');
+  const [showAllLines, setShowAllLines] = useState(false);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['clientBills', projectId] });
@@ -89,6 +90,16 @@ export default function ClientBillView({
   const shortfall =
     bill.certificationVariance !== null && bill.certificationVariance !== 0;
 
+  /**
+   * What this bill actually billed.
+   *
+   * `!== 0` rather than `> 0`, so a negative correction — a line reduced on a revision — is still
+   * a line this bill acted on and is still shown.
+   */
+  const billed = bill.lines.filter((line) => Number(line.quantity) !== 0);
+  const hidden = bill.lines.length - billed.length;
+  const lines = showAllLines ? bill.lines : billed;
+
   return (
     <section className="space-y-4">
       <header className="space-y-1 border-b border-gray-200 pb-3">
@@ -116,7 +127,12 @@ export default function ClientBillView({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
           {BILLING_COPY.billLinesHeading}
         </h3>
-        {/* Scrolls inside itself, so a forty-word BOQ description never widens the page. */}
+        {lines.length === 0 ? (
+          <p className="text-sm text-gray-600">
+            {BILLING_COPY.nothingBilledOnThisBill}
+          </p>
+        ) : (
+        /* Scrolls inside itself, so a forty-word BOQ description never widens the page. */
         <div className="overflow-x-auto rounded border border-gray-200">
           <table className="w-full min-w-[44rem] text-sm">
             <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
@@ -136,7 +152,7 @@ export default function ClientBillView({
               </tr>
             </thead>
             <tbody>
-              {bill.lines.map((line) => (
+              {lines.map((line) => (
                 <tr key={line.id} className="border-t border-gray-100">
                   <td className="px-2 py-1.5 tabular-nums text-gray-600">
                     {line.boqNo}
@@ -158,6 +174,23 @@ export default function ClientBillView({
             </tbody>
           </table>
         </div>
+        )}
+        {hidden > 0 && (
+          <div className="flex flex-wrap items-baseline gap-2">
+            <p className="text-xs text-gray-500">
+              {BILLING_COPY.linesHidden(hidden, billed.length)}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAllLines((current) => !current)}
+              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            >
+              {showAllLines
+                ? BILLING_COPY.showBilledLines
+                : BILLING_COPY.showAllLines}
+            </button>
+          </div>
+        )}
         <p className="text-xs text-gray-500">
           {BILLING_COPY.historicalRatesNote}
         </p>

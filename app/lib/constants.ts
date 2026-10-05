@@ -956,6 +956,25 @@ export const BILLING_COPY = {
   composeHeading: 'New bill to the client',
   pickBillPrompt: 'Pick a bill to read it, or compose a new one.',
   billLinesHeading: 'Lines billed this period',
+  /**
+   * A bill shows what was billed; a zero line is the schedule, not the bill (027).
+   *
+   * 023's package path writes a bill line for **every** schedule line, because its measurement
+   * sheet has to let a claim be made against any of them and "no measurement available" is a
+   * different fact from zero. The bill inherits all of them, so one with six measured lines was
+   * rendering 231 rows and the six were somewhere inside.
+   *
+   * Hidden rather than dropped, and counted rather than silently filtered: a reader who knows the
+   * schedule has 231 lines must be able to tell that the other 225 were considered and carried
+   * nothing, instead of wondering whether this screen is showing them everything.
+   */
+  linesHidden: (hidden: number, shown: number) =>
+    `Showing the ${shown} line${shown === 1 ? '' : 's'} billed on this bill. ${hidden} other schedule line${hidden === 1 ? '' : 's'} carried no quantity.`,
+  /** Lines exist, none carries a quantity — different from a bill with no lines at all. */
+  nothingBilledOnThisBill:
+    'No line on this bill carries a quantity. Every schedule line was considered and nothing was billed.',
+  showAllLines: 'Show every schedule line',
+  showBilledLines: 'Show only what was billed',
   certificationHeading: 'Certification',
   /** Said plainly rather than left as a dash: nobody has answered yet, which is not a shortfall. */
   notCertifiedYet:
