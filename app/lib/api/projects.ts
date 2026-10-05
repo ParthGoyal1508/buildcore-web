@@ -101,6 +101,10 @@ export const clientSchema = z.object({
   email: z.string().nullable(),
   address: z.string().nullable(),
   gstin: z.string().nullable(),
+  /** Printed in the running-account bill's statutory header (025 FR-039). */
+  pan: z.string().nullable().optional(),
+  /** Two-digit GST state code, as text — `08` is Rajasthan, and `08` is not `8`. */
+  state: z.string().nullable().optional(),
   status: z.enum(CLIENT_STATUSES),
 });
 export type Client = z.infer<typeof clientSchema>;
@@ -139,6 +143,8 @@ export interface ClientInput {
   email?: string;
   address?: string;
   gstin?: string;
+  pan?: string;
+  state?: string;
   status?: string;
 }
 
