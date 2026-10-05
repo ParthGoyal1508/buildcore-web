@@ -1014,6 +1014,22 @@ export const BILLING_COPY = {
     thisPeriodQty: 'This bill',
     amount: 'Amount',
   },
+  /**
+   * Collapsing a section of the composing sheet (027).
+   *
+   * Sections start **expanded**. This is the screen where money is entered, and a quantity hidden
+   * behind a closed section is a quantity nobody checks before composing — so the reader closes
+   * what they are done with, rather than opening what they need.
+   *
+   * A collapsed section that holds measured lines says so, with the count and the amount. That is
+   * the whole safety property: whatever is folded away, the total it contributes is still on
+   * screen, and the bill's own total below has always counted it either way.
+   */
+  expandAllSections: 'Expand all',
+  collapseAllSections: 'Collapse all',
+  sectionLineCount: (lines: number) => `${lines} line${lines === 1 ? '' : 's'}`,
+  sectionMeasured: (lines: number, amount: string) =>
+    `${lines} measured · ${amount}`,
   raEmpty: 'This work order has no awarded lines to measure against.',
   exceedsAward:
     'This measures more than the work order awarded. Raise a variation to the award first — paying above an award is the company agreeing to work it never ordered, and there is nobody downstream to catch it.',
