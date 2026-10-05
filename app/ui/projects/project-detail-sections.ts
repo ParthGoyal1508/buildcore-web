@@ -93,6 +93,14 @@ export const PROJECT_DETAIL_SECTIONS: {
     permission: 'PROJECT_FINANCIALS',
   },
   {
+    // 025 FR-033. Three letter kinds the backend has permitted since 017 — work order, letter of
+    // intent, purchase order — with no screen in the application that could issue one.
+    key: 'letters',
+    href: ROUTES.projectsLetters,
+    title: 'Letters',
+    permission: 'PROJECT_FINANCIALS',
+  },
+  {
     key: 'summary',
     href: ROUTES.projectsSummary,
     title: 'Position',

@@ -688,6 +688,36 @@ export async function validateBOQImport(
   return importReportSchema.parse(raw);
 }
 
+/**
+ * Reads an **internal estimate** workbook (025 FR-032).
+ *
+ * Identical to the tender import in every refusal and every figure. The difference is what the
+ * confirmed rows mean: an estimate is **not billable**, is absent from the alert groups, and does
+ * not set the project's quoted percentage — so importing one up the tender path would put
+ * unbillable lines into a bill.
+ */
+export async function validateEstimateImport(
+  projectId: string,
+  file: File,
+): Promise<BoqImportReport> {
+  const base64 = await fileToBase64(file);
+  const raw = await authFetch<unknown>(
+    `/projects/${projectId}/boq/estimate-import/validate`,
+    { method: 'POST', body: JSON.stringify({ file: base64 }) },
+  );
+  return importReportSchema.parse(raw);
+}
+
+export async function confirmEstimateImport(
+  projectId: string,
+  batchId: string,
+): Promise<{ groups: number; lines: number; quotedPercentageSet: boolean }> {
+  return authFetch(`/projects/${projectId}/boq/estimate-import/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ batchId }),
+  });
+}
+
 export async function confirmBOQImport(
   projectId: string,
   batchId: string,

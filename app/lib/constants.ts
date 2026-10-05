@@ -127,6 +127,9 @@ export const ROUTES = {
   // 023 / 024. Gated on `PROJECT_FINANCIALS`: a bill is money, and somebody who may record a day's
   // work is not thereby entitled to see what the company charges for it.
   /** Every running-account bill package on a project. */
+  /** Letters issued on a project — work order, LOI, purchase order (025 FR-033). */
+  projectsLetters: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/letters`,
   projectsBillPackages: (id: string) =>
     `/dashboard/projects/portfolio/${id}/bill-packages`,
   /** One package: its proposed lines, the abstract, the register and the check list. */
@@ -3688,6 +3691,7 @@ export const BOQ_COPY = {
 
   // Import
   importHeading: 'Import a tender workbook',
+  estimateHeading: 'Import an internal estimate',
   importHint: 'Excel (.xls or .xlsx). Nothing is saved until you confirm.',
   importChoose: 'Choose file',
   importReading: 'Reading the workbook…',

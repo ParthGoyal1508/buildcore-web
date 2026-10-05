@@ -8,6 +8,7 @@ import {
   createWorkOrder,
   getRaBills,
   getWorkOrders,
+  updateWorkOrder,
   setAward,
   submitRaBill,
   type RaBill,
@@ -16,6 +17,7 @@ import { BILLING_COPY, WORK_ORDER_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
+import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import {
   FormError,
   RowAction,
@@ -247,6 +249,73 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
           </Button>
         </section>
       )}
+
+      {/* 025 FR-032. A work order's detail and its retention term could be set once and never
+          corrected — a typo in either meant living with it, or a second work order beside the
+          wrong one. The endpoint has existed since 018 with no caller. */}
+      {chosen && (
+        <section className="rounded-md border border-gray-200 p-4">
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Correct this work order
+          </h3>
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = event.currentTarget;
+              const detail = (
+                form.elements.namedItem('wo-detail') as HTMLInputElement
+              ).value.trim();
+              const retention = (
+                form.elements.namedItem('wo-retention') as HTMLInputElement
+              ).value.trim();
+              updateWorkOrder(chosen.id, {
+                ...(detail ? { workDetail: detail } : {}),
+                // Percent in, fraction out — the same conversion the raise form above makes, and
+                // the one the server's bound of 1 is expressed in.
+                ...(retention
+                  ? { retentionPercent: Number(retention) / 100 }
+                  : {}),
+              })
+                .then(() => {
+                  setError(null);
+                  void queryClient.invalidateQueries({
+                    queryKey: ['workOrders', projectId],
+                  });
+                })
+                .catch((err: unknown) =>
+                  setError(err instanceof ApiError ? err.message : String(err)),
+                );
+            }}
+          >
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Work detail</span>
+              <input
+                name="wo-detail"
+                defaultValue={chosen.workDetail}
+                className="w-80 rounded-md border border-gray-300 px-3 py-2"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Retention (%)</span>
+              <input
+                name="wo-retention"
+                inputMode="decimal"
+                defaultValue={(chosen.retentionPercent * 100).toFixed(2)}
+                className="w-28 rounded-md border border-gray-300 px-3 py-2"
+              />
+            </label>
+            <div className="pb-1">
+              <Button type="submit">Save the correction</Button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {/* 025 FR-032. Two endpoints that have existed since 018 with no client at all, so the
+          question a subcontractor asks most often — how much are you still holding — could only be
+          answered by adding up bills by hand. */}
+      {chosen && <RetentionLedger workOrderId={chosen.id} />}
 
       {chosen && chosen.awardLineCount > 0 && (
         <RaBillSheet

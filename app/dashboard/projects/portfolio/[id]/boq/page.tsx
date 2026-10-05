@@ -32,6 +32,10 @@ export default function ProjectBoqPage() {
     <div className="flex flex-col gap-8">
       <p className="text-sm text-gray-600">{BOQ_COPY.subheading}</p>
       <BoqImport projectId={project.id} />
+      {/* 025 FR-032. The same component: the two imports share fourteen named refusals and every
+          figure, and differ only in what the confirmed rows mean — an estimate is not billable and
+          does not set the quoted percentage. The endpoints have existed since 008 with no screen. */}
+      <BoqImport projectId={project.id} variant="estimate" />
       <BoqEntry projectId={project.id} />
       <BoqTree projectId={project.id} />
       <BoqAlertTabs projectId={project.id} />

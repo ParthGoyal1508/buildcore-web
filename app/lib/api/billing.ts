@@ -460,6 +460,61 @@ export async function createWorkOrder(
   return workOrderSchema.parse(raw);
 }
 
+/**
+ * What a work order still holds back, and every release against it (025 FR-032).
+ *
+ * All three figures, not just the balance: a subcontractor asking "how much are you still holding"
+ * is really asking "and how did it get to that", and a single number sends somebody to add up bills
+ * by hand to answer the second half.
+ */
+const retentionLedgerSchema = z
+  .object({
+    workOrderId: z.string(),
+    retentionPercent: z.number(),
+    withheld: z.number(),
+    released: z.number(),
+    outstanding: z.number(),
+    releases: z.array(
+      z
+        .object({
+          id: z.string(),
+          amount: z.number(),
+          releasedOn: z.string(),
+          reason: z.string().nullable(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export type RetentionLedger = z.infer<typeof retentionLedgerSchema>;
+
+export async function getRetention(
+  workOrderId: string,
+): Promise<RetentionLedger> {
+  return retentionLedgerSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/retention/${workOrderId}`),
+  );
+}
+
+/**
+ * Records retention going back to the subcontractor.
+ *
+ * **An act somebody performs, never a schedule the system runs** — the client's own decision.
+ * Append-only: there is no edit, because the row *is* the evidence that money moved.
+ */
+export async function releaseRetention(
+  workOrderId: string,
+  input: { amount: number; releasedOn: string; reason: string },
+): Promise<RetentionLedger> {
+  return retentionLedgerSchema.parse(
+    await authFetch<unknown>(
+      `/projects/ra-bills/retention/${workOrderId}/release`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
+  );
+}
+
 export async function updateWorkOrder(
   id: string,
   input: Partial<WorkOrderInput>,

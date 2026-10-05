@@ -6,7 +6,9 @@ import { useRef, useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   confirmBOQImport,
+  confirmEstimateImport,
   validateBOQImport,
+  validateEstimateImport,
   type BoqImportReport,
 } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
@@ -28,7 +30,22 @@ import { SecondaryButton } from '@/app/ui/settings/form-fields';
  * failures: already-imported means it already worked, and in-progress means it is on its way.
  * Showing either as an error would send somebody to re-upload a schedule that is already in.
  */
-export default function BoqImport({ projectId }: { projectId: string }) {
+export default function BoqImport({
+  projectId,
+  variant = 'tender',
+}: {
+  projectId: string;
+  /**
+   * Which schedule is arriving (025 FR-032).
+   *
+   * **The same component, because the two imports are identical in every refusal and every
+   * figure.** What differs is what the confirmed rows mean: an estimate is not billable, is absent
+   * from the alert groups, and does not set the project's quoted percentage. Copying this file to
+   * change two function references would leave fourteen named refusals maintained in two places.
+   */
+  variant?: 'tender' | 'estimate';
+}) {
+  const isEstimate = variant === 'estimate';
   const queryClient = useQueryClient();
   const { isLocked } = useProjectLock();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +54,10 @@ export default function BoqImport({ projectId }: { projectId: string }) {
   const [done, setDone] = useState<string | null>(null);
 
   const read = useMutation({
-    mutationFn: (file: File) => validateBOQImport(projectId, file),
+    mutationFn: (file: File) =>
+      isEstimate
+        ? validateEstimateImport(projectId, file)
+        : validateBOQImport(projectId, file),
     onSuccess: (next) => {
       setReport(next);
       setRefusal(null);
@@ -49,7 +69,10 @@ export default function BoqImport({ projectId }: { projectId: string }) {
   });
 
   const commit = useMutation({
-    mutationFn: (batchId: string) => confirmBOQImport(projectId, batchId),
+    mutationFn: (batchId: string) =>
+      isEstimate
+        ? confirmEstimateImport(projectId, batchId)
+        : confirmBOQImport(projectId, batchId),
     onSuccess: (result) => {
       setDone(BOQ_COPY.importDone(result.groups, result.lines));
       setReport(null);
@@ -74,7 +97,9 @@ export default function BoqImport({ projectId }: { projectId: string }) {
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">{BOQ_COPY.importHeading}</h3>
+        <h3 className="text-sm font-semibold text-gray-900">
+          {isEstimate ? BOQ_COPY.estimateHeading : BOQ_COPY.importHeading}
+        </h3>
         <p className="text-xs text-gray-500">{BOQ_COPY.importHint}</p>
       </div>
 
