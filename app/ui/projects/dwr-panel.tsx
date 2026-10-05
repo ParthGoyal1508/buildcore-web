@@ -43,6 +43,17 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     queryFn: getCurrentUser,
   });
 
+  /**
+   * Whether this caller may approve a report they submitted (025 FR-040).
+   *
+   * Keyed to the permission the API keys it to, never to the role name "Super Admin" — a role is
+   * data an administrator renames, and a capability keyed to a display string disappears the day
+   * they do, silently and with no error anywhere.
+   */
+  const mayApproveOwn = Boolean(
+    user?.permissions.includes('CROSS_COMPANY_ACCESS'),
+  );
+
   const {
     data: reports,
     isLoading,
@@ -172,6 +183,7 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
                   report={report}
                   currentUserId={user?.id}
                   busy={act.isPending}
+                  mayApproveOwn={mayApproveOwn}
                   onAct={(kind, reason) =>
                     act.mutate({ kind, dwrId: report.id, reason })
                   }
@@ -190,8 +202,10 @@ function ReportRow({
   report,
   currentUserId,
   busy,
+  mayApproveOwn,
   onAct,
 }: {
+  mayApproveOwn: boolean;
   projectId: string;
   report: DwrSummary;
   currentUserId: string | undefined;
@@ -205,10 +219,16 @@ function ReportRow({
 
   // 022 FR-012a. The author of a report may not approve it, so the control says why instead of
   // offering an action that will be refused.
+  //
+  // **`submittedByUserId` alone, matching the server.** This also tested `createdByUserId`, which
+  // made the button stricter than the rule: a report you typed and somebody else put forward is one
+  // the API would let you approve, and the screen disabled it anyway. Failing safe, but a control
+  // that refuses what the server permits teaches people the screen is wrong rather than the rule.
   const isAuthor =
-    Boolean(currentUserId) &&
-    (report.createdByUserId === currentUserId ||
-      report.submittedByUserId === currentUserId);
+    Boolean(currentUserId) && report.submittedByUserId === currentUserId;
+
+  // 025 FR-040. A caller holding the cross-company permission may approve their own report.
+  const blockedAsAuthor = isAuthor && !mayApproveOwn;
 
   return (
     <tr className="align-top">
@@ -270,11 +290,13 @@ function ReportRow({
           {report.status === 'submitted' && (
             <>
               <Button
-                disabled={busy || isAuthor}
+                disabled={busy || blockedAsAuthor}
                 title={
-                  isAuthor
-                    ? 'You recorded this report, so somebody else has to approve it.'
-                    : undefined
+                  blockedAsAuthor
+                    ? 'You submitted this report, so somebody else has to approve it.'
+                    : isAuthor
+                      ? 'You submitted this report. Your permissions let you approve it anyway, and the approval is recorded as one you made yourself.'
+                      : undefined
                 }
                 onClick={() => onAct('approve')}
               >
@@ -311,7 +333,9 @@ function ReportRow({
         </div>
         {isAuthor && report.status === 'submitted' && (
           <p className="mt-1 text-right text-xs text-gray-500">
-            You recorded this one.
+            {blockedAsAuthor
+              ? 'You submitted this one.'
+              : 'You submitted this one — approving it is recorded as such.'}
           </p>
         )}
       </td>
