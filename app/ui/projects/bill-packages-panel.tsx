@@ -10,6 +10,7 @@ import {
   composeBillPackage,
   listBillPackages,
 } from '@/app/lib/api/bill-packages';
+import { getWorkOrders } from '@/app/lib/api/billing';
 import { ROUTES } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
@@ -48,6 +49,20 @@ export default function BillPackagesPanel({
   const [workOrderId, setWorkOrderId] = useState('');
   const [externalBillNo, setExternalBillNo] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * The project's work orders, so a bill to a subcontractor is chosen rather than typed.
+   *
+   * This was a text box asking for a "Work order id" — a cuid, which is shown nowhere in the
+   * product and which nobody could have supplied. A work order carries no number of its own
+   * either, so what identifies one to a person is what it is for: the work detail, with its
+   * retention and how much award has been captured against it.
+   */
+  const workOrders = useQuery({
+    queryKey: ['workOrders', projectId],
+    queryFn: () => getWorkOrders(projectId),
+    enabled: direction === 'to_subcontractor',
+  });
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['billPackages', projectId],
@@ -146,15 +161,38 @@ export default function BillPackagesPanel({
         {direction === 'to_subcontractor' ? (
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-gray-700">Work order</span>
-            <input
+            <select
               value={workOrderId}
               onChange={(event) => setWorkOrderId(event.target.value)}
               className="rounded-md border border-gray-300 px-3 py-2"
-              placeholder="Work order id"
-            />
+            >
+              <option value="">
+                {workOrders.isLoading
+                  ? 'Loading work orders…'
+                  : 'Choose a work order'}
+              </option>
+              {(workOrders.data ?? []).map((order) => (
+                // An award is what a subcontractor bill measures, so one with none captured
+                // cannot be billed — the server refuses it by name. Offered as a disabled row
+                // rather than hidden: a work order missing from this list reads as a work order
+                // that does not exist, and the thing to do about it is capture its award.
+                <option
+                  key={order.id}
+                  value={order.id}
+                  disabled={order.awardLineCount === 0}
+                >
+                  {order.workDetail}
+                  {` — retention ${(Number(order.retentionPercent) * 100).toFixed(2)}%`}
+                  {order.awardLineCount === 0
+                    ? ' · no award captured yet'
+                    : ` · ${order.awardLineCount} award line${order.awardLineCount === 1 ? '' : 's'}`}
+                </option>
+              ))}
+            </select>
             <span className="text-xs text-gray-500">
-              Required: a bill to a subcontractor measures that
-              subcontractor&rsquo;s award lines.
+              A bill to a subcontractor measures that subcontractor&rsquo;s award
+              lines. Capture the award on{' '}
+              <strong>Subcontractors</strong> before billing against it.
             </span>
           </label>
         ) : (
