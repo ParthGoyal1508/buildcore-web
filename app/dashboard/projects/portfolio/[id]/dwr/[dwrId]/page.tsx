@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 
-import { getDwr, quantityOf } from '@/app/lib/api/dwr';
+import { factorsOf, getDwr, quantityOf } from '@/app/lib/api/dwr';
 import DwrAttachments from '@/app/ui/projects/dwr-attachments';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import SectionGuard from '@/app/ui/projects/section-guard';
@@ -36,7 +36,10 @@ export default function DwrReportPage() {
     );
   }
 
-  const lines = report.tasks ?? report.lines ?? [];
+  // `lines`, and only `lines`. The read briefly answered with a `tasks` array too — the raw rows,
+  // carrying the BOQ line nested and no flat `boqNo` — and preferring it here is why every line on
+  // this screen read "BOQ —". The server no longer sends it; the fallback would re-create the bug.
+  const lines = report.lines ?? [];
 
   return (
     <SectionGuard permission="DWR">
@@ -122,15 +125,14 @@ export default function DwrReportPage() {
                       <td className="px-3 py-2 text-xs text-gray-600">
                         {line.paymentMode === 'work_basis' ? (
                           <>
-                            {[
-                              ['length', line.length],
-                              ['breadth', line.breadth],
-                              ['depth', line.depth],
-                              ['density', line.density],
-                            ]
-                              .filter(([, value]) => value)
+                            {/* All six, in the order the server multiplies them. Four were
+                                listed here and `nos1`/`nos2` were not, so a line measured
+                                2 × 6 × 2 × 1 would have shown the 6, the 2 and the 1 and
+                                silently dropped the ×2 — a quantity that cannot be checked
+                                against the factors beside it. */}
+                            {factorsOf(line)
                               .map(([label, value]) => `${label} ${value}`)
-                              .join(' × ') || 'no factors entered'}
+                              .join(' × ') || 'nothing entered — counted as one'}
                             <span className="block text-gray-400">
                               a blank factor counts as one
                             </span>

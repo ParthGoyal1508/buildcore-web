@@ -99,6 +99,11 @@ const dwrLineSchema = z
     equipmentId: z.string().nullable().optional(),
     actualQty: nullableQuantity.optional(),
     servedQty: nullableQuantity.optional(),
+    /** The quantity whichever basis produced, as the detail read reports it. */
+    quantityInForce: nullableQuantity.optional(),
+    /** All six factors. `nos1` and `nos2` were missing here, and so never rendered. */
+    nos1: nullableQuantity.optional(),
+    nos2: nullableQuantity.optional(),
     length: nullableQuantity.optional(),
     breadth: nullableQuantity.optional(),
     depth: nullableQuantity.optional(),
@@ -558,8 +563,39 @@ export async function getPeriodFigures(
  * zero, because a zero is a measurement and this is the absence of one.
  */
 export function quantityOf(line: DwrLine): string | null {
+  // `quantityInForce` first: the detail read reports the figure under that name, having already
+  // chosen between the two bases server-side. The pair below is what a create response carries.
+  if (line.quantityInForce != null) return line.quantityInForce;
   if (line.paymentMode === 'work_basis') return line.actualQty ?? null;
   return line.servedQty ?? null;
+}
+
+/**
+ * How a measured quantity was arrived at, as label/value pairs ready to join with `×`.
+ *
+ * **All six, in the order the server multiplies them.** One screen listed four and omitted
+ * `nos1`/`nos2`, so a line measured 2 × 6 × 2 × 1 displayed the 6, the 2 and the 1 and dropped the
+ * ×2 — leaving a quantity that could not be checked against the factors printed beside it. Declared
+ * here so a second screen cannot pick a different four.
+ *
+ * A factor the server reports as 1 is omitted: it is multiplicatively neutral and listing every
+ * unused dimension buries the two that matter. Nothing at all means nothing was entered, which the
+ * caller renders as such.
+ */
+export function factorsOf(line: DwrLine): [string, string][] {
+  if (line.paymentMode !== 'work_basis') return [];
+  return (
+    [
+      ['nos 1', line.nos1],
+      ['nos 2', line.nos2],
+      ['length', line.length],
+      ['breadth', line.breadth],
+      ['depth', line.depth],
+      ['density', line.density],
+    ] as const
+  )
+    .filter(([, v]) => v != null && Number(v) !== 1)
+    .map(([label, v]) => [label, String(v)]);
 }
 
 /**
