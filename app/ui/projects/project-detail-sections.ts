@@ -23,7 +23,7 @@ export const PROJECT_DETAIL_SECTIONS: {
   key: string;
   href: (id: string) => string;
   title: string;
-  permission: 'PROJECTS' | 'PROJECT_FINANCIALS';
+  permission: 'PROJECTS' | 'PROJECT_FINANCIALS' | 'DWR';
 }[] = [
   {
     key: 'overview',
@@ -36,6 +36,16 @@ export const PROJECT_DETAIL_SECTIONS: {
     href: ROUTES.projectsBoq,
     title: 'BOQ',
     permission: 'PROJECTS',
+  },
+  {
+    // 022 / 024. Straight after the BOQ, because that is the working order: the schedule says what
+    // is to be built and this says what was built today. Gated on `DWR` — the first section here
+    // whose permission is neither `PROJECTS` nor `PROJECT_FINANCIALS`, which is why the type above
+    // had to widen.
+    key: 'dwr',
+    href: ROUTES.projectsDwr,
+    title: 'Daily work',
+    permission: 'DWR',
   },
   {
     key: 'documents',
@@ -71,6 +81,15 @@ export const PROJECT_DETAIL_SECTIONS: {
     key: 'ra-bills',
     href: ROUTES.projectsRaBills,
     title: 'Subcontractors',
+    permission: 'PROJECT_FINANCIALS',
+  },
+  {
+    // 023 / 024. The running-account package: a period's claim, its abstract, its register and its
+    // check list, in either direction. Distinct from the two sections above it, which are 018's
+    // single bills — this is the 24-sheet document the client actually sends.
+    key: 'bill-packages',
+    href: ROUTES.projectsBillPackages,
+    title: 'RA bills',
     permission: 'PROJECT_FINANCIALS',
   },
   {

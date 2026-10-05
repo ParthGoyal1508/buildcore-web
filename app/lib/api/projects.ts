@@ -19,9 +19,12 @@ import { projectReadinessSchema } from '@/app/lib/api/project-documents';
  *
  * Scoped to User Stories 1–3, **and User Story 5's BOQ since 2026-10-03** — the endpoints it
  * calls were built that day, because nothing in either repository could write a BOQ and 018's
- * billing screens had been measuring against a table nothing could fill. DWR, revenue, budget and
- * P&L still have no functions here, for the original reason: a typed stub against an absent
- * endpoint is a compile-time promise the runtime cannot keep.
+ * billing screens had been measuring against a table nothing could fill.
+ *
+ * **Daily work reports moved out on 2026-10-05**, to `app/lib/api/dwr.ts`: feature 022 built the
+ * fourteen endpoints, so the promise this file could not keep is now keepable and is kept next
+ * door. Revenue and budget still have no functions here, for the original reason — a typed stub
+ * against an absent endpoint is a compile-time promise the runtime cannot keep.
  *
  * Schemas validate the fields the UI reads and let `zod` strip the rest, the same
  * choice `partners.ts` and `hr-payroll.ts` document: several routes return full

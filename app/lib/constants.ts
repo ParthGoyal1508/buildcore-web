@@ -113,6 +113,23 @@ export const ROUTES = {
    * a bill may certainly need to read it.
    */
   projectsBoq: (id: string) => `/dashboard/projects/portfolio/${id}/boq`,
+  // 022 / 024. Gated on `DWR`, not `PROJECTS` — recording and approving a day's work is its own
+  // permission, and the backend guards every one of these routes with it.
+  /** Every daily work report on a project, and the form that records the next one. */
+  projectsDwr: (id: string) => `/dashboard/projects/portfolio/${id}/dwr`,
+  projectsDwrNew: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/dwr/new`,
+  /** One report, its lines, and the submit / approve / reverse actions. */
+  projectsDwrReport: (projectId: string, dwrId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/dwr/${dwrId}`,
+  // 023 / 024. Gated on `PROJECT_FINANCIALS`: a bill is money, and somebody who may record a day's
+  // work is not thereby entitled to see what the company charges for it.
+  /** Every running-account bill package on a project. */
+  projectsBillPackages: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/bill-packages`,
+  /** One package: its proposed lines, the abstract, the register and the check list. */
+  projectsBillPackage: (projectId: string, packageId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/bill-packages/${packageId}`,
 
   // --- Projects: billing and the P&L (feature 018, `bugs.md` items 11 and 14) ---
   // Gated on `PROJECT_FINANCIALS`, not `PROJECTS` — see `PROJECTS_PERMISSIONS`. Billing
