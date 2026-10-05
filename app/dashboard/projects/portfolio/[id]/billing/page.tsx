@@ -1,16 +1,17 @@
 'use client';
 
-import BillSheet from '@/app/ui/projects/bill-sheet';
-import ClientBillsList from '@/app/ui/projects/client-bills-list';
+import ClientBillsPanel from '@/app/ui/projects/client-bills-panel';
 import FinancialsGuard from '@/app/ui/projects/financials-guard';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
 /**
  * Client bills for one project (018 US1 — `bugs.md` item 11).
  *
- * The sheet above and the history below, on one screen deliberately: the cumulative quantity a
- * biller measures against comes from the bills beneath it, and splitting them across two pages would
- * mean checking one against the other from memory.
+ * The bills and the composing sheet stay on one screen, because the cumulative quantity a biller
+ * measures against comes from the bills already raised and splitting them across two pages would
+ * mean checking one against the other from memory. What changed in 027 is the arrangement: they
+ * were stacked, so the page opened on 231 editable rows and the bills were below them. They are
+ * now master and detail — see `client-bills-panel.tsx`.
  *
  * `FinancialsGuard` stays even though the shell's tab strip already withholds this tab from a
  * caller without `PROJECT_FINANCIALS`. The two do different jobs: the strip stops the tab being
@@ -21,10 +22,7 @@ export default function ProjectBillingPage() {
 
   return (
     <FinancialsGuard>
-      <div className="flex flex-col gap-10">
-        <BillSheet projectId={project.id} />
-        <ClientBillsList projectId={project.id} />
-      </div>
+      <ClientBillsPanel projectId={project.id} />
     </FinancialsGuard>
   );
 }

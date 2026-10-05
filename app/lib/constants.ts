@@ -941,6 +941,28 @@ export const BILLING_COPY = {
   // --- A bill read back ---
   billsHeading: 'Bills raised',
   billsEmpty: 'No bills have been raised on this project yet.',
+  // --- 027: client bills as master and detail ---
+  /**
+   * The page used to open on the composing sheet — 231 editable BOQ rows — with the bills raised
+   * buried under it. Reading a bill meant scrolling past a form you were not filling in, and the
+   * cumulative figures you measure against were the furthest thing from the sheet that needs them.
+   *
+   * The list is the master now, and composing is a mode that takes over the panel beside it, the
+   * way raising a work order does on Subcontractors. No tab strip: a client bill is one document,
+   * and four tabs over two sections would be copying that page's shape rather than its point.
+   */
+  composeNew: 'Compose a bill',
+  composeCancel: 'Cancel',
+  composeHeading: 'New bill to the client',
+  pickBillPrompt: 'Pick a bill to read it, or compose a new one.',
+  billLinesHeading: 'Lines billed this period',
+  certificationHeading: 'Certification',
+  /** Said plainly rather than left as a dash: nobody has answered yet, which is not a shortfall. */
+  notCertifiedYet:
+    'The client has not certified this bill yet. Record what they certify when it comes back — the gap between billed and certified is the figure worth chasing.',
+  billedLabel: 'Billed',
+  certifiedMatched: 'Certified in full.',
+  draftNotSent: 'This bill is still a draft. It has not been sent to the client.',
   historicalRatesNote:
     'Shown at the rates it was billed at. A rate revised afterwards does not restate a bill that was already sent.',
   certified: 'Certified',
