@@ -15,6 +15,20 @@ import { authFetch } from '@/app/lib/session';
  * here… a typed stub against an absent endpoint is a compile-time promise the runtime cannot
  * keep."* Fourteen endpoints exist as of feature 022, so the promise can now be kept.
  *
+ * ## The document this module is aligned to
+ *
+ * **`specs/022-daily-work-reports-backend/contracts/dwr-api.md` in `buildcore-api`.** Read it before
+ * changing a schema here. This module was first written against a guess of that document and was
+ * wrong in four places at once, so a successful save rendered as a parse error and the engineer who
+ * made it believed the day was lost.
+ *
+ * Nothing automated checks this file against that one: `buildcore-web` has no test runner, and
+ * feature 025 declined to introduce a framework, a config and a CI step to run a single assertion
+ * (research.md section 3). What *is* pinned is the server's side — `test/dwr.e2e-spec.ts` asserts
+ * the exact key set of the creation response and of a list row, so the shape this module trusts
+ * cannot drift silently. The remaining gap is this file reading that shape correctly, and the only
+ * thing closing it is somebody opening the contract.
+ *
  * ## The one thing this module deliberately cannot do
  *
  * **There is no way to send a quantity for a measured line, and that is the point.** The API
