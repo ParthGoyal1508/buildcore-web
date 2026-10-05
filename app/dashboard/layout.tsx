@@ -16,6 +16,18 @@ import ShellHeader from '@/app/ui/shell-header';
  *
  * `md:h-screen` is unchanged and still what pins the sidebar and lets the content
  * column scroll inside itself on a desktop. The same split `app/my/layout.tsx` uses.
+ *
+ * `md:fixed md:inset-0` is what actually stops the document scrolling. `md:h-screen` with
+ * `md:overflow-hidden` sizes and clips this box correctly — but the box stays in normal flow, and
+ * the layout overflow of the scrolling column inside it still reaches the viewport's own scroll
+ * area. The result was a page that scrolled wherever the pointer was *not* over the inner
+ * scroller: 610px of blank space on a project's Client bills tab, and 35px on every other
+ * dashboard page. Measured, not reasoned about — a dispatched wheel over the sidebar moved the
+ * document while the same wheel over the grid did not.
+ *
+ * Taking the shell out of flow leaves nothing for the viewport to scroll: `html.scrollHeight`
+ * returns to exactly the viewport height. Only from `md`, because below it the shell is a normal
+ * document that must scroll.
  */
 export default function DashboardLayout({
   children,
@@ -23,7 +35,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden">
+    <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:flex-row md:overflow-hidden">
       <SessionGuard />
       <div className="w-full flex-none md:w-64">
         <SideNav />
