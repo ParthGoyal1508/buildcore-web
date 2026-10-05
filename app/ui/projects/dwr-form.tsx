@@ -21,6 +21,9 @@ import { getBOQ } from '@/app/lib/api/projects';
 import { ROUTES } from '@/app/lib/constants';
 import { todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import SearchableSelect, {
+  type SearchableOption,
+} from '@/app/ui/searchable-select';
 
 /**
  * Recording a day's work (024 Story 1, FR-002 to FR-004).
@@ -162,10 +165,16 @@ export default function DwrForm({
   // Flattened to a single picker. A grouped select would mirror the BOQ tree, which is the right
   // shape for reading a schedule and the wrong one for finding one line fast on a phone at the end
   // of a shift.
-  const boqOptions = (boqGroups ?? []).flatMap((group) =>
+  //
+  // Three fields rather than one joined string: the picker searches all of them and shows the
+  // number apart from the description, which is what makes `91.05` and `91.06` tellable apart in a
+  // list where both descriptions run to forty words.
+  const boqOptions: SearchableOption[] = (boqGroups ?? []).flatMap((group) =>
     group.items.map((item) => ({
       id: item.id,
-      label: `${item.boqNo} — ${item.taskName} (${item.unit})`,
+      label: item.boqNo,
+      sublabel: item.taskName,
+      note: item.unit,
     })),
   );
 
@@ -441,7 +450,7 @@ function LineEditor({
   onRemove,
 }: {
   line: DraftLine;
-  boqOptions: { id: string; label: string }[];
+  boqOptions: SearchableOption[];
   onChange: (next: DraftLine) => void;
   onRemove: () => void;
 }) {
@@ -470,23 +479,20 @@ function LineEditor({
         </Button>
       </div>
 
-      <label className="mb-3 flex flex-col gap-1 text-sm">
+      <div className="mb-3 flex flex-col gap-1 text-sm">
         <span className="font-medium text-gray-700">BOQ line</span>
-        <select
+        <SearchableSelect
           value={line.boqItemId}
-          onChange={(event) =>
-            onChange({ ...line, boqItemId: event.target.value })
-          }
-          className="rounded-md border border-gray-300 px-3 py-2"
-        >
-          <option value="">— not against a BOQ line —</option>
-          {boqOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          onChange={(boqItemId) => onChange({ ...line, boqItemId })}
+          options={boqOptions}
+          emptyLabel="— not against a BOQ line —"
+          placeholder="Search by item number, description or unit"
+        />
+        <span className="text-xs text-gray-500">
+          {boqOptions.length} lines in this schedule. Type any part of the number
+          or the description — “shutter”, “91.05”, “cum”.
+        </span>
+      </div>
 
       {line.kind === 'measured' ? (
         <>
