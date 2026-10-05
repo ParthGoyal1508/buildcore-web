@@ -356,10 +356,22 @@ export default function BillSheet({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      {/* NFR-003: the grid scrolls inside its own container. The page body never scrolls sideways. */}
-      <div className="overflow-x-auto rounded border border-gray-200">
+      {/*
+        NFR-003: the grid scrolls inside its own container, on **both** axes.
+
+        It was `overflow-x-auto` alone, so the rows were never bounded vertically. That is
+        invisible on a short schedule and ruinous on a real one: the client's own 231-line tender
+        renders rows up to 1,173px tall — the CCTV and NVR items carry a full specification as
+        their description — and the grid came to 48,345px, which pushed the document to 49,201px
+        against an 813px viewport. Sixty screens of scrolling, most of it past the end of the page,
+        with the shell clipped behind it.
+
+        The header sticks, because a column heading that scrolls away over two hundred rows leaves
+        somebody typing quantities into a grid whose columns they can no longer name.
+      */}
+      <div className="max-h-[70vh] overflow-auto rounded border border-gray-200">
         <table className="min-w-[56rem] w-full">
-          <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+          <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600 shadow-[0_1px_0_0_rgb(229,231,235)]">
             <tr>
               <th className="px-2 py-2">{BILLING_COPY.columns.boqNo}</th>
               <th className="px-2 py-2">{BILLING_COPY.columns.task}</th>

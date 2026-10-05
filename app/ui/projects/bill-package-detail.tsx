@@ -312,9 +312,13 @@ export default function BillPackageDetail({
         <h3 className="mb-2 font-medium text-gray-900">
           Proposed lines ({pkg.claims.length})
         </h3>
-        <div className="overflow-x-auto">
+        {/* Bounded on both axes, and the header sticks — the same reason `bill-sheet.tsx` gives:
+            a real schedule is 231 lines, several of them a full specification deep, and an
+            unbounded grid pushes the document to tens of thousands of pixels behind a shell that
+            is clipped at the viewport. */}
+        <div className="max-h-[70vh] overflow-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <thead className="sticky top-0 z-10 bg-white text-left text-xs uppercase tracking-wide text-gray-500 shadow-[0_1px_0_0_rgb(229,231,235)]">
               <tr>
                 <th className="px-3 py-2">BOQ</th>
                 <th className="px-3 py-2">Description</th>
