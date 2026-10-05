@@ -213,12 +213,14 @@ export default function BillPackageDetail({
             <Button
               onClick={() => {
                 const reason = window.prompt(
-                  'Why is this issued bill being revised? The revision is visible as a revision, not as a new bill.',
+                  'Why is this bill being revised? This records a revision against it — it does not reopen the bill for editing, because what was sent has to stay readable.',
                 );
                 if (reason) {
                   reviseBillPackage(packageId, reason)
                     .then(() => {
-                      setNotice('Revised. The figures are editable again.');
+                      setNotice(
+                        'Revision recorded, with its reason and a count. What the bill stated at issue is unchanged — a reader reconciling a payment against it must still see what was sent.',
+                      );
                       refresh();
                     })
                     .catch((err: unknown) => setError(describe(err)));
@@ -495,6 +497,16 @@ export default function BillPackageDetail({
       {checkList && (
         <section>
           <h3 className="mb-1 font-medium text-gray-900">Check list</h3>
+          {!editable && (
+            // A disabled control that does not explain itself sends somebody to ask whether the
+            // screen is broken. It is not: the check list records what was attached when the bill
+            // went out, and a document that has been sent cannot acquire a different history.
+            <p className="mb-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+              This bill has been <strong>issued</strong>, so its check list is
+              fixed. It records what was attached when the bill went out.
+              Answers belong on a draft — this one cannot be reopened.
+            </p>
+          )}
           <p className="mb-2 text-xs text-gray-500">
             An unanswered question is <strong>not</strong> an answer of no —
             &ldquo;we checked and it is not attached&rdquo; and &ldquo;nobody has
