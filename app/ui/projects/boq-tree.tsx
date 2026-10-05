@@ -31,8 +31,29 @@ import { RowAction } from '@/app/ui/settings/form-fields';
  *
  * The table scrolls inside its own container (FR-032). It is eleven columns wide, so the page body
  * must not be what moves sideways.
+ *
+ * ## One schedule at a time (027)
+ *
+ * A project can carry two: the tender workbook the client is billed against, and an internal
+ * estimate of what the work costs us. Both import through this screen, and until 2026-10-06 both
+ * landed in this one list — a reader saw "Section 2 Centering & shuttering" twice, at (3) lines and
+ * at (9), with nothing saying which was which.
+ *
+ * The estimate is not a second opinion about the same columns. It carries no programme, is excluded
+ * from the alerts, and is never measured against: `Done`, `Pending`, `Per day`, `Avg / day` and
+ * `Finish by` are five columns that can only ever read 0.000 and *Not planned* on it. It shows a
+ * costing instead — quantity, rate, amount and a total — which is the question an estimate is
+ * imported to answer.
  */
-export default function BoqTree({ projectId }: { projectId: string }) {
+export default function BoqTree({
+  projectId,
+  variant = 'contract',
+}: {
+  projectId: string;
+  /** Which of the project's two schedules to show. See the class note above. */
+  variant?: 'contract' | 'estimate';
+}) {
+  const isEstimate = variant === 'estimate';
   const queryClient = useQueryClient();
   const { isLocked } = useProjectLock();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -93,11 +114,26 @@ export default function BoqTree({ projectId }: { projectId: string }) {
 
   if (isLoading) return <p className="text-sm text-gray-500">{BOQ_COPY.loading}</p>;
   if (isError) return <p className="text-sm text-red-700">{BOQ_COPY.loadFailed}</p>;
-  if (!data || data.length === 0) {
+
+  // One read serves both tabs: the query key is the same, so switching tabs costs no request.
+  const groups = (data ?? []).filter((group) => group.isEstimate === isEstimate);
+
+  if (groups.length === 0) {
     return (
-      <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">{BOQ_COPY.empty}</p>
+      <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
+        {isEstimate ? BOQ_COPY.estimateEmpty : BOQ_COPY.contractEmpty}
+      </p>
     );
   }
+
+  // What the work is estimated to cost, across the whole schedule. The reason an estimate is
+  // imported at all, and it was nowhere on this screen.
+  const estimatedTotal = groups.reduce(
+    (total, group) =>
+      total +
+      group.items.reduce((sum, item) => sum + item.scopeQty * item.rate, 0),
+    0,
+  );
 
   return (
     <div className="space-y-2">
@@ -117,19 +153,26 @@ export default function BoqTree({ projectId }: { projectId: string }) {
               <th scope="col" className="px-3 py-2">{BOQ_COPY.columnUnit}</th>
               <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnScope}</th>
               <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.rate}</th>
-              <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnDone}</th>
-              <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnPending}</th>
-              <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnPerDay}</th>
-              <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnAvgPerDay}</th>
-              <th scope="col" className="px-3 py-2">{BOQ_COPY.columnFinish}</th>
+              {isEstimate ? (
+                <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnAmount}</th>
+              ) : (
+                <>
+                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnDone}</th>
+                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnPending}</th>
+                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnPerDay}</th>
+                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnAvgPerDay}</th>
+                  <th scope="col" className="px-3 py-2">{BOQ_COPY.columnFinish}</th>
+                </>
+              )}
               {!isLocked && <th scope="col" className="px-3 py-2" />}
             </tr>
           </thead>
           <tbody>
-            {data.map((group) => (
+            {groups.map((group) => (
               <GroupRows
                 key={group.id}
                 group={group}
+                isEstimate={isEstimate}
                 collapsed={collapsed.has(group.id)}
                 onToggle={() => toggle(group.id)}
                 onDelete={isLocked ? null : (itemId) => remove.mutate(itemId)}
@@ -140,6 +183,23 @@ export default function BoqTree({ projectId }: { projectId: string }) {
               />
             ))}
           </tbody>
+          {isEstimate && (
+            <tfoot>
+              <tr className="border-t-2 border-gray-300 bg-gray-50">
+                <th
+                  scope="row"
+                  colSpan={5}
+                  className="px-3 py-2 text-right font-semibold text-gray-900"
+                >
+                  {BOQ_COPY.estimateTotal}
+                </th>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">
+                  {rupees(estimatedTotal)}
+                </td>
+                {!isLocked && <td className="px-3 py-2" />}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
@@ -148,6 +208,7 @@ export default function BoqTree({ projectId }: { projectId: string }) {
 
 function GroupRows({
   group,
+  isEstimate,
   collapsed,
   onToggle,
   onDelete,
@@ -157,6 +218,8 @@ function GroupRows({
   planSaving,
 }: {
   group: BoqGroup;
+  /** A costing section rather than a contract one — six columns, and no programme to plan. */
+  isEstimate: boolean;
   collapsed: boolean;
   onToggle: () => void;
   /** Null when the project is locked: the control is absent, not disabled. */
@@ -166,7 +229,13 @@ function GroupRows({
   onPlanSave: (itemId: string, input: Parameters<typeof planBOQItem>[2]) => void;
   planSaving: boolean;
 }) {
-  const columns = onDelete ? 11 : 10;
+  const columns = (isEstimate ? 6 : 10) + (onDelete ? 1 : 0);
+  // Named on the heading so a folded section still says what it contributes. The whole reason to
+  // fold one: a 75-section estimate is unreadable open, and closing it must not hide the money.
+  const sectionAmount = group.items.reduce(
+    (sum, item) => sum + item.scopeQty * item.rate,
+    0,
+  );
 
   return (
     <>
@@ -190,6 +259,11 @@ function GroupRows({
             <span className="text-xs font-normal text-gray-500">
               ({group.items.length})
             </span>
+            {isEstimate && (
+              <span className="text-xs font-normal tabular-nums text-gray-500">
+                {rupees(sectionAmount)}
+              </span>
+            )}
           </button>
         </th>
       </tr>
@@ -212,21 +286,32 @@ function GroupRows({
             <td className="px-3 py-2 text-gray-700">{item.unit}</td>
             <td className="px-3 py-2 text-right tabular-nums">{item.scopeQty.toFixed(3)}</td>
             <td className="px-3 py-2 text-right tabular-nums">{rupees(item.rate)}</td>
-            <td className="px-3 py-2 text-right tabular-nums">{item.doneQty.toFixed(3)}</td>
-            <td className="px-3 py-2 text-right tabular-nums">{item.pendingQty.toFixed(3)}</td>
-            <Programme value={item.perDayQty} />
-            <Programme value={item.avgQtyPerDay} />
-            <td className="px-3 py-2">
-              {item.finishDate ? (
-                new Date(item.finishDate).toLocaleDateString()
-              ) : (
-                <Unplanned />
-              )}
-            </td>
+            {isEstimate ? (
+              <td className="px-3 py-2 text-right tabular-nums">
+                {rupees(item.scopeQty * item.rate)}
+              </td>
+            ) : (
+              <>
+                <td className="px-3 py-2 text-right tabular-nums">{item.doneQty.toFixed(3)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{item.pendingQty.toFixed(3)}</td>
+                <Programme value={item.perDayQty} />
+                <Programme value={item.avgQtyPerDay} />
+                <td className="px-3 py-2">
+                  {item.finishDate ? (
+                    new Date(item.finishDate).toLocaleDateString()
+                  ) : (
+                    <Unplanned />
+                  )}
+                </td>
+              </>
+            )}
             {onDelete && (
               <td className="px-3 py-2">
                 <div className="flex justify-end gap-2">
-                  {onPlanOpen && (
+                  {/* No Plan on a costing line: an estimate carries no programme, which is why
+                      its five programme columns are absent above. Delete stays, because an
+                      estimate imported against the wrong project must be removable. */}
+                  {onPlanOpen && !isEstimate && (
                     <RowAction
                       onClick={() =>
                         onPlanOpen(planningId === item.id ? null : item.id)

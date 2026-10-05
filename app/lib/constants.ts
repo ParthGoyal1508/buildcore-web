@@ -3926,6 +3926,28 @@ export const BOQ_COPY = {
     'Dates only. Leave a box empty to clear what is there — scope, rate and description are edited nowhere near a programme.',
   deleteBlocked: 'This line cannot be deleted because work has been recorded against it.',
 
+  /**
+   * The two schedules, kept apart (027).
+   *
+   * Reported 2026-10-06: a project carrying both a tender workbook and an internal estimate showed
+   * one list with every section twice — "Section 2 Centering & shuttering" appearing at (3) and at
+   * (9) — and nothing on screen said which was which. They are two documents about the same work
+   * and they answer different questions: one is what the client is billed against, the other is
+   * what it is expected to cost us. Reading them interleaved is reading neither.
+   */
+  contractTab: 'Contract schedule',
+  estimateTab: 'Internal estimate',
+  contractTabHint:
+    'What the client is billed against. Every bill, daily report and progress figure measures against these lines.',
+  estimateTabHint:
+    'Our own costing. Never billed, never alerted on, and no part of what the client has agreed — it exists to be compared with the contract schedule.',
+  contractEmpty:
+    'No contract schedule yet. Import the tender workbook, or enter sections and lines below.',
+  estimateEmpty:
+    'No internal estimate yet. Import one to keep your costing beside the contract schedule.',
+  columnAmount: 'Amount',
+  estimateTotal: 'Estimated cost',
+
   // Alert tabs — four, not three
   alertsHeading: 'What needs attention',
   tabToday: 'Due today',

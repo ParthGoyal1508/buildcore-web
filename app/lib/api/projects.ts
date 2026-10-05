@@ -530,6 +530,14 @@ const boqGroupSchema = z.object({
   scopeQty: decimal,
   startDate: z.string().nullable(),
   finishDate: z.string().nullable(),
+  /**
+   * Which of the project's two schedules this section belongs to (027).
+   *
+   * A tender workbook and an internal estimate describe the same work and are imported through the
+   * same screen, so a project carrying both held two sections called "Centering & shuttering" with
+   * nothing to tell them apart. The server has always said which; nothing read it.
+   */
+  isEstimate: z.boolean(),
   items: z.array(boqItemSchema),
 });
 
