@@ -1,12 +1,13 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 import {
   certifyClientBill,
   submitClientBill,
   type ClientBill,
+  type ClientBillLine,
 } from '@/app/lib/api/billing';
 import { ApiError } from '@/app/lib/api/client';
 import { BILLING_COPY } from '@/app/lib/constants';
@@ -100,6 +101,35 @@ export default function ClientBillView({
   const hidden = bill.lines.length - billed.length;
   const lines = showAllLines ? bill.lines : billed;
 
+  /**
+   * The lines under the headings they belong to (027).
+   *
+   * Reported on a real bill: two rows read "12.01 Suspended floors, roofs, landings …" and "12.02
+   * Columns, pillars, posts and struts etc." — a place and no work. The work is in the heading,
+   * *"centering and shuttering … and removal of formwork"*, and a client reading ₹340 a square metre
+   * could not tell what had been done to those floors.
+   *
+   * Grouped rather than repeated on every row because the heading is a sentence, and printing it
+   * twice beside two one-line qualifiers is how a bill stops being readable.
+   *
+   * Order comes from the server — `boqNo`, numerically — and first appearance preserves it, so the
+   * sections read in schedule order without a second sort that could disagree with the first.
+   */
+  const sections = useMemo(() => {
+    const ordered: { id: string; name: string; lines: ClientBillLine[] }[] = [];
+    const byId = new Map<string, (typeof ordered)[number]>();
+    for (const line of lines) {
+      let section = byId.get(line.groupId);
+      if (!section) {
+        section = { id: line.groupId, name: line.groupName, lines: [] };
+        byId.set(line.groupId, section);
+        ordered.push(section);
+      }
+      section.lines.push(line);
+    }
+    return ordered;
+  }, [lines]);
+
   return (
     <section className="space-y-4">
       <header className="space-y-1 border-b border-gray-200 pb-3">
@@ -152,24 +182,43 @@ export default function ClientBillView({
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => (
-                <tr key={line.id} className="border-t border-gray-100">
-                  <td className="px-2 py-1.5 tabular-nums text-gray-600">
-                    {line.boqNo}
-                  </td>
-                  <td className="px-2 py-1.5 text-gray-900">{line.taskName}</td>
-                  <td className="px-2 py-1.5 text-gray-600">{line.unit}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
-                    {line.quantity}
-                  </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
-                    {/* The rate **as billed**, frozen at composition. Never today's BOQ rate. */}
-                    {rupees(line.rate)}
-                  </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
-                    {rupees(line.amount)}
-                  </td>
-                </tr>
+              {sections.map((section) => (
+                <Fragment key={section.id}>
+                  <tr className="border-t border-gray-200 bg-gray-50">
+                    {/*
+                      Spans the row. A heading with empty cells under Quantity and Rate reads as a
+                      line billed at nothing, which is a different claim from a heading.
+                    */}
+                    <th
+                      scope="colgroup"
+                      colSpan={6}
+                      className="px-2 py-1.5 text-left text-sm font-semibold text-gray-900"
+                    >
+                      {section.name}
+                    </th>
+                  </tr>
+                  {section.lines.map((line) => (
+                    <tr key={line.id} className="border-t border-gray-100">
+                      <td className="px-2 py-1.5 tabular-nums text-gray-600">
+                        {line.boqNo}
+                      </td>
+                      <td className="px-2 py-1.5 text-gray-900">
+                        {line.taskName}
+                      </td>
+                      <td className="px-2 py-1.5 text-gray-600">{line.unit}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
+                        {line.quantity}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
+                        {/* The rate **as billed**, frozen at composition. Never today's BOQ rate. */}
+                        {rupees(line.rate)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
+                        {rupees(line.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

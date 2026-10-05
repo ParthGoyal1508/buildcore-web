@@ -129,6 +129,14 @@ export const clientBillLineSchema = z.object({
   boqTaskItemId: z.string(),
   boqNo: z.string(),
   taskName: z.string(),
+  /**
+   * The heading the line sits under, and half of what it says it is (027).
+   *
+   * A tender schedule puts the work in the heading and the qualifier in the child: 12.01 reads
+   * "Suspended floors, roofs, landings …" and the heading above it says what is being done to them.
+   */
+  groupId: z.string(),
+  groupName: z.string(),
   unit: z.string(),
   scopeQty: decimal,
   quantity: decimal,
