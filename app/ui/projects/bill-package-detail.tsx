@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as React from 'react';
 import { useState } from 'react';
 
 import {
@@ -360,8 +361,11 @@ export default function BillPackageDetail({
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {ABSTRACT_BLOCKS.map((block) => (
-                  <>
-                    <tr key={block.title} className="bg-gray-50">
+                  // The key belongs on the fragment, not on the first row inside it. A bare `<>` in
+                  // a list is itself the child React is keying, so keying its children instead
+                  // leaves the list unkeyed — which is what the warning was reporting.
+                  <React.Fragment key={block.title}>
+                    <tr className="bg-gray-50">
                       <td
                         className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-600"
                         colSpan={4}
@@ -387,7 +391,7 @@ export default function BillPackageDetail({
                         </td>
                       </tr>
                     ))}
-                  </>
+                  </React.Fragment>
                 ))}
                 <tr className="border-t-2 border-gray-300 text-base font-semibold">
                   <td className="px-3 py-2">Amount payable</td>
