@@ -70,7 +70,6 @@ export default function RaBillSheet({
       ]),
     ),
   );
-  const [billNumber, setBillNumber] = useState(revising?.billNumber ?? '');
   const [billingDate, setBillingDate] = useState(
     revising ? revising.billingDate.slice(0, 10) : todayIso(),
   );
@@ -127,11 +126,12 @@ export default function RaBillSheet({
       };
       return revising
         ? reviseRaBill(revising.id, { ...payload, reason: reason.trim() })
-        : composeRaBill({
+        : // `billNumber` is deliberately absent: the server allocates it. Sending an empty
+          // string would be refused — `@IsOptional()` skips `undefined`, not `''`.
+          composeRaBill({
             ...payload,
             projectId,
             workOrderId,
-            billNumber: billNumber.trim(),
             billingDate,
           });
     },
@@ -140,10 +140,7 @@ export default function RaBillSheet({
       void queryClient.invalidateQueries({ queryKey: ['raAward', workOrderId] });
       // Not "the approval has been invalidated" — see the class comment. The queue is eventual.
       setDone(revising ? BILLING_COPY.reviseDone : null);
-      if (!revising) {
-        setQuantities({});
-        setBillNumber('');
-      }
+      if (!revising) setQuantities({});
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
@@ -333,12 +330,18 @@ export default function RaBillSheet({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {!revising && (
           <>
-            <TextField
-              id="ra-bill-number"
-              label={BILLING_COPY.billNumberLabel}
-              value={billNumber}
-              onChange={(event) => setBillNumber(event.target.value)}
-            />
+            {/* 027: the number is allocated by the server, so this says so rather than asking.
+                Not previewed either — working the next number out here would be a second
+                implementation of a server rule, and the two drifting apart is how this module's
+                last defect started. */}
+            <div>
+              <span className="mb-1 block text-sm font-medium text-gray-700">
+                {BILLING_COPY.billNumberLabel}
+              </span>
+              <p className="text-sm text-gray-600">
+                {BILLING_COPY.billNumberAuto}
+              </p>
+            </div>
             <TextField
               id="ra-billing-date"
               type="date"
@@ -419,7 +422,7 @@ export default function RaBillSheet({
           disabled={
             measured.length === 0 ||
             save.isPending ||
-            (revising ? reason.trim().length < 3 : !billNumber.trim())
+            (revising ? reason.trim().length < 3 : false)
           }
           onClick={() => {
             setError(null);

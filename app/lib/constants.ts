@@ -922,6 +922,17 @@ export const BILLING_COPY = {
   submitting: 'Submitting…',
   submitFailed: 'That bill could not be submitted.',
   billNumberLabel: 'Bill number',
+  /**
+   * The subcontractor bill number stopped being typed in 027.
+   *
+   * It was the only document in the product whose number a person invented, and `RABill.billNumber`
+   * carried no unique constraint — so a number typed here could silently duplicate one the bill
+   * package path had already minted into the same column. The number is not previewed: deriving it
+   * in the web would be a second implementation of a server rule, which is the drift this product
+   * has already paid for once.
+   */
+  billNumberAuto:
+    'Numbered automatically when you compose it — RA-01, RA-02 and so on, in sequence on this work order.',
   billingDateLabel: 'Billing date',
   descriptionLabel: 'Description',
   retentionPercentLabel: 'Retention withheld (%)',
