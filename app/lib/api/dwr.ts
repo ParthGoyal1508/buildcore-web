@@ -624,3 +624,26 @@ export function previewMeasuredQuantity(
 
 /** A full day, as 022 FR-030e fixes it: `1` means one whole day, not a rate or a unit. */
 export const FULL_DAY = 1;
+
+/**
+ * What to show a person when a daily-work call is refused.
+ *
+ * Here rather than in each screen because 423 is the one every DWR surface gets wrong: a locked
+ * project refuses a write with a status that looks like a permission problem and is not, and a
+ * screen that renders the bare message sends somebody to an administrator who cannot help them.
+ */
+export function describeDwrError(err: unknown): string {
+  const anyErr = err as {
+    status?: number;
+    message?: string;
+    details?: { message?: string };
+  };
+  if (anyErr?.status === 423) {
+    return 'This project is locked, so nothing can be written to it. This is not a permission problem — the same person can write once it is unlocked.';
+  }
+  return (
+    anyErr?.details?.message ??
+    anyErr?.message ??
+    'The report was refused and the server gave no reason.'
+  );
+}

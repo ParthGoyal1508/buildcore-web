@@ -1,16 +1,21 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import {
   DWR_WEATHERS,
   FULL_DAY,
+  type Dwr,
+  type DwrLine,
   type DwrLineInput,
   type DwrWarning,
   createDwr,
+  describeDwrError as describe,
   previewMeasuredQuantity,
+  quantityOf,
+  updateDwr,
 } from '@/app/lib/api/dwr';
 import { getBOQ } from '@/app/lib/api/projects';
 import { ROUTES } from '@/app/lib/constants';
@@ -82,15 +87,70 @@ const emptyPresence = (): DraftLine => ({
   remark: '',
 });
 
-export default function DwrForm({ projectId }: { projectId: string }) {
-  const router = useRouter();
+/** A stored line, back into the shape this form edits. */
+function draftFrom(line: DwrLine): DraftLine {
+  const text = (value: string | null | undefined) =>
+    value == null || Number(value) === 1 ? '' : String(Number(value));
 
-  const [workDate, setWorkDate] = useState(todayIso());
-  const [weather, setWeather] = useState('');
-  const [workerCount, setWorkerCount] = useState('');
-  const [machineryCount, setMachineryCount] = useState('');
-  const [description, setDescription] = useState('');
-  const [lines, setLines] = useState<DraftLine[]>([]);
+  return line.paymentMode === 'work_basis'
+    ? {
+        kind: 'measured',
+        boqItemId: line.boqItemId ?? '',
+        nos1: text(line.nos1),
+        nos2: text(line.nos2),
+        length: text(line.length),
+        breadth: text(line.breadth),
+        depth: text(line.depth),
+        density: text(line.density),
+        remark: line.remark ?? '',
+      }
+    : {
+        kind: 'presence',
+        boqItemId: line.boqItemId ?? '',
+        equipmentId: line.equipmentId ?? '',
+        servedQty: String(quantityOf(line) ?? '1.000'),
+        remark: line.remark ?? '',
+      };
+}
+
+/**
+ * Recording a day, and correcting one (022 FR-018, 024 FR-002).
+ *
+ * **One form for both.** Pass `report` and it edits that draft instead of creating a report; pass
+ * nothing and it creates. A separate edit form would be a second place for the factor mapping to
+ * drift, and that mapping has already been wrong once — `nos`/`factor` against a server that has
+ * only ever accepted `nos1`/`nos2`.
+ *
+ * **The work date is not editable.** `UpdateDwrDto` omits it deliberately, and this says why rather
+ * than silently disabling the field: a report is the record of one named day, so moving its date
+ * makes it the record of a different day under a number people have already filed it under. The
+ * remedy is to delete the draft and record the right day.
+ */
+export default function DwrForm({
+  projectId,
+  report,
+}: {
+  projectId: string;
+  report?: Dwr;
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const editing = Boolean(report);
+
+  const [workDate, setWorkDate] = useState(
+    report?.workDate?.slice(0, 10) ?? todayIso(),
+  );
+  const [weather, setWeather] = useState(report?.weather ?? '');
+  const [workerCount, setWorkerCount] = useState(
+    report?.workerCount != null ? String(report.workerCount) : '',
+  );
+  const [machineryCount, setMachineryCount] = useState(
+    report?.machineryCount != null ? String(report.machineryCount) : '',
+  );
+  const [description, setDescription] = useState(report?.description ?? '');
+  const [lines, setLines] = useState<DraftLine[]>(
+    (report?.lines ?? []).map(draftFrom),
+  );
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<DwrWarning[]>([]);
 
@@ -110,17 +170,38 @@ export default function DwrForm({ projectId }: { projectId: string }) {
   );
 
   const save = useMutation({
-    mutationFn: (input: Parameters<typeof createDwr>[1]) =>
-      createDwr(projectId, input),
-    onSuccess: (report) => {
+    // The work date is split off rather than conditionally built into the payload: `UpdateDwrDto`
+    // does not accept it and the global pipe refuses an unknown field outright, so sending it on an
+    // edit is a 400 rather than a value quietly ignored.
+    mutationFn: async ({
+      workDate: day,
+      ...rest
+    }: Parameters<typeof createDwr>[1]): Promise<{
+      warnings: DwrWarning[];
+    }> => {
+      if (report) {
+        await updateDwr(report.id, rest);
+        // An edit answers with no warnings: the three 022 reports — a date before the project
+        // started, a day already covered, a line past scope — are raised when the day is first
+        // recorded, and the report is already on file by the time it is being corrected.
+        return { warnings: [] };
+      }
+      return { warnings: (await createDwr(projectId, { workDate: day, ...rest })).warnings };
+    },
+    onSuccess: (saved) => {
       // 022 reports three things rather than refusing them: a work date before the project started,
       // a second report for a day already covered, and a line past its BOQ scope. Shown, because a
       // 201 that quietly carried a warning is a 201 nobody reads.
-      if (report.warnings.length > 0) {
-        setWarnings(report.warnings);
+      if (saved.warnings.length > 0) {
+        setWarnings(saved.warnings);
         return;
       }
-      router.push(ROUTES.projectsDwr(projectId));
+      void queryClient.invalidateQueries({ queryKey: ['dwr'] });
+      router.push(
+        report
+          ? ROUTES.projectsDwrReport(projectId, report.id)
+          : ROUTES.projectsDwr(projectId),
+      );
     },
     onError: (err: unknown) => setError(describe(err)),
   });
@@ -174,11 +255,19 @@ export default function DwrForm({ projectId }: { projectId: string }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
       <header>
-        <h2 className="text-lg font-semibold text-gray-900">Record a day</h2>
+        <h2 className="text-lg font-semibold text-gray-900">
+          {editing ? `Correct ${report?.dprNumber}` : 'Record a day'}
+        </h2>
         <p className="text-sm text-gray-600">
           Enter what the site did. <strong>Quantities are computed</strong> — a
           measured line from its dimensions, a presence-paid line from the day
           served. There is no field to type one into.
+          {editing && (
+            <>
+              {' '}
+              <strong>Saving replaces every line</strong> with what is below.
+            </>
+          )}
         </p>
       </header>
 
@@ -217,12 +306,15 @@ export default function DwrForm({ projectId }: { projectId: string }) {
           <input
             type="date"
             required
+            disabled={editing}
             value={workDate}
             onChange={(event) => setWorkDate(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2"
+            className="rounded-md border border-gray-300 px-3 py-2 disabled:bg-gray-100 disabled:text-gray-500"
           />
           <span className="text-xs text-gray-500">
-            The day being reported, not today.
+            {editing
+              ? 'A report is the record of one named day, so its date cannot move. Delete this draft and record the right day instead.'
+              : 'The day being reported, not today.'}
           </span>
         </label>
 
@@ -501,18 +593,3 @@ function numeric(key: string, value: string): Record<string, string> {
   return value.trim() === '' ? {} : { [key]: value.trim() };
 }
 
-function describe(err: unknown): string {
-  const anyErr = err as {
-    status?: number;
-    message?: string;
-    details?: { message?: string };
-  };
-  if (anyErr?.status === 423) {
-    return 'This project is locked, so nothing can be written to it. This is not a permission problem — the same person can write once it is unlocked.';
-  }
-  return (
-    anyErr?.details?.message ??
-    anyErr?.message ??
-    'The report was refused and the server gave no reason.'
-  );
-}

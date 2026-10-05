@@ -1,11 +1,21 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
 
-import { factorsOf, getDwr, quantityOf } from '@/app/lib/api/dwr';
+import {
+  deleteDwr,
+  describeDwrError,
+  factorsOf,
+  getDwr,
+  quantityOf,
+} from '@/app/lib/api/dwr';
+import { ROUTES } from '@/app/lib/constants';
 import DwrAttachments from '@/app/ui/projects/dwr-attachments';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
+import { Button } from '@/app/ui/button';
 import SectionGuard from '@/app/ui/projects/section-guard';
 import StatusBadge from '@/app/ui/status-badge';
 
@@ -22,10 +32,24 @@ import StatusBadge from '@/app/ui/status-badge';
  * trusted: an omitted factor counts as one, so 100 × 7.5 × 0.15 with three blanks is 112.5.
  */
 export default function DwrReportPage() {
-  const params = useParams<{ dwrId: string }>();
+  const params = useParams<{ id: string; dwrId: string }>();
+  const projectId = params.id;
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+
   const { data: report, isLoading } = useQuery({
     queryKey: ['dwr', params.dwrId],
     queryFn: () => getDwr(params.dwrId),
+  });
+
+  const remove = useMutation({
+    mutationFn: () => deleteDwr(params.dwrId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['dwr'] });
+      router.push(ROUTES.projectsDwr(projectId));
+    },
+    onError: (err: unknown) => setError(describeDwrError(err)),
   });
 
   if (isLoading || !report) {
@@ -44,20 +68,53 @@ export default function DwrReportPage() {
   return (
     <SectionGuard permission="DWR">
       <div className="flex flex-col gap-6">
-        <header>
-          <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-            {report.dprNumber}
-            <StatusBadge status={report.status} />
-          </h2>
-          <p className="text-sm text-gray-600">
-            {dateLabel(report.workDate)} · {report.workerCount ?? 0} people ·{' '}
-            {report.machineryCount ?? 0} machines
-            {report.weather ? ` · ${report.weather}` : ''}
-          </p>
-          {report.description && (
-            <p className="mt-2 text-sm text-gray-700">{report.description}</p>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-900">
+              {report.dprNumber}
+              <StatusBadge status={report.status} />
+            </h2>
+            <p className="text-sm text-gray-600">
+              {dateLabel(report.workDate)} · {report.workerCount ?? 0} people ·{' '}
+              {report.machineryCount ?? 0} machines
+              {report.weather ? ` · ${report.weather}` : ''}
+            </p>
+            {report.description && (
+              <p className="mt-2 text-sm text-gray-700">{report.description}</p>
+            )}
+          </div>
+
+          {/* Draft only. A submitted report is a claim somebody is reading and an approved one has
+              already moved quantities a bill may rest on — the routes back are return and reverse,
+              which the panel offers. Offering Edit on either would promise something the server
+              refuses by status. */}
+          {report.status === 'draft' && (
+            <div className="flex items-center gap-2">
+              <Link
+                href={ROUTES.projectsDwrEdit(projectId, report.id)}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Edit
+              </Link>
+              <Button
+                type="button"
+                disabled={remove.isPending}
+                onClick={() => {
+                  setError(null);
+                  remove.mutate();
+                }}
+              >
+                {remove.isPending ? 'Deleting…' : 'Delete'}
+              </Button>
+            </div>
           )}
         </header>
+
+        {error && (
+          <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+            {error}
+          </p>
+        )}
 
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           <div>

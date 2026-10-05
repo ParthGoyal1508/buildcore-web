@@ -124,6 +124,9 @@ export const ROUTES = {
   /** One report, its lines, and the submit / approve / reverse actions. */
   projectsDwrReport: (projectId: string, dwrId: string) =>
     `/dashboard/projects/portfolio/${projectId}/dwr/${dwrId}`,
+  /** Correcting a draft. Draft only — the screen refuses anything further on (022 FR-018). */
+  projectsDwrEdit: (projectId: string, dwrId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/dwr/${dwrId}/edit`,
   // 023 / 024. Gated on `PROJECT_FINANCIALS`: a bill is money, and somebody who may record a day's
   // work is not thereby entitled to see what the company charges for it.
   /** Every running-account bill package on a project. */
