@@ -5,11 +5,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import {
-  type Dwr,
-  type DwrLine,
+  type DwrSummary,
   approveDwr,
   listDwrs,
-  quantityOf,
   returnDwr,
   reverseDwr,
   submitDwr,
@@ -155,7 +153,7 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
                 <th className="px-3 py-2">Report</th>
                 <th className="px-3 py-2">Work date</th>
                 <th className="px-3 py-2">State</th>
-                <th className="px-3 py-2">Lines</th>
+                <th className="px-3 py-2 text-right">Lines</th>
                 <th className="px-3 py-2">On site</th>
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
@@ -189,7 +187,7 @@ function ReportRow({
   onAct,
 }: {
   projectId: string;
-  report: Dwr;
+  report: DwrSummary;
   currentUserId: string | undefined;
   busy: boolean;
   onAct: (
@@ -197,7 +195,6 @@ function ReportRow({
     reason?: string,
   ) => void;
 }) {
-  const lines: DwrLine[] = report.tasks ?? report.lines ?? [];
   const reversed = Boolean(report.reversedAt);
 
   // 022 FR-012a. The author of a report may not approve it, so the control says why instead of
@@ -214,7 +211,7 @@ function ReportRow({
           href={ROUTES.projectsDwrReport(projectId, report.id)}
           className="font-medium text-blue-700 hover:underline"
         >
-          {report.reportNumber}
+          {report.dprNumber}
         </Link>
       </td>
       <td className="px-3 py-2">{dateLabel(report.workDate)}</td>
@@ -224,27 +221,14 @@ function ReportRow({
           <span className="ml-2 text-xs text-gray-500">reversed</span>
         )}
       </td>
-      <td className="px-3 py-2">
-        {lines.length === 0 ? (
+      {/* A count, because the list is a page of summaries: `lineCount` is what the server sends and
+          the lines themselves are on the detail read. This column rendered an array the list has
+          never carried, so it read "none" for every report whatever the day contained. */}
+      <td className="px-3 py-2 text-right tabular-nums">
+        {report.lineCount === 0 ? (
           <span className="text-gray-500">none</span>
         ) : (
-          <ul className="space-y-0.5">
-            {lines.slice(0, 3).map((line) => (
-              <li key={line.id} className="whitespace-nowrap">
-                <span className="text-gray-500">{line.boqNo ?? '—'}</span>{' '}
-                {/* One helper decides how a quantity reads, so the two line kinds cannot be
-                    displayed differently on two screens. A dash where neither column holds a
-                    figure — a zero would claim a measurement that does not exist. */}
-                <span className="font-medium">{quantityOf(line) ?? '—'}</span>{' '}
-                <span className="text-gray-500">{line.unit ?? ''}</span>
-              </li>
-            ))}
-            {lines.length > 3 && (
-              <li className="text-xs text-gray-500">
-                and {lines.length - 3} more
-              </li>
-            )}
-          </ul>
+          report.lineCount
         )}
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-gray-600">

@@ -99,10 +99,37 @@ const dwrLineSchema = z
   })
   .passthrough();
 
+/**
+ * A fact the API reports **beside** a success, never instead of one (022 FR-025).
+ *
+ * An object, not a string: a code the app can branch on, a sentence written for the person reading
+ * it, and whatever detail that person needs to act — the report number of the day already covered,
+ * the project's start date, the BOQ number of the line past its scope. The three are a work date
+ * before the project started, a second report for a date already covered, and a line past its BOQ
+ * scope, and **all three accompany a 201**.
+ */
+const warningSchema = z
+  .object({
+    code: z.string(),
+    message: z.string(),
+    detail: z.record(z.unknown()).optional(),
+  })
+  .passthrough();
+
+export type DwrWarning = z.infer<typeof warningSchema>;
+
+/**
+ * One report as the **detail** read returns it (`GET /projects/dwr/:dwrId`).
+ *
+ * Distinct from the list item below, and that distinction is the defect this module was repaired
+ * for: a single schema demanding the detail's fields was used to parse the list, the creation
+ * response and every lifecycle action, so a successful save rendered as a parse error naming three
+ * fields the server has never sent.
+ */
 const dwrSchema = z
   .object({
     id: z.string(),
-    reportNumber: z.string(),
+    dprNumber: z.string(),
     projectId: z.string(),
     workDate: z.string(),
     status: z.enum(DWR_STATUSES),
@@ -122,22 +149,85 @@ const dwrSchema = z
     reversalCount: z.number().optional(),
     tasks: z.array(dwrLineSchema).optional(),
     lines: z.array(dwrLineSchema).optional(),
-    /**
-     * Three things the API **reports rather than refuses** (022): a work date before the project
-     * started, a second report for a day already covered, and a line past its BOQ scope. Named
-     * here so the form can show them instead of a 201 that looks like nothing happened.
-     */
-    warnings: z.array(z.string()).optional(),
   })
   .passthrough();
 
 export type Dwr = z.infer<typeof dwrSchema>;
 export type DwrLine = z.infer<typeof dwrLineSchema>;
 
-const dwrListSchema = z.union([
-  z.array(dwrSchema),
-  z.object({ items: z.array(dwrSchema) }).passthrough(),
-]);
+/**
+ * One row of the **list**, which is a page of summaries and nothing more.
+ *
+ * `lineCount` is a count. **There is no lines array here** — rendering one from this response is
+ * what made the Lines column read "none" for every report regardless of what the day contained.
+ * The lines themselves are on the detail read, which is one click away.
+ *
+ * `createdByUserId` and `submittedByUserId` are carried so the Approve control can show 022
+ * FR-012a *before* the action rather than after it (025 FR-006).
+ */
+const dwrSummarySchema = z
+  .object({
+    id: z.string(),
+    dprNumber: z.string(),
+    workDate: z.string(),
+    status: z.enum(DWR_STATUSES),
+    workerCount: z.number().nullable().optional(),
+    machineryCount: z.number().nullable().optional(),
+    progress: z.number().nullable().optional(),
+    lineCount: z.number(),
+    createdByUserId: z.string().nullable().optional(),
+    submittedByUserId: z.string().nullable().optional(),
+    reversedAt: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export type DwrSummary = z.infer<typeof dwrSummarySchema>;
+
+const dwrListSchema = z
+  .object({
+    items: z.array(dwrSummarySchema),
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+  })
+  .passthrough();
+
+/**
+ * What recording a day returns — **an identifier, a number, a status and the warnings**.
+ *
+ * No `projectId`. No `workDate`. No lines. A client that demands them back rejects every successful
+ * save, which is precisely what happened: the server recorded the day, answered 201, and the screen
+ * showed a parse error, so the day was recorded and believed lost.
+ */
+const createdDwrSchema = z
+  .object({
+    id: z.string(),
+    dprNumber: z.string(),
+    status: z.enum(DWR_STATUSES),
+    warnings: z.array(warningSchema).default([]),
+  })
+  .passthrough();
+
+export type CreatedDwr = z.infer<typeof createdDwrSchema>;
+
+/**
+ * What a lifecycle action returns. Each is narrower than the detail read: submit and return answer
+ * `{ id, status }`, approve adds what it moved, reverse adds the count, and editing a draft adds
+ * the same warnings a creation carries.
+ */
+const dwrActionSchema = z
+  .object({
+    id: z.string(),
+    status: z.enum(DWR_STATUSES),
+    moved: z
+      .array(z.object({ boqNo: z.string(), delta: quantity }).passthrough())
+      .optional(),
+    reversalCount: z.number().optional(),
+    warnings: z.array(warningSchema).default([]),
+  })
+  .passthrough();
+
+export type DwrActionResult = z.infer<typeof dwrActionSchema>;
 
 /** One BOQ line, per period, as 023 composes a bill from (022 FR-034 to FR-038). */
 const periodFigureSchema = z
@@ -178,12 +268,18 @@ export type PeriodFigures = z.infer<typeof periodFiguresSchema>;
 export interface MeasuredLineInput {
   paymentMode: 'work_basis';
   boqItemId?: string;
-  nos?: string;
+  /**
+   * The server's own six names (`create-dwr.dto.ts`), not an approximation of them. The global
+   * pipe runs at `forbidNonWhitelisted`, so a field this client invents is a **400** rather than a
+   * figure quietly dropped — `nos` and `factor` were invented here and made every measured line
+   * carrying them unsaveable.
+   */
+  nos1?: string;
+  nos2?: string;
   length?: string;
   breadth?: string;
   depth?: string;
   density?: string;
-  factor?: string;
   chainageFrom?: string;
   chainageTo?: string;
   layer?: string;
@@ -235,11 +331,10 @@ export interface CreateDwrInput {
 // Calls
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function listDwrs(projectId?: string): Promise<Dwr[]> {
+export async function listDwrs(projectId?: string): Promise<DwrSummary[]> {
   const search = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
   const raw = await authFetch<unknown>(`/projects/dwr${search}`);
-  const parsed = dwrListSchema.parse(raw);
-  return Array.isArray(parsed) ? parsed : parsed.items;
+  return dwrListSchema.parse(raw).items;
 }
 
 export async function getDwr(dwrId: string): Promise<Dwr> {
@@ -249,8 +344,8 @@ export async function getDwr(dwrId: string): Promise<Dwr> {
 export async function createDwr(
   projectId: string,
   input: CreateDwrInput,
-): Promise<Dwr> {
-  return dwrSchema.parse(
+): Promise<CreatedDwr> {
+  return createdDwrSchema.parse(
     await authFetch<unknown>(`/projects/${projectId}/dwr`, {
       method: 'POST',
       body: JSON.stringify(input),
@@ -258,8 +353,8 @@ export async function createDwr(
   );
 }
 
-export async function submitDwr(dwrId: string): Promise<Dwr> {
-  return dwrSchema.parse(
+export async function submitDwr(dwrId: string): Promise<DwrActionResult> {
+  return dwrActionSchema.parse(
     await authFetch<unknown>(`/projects/dwr/${dwrId}/submit`, {
       method: 'POST',
     }),
@@ -273,16 +368,16 @@ export async function submitDwr(dwrId: string): Promise<Dwr> {
  * none. The API refuses an approval by the report's own author (FR-012a) and refuses a second
  * approval of the same report (FR-014).
  */
-export async function approveDwr(dwrId: string): Promise<Dwr> {
-  return dwrSchema.parse(
+export async function approveDwr(dwrId: string): Promise<DwrActionResult> {
+  return dwrActionSchema.parse(
     await authFetch<unknown>(`/projects/dwr/${dwrId}/approve`, {
       method: 'POST',
     }),
   );
 }
 
-export async function returnDwr(dwrId: string, reason: string): Promise<Dwr> {
-  return dwrSchema.parse(
+export async function returnDwr(dwrId: string, reason: string): Promise<DwrActionResult> {
+  return dwrActionSchema.parse(
     await authFetch<unknown>(`/projects/dwr/${dwrId}/return`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
@@ -291,8 +386,8 @@ export async function returnDwr(dwrId: string, reason: string): Promise<Dwr> {
 }
 
 /** Takes back exactly what approval added (022 FR-019), refused below what a bill has claimed. */
-export async function reverseDwr(dwrId: string, reason: string): Promise<Dwr> {
-  return dwrSchema.parse(
+export async function reverseDwr(dwrId: string, reason: string): Promise<DwrActionResult> {
+  return dwrActionSchema.parse(
     await authFetch<unknown>(`/projects/dwr/${dwrId}/reverse`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
@@ -345,7 +440,7 @@ export function quantityOf(line: DwrLine): string | null {
 export function previewMeasuredQuantity(
   factors: Record<string, string | undefined>,
 ): string | null {
-  const keys = ['nos', 'length', 'breadth', 'depth', 'density', 'factor'];
+  const keys = ['nos1', 'nos2', 'length', 'breadth', 'depth', 'density'];
   let product = 1;
   for (const key of keys) {
     const raw = factors[key];

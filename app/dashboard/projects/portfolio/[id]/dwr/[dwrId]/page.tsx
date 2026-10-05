@@ -42,7 +42,7 @@ export default function DwrReportPage() {
       <div className="flex flex-col gap-6">
         <header>
           <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-            {report.reportNumber}
+            {report.dprNumber}
             <StatusBadge status={report.status} />
           </h2>
           <p className="text-sm text-gray-600">

@@ -8,6 +8,7 @@ import {
   DWR_WEATHERS,
   FULL_DAY,
   type DwrLineInput,
+  type DwrWarning,
   createDwr,
   previewMeasuredQuantity,
 } from '@/app/lib/api/dwr';
@@ -43,12 +44,14 @@ type DraftLine =
   | {
       kind: 'measured';
       boqItemId: string;
-      nos: string;
+      // The server's own six (`create-dwr.dto.ts`), carrying the labels site staff read. `nos` and
+      // `factor` were this form's own invention and, under `forbidNonWhitelisted`, a 400.
+      nos1: string;
+      nos2: string;
       length: string;
       breadth: string;
       depth: string;
       density: string;
-      factor: string;
       remark: string;
     }
   | {
@@ -62,12 +65,12 @@ type DraftLine =
 const emptyMeasured = (): DraftLine => ({
   kind: 'measured',
   boqItemId: '',
-  nos: '',
+  nos1: '',
+  nos2: '',
   length: '',
   breadth: '',
   depth: '',
   density: '',
-  factor: '',
   remark: '',
 });
 
@@ -89,7 +92,7 @@ export default function DwrForm({ projectId }: { projectId: string }) {
   const [description, setDescription] = useState('');
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<DwrWarning[]>([]);
 
   const { data: boqGroups } = useQuery({
     queryKey: ['boq', projectId],
@@ -113,7 +116,7 @@ export default function DwrForm({ projectId }: { projectId: string }) {
       // 022 reports three things rather than refusing them: a work date before the project started,
       // a second report for a day already covered, and a line past its BOQ scope. Shown, because a
       // 201 that quietly carried a warning is a 201 nobody reads.
-      if (report.warnings && report.warnings.length > 0) {
+      if (report.warnings.length > 0) {
         setWarnings(report.warnings);
         return;
       }
@@ -141,12 +144,12 @@ export default function DwrForm({ projectId }: { projectId: string }) {
         ? {
             paymentMode: 'work_basis' as const,
             ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
-            ...numeric('nos', line.nos),
+            ...numeric('nos1', line.nos1),
+            ...numeric('nos2', line.nos2),
             ...numeric('length', line.length),
             ...numeric('breadth', line.breadth),
             ...numeric('depth', line.depth),
             ...numeric('density', line.density),
-            ...numeric('factor', line.factor),
             ...(line.remark ? { remark: line.remark } : {}),
           }
         : {
@@ -195,7 +198,7 @@ export default function DwrForm({ projectId }: { projectId: string }) {
           </p>
           <ul className="mt-1 list-disc pl-5">
             {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
+              <li key={warning.code}>{warning.message}</li>
             ))}
           </ul>
           <Button
@@ -353,12 +356,12 @@ function LineEditor({
   const preview =
     line.kind === 'measured'
       ? previewMeasuredQuantity({
-          nos: line.nos,
+          nos1: line.nos1,
+          nos2: line.nos2,
           length: line.length,
           breadth: line.breadth,
           depth: line.depth,
           density: line.density,
-          factor: line.factor,
         })
       : null;
 
@@ -398,12 +401,12 @@ function LineEditor({
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {(
               [
-                ['nos', 'Nos'],
+                ['nos1', 'Nos'],
+                ['nos2', 'Factor'],
                 ['length', 'Length'],
                 ['breadth', 'Breadth'],
                 ['depth', 'Depth'],
                 ['density', 'Density'],
-                ['factor', 'Factor'],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="flex flex-col gap-1 text-sm">
