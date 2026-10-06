@@ -901,6 +901,15 @@ export const BILLING_COPY = {
   retention: 'Retention',
   retentionBasis: (percent: string) => `${percent} of gross, withheld by the client`,
   advanceRecovery: 'Advance recovery',
+  /**
+   * Said on the sheet where the two inputs used to be (028 FR-004).
+   *
+   * Silence would be worse than the inputs were. Somebody who recorded a deduction here last month
+   * and finds the boxes gone needs to be told where it went, not left to conclude the capability
+   * was removed.
+   */
+  deductionsMovedNote:
+    'Recoveries and deductions are recorded on the bill package, which is what the issued document reads. Figures already on this bill are shown below and carried forward.',
   advanceRecoveryBasis: 'Money already advanced, coming back',
   otherDeductions: 'Other deductions',
   deductionTotal: 'Total deductions',

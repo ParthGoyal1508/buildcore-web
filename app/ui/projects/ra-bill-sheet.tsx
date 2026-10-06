@@ -83,12 +83,11 @@ export default function RaBillSheet({
   const [billingDate, setBillingDate] = useState(
     revising ? revising.billingDate.slice(0, 10) : todayIso(),
   );
-  const [advanceRecovery, setAdvanceRecovery] = useState(
-    revising ? String(revising.advanceRecovery) : '',
-  );
-  const [otherDeductions, setOtherDeductions] = useState(
-    revising ? String(revising.otherDeductions) : '',
-  );
+  // Read from the bill being revised, never typed. 028 FR-004 closed these as inputs; a bill that
+  // already carries them keeps them, and the server carries them forward across a revision rather
+  // than recomputing them from an input that no longer exists.
+  const advanceRecovery = revising ? String(revising.advanceRecovery) : '0';
+  const otherDeductions = revising ? String(revising.otherDeductions) : '0';
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -131,8 +130,6 @@ export default function RaBillSheet({
           workOrderBoqItemId: id,
           quantity,
         })),
-        advanceRecovery: advanceRecovery ? Number(advanceRecovery) : undefined,
-        otherDeductions: otherDeductions ? Number(otherDeductions) : undefined,
       };
       return revising
         ? reviseRaBill(revising.id, {
@@ -383,25 +380,21 @@ export default function RaBillSheet({
             />
           </>
         )}
-        <TextField
-          id="ra-advance-recovery"
-          type="number"
-          step="0.01"
-          min="0"
-          label={BILLING_COPY.advanceRecovery}
-          value={advanceRecovery}
-          onChange={(event) => setAdvanceRecovery(event.target.value)}
-        />
-        <TextField
-          id="ra-other-deductions"
-          type="number"
-          step="0.01"
-          min="0"
-          label={BILLING_COPY.otherDeductions}
-          value={otherDeductions}
-          onChange={(event) => setOtherDeductions(event.target.value)}
-        />
       </div>
+
+      {/*
+        The two deduction fields were here until 028 FR-004, and removing them is the fix for a bill
+        that understated what had been taken.
+
+        **A figure typed here never reached the document.** It was saved onto the bill row; the
+        abstract and the PDF a subcontractor receives read the package's adjustment columns and have
+        never looked at these two. So the deduction was recorded correctly and the bill went out
+        without it, with nothing on either screen saying the two disagreed.
+
+        Recoveries and deductions are recorded on the bill package now — one store, and it is the
+        one the document reads.
+      */}
+      <p className="text-xs text-gray-500">{BILLING_COPY.deductionsMovedNote}</p>
 
       {/* The reason is for whoever decides the bill a second time. A draft has no first decision,
           so asking for one makes somebody invent a justification — and an invented reason devalues
