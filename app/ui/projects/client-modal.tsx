@@ -48,6 +48,8 @@ export default function ClientModal({
   const [email, setEmail] = useState(client?.email ?? '');
   const [address, setAddress] = useState(client?.address ?? '');
   const [gstin, setGstin] = useState(client?.gstin ?? '');
+  const [pan, setPan] = useState(client?.pan ?? '');
+  const [state, setState] = useState(client?.state ?? '');
   const [status, setStatus] = useState<string>(client?.status ?? 'active');
 
   const [nameError, setNameError] = useState<string | undefined>();
@@ -67,6 +69,8 @@ export default function ClientModal({
         // company where present, and an empty string is a value that would collide
         // with the next GSTIN-less client.
         gstin: gstin.trim() || undefined,
+        pan: pan.trim() || undefined,
+        state: state.trim() || undefined,
         status,
       };
       return client
@@ -181,6 +185,25 @@ export default function ClientModal({
           error={gstinError}
           hint="Optional. Must be unique across your clients."
           maxLength={15}
+        />
+        {/* 025 FR-039. Both print in the bill's statutory header and the table carried neither
+            until now, so every running-account bill issued to a client reported the two rows as
+            missing and somebody filled them in by hand on the printed sheet. */}
+        <TextField
+          id="client-pan"
+          label="PAN"
+          value={pan}
+          onChange={(e) => setPan(e.target.value.toUpperCase())}
+          hint="Optional. A bill is still issued without it, with the gap reported."
+          maxLength={10}
+        />
+        <TextField
+          id="client-state"
+          label="GST state code"
+          value={state}
+          onChange={(e) => setState(e.target.value)}
+          hint="Two digits — the first two of the GSTIN. 08 is Rajasthan."
+          maxLength={2}
         />
         <SelectField
           id="client-status"

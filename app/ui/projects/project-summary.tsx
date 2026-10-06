@@ -94,11 +94,15 @@ export default function ProjectSummary({
             <span className="mb-1 block font-medium text-gray-700">
               {PNL_COPY.monthLabel}
             </span>
+            {/* `h-11 sm:h-10` are `SecondaryButton`'s own heights, taken rather than guessed at:
+                this field sits in a row with two of them, and `sm:min-h-0` left it 30px tall
+                against their 40px — bottom-aligned, so the mismatch read as a misaligned button
+                rather than a short input. 44px below `sm` is the touch target. */}
             <input
               type="month"
               value={period}
               onChange={(event) => setPeriod(event.target.value)}
-              className="min-h-11 rounded border border-gray-300 px-2 py-1 text-sm sm:min-h-0"
+              className="h-11 rounded border border-gray-300 px-3 text-sm sm:h-10"
             />
           </label>
           <div className="flex gap-2">

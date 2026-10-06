@@ -129,6 +129,14 @@ export const clientBillLineSchema = z.object({
   boqTaskItemId: z.string(),
   boqNo: z.string(),
   taskName: z.string(),
+  /**
+   * The heading the line sits under, and half of what it says it is (027).
+   *
+   * A tender schedule puts the work in the heading and the qualifier in the child: 12.01 reads
+   * "Suspended floors, roofs, landings …" and the heading above it says what is being done to them.
+   */
+  groupId: z.string(),
+  groupName: z.string(),
   unit: z.string(),
   scopeQty: decimal,
   quantity: decimal,
@@ -179,7 +187,13 @@ export interface ComposeBillLineInput {
 
 export interface ComposeBillInput {
   projectId: string;
-  billNumber: string;
+  /**
+   * Omit to have the server allocate it: `RA-01`, `RA-02`… in sequence on this project (027).
+   *
+   * Send it only for an import carrying numbers that already exist on paper. An empty string is
+   * **not** omission — the DTO's `@IsOptional()` skips `undefined`, and `''` fails its `MinLength`.
+   */
+  billNumber?: string;
   description?: string;
   billingDate: string;
   lines: ComposeBillLineInput[];
@@ -234,6 +248,15 @@ export async function certifyClientBill(
 export const raBillLineSchema = z.object({
   id: z.string(),
   workOrderBoqItemId: z.string(),
+  /**
+   * The client BOQ line this award line corresponds to, where it corresponds to one.
+   *
+   * Null is a real answer: a subcontract can cover work the client's BOQ itemises differently, and
+   * forcing a match would make somebody invent one. But it is also what the award editor must read
+   * back to **preserve** a link it did not create — re-saving an award without it unlinks every
+   * line, and an unlinked line drops out of the floor a daily-work reversal is checked against.
+   */
+  boqTaskItemId: z.string().nullable(),
   description: z.string(),
   unit: z.string(),
   awardedQty: decimal,
@@ -305,7 +328,13 @@ export interface MeasureLineInput {
 export interface ComposeRaBillInput {
   projectId: string;
   workOrderId: string;
-  billNumber: string;
+  /**
+   * Omit to have the server allocate it: `RA-01`, `RA-02`… in sequence on this work order (027).
+   *
+   * Send it only for an import carrying numbers that already exist on paper. An empty string is
+   * **not** omission — the DTO's `@IsOptional()` skips `undefined`, and `''` fails its `MinLength`.
+   */
+  billNumber?: string;
   description?: string;
   billingDate: string;
   lines: MeasureLineInput[];
@@ -315,8 +344,13 @@ export interface ComposeRaBillInput {
 
 export interface ReviseRaBillInput {
   lines: MeasureLineInput[];
-  /** Required. Somebody has to decide this bill a second time. */
-  reason: string;
+  /**
+   * Why the quantities changed. **Required once the bill has left draft, and only then** (027).
+   *
+   * A draft has been decided by nobody, so there is no second decider to read it. Omit it there —
+   * an empty string is not omission, and would fail the DTO's `MinLength(3)`.
+   */
+  reason?: string;
   advanceRecovery?: number;
   otherDeductions?: number;
 }
@@ -413,6 +447,12 @@ export const workOrderSchema = z.object({
   projectId: z.string(),
   /** `partners.Vendor.id`. Resolved to a name through the partners endpoints, not here. */
   partnerId: z.string().nullable(),
+  /**
+   * `PRPL-WO-0001`. **Null on every work order raised before 027 numbered them** — the column was
+   * added to a populated table, and inventing numbers for the existing rows would print figures on
+   * documents nobody issued. Render the absence, never an empty string.
+   */
+  code: z.string().nullable(),
   workDetail: z.string(),
   terms: z.string().nullable(),
   requirements: z.string().nullable(),
@@ -431,6 +471,7 @@ export type WorkOrder = z.infer<typeof workOrderSchema>;
 
 export interface WorkOrderInput {
   projectId: string;
+  /** The subcontractor. Optional: a work order can be raised before the vendor is settled. */
   partnerId?: string;
   workDetail: string;
   terms?: string;
@@ -458,6 +499,61 @@ export async function createWorkOrder(
     body: JSON.stringify(input),
   });
   return workOrderSchema.parse(raw);
+}
+
+/**
+ * What a work order still holds back, and every release against it (025 FR-032).
+ *
+ * All three figures, not just the balance: a subcontractor asking "how much are you still holding"
+ * is really asking "and how did it get to that", and a single number sends somebody to add up bills
+ * by hand to answer the second half.
+ */
+const retentionLedgerSchema = z
+  .object({
+    workOrderId: z.string(),
+    retentionPercent: z.number(),
+    withheld: z.number(),
+    released: z.number(),
+    outstanding: z.number(),
+    releases: z.array(
+      z
+        .object({
+          id: z.string(),
+          amount: z.number(),
+          releasedOn: z.string(),
+          reason: z.string().nullable(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export type RetentionLedger = z.infer<typeof retentionLedgerSchema>;
+
+export async function getRetention(
+  workOrderId: string,
+): Promise<RetentionLedger> {
+  return retentionLedgerSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/retention/${workOrderId}`),
+  );
+}
+
+/**
+ * Records retention going back to the subcontractor.
+ *
+ * **An act somebody performs, never a schedule the system runs** — the client's own decision.
+ * Append-only: there is no edit, because the row *is* the evidence that money moved.
+ */
+export async function releaseRetention(
+  workOrderId: string,
+  input: { amount: number; releasedOn: string; reason: string },
+): Promise<RetentionLedger> {
+  return retentionLedgerSchema.parse(
+    await authFetch<unknown>(
+      `/projects/ra-bills/retention/${workOrderId}/release`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
+  );
 }
 
 export async function updateWorkOrder(

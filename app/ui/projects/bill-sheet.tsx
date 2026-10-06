@@ -88,7 +88,6 @@ export default function BillSheet({ projectId }: { projectId: string }) {
   const quantitiesRef = useRef<Record<string, number>>({});
   const reasonsRef = useRef<Record<string, string>>({});
 
-  const [billNumber, setBillNumber] = useState('');
   const [billingDate, setBillingDate] = useState(todayIso());
   const [description, setDescription] = useState('');
   const [retentionPercent, setRetentionPercent] = useState('');
@@ -103,13 +102,23 @@ export default function BillSheet({ projectId }: { projectId: string }) {
    */
   const [conflict, setConflict] = useState(false);
   /**
+   * Sections the reader has folded away. Expanded is the default — see `collapseAllSections` in
+   * the copy for why this screen opens with everything showing.
+   *
+   * Collapsing unmounts the rows, and that is safe because a quantity settles on blur: clicking a
+   * section header blurs the input first, so the figure is already in `quantities` before the row
+   * goes. `onEnterNext` reads the live input registry, so Enter walks past a folded section to the
+   * next visible line rather than stopping at it.
+   */
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  /**
    * The header fields, mirrored for the draft writer.
    *
    * So that `persistDraft` and `onQuantityChange` can have empty dependency arrays and stay stable
    * across renders. A callback whose identity changed on every header keystroke would be new props
    * on 300 memoized rows — the same defect as a shared form object, arriving through the back door.
    */
-  const headerRef = useRef({ billNumber: '', billingDate: todayIso(), description: '' });
+  const headerRef = useRef({ billingDate: todayIso(), description: '' });
 
   // --- Draft recovery (FR-005) -----------------------------------------------
   const draftKey = clientDraftKey(projectId);
@@ -206,7 +215,8 @@ export default function BillSheet({ projectId }: { projectId: string }) {
     mutationFn: () =>
       composeClientBill({
         projectId,
-        billNumber: billNumber.trim(),
+        // `billNumber` is deliberately absent: the server allocates it. Sending an empty string
+        // would be refused — `@IsOptional()` skips `undefined`, not `''`.
         billingDate,
         description: description.trim() || undefined,
         retentionPercent: retentionPercent
@@ -225,8 +235,6 @@ export default function BillSheet({ projectId }: { projectId: string }) {
       reasonsRef.current = {};
       setQuantities({});
       setReasons({});
-      setBillNumber('');
-      headerRef.current = { ...headerRef.current, billNumber: '' };
       void queryClient.invalidateQueries({ queryKey: ['clientBills', projectId] });
       void queryClient.invalidateQueries({ queryKey: ['billableBoq', projectId] });
     },
@@ -324,11 +332,11 @@ export default function BillSheet({ projectId }: { projectId: string }) {
                 setQuantities({ ...draft.quantities });
                 setReasons({ ...(draft.reasons ?? {}) });
                 headerRef.current = {
-                  billNumber: draft.header?.billNumber ?? '',
                   billingDate: draft.header?.billingDate ?? todayIso(),
                   description: draft.header?.description ?? '',
                 };
-                setBillNumber(headerRef.current.billNumber);
+                // A draft saved before 027 may still carry a `billNumber`; it is ignored rather
+                // than migrated, because the number is no longer the person's to choose.
                 setBillingDate(headerRef.current.billingDate);
                 setDescription(headerRef.current.description);
                 // Changing the rows' keys remounts them, which is the only way to replace row-local
@@ -356,10 +364,41 @@ export default function BillSheet({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      {/* NFR-003: the grid scrolls inside its own container. The page body never scrolls sideways. */}
-      <div className="overflow-x-auto rounded border border-gray-200">
+      <div className="flex flex-wrap gap-2">
+        <SecondaryButton
+          type="button"
+          onClick={() => setCollapsed(new Set())}
+          disabled={collapsed.size === 0}
+        >
+          {BILLING_COPY.expandAllSections}
+        </SecondaryButton>
+        <SecondaryButton
+          type="button"
+          onClick={() =>
+            setCollapsed(new Set(boq.data.groups.map((group) => group.id)))
+          }
+          disabled={collapsed.size === boq.data.groups.length}
+        >
+          {BILLING_COPY.collapseAllSections}
+        </SecondaryButton>
+      </div>
+
+      {/*
+        NFR-003: the grid scrolls inside its own container, on **both** axes.
+
+        It was `overflow-x-auto` alone, so the rows were never bounded vertically. That is
+        invisible on a short schedule and ruinous on a real one: the client's own 231-line tender
+        renders rows up to 1,173px tall — the CCTV and NVR items carry a full specification as
+        their description — and the grid came to 48,345px, which pushed the document to 49,201px
+        against an 813px viewport. Sixty screens of scrolling, most of it past the end of the page,
+        with the shell clipped behind it.
+
+        The header sticks, because a column heading that scrolls away over two hundred rows leaves
+        somebody typing quantities into a grid whose columns they can no longer name.
+      */}
+      <div className="max-h-[70vh] overflow-auto rounded border border-gray-200">
         <table className="min-w-[56rem] w-full">
-          <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+          <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600 shadow-[0_1px_0_0_rgb(229,231,235)]">
             <tr>
               <th className="px-2 py-2">{BILLING_COPY.columns.boqNo}</th>
               <th className="px-2 py-2">{BILLING_COPY.columns.task}</th>
@@ -391,6 +430,14 @@ export default function BillSheet({ projectId }: { projectId: string }) {
                 boqNo={group.boqNo}
                 name={group.name}
                 items={group.items}
+                collapsed={collapsed.has(group.id)}
+                onToggle={() =>
+                  setCollapsed((current) => {
+                    const next = new Set(current);
+                    if (!next.delete(group.id)) next.add(group.id);
+                    return next;
+                  })
+                }
                 quotedPercentage={quotedPercentage}
                 settled={quantities}
                 draftGeneration={draftGeneration}
@@ -428,16 +475,16 @@ export default function BillSheet({ projectId }: { projectId: string }) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <TextField
-          id="bill-number"
-          label={BILLING_COPY.billNumberLabel}
-          value={billNumber}
-          onChange={(event) => {
-            setBillNumber(event.target.value);
-            headerRef.current.billNumber = event.target.value;
-          }}
-          onBlur={persistDraft}
-        />
+        {/* 027: the number is allocated by the server, so this says so rather than asking.
+            Not previewed either — working the next number out here would be a second
+            implementation of a server rule, and the two drifting apart is how this module's
+            last defect started. */}
+        <div>
+          <span className="mb-1 block text-sm font-medium text-gray-700">
+            {BILLING_COPY.billNumberLabel}
+          </span>
+          <p className="text-sm text-gray-600">{BILLING_COPY.billNumberAuto}</p>
+        </div>
         <TextField
           id="billing-date"
           type="date"
@@ -513,7 +560,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
         <Button
           type="button"
           disabled={
-            measured.length === 0 || !billNumber.trim() || compose.isPending
+            measured.length === 0 || compose.isPending
           }
           onClick={() => {
             setError(null);
@@ -550,6 +597,8 @@ function HeadingAndItems({
   boqNo,
   name,
   items,
+  collapsed,
+  onToggle,
   quotedPercentage,
   settled,
   draftGeneration,
@@ -561,6 +610,8 @@ function HeadingAndItems({
   boqNo: string;
   name: string;
   items: BillableBoqItem[];
+  collapsed: boolean;
+  onToggle: () => void;
   quotedPercentage: number;
   settled: Record<string, number>;
   draftGeneration: number;
@@ -569,6 +620,29 @@ function HeadingAndItems({
   onEnterNext: (id: string) => void;
   registerInput: (id: string, element: HTMLInputElement | null) => void;
 }) {
+  /**
+   * What this section contributes to the bill, for its own header.
+   *
+   * The reason a section can be folded at all. A closed section that silently held three measured
+   * lines would be money off the screen on the screen where money is entered; naming the count and
+   * the amount means nothing is hidden by closing it, only moved into one line.
+   */
+  const measured = items.filter((item) => (settled[item.id] ?? 0) > 0);
+  const measuredAmount = measured.reduce(
+    (sum, item) =>
+      sum +
+      lineTotals(
+        {
+          quantity: settled[item.id] ?? 0,
+          rate: item.rate,
+          previouslyBilledQty: item.previouslyBilledQty,
+          scopeQty: item.scopeQty,
+        },
+        quotedPercentage,
+      ).amount,
+    0,
+  );
+
   return (
     <>
       <tr className="border-b border-gray-200 bg-gray-100">
@@ -582,11 +656,33 @@ function HeadingAndItems({
           colSpan={9}
           className="px-2 py-1.5 text-left text-sm font-semibold text-gray-900"
         >
-          <span className="font-mono text-xs text-gray-600">{boqNo}</span>{' '}
-          {name}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!collapsed}
+            className="flex w-full flex-wrap items-baseline gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            <span aria-hidden="true" className="text-gray-400">
+              {collapsed ? '▸' : '▾'}
+            </span>
+            <span className="font-mono text-xs text-gray-600">{boqNo}</span>
+            <span>{name}</span>
+            <span className="text-xs font-normal text-gray-500">
+              {BILLING_COPY.sectionLineCount(items.length)}
+            </span>
+            {measured.length > 0 && (
+              <span className="text-xs font-medium text-blue-800">
+                {BILLING_COPY.sectionMeasured(
+                  measured.length,
+                  rupees(measuredAmount),
+                )}
+              </span>
+            )}
+          </button>
         </th>
       </tr>
-      {items.map((item) => (
+      {!collapsed &&
+        items.map((item) => (
         <BillLineRow
           // The draft generation is part of the key so restoring a draft remounts the rows with
           // their new starting values. See `BillLineRow.initialQuantity`.
@@ -605,10 +701,10 @@ function HeadingAndItems({
           initialQuantity={settled[item.id]}
           onQuantityChange={onQuantityChange}
           onReasonChange={onReasonChange}
-          onEnterNext={onEnterNext}
-          registerInput={registerInput}
-        />
-      ))}
+            onEnterNext={onEnterNext}
+            registerInput={registerInput}
+          />
+        ))}
     </>
   );
 }

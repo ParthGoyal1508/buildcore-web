@@ -1,8 +1,13 @@
 'use client';
 
-import { PROJECT_SHELL_COPY } from '@/app/lib/constants';
+import {
+  PROJECT_SHELL_COPY,
+  PROJECT_TAB_SOURCES,
+  ROUTES,
+} from '@/app/lib/constants';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import TabSourceNote from '@/app/ui/projects/tab-source-note';
 
 type Material = ReturnType<typeof useProjectShell>['tabs']['materials'][number];
 
@@ -14,7 +19,7 @@ type Material = ReturnType<typeof useProjectShell>['tabs']['materials'][number];
  * machinery section — see it for why the empty state is two sentences.
  */
 export default function ProjectMaterialsPage() {
-  const { tabs, unavailableModules } = useProjectShell();
+  const { project, tabs, unavailableModules } = useProjectShell();
   const couldNotAsk = unavailableModules.includes('inventory');
 
   const columns: Column<Material>[] = [
@@ -45,6 +50,14 @@ export default function ProjectMaterialsPage() {
       <h2 className="mb-3 text-sm font-semibold text-gray-900">
         {PROJECT_SHELL_COPY.materialsHeading}
       </h2>
+      <TabSourceNote
+        projectId={project.id}
+        explanation={PROJECT_TAB_SOURCES.materials}
+        linkLabel={PROJECT_TAB_SOURCES.materialsLink}
+        href={ROUTES.inventoryIssues}
+        secondLinkLabel={PROJECT_TAB_SOURCES.materialsSecondLink}
+        secondHref={ROUTES.inventoryPurchases}
+      />
       {couldNotAsk && (
         <p
           role="status"

@@ -161,6 +161,7 @@ function LineModal({
   const [unit, setUnit] = useState('');
   const [scopeQty, setScopeQty] = useState('');
   const [rate, setRate] = useState('');
+  const [startDate, setStartDate] = useState('');
   const [finishDate, setFinishDate] = useState('');
   const [perDayQty, setPerDayQty] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +177,7 @@ function LineModal({
         // Each sent only when it has a value. An empty string would be a date the server has to
         // reject, and a zero would be a programme nobody set.
         rate: rate.trim() || undefined,
+        startDate: startDate || undefined,
         finishDate: finishDate || undefined,
         perDayQty: perDayQty.trim() || undefined,
       }),
@@ -259,6 +261,16 @@ function LineModal({
         />
 
         <p className="text-xs text-gray-500">{BOQ_COPY.programmeHint}</p>
+        {/* 025 FR-014. The API has accepted a start date since 008 and no screen ever sent one, so
+            the achieved rate — doneQty over the days since work began — had nothing to divide by
+            and *Avg / day* read "Not planned" on every line of every project, planned or not. */}
+        <TextField
+          id="boq-line-start"
+          type="date"
+          label={BOQ_COPY.startDate}
+          value={startDate}
+          onChange={(event) => setStartDate(event.target.value)}
+        />
         <TextField
           id="boq-line-finish"
           type="date"

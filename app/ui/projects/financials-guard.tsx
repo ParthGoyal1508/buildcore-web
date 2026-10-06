@@ -1,10 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-
-import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
-import AccessDenied from '@/app/ui/access-denied';
+import SectionGuard from '@/app/ui/projects/section-guard';
 
 /**
  * `PROJECT_FINANCIALS` for the billing and summary screens under `portfolio/:id/`.
@@ -23,23 +19,8 @@ export default function FinancialsGuard({
 }: {
   children: React.ReactNode;
 }) {
-  const { data: user, isLoading, isError } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: getCurrentUser,
-  });
-
-  if (isLoading) {
-    return (
-      <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
-      </p>
-    );
-  }
-  if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
-  }
-  if (!user.permissions.includes('PROJECT_FINANCIALS')) {
-    return <AccessDenied />;
-  }
-  return <>{children}</>;
+  // Delegates to `SectionGuard` since 024: 022's daily-work screens need the same guard with a
+  // different permission, and two near-identical copies is how one of them stops being maintained.
+  // The name stays, because three working screens name it and the refusal it explains is specific.
+  return <SectionGuard permission="PROJECT_FINANCIALS">{children}</SectionGuard>;
 }

@@ -33,6 +33,8 @@ export const ROUTES = {
   settingsLetterKinds: '/dashboard/settings/letter-kinds',
   /** Named signatories and their signature graphics (017 US4). */
   settingsSignatories: '/dashboard/settings/signatories',
+  /** The four statutory rates a running-account bill is computed at (025 US4). */
+  settingsBillingRates: '/dashboard/settings/billing-rates',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -113,6 +115,29 @@ export const ROUTES = {
    * a bill may certainly need to read it.
    */
   projectsBoq: (id: string) => `/dashboard/projects/portfolio/${id}/boq`,
+  // 022 / 024. Gated on `DWR`, not `PROJECTS` — recording and approving a day's work is its own
+  // permission, and the backend guards every one of these routes with it.
+  /** Every daily work report on a project, and the form that records the next one. */
+  projectsDwr: (id: string) => `/dashboard/projects/portfolio/${id}/dwr`,
+  projectsDwrNew: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/dwr/new`,
+  /** One report, its lines, and the submit / approve / reverse actions. */
+  projectsDwrReport: (projectId: string, dwrId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/dwr/${dwrId}`,
+  /** Correcting a draft. Draft only — the screen refuses anything further on (022 FR-018). */
+  projectsDwrEdit: (projectId: string, dwrId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/dwr/${dwrId}/edit`,
+  // 023 / 024. Gated on `PROJECT_FINANCIALS`: a bill is money, and somebody who may record a day's
+  // work is not thereby entitled to see what the company charges for it.
+  /** Every running-account bill package on a project. */
+  /** Letters issued on a project — work order, LOI, purchase order (025 FR-033). */
+  projectsLetters: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/letters`,
+  projectsBillPackages: (id: string) =>
+    `/dashboard/projects/portfolio/${id}/bill-packages`,
+  /** One package: its proposed lines, the abstract, the register and the check list. */
+  projectsBillPackage: (projectId: string, packageId: string) =>
+    `/dashboard/projects/portfolio/${projectId}/bill-packages/${packageId}`,
 
   // --- Projects: billing and the P&L (feature 018, `bugs.md` items 11 and 14) ---
   // Gated on `PROJECT_FINANCIALS`, not `PROJECTS` — see `PROJECTS_PERMISSIONS`. Billing
@@ -897,6 +922,17 @@ export const BILLING_COPY = {
   submitting: 'Submitting…',
   submitFailed: 'That bill could not be submitted.',
   billNumberLabel: 'Bill number',
+  /**
+   * The subcontractor bill number stopped being typed in 027.
+   *
+   * It was the only document in the product whose number a person invented, and `RABill.billNumber`
+   * carried no unique constraint — so a number typed here could silently duplicate one the bill
+   * package path had already minted into the same column. The number is not previewed: deriving it
+   * in the web would be a second implementation of a server rule, which is the drift this product
+   * has already paid for once.
+   */
+  billNumberAuto:
+    'Numbered automatically when you compose it — RA-01, RA-02 and so on, in sequence on this work order.',
   billingDateLabel: 'Billing date',
   descriptionLabel: 'Description',
   retentionPercentLabel: 'Retention withheld (%)',
@@ -905,6 +941,47 @@ export const BILLING_COPY = {
   // --- A bill read back ---
   billsHeading: 'Bills raised',
   billsEmpty: 'No bills have been raised on this project yet.',
+  // --- 027: client bills as master and detail ---
+  /**
+   * The page used to open on the composing sheet — 231 editable BOQ rows — with the bills raised
+   * buried under it. Reading a bill meant scrolling past a form you were not filling in, and the
+   * cumulative figures you measure against were the furthest thing from the sheet that needs them.
+   *
+   * The list is the master now, and composing is a mode that takes over the panel beside it, the
+   * way raising a work order does on Subcontractors. No tab strip: a client bill is one document,
+   * and four tabs over two sections would be copying that page's shape rather than its point.
+   */
+  composeNew: 'Compose a bill',
+  composeCancel: 'Cancel',
+  composeHeading: 'New bill to the client',
+  pickBillPrompt: 'Pick a bill to read it, or compose a new one.',
+  billLinesHeading: 'Lines billed this period',
+  /**
+   * A bill shows what was billed; a zero line is the schedule, not the bill (027).
+   *
+   * 023's package path writes a bill line for **every** schedule line, because its measurement
+   * sheet has to let a claim be made against any of them and "no measurement available" is a
+   * different fact from zero. The bill inherits all of them, so one with six measured lines was
+   * rendering 231 rows and the six were somewhere inside.
+   *
+   * Hidden rather than dropped, and counted rather than silently filtered: a reader who knows the
+   * schedule has 231 lines must be able to tell that the other 225 were considered and carried
+   * nothing, instead of wondering whether this screen is showing them everything.
+   */
+  linesHidden: (hidden: number, shown: number) =>
+    `Showing the ${shown} line${shown === 1 ? '' : 's'} billed on this bill. ${hidden} other schedule line${hidden === 1 ? '' : 's'} carried no quantity.`,
+  /** Lines exist, none carries a quantity — different from a bill with no lines at all. */
+  nothingBilledOnThisBill:
+    'No line on this bill carries a quantity. Every schedule line was considered and nothing was billed.',
+  showAllLines: 'Show every schedule line',
+  showBilledLines: 'Show only what was billed',
+  certificationHeading: 'Certification',
+  /** Said plainly rather than left as a dash: nobody has answered yet, which is not a shortfall. */
+  notCertifiedYet:
+    'The client has not certified this bill yet. Record what they certify when it comes back — the gap between billed and certified is the figure worth chasing.',
+  billedLabel: 'Billed',
+  certifiedMatched: 'Certified in full.',
+  draftNotSent: 'This bill is still a draft. It has not been sent to the client.',
   historicalRatesNote:
     'Shown at the rates it was billed at. A rate revised afterwards does not restate a bill that was already sent.',
   certified: 'Certified',
@@ -937,6 +1014,22 @@ export const BILLING_COPY = {
     thisPeriodQty: 'This bill',
     amount: 'Amount',
   },
+  /**
+   * Collapsing a section of the composing sheet (027).
+   *
+   * Sections start **expanded**. This is the screen where money is entered, and a quantity hidden
+   * behind a closed section is a quantity nobody checks before composing — so the reader closes
+   * what they are done with, rather than opening what they need.
+   *
+   * A collapsed section that holds measured lines says so, with the count and the amount. That is
+   * the whole safety property: whatever is folded away, the total it contributes is still on
+   * screen, and the bill's own total below has always counted it either way.
+   */
+  expandAllSections: 'Expand all',
+  collapseAllSections: 'Collapse all',
+  sectionLineCount: (lines: number) => `${lines} line${lines === 1 ? '' : 's'}`,
+  sectionMeasured: (lines: number, amount: string) =>
+    `${lines} measured · ${amount}`,
   raEmpty: 'This work order has no awarded lines to measure against.',
   exceedsAward:
     'This measures more than the work order awarded. Raise a variation to the award first — paying above an award is the company agreeing to work it never ordered, and there is nobody downstream to catch it.',
@@ -947,6 +1040,20 @@ export const BILLING_COPY = {
     'This bill has been certified. Changing its quantities withdraws that certification and sends the bill for approval again — the existing approval is kept as a record of what was signed, and it will not apply to the new figures.',
   reviseWarningPending:
     'This bill is waiting on an approval. Changing its quantities replaces that request with a new one, so nobody is left deciding a version that no longer exists.',
+  /**
+   * A draft is edited, not revised (027).
+   *
+   * The sheet showed every non-approved bill the *pending* warning — "this bill is waiting on an
+   * approval" — over a draft that was waiting on nobody, and asked for a reason explaining a change
+   * to a document no one had seen. Three statuses, three behaviours: a draft is simply edited, a
+   * submitted bill replaces its pending request, an approved one withdraws a signature.
+   */
+  editHeading: 'Edit measured quantities',
+  editHint:
+    'This bill is still a draft. It has not been sent to anybody, so changing it changes nothing anyone has seen.',
+  edit: 'Save changes',
+  editing: 'Saving…',
+  editDone: 'Saved. The bill is still a draft.',
   reviseReasonLabel: 'Why the quantities changed',
   reviseReasonHint:
     'Required. Somebody has to decide this bill a second time, and “why” is the first thing they will ask.',
@@ -956,6 +1063,23 @@ export const BILLING_COPY = {
   /** FR-009's eventual consistency — see the note beside it in the sheet. */
   reviseDone:
     'Saved and sent for approval again. The approval queue may take a moment to catch up.',
+  // --- Reading a bill back (027) ---
+  /**
+   * A bill could only be opened for editing, so looking at one meant opening the sheet that
+   * changes it — and on a submitted bill, reading past a warning about withdrawing an approval.
+   */
+  viewBill: 'View bill',
+  hideBill: 'Hide bill',
+  viewColumns: {
+    description: 'Item',
+    unit: 'Unit',
+    quantity: 'Quantity',
+    rate: 'Rate',
+    amount: 'Amount',
+  },
+  viewNoLines:
+    'This bill has no measured lines. It predates work-order awards, or its lines were removed.',
+  viewDeductions: 'Deductions',
   // --- Conflict (FR-014) ---
   conflictHeading: 'Somebody else changed this bill',
   conflictHint:
@@ -989,7 +1113,15 @@ export const WORK_ORDER_COPY = {
     'No work order has been raised on this project yet. A subcontractor bill is measured against a work order’s award, so one has to exist first.',
   summary: (retentionPercent: string, awardLines: number, bills: number) =>
     `Retention ${retentionPercent} · ${awardLines} award line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
-  newHeading: 'New work order — what the subcontractor is doing',
+  /**
+   * A heading above the row, and a label on the field — not one string doing both.
+   *
+   * It read "New work order — what the subcontractor is doing" as a single label, which wrapped to
+   * two lines in its column and pushed that field's input a line below its neighbours'. A label
+   * that wraps is a row that does not line up.
+   */
+  newHeading: 'New work order',
+  detailLabel: 'What the subcontractor is doing',
   retentionLabel: 'Retention (%)',
   retentionHint:
     'Cannot be changed once a bill has been raised: the retention on an issued bill is already withheld at the old rate, and moving the basis would make the subcontractor’s copy disagree with ours about money already held.',
@@ -1009,6 +1141,105 @@ export const WORK_ORDER_COPY = {
     'No usable lines were found. Each line needs a description, a unit, a quantity and a rate, separated by a tab or a pipe.',
   awardMissing:
     'This work order has no award captured yet, so there is nothing to measure against.',
+  /**
+   * Saving an award replaces it — the server deletes the old lines and writes the new ones. Said
+   * before the save, because a person pasting a corrected line expects it to be *added*.
+   */
+  awardReplaceWarning:
+    'Saving replaces the award entirely. Paste every line, not just the ones you are correcting.',
+  awardCaptured: (lines: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} captured. Bills are measured against these.`,
+  /** Refused by the server, so said here rather than discovered on the save. */
+  awardLockedByBills:
+    'Bills have been raised against this award, so it can no longer be replaced — the remaining quantity on a bill already issued would move, and the subcontractor’s copy would then disagree with ours. Raise a variation instead.',
+
+  // --- 027: the number, the vendor, and the master–detail frame ---
+  /** Shown where a code would be, for the work orders raised before 027 numbered them. */
+  unnumbered: 'Not numbered',
+  unnumberedHint:
+    'Raised before work orders carried numbers. It keeps reading by its detail; everything raised since is numbered.',
+  vendorLabel: 'Subcontractor',
+  vendorHint:
+    'From your Partners register. Leave it blank if the vendor is not settled yet — it can be set later under Settings.',
+  vendorNone: 'Not chosen yet',
+  vendorUnknown: 'Unknown vendor',
+  vendorTruncated: (shown: number, total: number) =>
+    `Showing ${shown} of ${total} vendors. Narrow the list in Partners if the one you want is missing.`,
+  vendorLoading: 'Loading vendors…',
+
+  /** The list is the master; one of these fills the panel beside it. */
+  pickPrompt: 'Pick a work order to see its award, its bills and its retention.',
+  raiseNew: 'Raise a work order',
+  raiseCancel: 'Cancel',
+  tabs: {
+    award: 'Award',
+    bills: 'Bills',
+    retention: 'Retention',
+    settings: 'Settings',
+  },
+  /** Each tab says in one line what it is for, so the four names are not guessed at. */
+  tabHints: {
+    award: 'What this subcontractor was given: the item, the quantity and their rate. Bills are measured against it.',
+    bills: 'Running account bills measured against the award — what was done this period, and what is payable after deductions.',
+    retention: 'Money withheld from each bill as security, and every release of it back to the subcontractor.',
+    settings: 'Correcting the detail, the subcontractor and the retention basis on this work order.',
+  },
+  settingsHeading: 'Correct this work order',
+  settingsSave: 'Save the correction',
+  settingsSaved: 'Saved.',
+  detailField: 'What the subcontractor is doing',
+  // --- 027: the award editor ---
+  /** Three ways in, because one award is three different jobs. */
+  awardAddFromBoq: 'Add from the BOQ',
+  awardAddBlank: 'Add a blank line',
+  awardPasteDisclosure: 'Paste several lines at once',
+  awardPasteAdd: 'Add these lines',
+  awardBoqPickerLabel: 'BOQ line',
+  awardBoqPickerPlaceholder: 'Search the BOQ by number, description or unit',
+  awardBoqEmpty: 'Choose a BOQ line',
+  awardBoqAlreadyAdded: 'already on this award',
+  awardBoqLoading: 'Loading the BOQ…',
+  awardBoqUnavailable:
+    'The project BOQ could not be loaded, so lines cannot be picked from it. Typing and pasting still work.',
+  awardNoBoq:
+    'This project has no BOQ yet, so there is nothing to pick from. Type the lines or paste them.',
+  awardColumns: {
+    boq: 'BOQ',
+    description: 'Description',
+    unit: 'Unit',
+    quantity: 'Quantity',
+    boqRate: 'BOQ rate',
+    rate: 'Their rate',
+    amount: 'Amount',
+    remove: '',
+  },
+  awardEmptyRows:
+    'No lines yet. Add one from the BOQ, type one, or paste a block of them.',
+  awardUnlinked: '—',
+  /**
+   * Why the subcontractor's rate is never prefilled from the BOQ.
+   *
+   * The BOQ rate is what the **client** pays. The difference between the two is the margin on the
+   * work, and a prefilled field is one somebody accepts — which would make the margin zero without
+   * anybody deciding it should be. Shown beside, never in the box.
+   */
+  awardRateHint:
+    'What you pay the subcontractor, which is not the BOQ rate — the BOQ rate is what the client pays you, and the difference is the margin. Shown beside for reference, never filled in for you.',
+  awardLinkedHint:
+    'A line picked from the BOQ stays tied to it, so work recorded against that BOQ line counts towards this award. A typed line is not tied to anything, which is correct when the subcontract covers work the BOQ itemises differently.',
+  awardRowIncomplete: (row: number) =>
+    `Line ${row} needs a description, a unit, a quantity and a rate.`,
+  awardNothingToSave: 'Add at least one line before saving.',
+  awardSaveChanges: 'Save award',
+  awardDiscard: 'Discard changes',
+  awardRemoveRow: 'Remove this line',
+  awardTotal: 'Award total',
+  awardLoading: 'Loading the award…',
+
+  /** Bills whose work order was never recorded. Listed rather than hidden by the master–detail. */
+  orphanBillsHeading: 'Bills not attached to a work order',
+  orphanBillsHint:
+    'These were raised against the project rather than a work order, so they appear here instead of under one.',
 } as const;
 
 /**
@@ -1576,6 +1807,9 @@ export const SETTINGS_PERMISSIONS = {
   'project-documents': 'SETTINGS',
   'letter-kinds': 'SETTINGS',
   signatories: 'SETTINGS',
+  // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
+  // computed at, guarded by the same permission as the registration numbers beside them.
+  'billing-rates': 'COMPANY_SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -1794,6 +2028,44 @@ export function partnersLabel(value: string | null | undefined): string {
  * for tidiness would cost real bytes for no benefit; `NavModuleId` keeps that record
  * exhaustive instead.
  */
+/**
+ * Where each read-only project tab's contents actually come from (027).
+ *
+ * People, machinery and material all reach a project **through its sites** — an employee posted to
+ * one, a machine deployed to one, stock issued from one. The three tabs are mirrors of that, with
+ * no way to add from here on purpose: a roster editable from two places is two places for it to
+ * disagree.
+ *
+ * What was missing was any statement of that. The tabs showed an empty list and no indication that
+ * the thing to do was somewhere else entirely, so "there is nothing here" and "you add this in HR"
+ * looked identical. Naming the source is the whole job; the link saves the hunt.
+ */
+export const PROJECT_TAB_SOURCES = {
+  /** Shown instead of the per-tab note. Without a site, none of the three can ever populate. */
+  noSites:
+    'This project has no sites yet. People, machinery and material all reach a project through its sites, so nothing can appear on these tabs until one exists.',
+  noSitesLink: 'Add a site',
+  sitesLabel: (names: string) => `This project’s sites: ${names}.`,
+
+  people:
+    'People are not added here. An employee belongs to this project by being posted to one of its sites, which is set on the employee’s Employment tab in HR.',
+  peopleLink: 'Open HR → Employees',
+
+  machinery:
+    'Machinery is not added here. A machine joins this project when its “Deployed at” site is one of this project’s, which is set on the machine in Plant & Machinery.',
+  machineryLink: 'Open Plant → Equipment',
+
+  /**
+   * Two steps, and saying so matters: the Store list offers every site, so picking this project's
+   * is easy — and the Item list beneath it is then empty, with nothing explaining that the store
+   * holds no stock. That dead end is the one worth warning about in advance.
+   */
+  materials:
+    'Material is not added here. It appears once stock is issued from one of this project’s sites. The store has to hold the stock first — receive it on a purchase, or transfer it in — because the issue form offers only what that store actually has.',
+  materialsLink: 'Open Inventory → Issues',
+  materialsSecondLink: 'Open Inventory → Purchases',
+} as const;
+
 export const NAV_MODULES = [
   {
     id: 'dashboard',
@@ -3649,7 +3921,32 @@ export const BOQ_COPY = {
   saving: 'Saving…',
   cancel: 'Cancel',
   deleteLine: 'Delete',
+  planLine: 'Plan',
+  planHint:
+    'Dates only. Leave a box empty to clear what is there — scope, rate and description are edited nowhere near a programme.',
   deleteBlocked: 'This line cannot be deleted because work has been recorded against it.',
+
+  /**
+   * The two schedules, kept apart (027).
+   *
+   * Reported 2026-10-06: a project carrying both a tender workbook and an internal estimate showed
+   * one list with every section twice — "Section 2 Centering & shuttering" appearing at (3) and at
+   * (9) — and nothing on screen said which was which. They are two documents about the same work
+   * and they answer different questions: one is what the client is billed against, the other is
+   * what it is expected to cost us. Reading them interleaved is reading neither.
+   */
+  contractTab: 'Contract schedule',
+  estimateTab: 'Internal estimate',
+  contractTabHint:
+    'What the client is billed against. Every bill, daily report and progress figure measures against these lines.',
+  estimateTabHint:
+    'Our own costing. Never billed, never alerted on, and no part of what the client has agreed — it exists to be compared with the contract schedule.',
+  contractEmpty:
+    'No contract schedule yet. Import the tender workbook, or enter sections and lines below.',
+  estimateEmpty:
+    'No internal estimate yet. Import one to keep your costing beside the contract schedule.',
+  columnAmount: 'Amount',
+  estimateTotal: 'Estimated cost',
 
   // Alert tabs — four, not three
   alertsHeading: 'What needs attention',
@@ -3663,6 +3960,7 @@ export const BOQ_COPY = {
 
   // Import
   importHeading: 'Import a tender workbook',
+  estimateHeading: 'Import an internal estimate',
   importHint: 'Excel (.xls or .xlsx). Nothing is saved until you confirm.',
   importChoose: 'Choose file',
   importReading: 'Reading the workbook…',

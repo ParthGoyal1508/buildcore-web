@@ -68,6 +68,18 @@ export const projectSchema = z
     purchaseLimit: z.string().optional(),
     orderNumber: z.string().trim().optional(),
     cgstApplicable: z.boolean(),
+    /**
+     * The client contract's retention term, **typed as a percentage** — 5 means 5%.
+     *
+     * Stored as the fraction the API takes, which is the same convention the subcontract term
+     * already uses: `WorkOrder.retentionPercent` is a fraction too, and the bill composer reads
+     * both four lines apart in one function. Converting here keeps those two in one unit.
+     *
+     * Empty is not zero. A project with no term recorded is refused when a client bill is composed
+     * — deliberately, because billing at zero retention makes the payable five per cent too high
+     * and nothing downstream would notice.
+     */
+    clientRetentionPercent: z.string().optional(),
     description: z.string().trim().optional(),
     isLocked: z.boolean(),
   })
@@ -170,6 +182,11 @@ export default function ProjectForm({ project }: { project?: Project }) {
         project?.purchaseLimit != null ? String(project.purchaseLimit) : '',
       orderNumber: project?.orderNumber ?? '',
       cgstApplicable: project?.cgstApplicable ?? false,
+      clientRetentionPercent:
+        project?.clientRetentionFraction === null ||
+        project?.clientRetentionFraction === undefined
+          ? ''
+          : String(Number(project.clientRetentionFraction) * 100),
       description: project?.description ?? '',
       isLocked: project?.isLocked ?? false,
     },
@@ -227,6 +244,11 @@ export default function ProjectForm({ project }: { project?: Project }) {
           : undefined,
         orderNumber: values.orderNumber,
         cgstApplicable: values.cgstApplicable,
+        // Percent in, fraction out — the single conversion in the system, so the two retention
+        // terms the bill composer reads are never in different units.
+        clientRetentionFraction: values.clientRetentionPercent?.trim()
+          ? Number(values.clientRetentionPercent) / 100
+          : undefined,
         description: values.description,
       };
       if (project) {
@@ -401,6 +423,15 @@ export default function ProjectForm({ project }: { project?: Project }) {
               {...register('cgstApplicable')}
             />
           </div>
+
+          <TextField
+            id="project-client-retention"
+            label="Client retention (%)"
+            hint="The contract's own term — 5 for 5%. Leave it empty and a bill to the client is refused rather than billed at zero retention."
+            inputMode="decimal"
+            error={errors.clientRetentionPercent?.message}
+            {...register('clientRetentionPercent')}
+          />
         </div>
       </section>
 

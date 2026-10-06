@@ -133,7 +133,7 @@ export default function MyWorkspaceLayout({
       swUrl="/sw.js"
       disable={process.env.NODE_ENV === 'development'}
     >
-      <div className="flex min-h-screen flex-col bg-gray-50 md:h-screen md:flex-row md:overflow-hidden md:bg-transparent">
+      <div className="flex min-h-screen flex-col bg-gray-50 md:fixed md:inset-0 md:h-screen md:flex-row md:overflow-hidden md:bg-transparent">
       {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
           keeps every module they can reach instead of being stranded in this one. */}
       <div className="hidden flex-none md:block md:w-64">

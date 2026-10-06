@@ -1,8 +1,13 @@
 'use client';
 
-import { PROJECT_SHELL_COPY } from '@/app/lib/constants';
+import {
+  PROJECT_SHELL_COPY,
+  PROJECT_TAB_SOURCES,
+  ROUTES,
+} from '@/app/lib/constants';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import TabSourceNote from '@/app/ui/projects/tab-source-note';
 
 type Person = ReturnType<typeof useProjectShell>['tabs']['employees'][number];
 
@@ -18,7 +23,7 @@ type Person = ReturnType<typeof useProjectShell>['tabs']['employees'][number];
  * — a second request for one column, on a page that currently makes none.
  */
 export default function ProjectPeoplePage() {
-  const { tabs } = useProjectShell();
+  const { project, tabs } = useProjectShell();
 
   const columns: Column<Person>[] = [
     {
@@ -42,6 +47,12 @@ export default function ProjectPeoplePage() {
       <h2 className="mb-3 text-sm font-semibold text-gray-900">
         {PROJECT_SHELL_COPY.peopleHeading}
       </h2>
+      <TabSourceNote
+        projectId={project.id}
+        explanation={PROJECT_TAB_SOURCES.people}
+        linkLabel={PROJECT_TAB_SOURCES.peopleLink}
+        href={ROUTES.hrEmployees}
+      />
       <ResponsiveList
         columns={columns}
         rows={tabs.employees}

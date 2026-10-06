@@ -90,6 +90,44 @@ export const codeSeriesSchema = z.object({
 });
 export type CodeSeriesView = z.infer<typeof codeSeriesSchema>;
 
+/**
+ * The four statutory rates a running-account bill is computed at (025 FR-021).
+ *
+ * **Fractions on the wire** — `"0.090000"` is nine per cent — because that is what the bill freezes
+ * and compares against the client's signed paper. The screen multiplies by 100 to show them and
+ * divides to send them, which is the same conversion the project's retention term makes and for the
+ * same reason: one unit in the database, the contract's own unit on the screen.
+ */
+export const billingRatesSchema = z.object({
+  cgstFraction: z.string(),
+  sgstFraction: z.string(),
+  igstFraction: z.string(),
+  tdsFraction: z.string(),
+});
+
+export type BillingRates = z.infer<typeof billingRatesSchema>;
+
+export async function getBillingRates(
+  companyId: string,
+): Promise<BillingRates> {
+  return billingRatesSchema.parse(
+    await authFetch(`/settings/companies/${companyId}/billing-rates`),
+  );
+}
+
+/** Each rate optional: naming one leaves the other three alone. */
+export async function setBillingRates(
+  companyId: string,
+  input: Partial<Record<keyof BillingRates, number>>,
+): Promise<BillingRates> {
+  return billingRatesSchema.parse(
+    await authFetch(`/settings/companies/${companyId}/billing-rates`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
 export async function getCodeSeries(companyId: string): Promise<CodeSeriesView> {
   return codeSeriesSchema.parse(
     await authFetch(`/settings/companies/${companyId}/code-series`),

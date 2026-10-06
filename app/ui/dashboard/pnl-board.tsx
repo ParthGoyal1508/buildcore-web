@@ -66,7 +66,7 @@ export default function PnlBoard() {
             onChange={(event) => setPeriod(event.target.value)}
             // 44px below `sm`: a director changing the month on a phone is the use this screen was
             // named for.
-            className="min-h-11 w-full rounded border border-gray-300 px-2 py-1 text-sm sm:min-h-0 sm:w-auto"
+            className="h-11 w-full rounded border border-gray-300 px-3 text-sm sm:h-10 sm:w-auto"
           />
         </label>
       </div>

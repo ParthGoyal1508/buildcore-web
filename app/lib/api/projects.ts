@@ -19,9 +19,12 @@ import { projectReadinessSchema } from '@/app/lib/api/project-documents';
  *
  * Scoped to User Stories 1–3, **and User Story 5's BOQ since 2026-10-03** — the endpoints it
  * calls were built that day, because nothing in either repository could write a BOQ and 018's
- * billing screens had been measuring against a table nothing could fill. DWR, revenue, budget and
- * P&L still have no functions here, for the original reason: a typed stub against an absent
- * endpoint is a compile-time promise the runtime cannot keep.
+ * billing screens had been measuring against a table nothing could fill.
+ *
+ * **Daily work reports moved out on 2026-10-05**, to `app/lib/api/dwr.ts`: feature 022 built the
+ * fourteen endpoints, so the promise this file could not keep is now keepable and is kept next
+ * door. Revenue and budget still have no functions here, for the original reason — a typed stub
+ * against an absent endpoint is a compile-time promise the runtime cannot keep.
  *
  * Schemas validate the fields the UI reads and let `zod` strip the rest, the same
  * choice `partners.ts` and `hr-payroll.ts` document: several routes return full
@@ -98,6 +101,10 @@ export const clientSchema = z.object({
   email: z.string().nullable(),
   address: z.string().nullable(),
   gstin: z.string().nullable(),
+  /** Printed in the running-account bill's statutory header (025 FR-039). */
+  pan: z.string().nullable().optional(),
+  /** Two-digit GST state code, as text — `08` is Rajasthan, and `08` is not `8`. */
+  state: z.string().nullable().optional(),
   status: z.enum(CLIENT_STATUSES),
 });
 export type Client = z.infer<typeof clientSchema>;
@@ -136,6 +143,8 @@ export interface ClientInput {
   email?: string;
   address?: string;
   gstin?: string;
+  pan?: string;
+  state?: string;
   status?: string;
 }
 
@@ -297,6 +306,12 @@ export const projectSchema = z.object({
   purchaseLimit: nullableDecimal,
   orderNumber: z.string().nullable(),
   cgstApplicable: z.boolean(),
+  /**
+   * The client contract's retention term as a **fraction** — `0.05` is 5%, and `null` means no
+   * term has been recorded, which is not the same as zero: composing a bill to the client is
+   * refused until it is set.
+   */
+  clientRetentionFraction: decimal.nullable().optional(),
   description: z.string().nullable(),
 });
 export type Project = z.infer<typeof projectSchema>;
@@ -413,6 +428,8 @@ export interface ProjectInput {
   purchaseLimit?: number;
   orderNumber?: string;
   cgstApplicable?: boolean;
+  /** A fraction — the form collects a percentage and divides by 100 before sending. */
+  clientRetentionFraction?: number;
   description?: string;
   isLocked?: boolean;
   /**
@@ -513,6 +530,14 @@ const boqGroupSchema = z.object({
   scopeQty: decimal,
   startDate: z.string().nullable(),
   finishDate: z.string().nullable(),
+  /**
+   * Which of the project's two schedules this section belongs to (027).
+   *
+   * A tender workbook and an internal estimate describe the same work and are imported through the
+   * same screen, so a project carrying both held two sections called "Centering & shuttering" with
+   * nothing to tell them apart. The server has always said which; nothing read it.
+   */
+  isEstimate: z.boolean(),
   items: z.array(boqItemSchema),
 });
 
@@ -625,6 +650,33 @@ export async function createBOQItem(projectId: string, input: BoqItemInput) {
   });
 }
 
+/**
+ * Gives an existing line its programme (025 FR-009).
+ *
+ * **`null` clears a field; leaving it out leaves the field alone.** The two are different
+ * intentions and the API keeps them apart, so this signature does too: `undefined` is never sent,
+ * and a `null` reaching the wire is a deliberate clear.
+ *
+ * Only these four. Scope, rate, unit and description are not accepted by the endpoint at all — a
+ * programme is *when* the work happens, and those are *what the work is*.
+ */
+export async function planBOQItem(
+  projectId: string,
+  itemId: string,
+  input: {
+    startDate?: string | null;
+    finishDate?: string | null;
+    duration?: number | null;
+    perDayQty?: string | null;
+  },
+): Promise<BoqItem> {
+  const raw = await authFetch<unknown>(
+    `/projects/${projectId}/boq/items/${itemId}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+  return boqItemSchema.parse(raw);
+}
+
 export async function deleteBOQItem(projectId: string, itemId: string): Promise<void> {
   await authFetch<unknown>(`/projects/${projectId}/boq/items/${itemId}`, {
     method: 'DELETE',
@@ -648,6 +700,36 @@ export async function validateBOQImport(
     body: JSON.stringify({ file: base64 }),
   });
   return importReportSchema.parse(raw);
+}
+
+/**
+ * Reads an **internal estimate** workbook (025 FR-032).
+ *
+ * Identical to the tender import in every refusal and every figure. The difference is what the
+ * confirmed rows mean: an estimate is **not billable**, is absent from the alert groups, and does
+ * not set the project's quoted percentage — so importing one up the tender path would put
+ * unbillable lines into a bill.
+ */
+export async function validateEstimateImport(
+  projectId: string,
+  file: File,
+): Promise<BoqImportReport> {
+  const base64 = await fileToBase64(file);
+  const raw = await authFetch<unknown>(
+    `/projects/${projectId}/boq/estimate-import/validate`,
+    { method: 'POST', body: JSON.stringify({ file: base64 }) },
+  );
+  return importReportSchema.parse(raw);
+}
+
+export async function confirmEstimateImport(
+  projectId: string,
+  batchId: string,
+): Promise<{ groups: number; lines: number; quotedPercentageSet: boolean }> {
+  return authFetch(`/projects/${projectId}/boq/estimate-import/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ batchId }),
+  });
 }
 
 export async function confirmBOQImport(
