@@ -3985,6 +3985,20 @@ export const BOQ_COPY = {
     'The totals do not agree with the figures stated in your file. Check the schedule before confirming.',
   reportPercentage: 'Quoted percentage',
   /**
+   * The direction said in words, not left to a minus sign (027).
+   *
+   * A tender is quoted above the estimate or below it, and which one it is moves every bill on the
+   * project for the life of the contract — on this file, by ₹44 lakh. The importer read the
+   * magnitude and dropped the direction until 2026-10-06; this is the screen where a person
+   * confirms it, and `-10.79%` is one keystroke of rendering away from reading as `10.79%`.
+   */
+  reportPercentageDirection: (fraction: number) =>
+    fraction < 0
+      ? 'below the schedule rate'
+      : fraction > 0
+        ? 'above the schedule rate'
+        : 'at par with the schedule rate',
+  /**
    * Shown where the percentage was not found (FR-028).
    *
    * A condition to resolve, never a zero. The consequence is named because it is invisible
