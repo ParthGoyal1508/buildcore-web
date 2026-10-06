@@ -961,6 +961,21 @@ export const BILLING_COPY = {
    * and four tabs over two sections would be copying that page's shape rather than its point.
    */
   composeNew: 'Compose a bill',
+  /**
+   * The two routes to a client bill, named for what each is good at (028 FR-007).
+   *
+   * The package proposes every quantity from approved daily work — the capability has existed since
+   * 023 and was reachable only from a different tab, so this screen's manual sheet was the obvious
+   * route and the one that reads nothing the site recorded. A bill typed against a 231-line
+   * schedule when the application already knows what was built is work done twice, and the second
+   * answer is the one nobody can check.
+   */
+  composeFromWork: 'Compose from approved work',
+  composeFromWorkHint:
+    'Every quantity proposed from the daily work approved in the period — you review them rather than entering them, and a figure you change carries a reason.',
+  composeByHand: 'Enter quantities by hand',
+  composeByHandHint:
+    'The correction route, for scope measured outside a daily report. Nothing here is proposed, so every figure is typed and nothing checks it against what the site recorded.',
   composeCancel: 'Cancel',
   composeHeading: 'New bill to the client',
   pickBillPrompt: 'Pick a bill to read it, or compose a new one.',
