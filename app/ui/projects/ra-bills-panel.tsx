@@ -19,6 +19,7 @@ import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import AwardEditor from '@/app/ui/projects/award-editor';
 import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
+import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import RaBillView from '@/app/ui/projects/ra-bill-view';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import SearchableSelect, {
@@ -348,8 +349,12 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
  * `pageSize` matches `contractor-modal.tsx`'s existing 200. A register larger than that is
  * **reported, not silently truncated**: `truncated` carries the count so the picker can say the one
  * you want may not be in the list, which is the difference between a short list and a wrong one.
+ *
+ * Exported for 028 FR-025: the bill-package composer needs the same names for the same vendors, and
+ * a second fetch under a second key would hit the network again to produce the same list — and
+ * would be free to produce a *different* one the day somebody changed the filter here.
  */
-function useVendorOptions() {
+export function useVendorOptions() {
   const query = useQuery({
     queryKey: ['vendors', 'workOrderPicker'],
     queryFn: () => getVendors({ active: true, pageSize: 200 }),
@@ -657,7 +662,15 @@ function BillsTab({
                       : BILLING_COPY.reviseHeading}
                   </SecondaryButton>
                 </div>
-                {opened.has(bill.id) && <RaBillView bill={bill} />}
+                {opened.has(bill.id) && (
+                  <>
+                    <RaBillView bill={bill} />
+                    {/* 028 FR-020, FR-021. Beside the bill rather than inside `RaBillView`, which
+                        fetches nothing by design: payments and signed copies are different data
+                        and change without the bill changing. */}
+                    <RaBillSettlement bill={bill} />
+                  </>
+                )}
               </li>
             ))}
           </ul>

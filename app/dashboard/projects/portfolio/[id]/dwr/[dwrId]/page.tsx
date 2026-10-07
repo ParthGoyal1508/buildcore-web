@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { saveBlob } from '@/app/lib/api/hr-payroll';
 import {
   deleteDwr,
   describeDwrError,
+  downloadDwrReport,
   factorsOf,
   getDwr,
   quantityOf,
@@ -41,6 +43,24 @@ export default function DwrReportPage() {
   const { data: report, isLoading } = useQuery({
     queryKey: ['dwr', params.dwrId],
     queryFn: () => getDwr(params.dwrId),
+  });
+
+  /**
+   * The printable form (028 FR-022).
+   *
+   * Offered on every status, not only on an approved report. A draft downloads and says DRAFT on
+   * its face — which is what somebody checking their figures before submitting actually wants, and
+   * more honest than a clean-looking form for a report nobody has put forward.
+   */
+  const form = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await downloadDwrReport(
+        params.dwrId,
+        report?.dprNumber ?? 'report',
+      );
+      saveBlob(blob, filename);
+    },
+    onError: (err: unknown) => setError(describeDwrError(err)),
   });
 
   const remove = useMutation({
@@ -84,30 +104,46 @@ export default function DwrReportPage() {
             )}
           </div>
 
-          {/* Draft only. A submitted report is a claim somebody is reading and an approved one has
-              already moved quantities a bill may rest on — the routes back are return and reverse,
-              which the panel offers. Offering Edit on either would promise something the server
-              refuses by status. */}
-          {report.status === 'draft' && (
-            <div className="flex items-center gap-2">
-              <Link
-                href={ROUTES.projectsDwrEdit(projectId, report.id)}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Edit
-              </Link>
-              <Button
-                type="button"
-                disabled={remove.isPending}
-                onClick={() => {
-                  setError(null);
-                  remove.mutate();
-                }}
-              >
-                {remove.isPending ? 'Deleting…' : 'Delete'}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Every status, deliberately. A draft downloads and says DRAFT on its face, which is
+                what somebody checking their figures before submitting wants — and more honest than
+                a clean-looking form for a report nobody has put forward. */}
+            <Button
+              type="button"
+              disabled={form.isPending}
+              onClick={() => {
+                setError(null);
+                form.mutate();
+              }}
+            >
+              {form.isPending ? 'Preparing…' : 'Download the form'}
+            </Button>
+
+            {/* Draft only. A submitted report is a claim somebody is reading and an approved one
+                has already moved quantities a bill may rest on — the routes back are return and
+                reverse, which the panel offers. Offering Edit on either would promise something
+                the server refuses by status. */}
+            {report.status === 'draft' && (
+              <>
+                <Link
+                  href={ROUTES.projectsDwrEdit(projectId, report.id)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Edit
+                </Link>
+                <Button
+                  type="button"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    setError(null);
+                    remove.mutate();
+                  }}
+                >
+                  {remove.isPending ? 'Deleting…' : 'Delete'}
+                </Button>
+              </>
+            )}
+          </div>
         </header>
 
         {error && (
@@ -117,6 +153,18 @@ export default function DwrReportPage() {
         )}
 
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          {/* FR-024, and both of them. The ids have been on this response since 025 and name
+              nobody; on a report returned for correction the person who recorded it and the
+              person who submitted it are different people, and the second is usually the one who
+              has to answer for a figure. */}
+          <div>
+            <dt className="text-gray-500">Recorded by</dt>
+            <dd>{report.recordedByName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Submitted by</dt>
+            <dd>{report.submittedByName ?? '—'}</dd>
+          </div>
           <div>
             <dt className="text-gray-500">Submitted</dt>
             <dd>{dateTimeLabel(report.submittedAt) || '—'}</dd>

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import {
-  DWR_WEATHERS,
   FULL_DAY,
   type Dwr,
   type DwrLine,
@@ -143,7 +142,6 @@ export default function DwrForm({
   const [workDate, setWorkDate] = useState(
     report?.workDate?.slice(0, 10) ?? todayIso(),
   );
-  const [weather, setWeather] = useState(report?.weather ?? '');
   const [workerCount, setWorkerCount] = useState(
     report?.workerCount != null ? String(report.workerCount) : '',
   );
@@ -261,7 +259,6 @@ export default function DwrForm({
 
     save.mutate({
       workDate,
-      ...(weather ? { weather } : {}),
       ...(workerCount ? { workerCount: Number(workerCount) } : {}),
       ...(machineryCount ? { machineryCount: Number(machineryCount) } : {}),
       ...(description ? { description } : {}),
@@ -335,21 +332,16 @@ export default function DwrForm({
           </span>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">Weather</span>
-          <select
-            value={weather}
-            onChange={(event) => setWeather(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2"
-          >
-            <option value="">—</option>
-            {DWR_WEATHERS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/*
+          **Weather was here and is deliberately gone** (028 FR-023). Removed from entry at the
+          client's request: a field nobody filled in honestly and nobody read.
+
+          The column, its default and every recorded value are kept on the server — removing the
+          input is what was asked, discarding history is not — and the printable form still prints
+          what a report holds. The API no longer accepts the field at all, and its pipe runs at
+          `forbidNonWhitelisted`, so sending it from here would now be a 400 rather than a value
+          quietly ignored.
+        */}
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-gray-700">People on site</span>
@@ -406,7 +398,7 @@ export default function DwrForm({
         {lines.length === 0 && (
           <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
             No lines. A day with nothing measured is still a day that happened —
-            weather, people and machines are worth recording on their own.
+            the people and the machines on site are worth recording on their own.
           </p>
         )}
 

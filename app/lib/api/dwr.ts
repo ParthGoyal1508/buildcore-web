@@ -73,6 +73,13 @@ export type DwrStatus = (typeof DWR_STATUSES)[number];
 export const DWR_PAYMENT_MODES = ['work_basis', 'day_basis'] as const;
 export type DwrPaymentMode = (typeof DWR_PAYMENT_MODES)[number];
 
+/**
+ * The recorded weather vocabulary.
+ *
+ * **Kept, although entry no longer offers it** (028 FR-023). Reports recorded before this carry
+ * real values and still display them, and the printable form prints what a report holds — so the
+ * vocabulary is still needed to read one. It is the *input* that went, not the field.
+ */
 export const DWR_WEATHERS = ['clear', 'cloudy', 'rain', 'storm'] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,6 +179,17 @@ const dwrSchema = z
     description: z.string().nullable().optional(),
     createdByUserId: z.string().nullable().optional(),
     submittedByUserId: z.string().nullable().optional(),
+    /**
+     * Who filed it and who put it forward, **by name** (028 FR-024).
+     *
+     * Both, because on a report returned for correction they are different people — and the one
+     * who has to answer for a figure is usually the second. The ids above have been returned
+     * since 025 and name nobody: a report attributed to `cmuoe9b7l00q5v8…` answers half the
+     * question it was asked.
+     */
+    recordedByName: z.string().nullable().optional(),
+    submittedByName: z.string().nullable().optional(),
+    approvedByName: z.string().nullable().optional(),
     submittedAt: z.string().nullable().optional(),
     approvedByUserId: z.string().nullable().optional(),
     approvedAt: z.string().nullable().optional(),
@@ -348,7 +366,9 @@ export type DwrLineInput = MeasuredLineInput | PresenceLineInput;
 
 export interface CreateDwrInput {
   workDate: string;
-  weather?: string;
+  // `weather` removed by 028 FR-023. Not accepted by either DTO any more, and the API's pipe runs
+  // at `forbidNonWhitelisted`, so sending it is a 400 rather than a value quietly ignored. Gone
+  // from the type as well, so a caller that still sets it fails to compile rather than at runtime.
   workerCount?: number;
   machineryCount?: number;
   progress?: number;
@@ -646,4 +666,28 @@ export function describeDwrError(err: unknown): string {
     anyErr?.message ??
     'The report was refused and the server gave no reason.'
   );
+}
+
+/**
+ * One report as the client's printable form (028 FR-022).
+ *
+ * The daily-work surface had **no download of any kind** — fifteen endpoints and none producing a
+ * file — so a report read on screen had to be retyped into the client's own spreadsheet to be sent
+ * anywhere, which is where the two copies start to disagree.
+ *
+ * The name comes from the server, which builds it from the report number and the work date. Never
+ * guessed here: a filename assembled in the browser is the one that arrives as a bare id the day
+ * somebody changes the convention on one side only.
+ */
+export async function downloadDwrReport(
+  dwrId: string,
+  dprNumber: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/dwr/${dwrId}/report.xlsx`,
+  );
+  // The server's name, which it builds from the report number and the work date. The fallback is
+  // the report number rather than a generic "report": a folder of files called `report.xlsx` is
+  // the thing 017 fixed for every other download in this product.
+  return { blob, filename: filename ?? `${dprNumber}.xlsx` };
 }

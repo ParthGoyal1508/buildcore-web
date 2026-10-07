@@ -2086,7 +2086,7 @@ export const PROJECT_TAB_SOURCES = {
    */
   materials:
     'Material is not added here. It appears once stock is issued from one of this project’s sites. The store has to hold the stock first — receive it on a purchase, or transfer it in — because the issue form offers only what that store actually has.',
-  materialsLink: 'Open Inventory → Issues',
+  materialsLink: 'Open Inventory → Issue / Consumption material',
   materialsSecondLink: 'Open Inventory → Purchases',
 } as const;
 
@@ -3858,6 +3858,108 @@ export const PAYMENT_PROOF_COPY = {
  * project page that says *No machinery on this project* when Plant was never consulted is
  * stating as fact the one thing nobody knows.
  */
+/**
+ * What the Inventory issue screen is called (028 FR-030).
+ *
+ * **Labels only. The route stays `/dashboard/inventory/issues` and so does the API.** Renaming a
+ * URL breaks every link already sent — a bookmark, a message, a printed note — for no gain a user
+ * can see, and the complaint was about the word on the screen.
+ *
+ * One constant because the word appears in four places: the Inventory tab strip, the Inventory
+ * landing tile, the page heading, and the link out of a project's Materials tab. Three of them
+ * being renamed is the version of this that looks like a bug.
+ */
+/**
+ * The bill-package composer's subcontractor filter (028 FR-025 to FR-027).
+ *
+ * The control exists because a project can carry dozens of work orders and the composer offered
+ * them as one flat list: finding the right one meant reading every entry. Choosing the
+ * subcontractor first narrows it to their contracts, which is how anybody actually thinks about it.
+ */
+/**
+ * Payments against a bill, and the copy that comes back signed (028 FR-020, FR-021).
+ *
+ * A bill reached certified and stopped: nothing recorded that it had been paid, so what a
+ * subcontractor is still owed was answered from a spreadsheet — which is why two people had two
+ * answers.
+ */
+export const SETTLEMENT_COPY = {
+  heading: 'Payment and acknowledgement',
+  /** Only a certified bill has an agreed figure to be outstanding against. */
+  notCertified:
+    'This bill has not been certified, so there is no agreed figure to pay against and its quantities can still change. Money paid before certification is an advance — record it as an advance recovery on the bill package.',
+  certified: 'Certified',
+  paid: 'Paid',
+  outstanding: 'Outstanding',
+  /** Said once, where somebody might otherwise look for a stored balance. */
+  outstandingHint:
+    'Certified less paid, computed on this read. No balance is stored anywhere, so correcting a payment corrects the figure.',
+  settled: 'Settled in full',
+
+  paymentsHeading: 'Payments',
+  paymentsNone: 'Nothing has been paid against this bill yet.',
+  paidOnLabel: 'Paid on',
+  amountLabel: 'Amount',
+  instrumentLabel: 'Instrument',
+  referenceLabel: 'Reference',
+  referenceHint: 'UTR, cheque number, adjustment memo.',
+  remarksLabel: 'Remarks',
+  record: 'Record the payment',
+  recording: 'Recording…',
+  remove: 'Remove',
+  removeConfirm:
+    'Remove this payment? The outstanding figure moves with it. A payment is never edited — removing and re-recording is the correction route.',
+  instrumentLabels: {
+    bank_transfer: 'Bank transfer',
+    cheque: 'Cheque',
+    cash: 'Cash',
+    adjustment: 'Adjustment',
+  } as Record<string, string>,
+
+  signedHeading: 'Signed copy',
+  /** The state, which is the point of FR-020 — not merely a file in a list. */
+  acknowledged: (date: string) => `Acknowledged on ${date}`,
+  unacknowledged: 'No signed copy has come back yet.',
+  receivedOnLabel: 'Received on',
+  receivedOnHint:
+    'When the copy came back, not when it was scanned. A copy signed on site on Tuesday and scanned on Friday was acknowledged on Tuesday — and that is the date a payment term runs from.',
+  fileLabel: 'The signed copy',
+  upload: 'File the signed copy',
+  uploading: 'Uploading…',
+  download: 'Download',
+  /** A later scan does not move the acknowledgement date. */
+  replaceHint:
+    'The first copy sets the acknowledgement date. A later replacement scan is filed beside it and does not move the date.',
+  debitNote: 'Download the debit note',
+} as const;
+
+export const BILL_PACKAGE_PICKER_COPY = {
+  subcontractorLabel: 'Subcontractor',
+  subcontractorAll: 'All subcontractors',
+  subcontractorHint:
+    'Choose the subcontractor first and the work orders narrow to their contracts.',
+  /**
+   * `WorkOrder.partnerId` is nullable, so some work orders belong to nobody yet.
+   *
+   * They get **their own entry** rather than being filtered out (FR-027). Filtered, they are
+   * unbillable with nothing on screen to say why — and the thing to do about one is to set its
+   * subcontractor, which a reader cannot know to do if they cannot see it.
+   */
+  subcontractorUnassigned: 'No subcontractor set',
+  unassignedHint:
+    'These work orders have no subcontractor recorded. They can still be billed; set the subcontractor under Subcontractors so they appear under a name.',
+  /** Said after the subcontractor changes, because the work order deliberately cleared. */
+  selectionCleared:
+    'The work order has been cleared because the subcontractor changed. Choose one of theirs.',
+  noWorkOrders:
+    'This subcontractor has no work order on this project. Raise one under Subcontractors first.',
+} as const;
+
+export const INVENTORY_ISSUE_LABEL = 'Issue / Consumption material';
+
+/** The same label where a shorter one is needed — a tab strip, a breadcrumb. */
+export const INVENTORY_ISSUE_LABEL_SHORT = 'Issue / Consumption';
+
 export const PROJECT_SHELL_COPY = {
   loading: 'Loading this project…',
   loadFailed: 'This project could not be loaded.',
@@ -3866,6 +3968,16 @@ export const PROJECT_SHELL_COPY = {
 
   overviewHeading: 'Overview',
   contractHeading: 'Contract',
+  /**
+   * 028 FR-029. Commercial **terms**, in a card of their own.
+   *
+   * Retention and the quoted percentage are not descriptive facts about a project — they are the
+   * terms money is computed under, and both are refusals waiting to happen: a bill to the client
+   * is refused until retention is recorded, and the quoted percentage prices every line of the
+   * schedule. Mixed into Contract they read as two more fields among twelve.
+   */
+  commercialHeading: 'Commercial terms',
+  detailsHeading: 'Details',
   activityHeading: 'Activity',
   peopleHeading: 'People on this project',
   machineryHeading: 'Machinery deployed here',
@@ -3894,7 +4006,58 @@ export const PROJECT_SHELL_COPY = {
 
   locked:
     'This project is locked. Its details cannot be changed until it is unlocked on the edit screen.',
+
+  // --- 028 FR-029: the facts the response held and the page never showed ---
+  clientLabel: 'Client',
+  managerLabel: 'Project manager',
+  locationLabel: 'Location',
+  departmentLabel: 'Department',
+  projectTypeLabel: 'Project type',
+  siteStartLabel: 'Site start',
+  cgstLabel: 'CGST',
+  cgstApplicable: 'Applicable',
+  cgstNotApplicable: 'Not applicable',
+  retentionLabel: 'Client retention',
+  quotedLabel: 'Quoted percentage',
+  /** Null is not zero: a bill to the client is refused until a term is recorded. */
+  retentionUnset: 'Not recorded — a bill to the client is refused until it is set',
+  quotedAtPar: 'At par',
+  /**
+   * The sign carried in words as well as in the figure.
+   *
+   * `−10.79%` and `10.79% below the schedule` say the same thing, and the second cannot be
+   * misread. 027's defect was a dropped sign that read a tender quoted *below* the estimate as
+   * quoted above it — ₹88.96 lakh on one file — so this page says which way it goes.
+   */
+  quotedDirection: (fraction: number) =>
+    fraction === 0
+      ? 'At par with the schedule'
+      : `${(Math.abs(fraction) * 100).toFixed(2)}% ${fraction < 0 ? 'below' : 'above'} the schedule`,
+  managerUnknown: 'Recorded, but not on this project’s roster',
+  notRecorded: 'Not recorded',
+
+  // --- 028 FR-028: changing company while reading a project ---
+  /** Shown for the instant between the 404 and the redirect landing. */
+  otherCompanyRedirect: 'Taking you back to the portfolio…',
+  /**
+   * The explanation **on arrival**, which is the half that matters.
+   *
+   * A silent redirect reads as the application losing your place, and the reader's next move is to
+   * click into a project that will do it again. Says what happened, why, and what is in front of
+   * them now — without implying they did anything wrong, because they did not.
+   */
+  otherCompanyExplanation:
+    'That project belongs to the company you were in before. You are now looking at the portfolio of the company you have just selected.',
 } as const;
+
+/**
+ * The query parameter that carries FR-028's explanation to the portfolio.
+ *
+ * A parameter rather than client state, because the redirect is a navigation: state set before
+ * `router.replace` does not survive it, and a reader who reloads the page they landed on should
+ * still see why they are there.
+ */
+export const PROJECT_MOVED_PARAM = 'movedCompany';
 
 export const BOQ_COPY = {
   heading: 'Bill of Quantities',

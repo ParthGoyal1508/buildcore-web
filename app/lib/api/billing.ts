@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/projects/client-bills/*` and `/projects/ra-bills/*` call to `buildcore-api`
@@ -565,4 +565,220 @@ export async function updateWorkOrder(
     body: JSON.stringify(input),
   });
   return workOrderSchema.parse(raw);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 028 FR-020, FR-021 — what was paid, and what came back signed
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const PAYMENT_INSTRUMENTS = [
+  'bank_transfer',
+  'cheque',
+  'cash',
+  'adjustment',
+] as const;
+export type PaymentInstrument = (typeof PAYMENT_INSTRUMENTS)[number];
+
+const paymentSchema = z.object({
+  id: z.string(),
+  raBillId: z.string(),
+  paidOn: isoDate,
+  /**
+   * **Nullable, and that is not a quirk of the schema.** A cash payment's amount is hidden from a
+   * caller without the Cash Entry permission (019 FR-014) — `instrument` joined the cash surface
+   * list with 028 — and it arrives as `null` beside `amountHidden: true` rather than as a zero,
+   * because a zero is a figure and nothing downstream could tell the two apart.
+   */
+  amount: nullableDecimal,
+  amountHidden: z.boolean().optional(),
+  instrument: z.enum(PAYMENT_INSTRUMENTS),
+  reference: z.string().nullable(),
+  remarks: z.string().nullable(),
+  recordedAt: isoDate,
+});
+export type BillPayment = z.infer<typeof paymentSchema>;
+
+const billOutstandingSchema = z.object({
+  raBillId: z.string(),
+  billNumber: z.string(),
+  projectId: z.string(),
+  workOrderId: z.string().nullable(),
+  status: z.string(),
+  /** Null until the countersigned copy comes back (FR-020). */
+  acknowledgedOn: isoDate.nullable(),
+  certifiedAmount: decimal,
+  paidAmount: decimal,
+  /** **Derived on the server, stored nowhere.** Certified less paid. */
+  outstandingAmount: decimal,
+  payments: z.array(paymentSchema),
+});
+export type BillOutstanding = z.infer<typeof billOutstandingSchema>;
+
+const subcontractorOutstandingSchema = z.object({
+  partnerId: z.string(),
+  certifiedAmount: decimal,
+  paidAmount: decimal,
+  outstandingAmount: decimal,
+  bills: z.array(billOutstandingSchema),
+});
+export type SubcontractorOutstanding = z.infer<
+  typeof subcontractorOutstandingSchema
+>;
+
+const signedCopySchema = z.object({
+  id: z.string(),
+  subjectType: z.enum(['ra_bill', 'debit_note']),
+  subjectId: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number(),
+  receivedOn: isoDate,
+  uploadedAt: isoDate,
+});
+export type SignedCopy = z.infer<typeof signedCopySchema>;
+
+/**
+ * Records a payment against a certified bill (FR-021).
+ *
+ * `amount` goes as a **string**, not a number: the column is `Decimal(18,2)` and a JSON number
+ * cannot carry every paisa exactly. The response is the bill's whole position afterwards — what was
+ * certified, what has been paid and what is left — because that is what the screen shows next, and
+ * asking for it in a second request is a second chance for the two to disagree.
+ */
+export async function recordBillPayment(
+  raBillId: string,
+  input: {
+    paidOn: string;
+    amount: string;
+    instrument: PaymentInstrument;
+    reference?: string;
+    remarks?: string;
+  },
+): Promise<BillOutstanding> {
+  return billOutstandingSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+/** Removes a payment recorded in error. The only correction route — a payment is never edited. */
+export async function removeBillPayment(paymentId: string): Promise<void> {
+  await authFetch<unknown>(`/projects/ra-bill-payments/${paymentId}`, {
+    method: 'DELETE',
+  });
+}
+
+/** One bill's position: certified, paid, and what is left (FR-021). */
+export async function getBillOutstanding(
+  raBillId: string,
+): Promise<BillOutstanding> {
+  return billOutstandingSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/outstanding`),
+  );
+}
+
+/**
+ * One subcontractor's position across **every** bill of theirs (FR-021).
+ *
+ * Across, not per bill, because that is the question a subcontractor actually asks. Answered bill
+ * by bill, somebody adds six figures up by hand and the number they come back with is the one that
+ * gets paid.
+ */
+export async function getSubcontractorOutstanding(
+  partnerId: string,
+): Promise<SubcontractorOutstanding> {
+  return subcontractorOutstandingSchema.parse(
+    await authFetch<unknown>(
+      `/projects/subcontractors/${partnerId}/outstanding`,
+    ),
+  );
+}
+
+/**
+ * Files the countersigned copy of a bill, which **acknowledges it** (FR-020).
+ *
+ * `receivedOn` is asked for rather than taken from the clock: a copy signed on site on Tuesday and
+ * scanned on Friday was acknowledged on Tuesday, and that is the date a payment term runs from.
+ *
+ * Base64 in a JSON body, the shape `addDwrAttachment` established — one upload mechanism in this
+ * product rather than two.
+ */
+export async function uploadBillSignedCopy(
+  raBillId: string,
+  input: { data: string; fileName: string; receivedOn: string },
+): Promise<SignedCopy> {
+  return signedCopySchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/signed-copy`, {
+      method: 'POST',
+      body: JSON.stringify({ ...input, subjectType: 'ra_bill' }),
+    }),
+  );
+}
+
+/** Files the countersigned copy of a debit note (FR-020). */
+export async function uploadDebitSignedCopy(
+  debitId: string,
+  input: { data: string; fileName: string; receivedOn: string },
+): Promise<SignedCopy> {
+  return signedCopySchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-package-debits/${debitId}/signed-copy`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...input, subjectType: 'debit_note' }),
+      },
+    ),
+  );
+}
+
+export async function getBillSignedCopies(
+  raBillId: string,
+): Promise<SignedCopy[]> {
+  return z
+    .array(signedCopySchema)
+    .parse(
+      await authFetch<unknown>(`/projects/ra-bills/${raBillId}/signed-copies`),
+    );
+}
+
+export async function getDebitSignedCopies(
+  debitId: string,
+): Promise<SignedCopy[]> {
+  return z
+    .array(signedCopySchema)
+    .parse(
+      await authFetch<unknown>(
+        `/projects/bill-package-debits/${debitId}/signed-copies`,
+      ),
+    );
+}
+
+/** Reads a signed copy back, under the name it was uploaded with. */
+export async function downloadSignedCopy(
+  copyId: string,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/signed-copies/${copyId}/file`,
+  );
+  return { blob, filename: filename ?? fallbackName };
+}
+
+/**
+ * One debit as the standalone note a subcontractor signs (FR-018).
+ *
+ * The register already prints inside the package PDF; this is the single-debit document, carrying
+ * the number allocated when the debit was raised so the register and the note cannot disagree about
+ * which debit it is.
+ */
+export async function downloadDebitNote(
+  debitId: string,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/bill-package-debits/${debitId}/note.pdf`,
+  );
+  return { blob, filename: filename ?? fallbackName };
 }

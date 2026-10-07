@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import { deleteIssue, getIssues, type Issue } from '@/app/lib/api/inventory';
-import { MESSAGES } from '@/app/lib/constants';
+import { INVENTORY_ISSUE_LABEL, MESSAGES } from '@/app/lib/constants';
 import IssueModal from '@/app/ui/inventory/issue-modal';
 import { useItems, useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
@@ -86,7 +86,7 @@ export default function IssuesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeader title="Issues" />
+        <PageHeader title={INVENTORY_ISSUE_LABEL} />
         <SecondaryButton type="button" onClick={() => setShowModal(true)}>
           New issue
         </SecondaryButton>

@@ -205,6 +205,14 @@ export type MeasurementSheet = z.infer<typeof measurementSheetSchema>;
 const debitRowSchema = z
   .object({
     id: z.string(),
+    /**
+     * `PRPL-DN-0004`, allocated when the debit was raised (028 FR-019).
+     *
+     * **Null on every debit recorded before 028**, and rendered as an absence rather than as a
+     * placeholder: those debits were never issued under a number, and printing one would name a
+     * document nobody sent — the decision 027 made for work-order codes.
+     */
+    noteNumber: z.string().nullable().optional(),
     groupHeading: z.string().nullable(),
     description: z.string(),
     location: z.string().nullable(),

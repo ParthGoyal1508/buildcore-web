@@ -26,6 +26,8 @@ import {
   reviseBillPackage,
   setClaim,
 } from '@/app/lib/api/bill-packages';
+import { downloadDebitNote } from '@/app/lib/api/billing';
+import { SETTLEMENT_COPY } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import BillAdjustments from '@/app/ui/projects/bill-adjustments';
 import { Button } from '@/app/ui/button';
@@ -491,7 +493,17 @@ export default function BillPackageDetail({
                     <tbody className="divide-y divide-gray-100">
                       {group.rows.map((row) => (
                         <tr key={row.id}>
-                          <td className="px-3 py-1.5">{row.description}</td>
+                          <td className="px-3 py-1.5">
+                            {row.description}
+                            {/* 028 FR-019. The number the note itself carries, so the register and
+                                the signed document cannot disagree about which debit this is.
+                                Absent on debits raised before the series existed. */}
+                            {row.noteNumber && (
+                              <span className="block font-mono text-xs text-gray-500">
+                                {row.noteNumber}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-1.5 text-gray-500">
                             {row.location ?? ''}
                           </td>
@@ -504,6 +516,26 @@ export default function BillPackageDetail({
                               : 'not yet recovered'}
                           </td>
                           <td className="px-3 py-1.5 text-right">
+                            {/* 028 FR-018. The standalone note a subcontractor signs to
+                                acknowledge the recovery — the register already prints inside the
+                                package PDF, and this is the single-debit document. */}
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                downloadDebitNote(
+                                  row.id,
+                                  `${row.noteNumber ?? 'Debit note'}.pdf`,
+                                )
+                                  .then(({ blob, filename }) =>
+                                    save(blob, filename),
+                                  )
+                                  .catch((err: unknown) =>
+                                    setError(describe(err)),
+                                  );
+                              }}
+                            >
+                              {SETTLEMENT_COPY.debitNote}
+                            </Button>
                             {/* 025 FR-029. A debit is recovered on exactly one bill; the server
                                 refuses a second application by name, so the control is offered and
                                 its refusal is shown rather than guessed at here. */}

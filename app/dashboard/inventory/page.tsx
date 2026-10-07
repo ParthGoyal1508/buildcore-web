@@ -8,7 +8,7 @@ import {
   ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 
-import { ROUTES } from '@/app/lib/constants';
+import { INVENTORY_ISSUE_LABEL, ROUTES } from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
 import TileGrid, { type Tile } from '@/app/ui/tile-grid';
 
@@ -30,7 +30,7 @@ const SECTIONS: Tile[] = [
       'Material received, with its bill, GRN number and payment status.',
   },
   {
-    name: 'Issues',
+    name: INVENTORY_ISSUE_LABEL,
     href: ROUTES.inventoryIssues,
     icon: ArrowUpTrayIcon,
     description: 'Material issued from a store to work.',
