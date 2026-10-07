@@ -656,6 +656,7 @@ function LineEditor({
                           onChange={(chainageFrom) => update({ chainageFrom })}
                           placeholder="21+300"
                           width="w-28"
+                          label="Chainage from"
                         />
                       </td>
                       <td className="px-2 py-1.5">
@@ -664,6 +665,7 @@ function LineEditor({
                           onChange={(chainageTo) => update({ chainageTo })}
                           placeholder="21+450"
                           width="w-28"
+                          label="Chainage to"
                         />
                       </td>
                       <td className="px-2 py-1.5">
@@ -672,6 +674,7 @@ function LineEditor({
                           onChange={(roadSide) => update({ roadSide })}
                           placeholder="LHS"
                           width="w-24"
+                          label="Side"
                         />
                       </td>
                       {(
@@ -706,6 +709,7 @@ function LineEditor({
                           onChange={(remark) => update({ remark })}
                           placeholder="RA-06"
                           width="w-40"
+                          label="Remark"
                         />
                       </td>
                       <td className="px-2 py-1.5 text-right">
@@ -835,8 +839,13 @@ function LineEditor({
  *
  * A bare input rather than a labelled field: the column header is the label, which is what makes
  * nine rows readable where nine labelled stacks are not. The header is not announced to a screen
- * reader by proximity though, so each numeric cell carries an `aria-label` naming its column —
- * otherwise every one of them is "edit text" and the table is unusable without sight of it.
+ * reader by proximity though, so **every** cell carries an `aria-label` naming its column —
+ * otherwise each one is "edit text" and the table is unusable without sight of it.
+ *
+ * `label` is required, and it used to fall back to `placeholder`. That read plausibly and was
+ * wrong: the four text cells pass only a placeholder, so a screen reader announced the chainage
+ * boxes as "21+300" and "21+450", the side as "LHS" and the remark as "RA-06" — examples, not
+ * names. The fallback is gone so the compiler asks for the column name instead of inventing one.
  */
 function Cell({
   value,
@@ -851,7 +860,7 @@ function Cell({
   placeholder?: string;
   numeric?: boolean;
   width: string;
-  label?: string;
+  label: string;
 }) {
   return (
     <input
@@ -859,7 +868,7 @@ function Cell({
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       inputMode={isNumeric ? 'decimal' : undefined}
-      aria-label={label ?? placeholder}
+      aria-label={label}
       className={`${width} min-h-11 rounded-md border border-gray-300 px-2 py-1.5 ${
         isNumeric ? 'tabular-nums' : ''
       }`}
