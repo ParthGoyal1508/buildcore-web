@@ -12,9 +12,11 @@ import {
   type BoqGroup,
   type BoqItem,
 } from '@/app/lib/api/projects';
+import { percentLabel, scheduleTotals } from '@/app/lib/bill-totals';
 import { BOQ_COPY } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 import { RowAction } from '@/app/ui/settings/form-fields';
 
 /**
@@ -56,6 +58,7 @@ export default function BoqTree({
   const isEstimate = variant === 'estimate';
   const queryClient = useQueryClient();
   const { isLocked } = useProjectLock();
+  const { project } = useProjectShell();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [planning, setPlanning] = useState<string | null>(null);
@@ -135,12 +138,59 @@ export default function BoqTree({
     0,
   );
 
+  // The contract schedule's two figures: what it prices at, and what it is worth once the quote is
+  // on it. `scheduleTotals` rather than a sum of discounted lines — it applies the percentage
+  // **once, to the total**, which is how the tender document computes it; per line it would round
+  // to paise on every one of them and drift from the figure the client signed.
+  const quotedFraction = Number(project.quotedPercentage ?? 0) || 0;
+  const totals = scheduleTotals(
+    groups.flatMap((group) =>
+      group.items.map((item) => ({ scopeQty: item.scopeQty, rate: item.rate })),
+    ),
+    quotedFraction,
+  );
+
   return (
     <div className="space-y-2">
       {error && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
+      )}
+
+      {/*
+        The quote, on the screen the quote applies to.
+        Contract only: the estimate is our own costing of the same work, and the percentage is what
+        the client is billed at — putting it on a costing would answer a question nobody asked of
+        it. Shown even at par, because "at par" is a fact about the contract and a blank space is
+        not: the absence of this band was the whole defect.
+      */}
+      {!isEstimate && (
+        <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+          <div className="flex items-baseline gap-2">
+            <dt className="text-gray-500">{BOQ_COPY.scheduleTotalLabel}</dt>
+            <dd className="font-medium tabular-nums text-gray-900">
+              {rupees(totals.estimatedTotal)}
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-gray-500">{BOQ_COPY.quotedLabel}</dt>
+            <dd className="font-medium tabular-nums text-gray-900">
+              {quotedFraction === 0
+                ? BOQ_COPY.quotedAtPar
+                : percentLabel(quotedFraction)}
+            </dd>
+          </div>
+          {quotedFraction !== 0 && (
+            <div className="flex items-baseline gap-2">
+              <dt className="text-gray-500">{BOQ_COPY.contractTotalLabel}</dt>
+              <dd className="font-semibold tabular-nums text-gray-900">
+                {rupees(totals.quotedTotal)}
+              </dd>
+            </div>
+          )}
+          <p className="w-full text-xs text-gray-500">{BOQ_COPY.quotedNote}</p>
+        </dl>
       )}
 
       <div className="overflow-x-auto rounded-lg border border-gray-200">

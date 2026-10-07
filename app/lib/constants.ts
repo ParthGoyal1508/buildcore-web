@@ -4163,6 +4163,26 @@ export const BOQ_COPY = {
   columnAmount: 'Amount',
   estimateTotal: 'Estimated cost',
 
+  /**
+   * What the contract schedule is actually worth (2026-10-07).
+   *
+   * Reported: a project imported with a quote of −10.79% showed every line at its full schedule
+   * rate, with nothing on the screen mentioning the quote — so the only available reading was that
+   * the percentage had not been applied. It had been, on every bill; the schedule simply never
+   * said so.
+   *
+   * The **rate column stays the schedule rate**, because that is the figure the tender prints and
+   * the one a variation or a dispute is argued against. What was missing is the other number: what
+   * the same schedule is worth once the quote is on it.
+   */
+  scheduleTotalLabel: 'Schedule total',
+  quotedLabel: 'Quoted',
+  contractTotalLabel: 'Contract total at quote',
+  quotedAtPar: 'At par — priced from the schedule exactly',
+  quotedNote:
+    'Rates below are the schedule’s own. Every bill prices its lines at the quoted percentage, ' +
+    'and keeps the percentage it was priced at.',
+
   // Alert tabs — four, not three
   alertsHeading: 'What needs attention',
   tabToday: 'Due today',
