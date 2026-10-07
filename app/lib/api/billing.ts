@@ -481,7 +481,15 @@ export interface WorkOrderInput {
   materialAmount?: number;
   /** As a fraction. Refused once a bill has been raised. */
   retentionPercent?: number;
-  status?: string;
+  /**
+   * **Only `completed`, and only on an update** (028 FR-009).
+   *
+   * `POST /projects/work-orders` no longer accepts a status at all — it answers 400 — because
+   * accepting one let a caller declare an award active and bill against it before anybody had
+   * approved it, which is what this screen was doing. `pending_approval` comes from submitting;
+   * `active` comes from the approval chain completing.
+   */
+  status?: 'completed';
 }
 
 export async function getWorkOrders(projectId: string): Promise<WorkOrder[]> {
@@ -781,4 +789,23 @@ export async function downloadDebitNote(
     `/projects/bill-package-debits/${debitId}/note.pdf`,
   );
   return { blob, filename: filename ?? fallbackName };
+}
+
+/**
+ * Sends an award for approval (028 FR-009): `draft` → `pending_approval`.
+ *
+ * The commitment is made when the award is given, not when the first bill measures against it — a
+ * work order committing the company to several crore used to go active on one person's save while
+ * the bill under it needed an approval. An award with no lines is refused: there is nothing to
+ * approve in a work order that awards nothing, and a decision recorded against an empty schedule
+ * would stand against whatever is added afterwards.
+ */
+export async function submitWorkOrderForApproval(
+  id: string,
+): Promise<WorkOrder> {
+  return workOrderSchema.parse(
+    await authFetch<unknown>(`/projects/work-orders/${id}/submit`, {
+      method: 'POST',
+    }),
+  );
 }

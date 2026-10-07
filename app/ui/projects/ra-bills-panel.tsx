@@ -10,6 +10,7 @@ import {
   getWorkOrders,
   updateWorkOrder,
   submitRaBill,
+  submitWorkOrderForApproval,
   type RaBill,
   type WorkOrder,
 } from '@/app/lib/api/billing';
@@ -83,6 +84,30 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
     queryFn: () => getRaBills(projectId),
   });
   const vendors = useVendorOptions();
+
+  /**
+   * Sends the chosen award for approval (028 FR-009).
+   *
+   * The list is invalidated rather than the row patched, because the status is what every other
+   * control on this panel reads — and a stale `draft` beside a submitted award would offer to send
+   * it a second time.
+   */
+  const submitAward = useMutation({
+    mutationFn: (id: string) => submitWorkOrderForApproval(id),
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({
+        queryKey: ['workOrders', projectId],
+      });
+    },
+    onError: (err) =>
+      setError(
+        err instanceof ApiError
+          ? (err.details as { message?: string } | undefined)?.message ??
+              err.message
+          : WORK_ORDER_COPY.submitFailed,
+      ),
+  });
 
   // Falls back to the first order so the panel is never empty on a project that has one, but only
   // while nothing has been picked — an explicit choice is never overridden.
@@ -212,6 +237,42 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                 {chosen.code === null && (
                   <p className="text-xs text-gray-500">
                     {WORK_ORDER_COPY.unnumberedHint}
+                  </p>
+                )}
+
+                {/* 028 FR-009. The award approval, which nothing in this product offered: a work
+                    order went active on one person's save while the first bill under it needed an
+                    approval. Offered on a draft, explained on the other two states — "waiting" and
+                    "never sent" need different things done about them. */}
+                {chosen.status === 'draft' && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <SecondaryButton
+                      type="button"
+                      disabled={
+                        submitAward.isPending || chosen.awardLineCount === 0
+                      }
+                      onClick={() => {
+                        setError(null);
+                        submitAward.mutate(chosen.id);
+                      }}
+                    >
+                      {submitAward.isPending
+                        ? WORK_ORDER_COPY.submitting
+                        : WORK_ORDER_COPY.submitForApproval}
+                    </SecondaryButton>
+                    <span className="text-xs text-gray-500">
+                      {WORK_ORDER_COPY.submitHint}
+                    </span>
+                  </div>
+                )}
+                {chosen.status === 'pending_approval' && (
+                  <p className="text-xs text-amber-800">
+                    {WORK_ORDER_COPY.pendingHint}
+                  </p>
+                )}
+                {chosen.status === 'active' && (
+                  <p className="text-xs text-gray-500">
+                    {WORK_ORDER_COPY.activeHint}
                   </p>
                 )}
               </header>
@@ -451,7 +512,12 @@ function RaiseForm({
         // same way — one convention, converted on the one side that collects a percent.
         retentionPercent: retention ? Number(retention) / 100 : undefined,
         ...(partnerId ? { partnerId } : {}),
-        status: 'active',
+        // **`status: 'active'` was sent here and is deliberately gone** (028 FR-009).
+        //
+        // It made the award approval this feature added cosmetic: every work order this screen
+        // raised arrived already active, so the gate that refuses a bill against an unapproved
+        // award never saw one. The server no longer accepts the field at all — it answers 400 —
+        // and an award now reaches `active` only when its approval chain completes.
       }),
     onSuccess: onRaised,
     onError: (err) =>

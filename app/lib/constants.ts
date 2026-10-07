@@ -1177,6 +1177,24 @@ export const WORK_ORDER_COPY = {
   awardLockedByBills:
     'Bills have been raised against this award, so it can no longer be replaced — the remaining quantity on a bill already issued would move, and the subcontractor’s copy would then disagree with ours. Raise a variation instead.',
 
+  // --- 028 FR-009: the award is approved before it commits anything ---
+  /**
+   * The award approval, which did not exist until 028.
+   *
+   * A work order committing the company to several crore went `active` the moment one person saved
+   * it, while the first bill raised under it needed an approval. The commitment is made when the
+   * award is given; a bill only measures against it.
+   */
+  submitForApproval: 'Send the award for approval',
+  submitting: 'Sending…',
+  submitHint:
+    'A bill cannot be measured against this award until it has been approved. Capture the award lines first — there is nothing to approve in a work order that awards nothing.',
+  pendingHint:
+    'Waiting for approval. A bill against it is refused until the approval completes — which is a different thing from it never having been sent.',
+  activeHint:
+    'Approved. Bills may be measured against this award.',
+  submitFailed: 'That award could not be sent for approval.',
+
   // --- 027: the number, the vendor, and the master–detail frame ---
   /** Shown where a code would be, for the work orders raised before 027 numbered them. */
   unnumbered: 'Not numbered',
