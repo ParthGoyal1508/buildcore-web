@@ -606,11 +606,14 @@ export function factorsOf(line: DwrLine): [string, string][] {
   if (line.paymentMode !== 'work_basis') return [];
   return (
     [
-      ['nos 1', line.nos1],
-      ['nos 2', line.nos2],
+      // The client's own words (2026-10-07), not the column names. `nos 2` and `density` keep
+      // theirs: entry no longer offers either, so a line showing one carries a value that did not
+      // come from this form and naming it plainly is the point.
+      ['nos', line.nos1],
       ['length', line.length],
-      ['breadth', line.breadth],
-      ['depth', line.depth],
+      ['width', line.breadth],
+      ['height', line.depth],
+      ['factor', line.nos2],
       ['density', line.density],
     ] as const
   )
@@ -690,4 +693,36 @@ export async function downloadDwrReport(
   // the report number rather than a generic "report": a folder of files called `report.xlsx` is
   // the thing 017 fixed for every other download in this product.
   return { blob, filename: filename ?? `${dprNumber}.xlsx` };
+}
+
+/**
+ * `21+300` → `21.3`, for storage. Also accepts a plain decimal, unchanged.
+ *
+ * A road is measured from its start in kilometres and metres, and the client's measurement sheet
+ * writes every position that way. The column is `Decimal(18, 3)` kilometres for a reason better
+ * than tidiness: a bill measures a **range**, so chainage has to be comparable — two text fields
+ * reading `21+300` and `9+750` cannot be ordered, and the one that looks larger is smaller.
+ *
+ * Both notations are accepted because both get typed: off the client's sheet it is `21+300`, off a
+ * survey it is `21.3`. Returns `null` for anything else, so the form can refuse rather than send a
+ * guess the API would reject as a non-numeric string.
+ *
+ * Mirrors `buildcore-api/src/projects/dwr/chainage.ts`, which owns the printing half and carries
+ * the tests. Two copies of four lines across a repository boundary, rather than a shared package
+ * for one function.
+ */
+export function parseChainage(input: string): string | null {
+  const text = input.trim();
+  if (text === '') return null;
+
+  const plus = /^(-?)(\d+)\+(\d{1,3})$/.exec(text);
+  if (plus) {
+    const [, sign, km, metres] = plus;
+    // Padded on the right: `6+82` is 6 km 820 m. The metres are a position within the kilometre,
+    // not a count.
+    return `${sign}${Number(km) + Number(metres.padEnd(3, '0')) / 1000}`;
+  }
+
+  if (/^-?\d+(\.\d+)?$/.test(text)) return text;
+  return null;
 }

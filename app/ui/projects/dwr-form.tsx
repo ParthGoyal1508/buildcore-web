@@ -12,6 +12,7 @@ import {
   type DwrWarning,
   createDwr,
   describeDwrError as describe,
+  parseChainage,
   previewMeasuredQuantity,
   quantityOf,
   updateDwr,
@@ -51,14 +52,29 @@ type DraftLine =
   | {
       kind: 'measured';
       boqItemId: string;
-      // The server's own six (`create-dwr.dto.ts`), carrying the labels site staff read. `nos` and
-      // `factor` were this form's own invention and, under `forbidNonWhitelisted`, a 400.
+      /**
+       * **The client's own measurement sheet, column for column** (reported 2026-10-07).
+       *
+       * Chainage, Side, Nos, Length, Width, Height, Qty, Remark — which is what site staff are
+       * reading off when they type this, and what the printable form prints back.
+       *
+       * The field *names* are still the server's (`create-dwr.dto.ts`): `nos1`, `breadth`,
+       * `depth`. Only the labels change. `nos`/`factor` were this form's own invention once and,
+       * under `forbidNonWhitelisted`, a 400 — a lesson worth not repeating.
+       *
+       * `nos2` and `density` are **deliberately absent**. They were offered as "Factor" and
+       * "Density" and nothing has ever used them: of 27 recorded lines, none carries a value other
+       * than 1 for either. Both default to 1, so the product is unchanged and the columns stay —
+       * the same decision FR-023 made for weather. Qty is computed, never typed: a sheet where the
+       * dimensions and the total can disagree is a sheet nobody can check.
+       */
+      chainageFrom: string;
+      chainageTo: string;
+      roadSide: string;
       nos1: string;
-      nos2: string;
       length: string;
       breadth: string;
       depth: string;
-      density: string;
       remark: string;
     }
   | {
@@ -72,12 +88,13 @@ type DraftLine =
 const emptyMeasured = (): DraftLine => ({
   kind: 'measured',
   boqItemId: '',
+  chainageFrom: '',
+  chainageTo: '',
+  roadSide: '',
   nos1: '',
-  nos2: '',
   length: '',
   breadth: '',
   depth: '',
-  density: '',
   remark: '',
 });
 
@@ -89,6 +106,22 @@ const emptyPresence = (): DraftLine => ({
   remark: '',
 });
 
+/**
+ * `21.3` → `21+300`, for an edit.
+ *
+ * The reverse of `parseChainage`. Three digits of metres always: `6+820` and `6+082` are 738
+ * metres apart, and dropping a leading zero on the second prints the first.
+ */
+function chainageText(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const km = Number(value);
+  if (Number.isNaN(km)) return '';
+  const metres = Math.round(Math.abs(km) * 1000);
+  return `${km < 0 ? '-' : ''}${Math.floor(metres / 1000)}+${String(
+    metres % 1000,
+  ).padStart(3, '0')}`;
+}
+
 /** A stored line, back into the shape this form edits. */
 function draftFrom(line: DwrLine): DraftLine {
   const text = (value: string | null | undefined) =>
@@ -98,12 +131,15 @@ function draftFrom(line: DwrLine): DraftLine {
     ? {
         kind: 'measured',
         boqItemId: line.boqItemId ?? '',
+        // Back in the notation it was typed in, so an edit does not silently restate `21+300` as
+        // `21.3` and leave the next reader comparing two spellings of one position.
+        chainageFrom: chainageText(line.chainageFrom),
+        chainageTo: chainageText(line.chainageTo),
+        roadSide: line.roadSide ?? '',
         nos1: text(line.nos1),
-        nos2: text(line.nos2),
         length: text(line.length),
         breadth: text(line.breadth),
         depth: text(line.depth),
-        density: text(line.density),
         remark: line.remark ?? '',
       }
     : {
@@ -241,11 +277,17 @@ export default function DwrForm({
             paymentMode: 'work_basis' as const,
             ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
             ...numeric('nos1', line.nos1),
-            ...numeric('nos2', line.nos2),
             ...numeric('length', line.length),
             ...numeric('breadth', line.breadth),
             ...numeric('depth', line.depth),
-            ...numeric('density', line.density),
+            // Converted here, not validated away: the API's `chainageFrom` is `@IsNumberString`,
+            // so `21+300` would be a 400. `parseChainage` returns null for anything it cannot
+            // read, and a null is simply not sent — the alternative is sending a guess.
+            ...chainage('chainageFrom', line.chainageFrom),
+            ...chainage('chainageTo', line.chainageTo),
+            ...(line.roadSide.trim()
+              ? { roadSide: line.roadSide.trim() }
+              : {}),
             ...(line.remark ? { remark: line.remark } : {}),
           }
         : {
@@ -458,11 +500,9 @@ function LineEditor({
     line.kind === 'measured'
       ? previewMeasuredQuantity({
           nos1: line.nos1,
-          nos2: line.nos2,
           length: line.length,
           breadth: line.breadth,
           depth: line.depth,
-          density: line.density,
         })
       : null;
 
@@ -496,15 +536,59 @@ function LineEditor({
 
       {line.kind === 'measured' ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {/* Where on the road. The client's sheet leads with it, and the columns have been on
+              the API since 022 with no form ever offering them — so every line recorded to date
+              carries no position at all. */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Chainage from</span>
+              <input
+                value={line.chainageFrom}
+                onChange={(event) =>
+                  onChange({ ...line, chainageFrom: event.target.value })
+                }
+                className="rounded-md border border-gray-300 px-3 py-2"
+                placeholder="21+300"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Chainage to</span>
+              <input
+                value={line.chainageTo}
+                onChange={(event) =>
+                  onChange({ ...line, chainageTo: event.target.value })
+                }
+                className="rounded-md border border-gray-300 px-3 py-2"
+                placeholder="21+450"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Side</span>
+              <input
+                value={line.roadSide}
+                onChange={(event) =>
+                  onChange({ ...line, roadSide: event.target.value })
+                }
+                className="rounded-md border border-gray-300 px-3 py-2"
+                placeholder="LHS, RHS, MED, LHS Ramp"
+              />
+            </label>
+          </div>
+          <p className="mt-1 mb-3 text-xs text-gray-500">
+            Chainage as the sheet writes it — <strong>21+300</strong> is 21 km
+            and 300 m. A plain <strong>21.300</strong> is accepted too.
+          </p>
+
+          {/* Nos × Length × Width × Height, which is the client's own arithmetic. Their sheet's
+              Qty column is the product of exactly these four, verified against it: 1 × 5.8 × 1.8
+              is 10.44, and 2 × 0.5 is 1.00. */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
                 ['nos1', 'Nos'],
-                ['nos2', 'Factor'],
-                ['length', 'Length'],
-                ['breadth', 'Breadth'],
-                ['depth', 'Depth'],
-                ['density', 'Density'],
+                ['length', 'Length in Meter'],
+                ['breadth', 'Width in Meter'],
+                ['depth', 'Height'],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="flex flex-col gap-1 text-sm">
@@ -521,9 +605,7 @@ function LineEditor({
             ))}
           </div>
           <p className="mt-2 text-sm">
-            <span className="text-gray-600">
-              The server will compute a quantity of{' '}
-            </span>
+            <span className="text-gray-600">Qty — the server computes{' '}</span>
             <span className="font-semibold text-gray-900">
               {preview ?? '—'}
             </span>
@@ -597,5 +679,17 @@ function LineEditor({
 /** Only the fields that carry a value, because an empty string is not a decimal. */
 function numeric(key: string, value: string): Record<string, string> {
   return value.trim() === '' ? {} : { [key]: value.trim() };
+}
+
+/**
+ * A chainage, in whichever notation it was typed, as the decimal kilometres the API stores.
+ *
+ * Omitted rather than sent when it cannot be read. The API validates these as number strings, so
+ * `km 21` would come back a 400 naming a field the person cannot see the problem with — and a
+ * position nobody could parse is better absent than approximated.
+ */
+function chainage(key: string, value: string): Record<string, string> {
+  const parsed = parseChainage(value);
+  return parsed === null ? {} : { [key]: parsed };
 }
 

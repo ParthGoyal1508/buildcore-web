@@ -205,9 +205,13 @@ export default function DwrReportPage() {
                 <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-3 py-2">BOQ</th>
+                    {/* Where on the road. Collected since 2026-10-07 and shown here because a
+                        measurement without its position cannot be checked against the site. */}
+                    <th className="px-3 py-2">Chainage</th>
+                    <th className="px-3 py-2">Side</th>
                     <th className="px-3 py-2">Basis</th>
                     <th className="px-3 py-2">How it was measured</th>
-                    <th className="px-3 py-2 text-right">Quantity</th>
+                    <th className="px-3 py-2 text-right">Qty</th>
                     <th className="px-3 py-2">Remark</th>
                   </tr>
                 </thead>
@@ -222,6 +226,10 @@ export default function DwrReportPage() {
                           </span>
                         )}
                       </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {chainageRange(line.chainageFrom, line.chainageTo)}
+                      </td>
+                      <td className="px-3 py-2">{line.roadSide ?? '—'}</td>
                       <td className="px-3 py-2">
                         {line.paymentMode === 'work_basis'
                           ? 'measured'
@@ -273,4 +281,30 @@ export default function DwrReportPage() {
       </div>
     </SectionGuard>
   );
+}
+
+/**
+ * `21.3`, `21.45` → `21+300 – 21+450`, as the client's sheet writes a position.
+ *
+ * A dash where neither end was recorded, and the single end on its own where only one was: a line
+ * measured at a point rather than over a stretch has a from and no to, and printing `21+300 – —`
+ * reads as a range somebody failed to finish.
+ */
+function chainageRange(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): string {
+  const point = (value: string | null | undefined) => {
+    if (value === null || value === undefined || value === '') return null;
+    const km = Number(value);
+    if (Number.isNaN(km)) return null;
+    const metres = Math.round(Math.abs(km) * 1000);
+    return `${km < 0 ? '-' : ''}${Math.floor(metres / 1000)}+${String(
+      metres % 1000,
+    ).padStart(3, '0')}`;
+  };
+  const start = point(from);
+  const end = point(to);
+  if (start && end) return `${start} – ${end}`;
+  return start ?? end ?? '—';
 }
