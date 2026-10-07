@@ -3773,6 +3773,16 @@ export const DOCUMENT_COPY = {
   /** T072: the server's refusal, said on the control it refers to. */
   creationRefusedHere: 'The server refused the project without this document.',
   /**
+   * Where a project's documents live once it exists (028, reported 2026-10-07).
+   *
+   * The edit form shows no upload controls — an existing project is past the creation gate and its
+   * papers are filed on its own Documents tab. Said rather than left as an absence, because the
+   * reader's question when the controls are not there is "where did they go", and silence answers
+   * it with a hunt through ten tabs.
+   */
+  editFiledElsewhere: 'Documents for this project are filed on its Documents tab.',
+  editFiledElsewhereLink: 'Open Documents',
+  /**
    * The summary beside the submit control. Names the count, not the kinds — the kinds are named on
    * their own controls, and repeating them here is the matching exercise T072 exists to remove.
    */
