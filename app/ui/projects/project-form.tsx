@@ -9,7 +9,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 import { ApiError } from '@/app/lib/api/client';
-import { listEmployees } from '@/app/lib/api/hr-payroll';
+import { EMPLOYEE_PAGE_MAX, listEmployees } from '@/app/lib/api/hr-payroll';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import ProjectDocumentUploads, {
@@ -171,9 +171,14 @@ export default function ProjectForm({ project }: { project?: Project }) {
 
   // The project manager picker. Active employees only — assigning a leaver is
   // never intended, and the list is long enough without them.
+  //
+  // `EMPLOYEE_PAGE_MAX`, not a guessed number: this asked for 200 against an endpoint
+  // that refuses anything over 100, so the request was a 400 and the control offered
+  // "Not assigned" and nothing else — on creating a project and on editing one.
   const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 200, isActive: true }],
-    queryFn: () => listEmployees({ pageSize: 200, isActive: true }),
+    queryKey: ['hr', 'employees', { pageSize: EMPLOYEE_PAGE_MAX, isActive: true }],
+    queryFn: () =>
+      listEmployees({ pageSize: EMPLOYEE_PAGE_MAX, isActive: true }),
   });
 
   const {

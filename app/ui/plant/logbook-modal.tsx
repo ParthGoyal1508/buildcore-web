@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { listEmployees } from '@/app/lib/api/hr-payroll';
+import { EMPLOYEE_PAGE_MAX, listEmployees } from '@/app/lib/api/hr-payroll';
 import { createLogbookEntry } from '@/app/lib/api/plant';
 import { getProjects } from '@/app/lib/api/projects';
 import { MESSAGES, formatReading } from '@/app/lib/constants';
@@ -32,7 +32,10 @@ export default function LogbookModal({ onClose }: { onClose: () => void }) {
 
   const employees = useQuery({
     queryKey: ['plant', 'employees'],
-    queryFn: () => listEmployees({ isActive: true, pageSize: 200 }),
+    // 100 is the endpoint's documented maximum; 200 was a 400, and the operator
+    // picker rendered empty.
+    queryFn: () =>
+      listEmployees({ isActive: true, pageSize: EMPLOYEE_PAGE_MAX }),
     select: (page) => page.items,
   });
   const projects = useQuery({

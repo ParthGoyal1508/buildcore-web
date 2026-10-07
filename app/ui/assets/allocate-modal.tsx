@@ -9,7 +9,7 @@ import {
   type Asset,
 } from '@/app/lib/api/assets';
 import { ApiError } from '@/app/lib/api/client';
-import { listEmployees } from '@/app/lib/api/hr-payroll';
+import { EMPLOYEE_PAGE_MAX, listEmployees } from '@/app/lib/api/hr-payroll';
 import { MESSAGES, formatAssetQuantity } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
@@ -91,7 +91,10 @@ export default function AllocateModal({
   // narrowed rather than left to fail on submit.
   const employees = useQuery({
     queryKey: ['assets', 'employees', siteId],
-    queryFn: () => listEmployees({ siteId, isActive: true, pageSize: 200 }),
+    // 100 is the endpoint's documented maximum; 200 was a 400, and custody could
+    // not be assigned to anybody.
+    queryFn: () =>
+      listEmployees({ siteId, isActive: true, pageSize: EMPLOYEE_PAGE_MAX }),
     enabled: custodyRequired && siteId !== '',
     select: (page) => page.items,
   });
