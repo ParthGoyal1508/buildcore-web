@@ -89,6 +89,11 @@ const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-800',
   approved: 'bg-green-100 text-green-800',
+  // Returned for correction (028 — a daily work report, a muster). Amber rather than the grey
+  // `draft` carries, and that difference is the point: a returned report is waiting on somebody
+  // specific to do something specific, which a draft nobody has touched is not. Not red — being
+  // sent back is the review working, not a failure.
+  returned: 'bg-amber-100 text-amber-900',
   rejected: 'bg-gray-200 text-gray-700',
   partially_fulfilled: 'bg-amber-100 text-amber-900',
   fulfilled: 'bg-green-100 text-green-800',

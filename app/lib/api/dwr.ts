@@ -193,6 +193,17 @@ const dwrSchema = z
     submittedAt: z.string().nullable().optional(),
     approvedByUserId: z.string().nullable().optional(),
     approvedAt: z.string().nullable().optional(),
+    /**
+     * Why a reviewer sent this back, and who (028).
+     *
+     * **The reason is the action.** It was typed into a prompt, sent on the request, and dropped
+     * by a route that read no body — so a returned report arrived at its author as a status of
+     * `draft` with no sentence anywhere saying what to change. Parsed here because the detail
+     * screen is where the author reads it.
+     */
+    returnedAt: z.string().nullable().optional(),
+    returnedByName: z.string().nullable().optional(),
+    returnReason: z.string().nullable().optional(),
     reversedAt: z.string().nullable().optional(),
     reversalReason: z.string().nullable().optional(),
     reversalCount: z.number().optional(),

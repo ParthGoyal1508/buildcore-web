@@ -242,7 +242,12 @@ function ReportRow({
       </td>
       <td className="px-3 py-2">{dateLabel(report.workDate)}</td>
       <td className="px-3 py-2">
-        <StatusBadge status={reversed ? 'returned' : report.status} />
+        {/* The report's own status, and a marker beside it where an approval was taken back.
+            This read `reversed ? 'returned' : report.status`, which was a stand-in from when the
+            server had no `returned` value to send: a reversed report sits in `draft`, and showing
+            it as "Returned" said a reviewer had sent it back when nobody had. Now that a return
+            is a status of its own (028), the two cannot share one badge. */}
+        <StatusBadge status={report.status} />
         {reversed && (
           <span className="ml-2 text-xs text-gray-500">reversed</span>
         )}

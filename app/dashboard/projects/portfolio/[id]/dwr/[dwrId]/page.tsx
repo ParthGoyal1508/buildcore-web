@@ -16,6 +16,7 @@ import {
 } from '@/app/lib/api/dwr';
 import { ROUTES } from '@/app/lib/constants';
 import DwrAttachments from '@/app/ui/projects/dwr-attachments';
+import DwrReturnedNotice from '@/app/ui/projects/dwr-returned-notice';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import SectionGuard from '@/app/ui/projects/section-guard';
@@ -119,11 +120,13 @@ export default function DwrReportPage() {
               {form.isPending ? 'Preparing…' : 'Download the form'}
             </Button>
 
-            {/* Draft only. A submitted report is a claim somebody is reading and an approved one
-                has already moved quantities a bill may rest on — the routes back are return and
-                reverse, which the panel offers. Offering Edit on either would promise something
-                the server refuses by status. */}
-            {report.status === 'draft' && (
+            {/* A draft, **or a report returned for correction** (028) — the server treats the two
+                identically, and the banner above tells the author to edit this one, so the screen
+                that says so must be the screen that lets them. A submitted report is a claim
+                somebody is reading and an approved one has already moved quantities a bill may
+                rest on; the routes back are return and reverse, which the panel offers. Offering
+                Edit on either would promise something the server refuses by status. */}
+            {(report.status === 'draft' || report.status === 'returned') && (
               <>
                 <Link
                   href={ROUTES.projectsDwrEdit(projectId, report.id)}
@@ -174,6 +177,14 @@ export default function DwrReportPage() {
             <dd>{dateTimeLabel(report.approvedAt) || '—'}</dd>
           </div>
           <div>
+            <dt className="text-gray-500">Returned</dt>
+            <dd>
+              {report.returnedAt
+                ? `${dateTimeLabel(report.returnedAt)} by ${report.returnedByName ?? 'somebody no longer on record'}`
+                : '—'}
+            </dd>
+          </div>
+          <div>
             <dt className="text-gray-500">Reversed</dt>
             <dd>
               {report.reversedAt
@@ -182,6 +193,11 @@ export default function DwrReportPage() {
             </dd>
           </div>
         </dl>
+
+        {/* 028. The reviewer's own sentence, where the author will see it. Above the "not yet
+            approved" note deliberately: that note is true of every draft and says nothing to act
+            on, and this one is the only thing on the screen that does. */}
+        <DwrReturnedNotice report={report} />
 
         {report.status !== 'approved' && (
           <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">

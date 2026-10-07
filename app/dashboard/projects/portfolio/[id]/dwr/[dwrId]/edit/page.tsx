@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 
 import { getDwr } from '@/app/lib/api/dwr';
 import DwrForm from '@/app/ui/projects/dwr-form';
+import DwrReturnedNotice from '@/app/ui/projects/dwr-returned-notice';
 import SectionGuard from '@/app/ui/projects/section-guard';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
@@ -19,9 +20,15 @@ import { useProjectShell } from '@/app/ui/projects/project-shell-context';
  * would be a second place for the factor mapping to drift, and that mapping has been wrong once
  * already.
  *
- * **Draft only, and the refusal is here as well as on the server.** The server refuses a submitted
- * or approved report by status; this says so before the person has filled anything in, and names
- * the route back — return it to draft, or reverse the approval.
+ * **A draft or a report returned for correction, and the refusal is here as well as on the
+ * server.** The server refuses a submitted or approved report by status; this says so before the
+ * person has filled anything in, and names the route back — return it to its author, or reverse
+ * the approval.
+ *
+ * `returned` is accepted because a returned report is a draft carrying a complaint (028), and this
+ * is the screen the reviewer's complaint sends the author to. Testing for `draft` alone made the
+ * review loop a dead end the moment `returned` became a status of its own: the report page said
+ * "edit it as you would a draft" and this page answered that it could not be edited.
  */
 export default function EditDwrPage() {
   const { project } = useProjectShell();
@@ -40,14 +47,14 @@ export default function EditDwrPage() {
     );
   }
 
-  if (report.status !== 'draft') {
+  if (report.status !== 'draft' && report.status !== 'returned') {
     return (
       <SectionGuard permission="DWR">
         <p className="rounded-md bg-amber-50 p-4 text-sm text-amber-900" role="alert">
           <strong>{report.dprNumber}</strong> is {report.status}, so it cannot be
           edited.{' '}
           {report.status === 'submitted'
-            ? 'Return it to draft first — a report under review is a claim somebody is reading.'
+            ? 'Return it to its author first — a report under review is a claim somebody is reading.'
             : 'Reverse the approval first — approving it moved executed quantities a bill may already have been built from.'}
         </p>
       </SectionGuard>
@@ -56,7 +63,12 @@ export default function EditDwrPage() {
 
   return (
     <SectionGuard permission="DWR">
-      <DwrForm projectId={project.id} report={report} />
+      <div className="flex flex-col gap-4">
+        {/* The complaint stays on screen while it is being answered. An author who has to
+            navigate back to read what was wrong is an author correcting from memory. */}
+        <DwrReturnedNotice report={report} />
+        <DwrForm projectId={project.id} report={report} />
+      </div>
     </SectionGuard>
   );
 }
