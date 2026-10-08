@@ -1192,8 +1192,33 @@ export const WORK_ORDER_COPY = {
   pendingHint:
     'Waiting for approval. A bill against it is refused until the approval completes — which is a different thing from it never having been sent.',
   activeHint:
-    'Approved. Bills may be measured against this award.',
+    'Approved. Bills may be measured against this award — and the award is now fixed. Reopen it to change a rate.',
   submitFailed: 'That award could not be sent for approval.',
+
+  /**
+   * Reopening an approved award (2026-10-08).
+   *
+   * Reported from the screen: "once it is approved, if I'm changing the rate it's allowing me to
+   * update the rate". It was — capturing an award was refused only once a bill existed, so between
+   * approval and the first bill the rates could be rewritten while the order stayed approved.
+   *
+   * Now the editor is locked outside a draft, and this is the way back. Its own control rather
+   * than a side effect of saving: an edit that quietly cancelled an approval would remove one
+   * without the person noticing they had.
+   */
+  reopen: 'Reopen the award',
+  reopening: 'Reopening…',
+  reopenPrompt:
+    'Reopening sends this award back to draft and cancels its approval — it will have to be approved again. Why is it being reopened?',
+  reopenHint:
+    'The rates are fixed while the award is approved. Reopen it to correct one; the approval is given again afterwards.',
+  reopenedNotice:
+    'Back to draft. The approval has been cancelled — correct the award, then send it for approval again.',
+  reopenFailed: 'That award could not be reopened.',
+  awardLockedPending:
+    'Somebody is reviewing these figures, so they cannot be changed. Changing them under the approver would put a decision against a schedule they never saw.',
+  awardLockedApproved:
+    'This award was approved at the rates it holds, so it cannot be edited. Reopen it to make a change — that cancels the approval.',
 
   // --- 027: the number, the vendor, and the master–detail frame ---
   /** Shown where a code would be, for the work orders raised before 027 numbered them. */

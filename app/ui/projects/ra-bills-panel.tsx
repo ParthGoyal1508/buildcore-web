@@ -10,6 +10,7 @@ import {
   getWorkOrders,
   updateWorkOrder,
   submitRaBill,
+  reopenWorkOrderAward,
   submitWorkOrderForApproval,
   type RaBill,
   type WorkOrder,
@@ -74,6 +75,12 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
   const [tab, setTab] = useState<Tab>('bills');
   const [revising, setRevising] = useState<RaBill | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * A confirmation, not a failure. Reopening an award cancels an approval somebody gave, and the
+   * status badge alone does not say that — a person who meant to fix a typo should be told what
+   * else just happened.
+   */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const orders = useQuery({
     queryKey: ['workOrders', projectId],
@@ -109,6 +116,35 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
       ),
   });
 
+  /**
+   * Reopening an approved award (2026-10-08).
+   *
+   * The way back from the lock: capturing an award is refused outside a draft, so an approved
+   * award with a wrong rate would otherwise have nowhere to go — the "raise a variation" the
+   * billed path names is advice, not a feature.
+   *
+   * Its own control rather than a side effect of saving, so the approval is never cancelled by
+   * somebody who only meant to fix a typo and did not read a banner.
+   */
+  const reopenAward = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      reopenWorkOrderAward(id, reason),
+    onSuccess: () => {
+      setError(null);
+      setNotice(WORK_ORDER_COPY.reopenedNotice);
+      void queryClient.invalidateQueries({
+        queryKey: ['workOrders', projectId],
+      });
+    },
+    onError: (err) =>
+      setError(
+        err instanceof ApiError
+          ? (err.details as { message?: string } | undefined)?.message ??
+              err.message
+          : WORK_ORDER_COPY.reopenFailed,
+      ),
+  });
+
   // Falls back to the first order so the panel is never empty on a project that has one, but only
   // while nothing has been picked — an explicit choice is never overridden.
   const chosen =
@@ -124,6 +160,7 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
     setRaising(false);
     setRevising(null);
     setError(null);
+    setNotice(null);
   };
 
   const orphanBills = (bills.data ?? []).filter(
@@ -133,6 +170,14 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       <FormError message={error} />
+      {notice && (
+        <p
+          role="status"
+          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          {notice}
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="space-y-3">
@@ -274,6 +319,34 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   <p className="text-xs text-gray-500">
                     {WORK_ORDER_COPY.activeHint}
                   </p>
+                )}
+
+                {/* Offered only where it can succeed. A billed award is final — reopening one
+                    would move the remaining quantity under bills the subcontractor already holds
+                    — and the server refuses it, so a button here would promise what it cannot do. */}
+                {chosen.status !== 'draft' && chosen.billCount === 0 && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <SecondaryButton
+                      type="button"
+                      disabled={reopenAward.isPending}
+                      onClick={() => {
+                        const reason = window.prompt(
+                          WORK_ORDER_COPY.reopenPrompt,
+                        );
+                        if (!reason) return;
+                        setError(null);
+                        setNotice(null);
+                        reopenAward.mutate({ id: chosen.id, reason });
+                      }}
+                    >
+                      {reopenAward.isPending
+                        ? WORK_ORDER_COPY.reopening
+                        : WORK_ORDER_COPY.reopen}
+                    </SecondaryButton>
+                    <span className="text-xs text-gray-500">
+                      {WORK_ORDER_COPY.reopenHint}
+                    </span>
+                  </div>
                 )}
               </header>
 
@@ -586,8 +659,10 @@ function RaiseForm({
  *
  * The editing itself moved out when the award stopped being a paste box — see `award-editor.tsx`
  * for why there are three ways to enter a line and why the subcontractor's rate is never prefilled.
- * What stays here is the one fact the editor cannot know on its own: whether a bill exists, which
- * is what the server refuses a replacement on.
+ * What stays here is the one fact the editor cannot know on its own: the work order's state, which
+ * is what the server refuses a replacement on. Three refusals, and they need different things done
+ * about them — a bill exists and the award is final; it is under review; or it is approved and has
+ * to be reopened first.
  */
 function AwardTab({
   projectId,
@@ -610,7 +685,15 @@ function AwardTab({
       <AwardEditor
         projectId={projectId}
         workOrderId={order.id}
-        locked={order.billCount > 0}
+        lockedBecause={
+          order.billCount > 0
+            ? WORK_ORDER_COPY.awardLockedByBills
+            : order.status === 'pending_approval'
+              ? WORK_ORDER_COPY.awardLockedPending
+              : order.status === 'draft'
+                ? null
+                : WORK_ORDER_COPY.awardLockedApproved
+        }
         onSaved={onSaved}
         onError={onError}
       />

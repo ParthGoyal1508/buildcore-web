@@ -809,3 +809,26 @@ export async function submitWorkOrderForApproval(
     }),
   );
 }
+
+/**
+ * Takes an approved award back to draft so it can be corrected, voiding the approval.
+ *
+ * The way back from a lock added on 2026-10-08: capturing an award is now refused on anything but
+ * a draft, because an approved award could previously be rewritten in place — rates included — for
+ * as long as no bill had been measured against it. The approval then stood against figures that no
+ * longer existed.
+ *
+ * A reason is required. The act removes a control somebody applied, and "why" is the only part of
+ * that a reader can act on afterwards.
+ */
+export async function reopenWorkOrderAward(
+  id: string,
+  reason: string,
+): Promise<WorkOrder> {
+  return workOrderSchema.parse(
+    await authFetch<unknown>(`/projects/work-orders/${id}/reopen`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  );
+}
