@@ -171,6 +171,13 @@ export default function BillPackageDetail({
   }
 
   const editable = isEditable(pkg.status);
+  // Null and "0.000" are different facts on a claim — a line with no measurement source against a
+  // line measured as nothing — but neither is a quantity to bill, so both count as nothing here.
+  const nothingProposed =
+    pkg.claims.length > 0 &&
+    pkg.claims.every(
+      (claim) => claim.proposedQty === null || Number(claim.proposedQty) === 0,
+    );
 
   return (
     <div className="flex flex-col gap-8">
@@ -306,6 +313,33 @@ export default function BillPackageDetail({
           would bill that work at nothing, so it is refused — price the lines
           first. A zero rate is almost always an unpriced line rather than free
           work.
+        </p>
+      )}
+      {/* Every line proposing zero is what a quiet month looks like **and** what a broken system
+          looks like. Reported 2026-10-08 as the second. The award decides which lines appear and
+          at what rate; approved daily work decides how much — and that fact is nowhere on this
+          screen unless it is said. */}
+      {nothingProposed && (
+        <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+          Every line proposes 0.000, because no approved daily work falls in{' '}
+          {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}. Quantities
+          come from approved daily reports, not from the award — the award sets
+          which lines are billable and at what rate.{' '}
+          {pkg.latestApprovedWork ? (
+            <>
+              The latest approved report on this project is{' '}
+              <strong>{dateLabel(pkg.latestApprovedWork.workDate)}</strong> (
+              {pkg.latestApprovedWork.dprNumber}).
+              {editable
+                ? ' Discard this bill and compose one for a period that covers it.'
+                : ''}
+            </>
+          ) : (
+            <>
+              No daily report has been approved on this project yet, so there is
+              nothing to bill against anywhere.
+            </>
+          )}
         </p>
       )}
 

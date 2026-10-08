@@ -108,6 +108,17 @@ const packageSchema = z
     rates: ratesSchema,
     claims: z.array(claimSchema),
     unpricedClaimedCount: z.number(),
+    /**
+     * The last approved daily report on the project — sent **only** when this package proposed
+     * nothing at all, and null otherwise. Null together with an all-zero proposal is the other
+     * answer: no work has ever been approved here.
+     *
+     * Optional as well as nullable, so a package read from an older server still parses.
+     */
+    latestApprovedWork: z
+      .object({ workDate: z.string(), dprNumber: z.string() })
+      .nullable()
+      .optional(),
   })
   .passthrough();
 
