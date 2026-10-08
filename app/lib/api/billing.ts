@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/projects/client-bills/*` and `/projects/ra-bills/*` call to `buildcore-api`
@@ -163,7 +163,14 @@ export const clientBillSchema = z.object({
   quotedPercentage: decimal,
   grossAmount: decimal,
   retentionAmount: decimal,
-  netAmount: decimal,
+  /**
+   * **Null until the bill package behind this bill is issued.**
+   *
+   * The recoveries, deductions and tax on a package-composed bill are decided on the package and
+   * settled when it is issued. Before that there is no net, and the old answer — the gross, the
+   * bill row's own deduction columns being zero — was a figure the document would not agree with.
+   */
+  netAmount: nullableDecimal,
   certifiedAmount: nullableDecimal,
   certifiedAt: isoDate.nullable(),
   /**
@@ -289,7 +296,8 @@ export const raBillSchema = z.object({
   advanceRecovery: decimal,
   otherDeductions: decimal,
   deductionTotal: decimal,
-  netPayable: decimal,
+  /** Null until the bill package behind this bill is issued — see `netAmount` above. */
+  netPayable: nullableDecimal,
   /**
    * What the project summary takes from this bill: **gross**.
    *
@@ -481,7 +489,15 @@ export interface WorkOrderInput {
   materialAmount?: number;
   /** As a fraction. Refused once a bill has been raised. */
   retentionPercent?: number;
-  status?: string;
+  /**
+   * **Only `completed`, and only on an update** (028 FR-009).
+   *
+   * `POST /projects/work-orders` no longer accepts a status at all — it answers 400 — because
+   * accepting one let a caller declare an award active and bill against it before anybody had
+   * approved it, which is what this screen was doing. `pending_approval` comes from submitting;
+   * `active` comes from the approval chain completing.
+   */
+  status?: 'completed';
 }
 
 export async function getWorkOrders(projectId: string): Promise<WorkOrder[]> {
@@ -565,4 +581,272 @@ export async function updateWorkOrder(
     body: JSON.stringify(input),
   });
   return workOrderSchema.parse(raw);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 028 FR-020, FR-021 — what was paid, and what came back signed
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const PAYMENT_INSTRUMENTS = [
+  'bank_transfer',
+  'cheque',
+  'cash',
+  'adjustment',
+] as const;
+export type PaymentInstrument = (typeof PAYMENT_INSTRUMENTS)[number];
+
+const paymentSchema = z.object({
+  id: z.string(),
+  raBillId: z.string(),
+  paidOn: isoDate,
+  /**
+   * **Nullable, and that is not a quirk of the schema.** A cash payment's amount is hidden from a
+   * caller without the Cash Entry permission (019 FR-014) — `instrument` joined the cash surface
+   * list with 028 — and it arrives as `null` beside `amountHidden: true` rather than as a zero,
+   * because a zero is a figure and nothing downstream could tell the two apart.
+   */
+  amount: nullableDecimal,
+  amountHidden: z.boolean().optional(),
+  instrument: z.enum(PAYMENT_INSTRUMENTS),
+  reference: z.string().nullable(),
+  remarks: z.string().nullable(),
+  recordedAt: isoDate,
+});
+export type BillPayment = z.infer<typeof paymentSchema>;
+
+const billOutstandingSchema = z.object({
+  raBillId: z.string(),
+  billNumber: z.string(),
+  projectId: z.string(),
+  workOrderId: z.string().nullable(),
+  status: z.string(),
+  /** Null until the countersigned copy comes back (FR-020). */
+  acknowledgedOn: isoDate.nullable(),
+  certifiedAmount: decimal,
+  paidAmount: decimal,
+  /** **Derived on the server, stored nowhere.** Certified less paid. */
+  outstandingAmount: decimal,
+  payments: z.array(paymentSchema),
+});
+export type BillOutstanding = z.infer<typeof billOutstandingSchema>;
+
+const subcontractorOutstandingSchema = z.object({
+  partnerId: z.string(),
+  certifiedAmount: decimal,
+  paidAmount: decimal,
+  outstandingAmount: decimal,
+  bills: z.array(billOutstandingSchema),
+});
+export type SubcontractorOutstanding = z.infer<
+  typeof subcontractorOutstandingSchema
+>;
+
+const signedCopySchema = z.object({
+  id: z.string(),
+  subjectType: z.enum(['ra_bill', 'debit_note']),
+  subjectId: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number(),
+  receivedOn: isoDate,
+  uploadedAt: isoDate,
+});
+export type SignedCopy = z.infer<typeof signedCopySchema>;
+
+/**
+ * Records a payment against a certified bill (FR-021).
+ *
+ * `amount` goes as a **string**, not a number: the column is `Decimal(18,2)` and a JSON number
+ * cannot carry every paisa exactly. The response is the bill's whole position afterwards — what was
+ * certified, what has been paid and what is left — because that is what the screen shows next, and
+ * asking for it in a second request is a second chance for the two to disagree.
+ */
+export async function recordBillPayment(
+  raBillId: string,
+  input: {
+    paidOn: string;
+    amount: string;
+    instrument: PaymentInstrument;
+    reference?: string;
+    remarks?: string;
+  },
+): Promise<BillOutstanding> {
+  return billOutstandingSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+/** Removes a payment recorded in error. The only correction route — a payment is never edited. */
+export async function removeBillPayment(paymentId: string): Promise<void> {
+  await authFetch<unknown>(`/projects/ra-bill-payments/${paymentId}`, {
+    method: 'DELETE',
+  });
+}
+
+/** One bill's position: certified, paid, and what is left (FR-021). */
+export async function getBillOutstanding(
+  raBillId: string,
+): Promise<BillOutstanding> {
+  return billOutstandingSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/outstanding`),
+  );
+}
+
+/**
+ * One subcontractor's position across **every** bill of theirs (FR-021).
+ *
+ * Across, not per bill, because that is the question a subcontractor actually asks. Answered bill
+ * by bill, somebody adds six figures up by hand and the number they come back with is the one that
+ * gets paid.
+ */
+export async function getSubcontractorOutstanding(
+  partnerId: string,
+): Promise<SubcontractorOutstanding> {
+  return subcontractorOutstandingSchema.parse(
+    await authFetch<unknown>(
+      `/projects/subcontractors/${partnerId}/outstanding`,
+    ),
+  );
+}
+
+/**
+ * Files the countersigned copy of a bill, which **acknowledges it** (FR-020).
+ *
+ * `receivedOn` is asked for rather than taken from the clock: a copy signed on site on Tuesday and
+ * scanned on Friday was acknowledged on Tuesday, and that is the date a payment term runs from.
+ *
+ * Base64 in a JSON body, the shape `addDwrAttachment` established — one upload mechanism in this
+ * product rather than two.
+ */
+export async function uploadBillSignedCopy(
+  raBillId: string,
+  input: { data: string; fileName: string; receivedOn: string },
+): Promise<SignedCopy> {
+  return signedCopySchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/signed-copy`, {
+      method: 'POST',
+      body: JSON.stringify({ ...input, subjectType: 'ra_bill' }),
+    }),
+  );
+}
+
+/** Files the countersigned copy of a debit note (FR-020). */
+export async function uploadDebitSignedCopy(
+  debitId: string,
+  input: { data: string; fileName: string; receivedOn: string },
+): Promise<SignedCopy> {
+  return signedCopySchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-package-debits/${debitId}/signed-copy`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...input, subjectType: 'debit_note' }),
+      },
+    ),
+  );
+}
+
+export async function getBillSignedCopies(
+  raBillId: string,
+): Promise<SignedCopy[]> {
+  return z
+    .array(signedCopySchema)
+    .parse(
+      await authFetch<unknown>(`/projects/ra-bills/${raBillId}/signed-copies`),
+    );
+}
+
+export async function getDebitSignedCopies(
+  debitId: string,
+): Promise<SignedCopy[]> {
+  return z
+    .array(signedCopySchema)
+    .parse(
+      await authFetch<unknown>(
+        `/projects/bill-package-debits/${debitId}/signed-copies`,
+      ),
+    );
+}
+
+/** Reads a signed copy back, under the name it was uploaded with. */
+export async function downloadSignedCopy(
+  copyId: string,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/signed-copies/${copyId}/file`,
+  );
+  return { blob, filename: filename ?? fallbackName };
+}
+
+/**
+ * One debit as the standalone note a subcontractor signs (FR-018).
+ *
+ * The register already prints inside the package PDF; this is the single-debit document, carrying
+ * the number allocated when the debit was raised so the register and the note cannot disagree about
+ * which debit it is.
+ */
+export async function downloadDebitNote(
+  debitId: string,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/bill-package-debits/${debitId}/note.pdf`,
+  );
+  return { blob, filename: filename ?? fallbackName };
+}
+
+/**
+ * Sends an award for approval (028 FR-009): `draft` → `pending_approval`.
+ *
+ * The commitment is made when the award is given, not when the first bill measures against it — a
+ * work order committing the company to several crore used to go active on one person's save while
+ * the bill under it needed an approval. An award with no lines is refused: there is nothing to
+ * approve in a work order that awards nothing, and a decision recorded against an empty schedule
+ * would stand against whatever is added afterwards.
+ */
+export async function submitWorkOrderForApproval(
+  id: string,
+): Promise<WorkOrder> {
+  return workOrderSchema.parse(
+    await authFetch<unknown>(`/projects/work-orders/${id}/submit`, {
+      method: 'POST',
+    }),
+  );
+}
+
+/**
+ * Takes an approved award back to draft so it can be corrected, voiding the approval.
+ *
+ * The way back from a lock added on 2026-10-08: capturing an award is now refused on anything but
+ * a draft, because an approved award could previously be rewritten in place — rates included — for
+ * as long as no bill had been measured against it. The approval then stood against figures that no
+ * longer existed.
+ *
+ * A reason is required. The act removes a control somebody applied, and "why" is the only part of
+ * that a reader can act on afterwards.
+ */
+/**
+ * Throws away a draft RA bill raised by mistake (2026-10-08).
+ *
+ * A delete rather than a status: a bill nobody sent records nothing worth keeping. Its lines and
+ * its draft package go with it, so the dates it covered can be composed again.
+ */
+export async function discardRaBill(id: string): Promise<void> {
+  await authFetch<unknown>(`/projects/ra-bills/${id}`, { method: 'DELETE' });
+}
+
+export async function reopenWorkOrderAward(
+  id: string,
+  reason: string,
+): Promise<WorkOrder> {
+  return workOrderSchema.parse(
+    await authFetch<unknown>(`/projects/work-orders/${id}/reopen`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  );
 }

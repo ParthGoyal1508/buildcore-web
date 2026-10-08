@@ -252,8 +252,31 @@ export interface EmployeeFilters {
   pageSize?: number;
 }
 
+/**
+ * The largest page `GET /hr/employees` will serve.
+ *
+ * The DTO declares `maximum: 100` and enforces it with `@Max(100)`, so a larger
+ * request is a **400**, not a smaller page — and a picker built on one renders empty
+ * with nothing on screen to say why. Three screens asked for 200 and showed nobody:
+ * the project manager on a project, the operator on a plant logbook entry, and the
+ * custodian on an asset allocation.
+ *
+ * Named here because this is the only module that knows the endpoint's contract. A
+ * caller guessing a number is how the three came to disagree with it.
+ */
+export const EMPLOYEE_PAGE_MAX = 100;
+
 export async function listEmployees(filters: EmployeeFilters = {}) {
-  const data = await authFetch<unknown>(`/hr/employees${qs({ ...filters })}`);
+  // Clamped rather than passed through. A caller asking for more than the endpoint
+  // allows wants as many people as it can get, not a refusal — and the refusal is
+  // what the three screens above were showing.
+  const pageSize =
+    filters.pageSize === undefined
+      ? undefined
+      : Math.min(filters.pageSize, EMPLOYEE_PAGE_MAX);
+  const data = await authFetch<unknown>(
+    `/hr/employees${qs({ ...filters, pageSize })}`,
+  );
   return paginated(employeeSchema).parse(data);
 }
 

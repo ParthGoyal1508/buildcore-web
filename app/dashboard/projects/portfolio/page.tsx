@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -9,6 +10,8 @@ import { INCLUDE_DOCUMENT_READINESS } from '@/app/lib/api/project-documents';
 import { deleteProject, getClients, getProjects } from '@/app/lib/api/projects';
 import {
   MESSAGES,
+  PROJECT_MOVED_PARAM,
+  PROJECT_SHELL_COPY,
   PROJECT_STATUSES,
   ROUTES,
   projectsLabel,
@@ -23,6 +26,13 @@ import PageHeader from '@/app/ui/page-header';
 
 /** The project portfolio (spec US3). */
 export default function PortfolioPage() {
+  // FR-028's other half: the project shell redirects here when a company switch leaves a reader on
+  // a project belonging to the company they have just left, and this is where the explanation
+  // lands. Read from the URL rather than from state, because a redirect discards state and a
+  // reader who reloads what they landed on should still be told why they are here.
+  const movedCompany =
+    useSearchParams().get(PROJECT_MOVED_PARAM) !== null;
+
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [clientId, setClientId] = useState('');
@@ -80,6 +90,15 @@ export default function PortfolioPage() {
           Add project
         </Link>
       </div>
+
+      {movedCompany && (
+        <p
+          role="status"
+          className="mb-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900"
+        >
+          {PROJECT_SHELL_COPY.otherCompanyExplanation}
+        </p>
+      )}
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <TextField

@@ -11,7 +11,7 @@ import {
   type ProjectDocument,
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
-import { dateTimeLabel } from '@/app/lib/format';
+import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import { openStoredFile } from '@/app/lib/download-file';
 import { Button } from '@/app/ui/button';
 import { DocumentUpload, type UploadKind } from '@/app/ui/documents/document-upload';
@@ -40,6 +40,19 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
  * advisory one means somebody is still chasing paper. Those are different sentences, which is why
  * the API counts them separately and why this does not merge them into one "missing" list.
  */
+/**
+ * Whether a document has lapsed — **the same rule readiness applies on the server**.
+ *
+ * Null is no date recorded, not expired: every document filed before 2026-10-09 has none, and
+ * reading those as lapsed would mark every project in flight non-compliant. Compared as whole
+ * days, because an expiry is a calendar date and a certificate valid "until the 31st" is valid
+ * all of the 31st.
+ */
+function hasLapsed(document: { expiresAt?: string | null }): boolean {
+  if (!document.expiresAt) return false;
+  return document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
+}
+
 export default function ProjectDocumentsPanel({
   projectId,
 }: {
@@ -86,6 +99,8 @@ export default function ProjectDocumentsPanel({
       data: string;
       contentType: string;
       fileName?: string;
+      documentNumber?: string;
+      expiresAt?: string;
     }) => uploadProjectDocument(projectId, input),
     onSuccess: () => {
       setUploadFor(null);
@@ -137,8 +152,10 @@ export default function ProjectDocumentsPanel({
    * for a server too old to send the wider list — an upload against the kinds it does know is
    * better than a form with nothing in it.
    *
-   * `expires: false` throughout, and that is not a shrug. A project document has no expiry
-   * column; the panel passes `showExpiry={false}` below for the same reason.
+   * `expires` comes from the kind itself (2026-10-09). It was hardcoded false because
+   * `ProjectDocument` had no expiry column — so an insurance certificate filed here answered its
+   * mandatory kind for ever, lapsed or not. The column exists now and `DocumentType.hasExpiry`
+   * has always said which kinds lapse; this is simply passing it on.
    */
   const available = requirements.data?.availableTypes ?? [];
   const uploadKinds: UploadKind[] = (
@@ -146,7 +163,7 @@ export default function ProjectDocumentsPanel({
   ).map((type) => ({
     documentTypeId: type.documentTypeId,
     name: type.name,
-    expires: false,
+    expires: type.hasExpiry,
   }));
 
   if (documents.isLoading) {
@@ -209,6 +226,30 @@ export default function ProjectDocumentsPanel({
                         dateTimeLabel(document.uploadedAt),
                       )}
                 </p>
+                {(document.expiresAt || document.documentNumber) && (
+                  <p
+                    className={`mt-0.5 text-xs ${
+                      hasLapsed(document) ? 'text-red-700' : 'text-gray-600'
+                    }`}
+                  >
+                    {[
+                      document.documentNumber &&
+                        DOCUMENT_COPY.projectDocumentNumber(
+                          document.documentNumber,
+                        ),
+                      document.expiresAt &&
+                        (hasLapsed(document)
+                          ? DOCUMENT_COPY.projectDocumentExpired(
+                              dateLabel(document.expiresAt),
+                            )
+                          : DOCUMENT_COPY.projectDocumentExpires(
+                              dateLabel(document.expiresAt),
+                            )),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                )}
                 {document.remark && (
                   <p className="mt-0.5 break-words text-xs text-gray-600">
                     {document.remark}
@@ -218,14 +259,18 @@ export default function ProjectDocumentsPanel({
               <div className="flex shrink-0 flex-wrap items-center gap-2">
                 <span
                   className={
-                    document.documentTypeId
-                      ? 'whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-900'
-                      : 'whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700'
+                    hasLapsed(document) && document.documentTypeId
+                      ? 'whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900'
+                      : document.documentTypeId
+                        ? 'whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-900'
+                        : 'whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700'
                   }
                 >
-                  {document.documentTypeId
-                    ? DOCUMENT_COPY.projectDocumentRequiredBadge
-                    : DOCUMENT_COPY.projectDocumentSupplementaryBadge}
+                  {hasLapsed(document) && document.documentTypeId
+                    ? DOCUMENT_COPY.projectDocumentExpiredBadge
+                    : document.documentTypeId
+                      ? DOCUMENT_COPY.projectDocumentRequiredBadge
+                      : DOCUMENT_COPY.projectDocumentSupplementaryBadge}
                 </span>
                 <RowAction
                   intent="read"
@@ -305,10 +350,10 @@ export default function ProjectDocumentsPanel({
             kinds={uploadKinds}
             initialDocumentTypeId={uploadFor || undefined}
             ownerLabel={DOCUMENT_COPY.projectDocumentOwnerLabel}
-            // Neither is stored against a project document, so neither is asked for. See the
-            // note on the props themselves.
-            showDocumentNumber={false}
-            showExpiry={false}
+            // Both are stored against a project document as of 2026-10-09, and the expiry is
+            // required on the kinds that declare one — `DocumentUpload` reads that off the kind.
+            showDocumentNumber
+            showExpiry
             hint={DOCUMENT_COPY.projectDocumentUploadHint}
             onUpload={(input) =>
               upload.mutateAsync({
@@ -322,6 +367,8 @@ export default function ProjectDocumentsPanel({
                 data: input.data,
                 contentType: input.contentType,
                 fileName: input.fileName,
+                documentNumber: input.documentNumber,
+                expiresAt: input.expiresAt,
               })
             }
           />

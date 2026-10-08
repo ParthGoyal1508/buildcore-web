@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import {
-  DWR_WEATHERS,
   FULL_DAY,
   type Dwr,
   type DwrLine,
@@ -13,6 +12,7 @@ import {
   type DwrWarning,
   createDwr,
   describeDwrError as describe,
+  parseChainage,
   previewMeasuredQuantity,
   quantityOf,
   updateDwr,
@@ -48,19 +48,55 @@ import SearchableSelect, {
  * line whose quantity is right by coincidence until somebody fills one in. 022 made the DTO two
  * shapes for exactly this, and a single form here would quietly undo it.
  */
+/**
+ * One measurement, at one position, under a BOQ item.
+ *
+ * **The client's own measurement sheet, column for column** (reported 2026-10-07). Chainage, Side,
+ * Nos, Length, Width, Height, Qty, Remark — what site staff are reading off when they type this,
+ * and what the printable form prints back.
+ *
+ * The field *names* are still the server's (`create-dwr.dto.ts`): `nos1`, `breadth`, `depth`. Only
+ * the labels change. `nos`/`factor` were this form's own invention once and, under
+ * `forbidNonWhitelisted`, a 400 — a lesson worth not repeating.
+ *
+ * `nos2` and `density` are **deliberately absent**. They were offered as "Factor" and "Density"
+ * and nothing has ever used them: of 27 recorded lines, none carries a value other than 1 for
+ * either. Both default to 1, so the product is unchanged and the columns stay — the same decision
+ * FR-023 made for weather. Qty is computed, never typed: a sheet where the dimensions and the
+ * total can disagree is a sheet nobody can check.
+ */
+interface MeasurementRow {
+  chainageFrom: string;
+  chainageTo: string;
+  roadSide: string;
+  nos1: string;
+  length: string;
+  breadth: string;
+  depth: string;
+  remark: string;
+}
+
+/**
+ * The BOQ item is chosen **once** and measured as many times as the day needs.
+ *
+ * ## Why this is a group rather than a line
+ *
+ * One BOQ item is measured at many positions in a day. The client's own sheet shows nine rows of
+ * pot-hole filling under item 1.1 — nine chainages, nine sides, nine quantities, one item. This
+ * form made each of those a card with its own picker, so recording that day meant finding 1.1 in a
+ * 120-line searchable list nine times. The schedule is the slow part of the entry and it was being
+ * repeated for every measurement.
+ *
+ * **Nothing changes in the database.** `DWRTask` is already one row per measurement carrying its
+ * own `boqItemId`, so a group of five rows is five tasks exactly as five cards were — the grouping
+ * is this form's shape, not a new structure. Which is why there is no migration here and why a
+ * report recorded before this edits perfectly: `draftsFrom` reads the stored rows back into groups.
+ */
 type DraftLine =
   | {
       kind: 'measured';
       boqItemId: string;
-      // The server's own six (`create-dwr.dto.ts`), carrying the labels site staff read. `nos` and
-      // `factor` were this form's own invention and, under `forbidNonWhitelisted`, a 400.
-      nos1: string;
-      nos2: string;
-      length: string;
-      breadth: string;
-      depth: string;
-      density: string;
-      remark: string;
+      rows: MeasurementRow[];
     }
   | {
       kind: 'presence';
@@ -70,16 +106,22 @@ type DraftLine =
       remark: string;
     };
 
-const emptyMeasured = (): DraftLine => ({
-  kind: 'measured',
-  boqItemId: '',
+const emptyRow = (): MeasurementRow => ({
+  chainageFrom: '',
+  chainageTo: '',
+  roadSide: '',
   nos1: '',
-  nos2: '',
   length: '',
   breadth: '',
   depth: '',
-  density: '',
   remark: '',
+});
+
+/** A new item opens with one row, because an item measured nowhere is not an entry anybody wants. */
+const emptyMeasured = (): DraftLine => ({
+  kind: 'measured',
+  boqItemId: '',
+  rows: [emptyRow()],
 });
 
 const emptyPresence = (): DraftLine => ({
@@ -90,30 +132,78 @@ const emptyPresence = (): DraftLine => ({
   remark: '',
 });
 
-/** A stored line, back into the shape this form edits. */
-function draftFrom(line: DwrLine): DraftLine {
+/**
+ * `21.3` → `21+300`, for an edit.
+ *
+ * The reverse of `parseChainage`. Three digits of metres always: `6+820` and `6+082` are 738
+ * metres apart, and dropping a leading zero on the second prints the first.
+ */
+function chainageText(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const km = Number(value);
+  if (Number.isNaN(km)) return '';
+  const metres = Math.round(Math.abs(km) * 1000);
+  return `${km < 0 ? '-' : ''}${Math.floor(metres / 1000)}+${String(
+    metres % 1000,
+  ).padStart(3, '0')}`;
+}
+
+/**
+ * The stored lines, back into the groups this form edits.
+ *
+ * **Measured lines are grouped by BOQ item**, in the order the items first appear, so a day
+ * recorded as nine measurements of item 1.1 edits as one item with nine rows — which is what it
+ * was. Grouping by id rather than by adjacency on purpose: the stored order is the order they were
+ * sent, and two runs of the same item separated by another would otherwise open as two groups of
+ * the same thing, which is the duplication this change exists to remove.
+ *
+ * Lines with no BOQ item group together under "not against a BOQ line". They are genuinely one
+ * group — the thing they have in common is having no item — and each keeps its own remark, which
+ * is where a freeform measurement says what it was.
+ *
+ * Presence lines stay one card each. They carry no dimensions, so there is nothing to tabulate.
+ */
+function draftsFrom(lines: DwrLine[]): DraftLine[] {
   const text = (value: string | null | undefined) =>
     value == null || Number(value) === 1 ? '' : String(Number(value));
 
-  return line.paymentMode === 'work_basis'
-    ? {
-        kind: 'measured',
-        boqItemId: line.boqItemId ?? '',
-        nos1: text(line.nos1),
-        nos2: text(line.nos2),
-        length: text(line.length),
-        breadth: text(line.breadth),
-        depth: text(line.depth),
-        density: text(line.density),
-        remark: line.remark ?? '',
-      }
-    : {
+  const drafts: DraftLine[] = [];
+  const groups = new Map<string, Extract<DraftLine, { kind: 'measured' }>>();
+
+  for (const line of lines) {
+    if (line.paymentMode !== 'work_basis') {
+      drafts.push({
         kind: 'presence',
         boqItemId: line.boqItemId ?? '',
         equipmentId: line.equipmentId ?? '',
         servedQty: String(quantityOf(line) ?? '1.000'),
         remark: line.remark ?? '',
-      };
+      });
+      continue;
+    }
+
+    const key = line.boqItemId ?? '';
+    let group = groups.get(key);
+    if (!group) {
+      group = { kind: 'measured', boqItemId: key, rows: [] };
+      groups.set(key, group);
+      drafts.push(group);
+    }
+    group.rows.push({
+      // Back in the notation it was typed in, so an edit does not silently restate `21+300` as
+      // `21.3` and leave the next reader comparing two spellings of one position.
+      chainageFrom: chainageText(line.chainageFrom),
+      chainageTo: chainageText(line.chainageTo),
+      roadSide: line.roadSide ?? '',
+      nos1: text(line.nos1),
+      length: text(line.length),
+      breadth: text(line.breadth),
+      depth: text(line.depth),
+      remark: line.remark ?? '',
+    });
+  }
+
+  return drafts;
 }
 
 /**
@@ -143,7 +233,6 @@ export default function DwrForm({
   const [workDate, setWorkDate] = useState(
     report?.workDate?.slice(0, 10) ?? todayIso(),
   );
-  const [weather, setWeather] = useState(report?.weather ?? '');
   const [workerCount, setWorkerCount] = useState(
     report?.workerCount != null ? String(report.workerCount) : '',
   );
@@ -152,7 +241,7 @@ export default function DwrForm({
   );
   const [description, setDescription] = useState(report?.description ?? '');
   const [lines, setLines] = useState<DraftLine[]>(
-    (report?.lines ?? []).map(draftFrom),
+    draftsFrom(report?.lines ?? []),
   );
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<DwrWarning[]>([]);
@@ -237,31 +326,43 @@ export default function DwrForm({
     setError(null);
     setWarnings([]);
 
-    const payload: DwrLineInput[] = lines.map((line) =>
+    // **One task per measurement row, carrying its group's BOQ item.** The grouping is this
+    // form's shape; the wire has always been flat, so a group of nine rows sends the nine lines
+    // nine cards used to.
+    //
+    // A row left entirely blank is dropped rather than sent. Adding a row and then not filling it
+    // is ordinary — somebody clicks twice, or measures eight of the nine they expected — and a
+    // nil line on a bill's measurement sheet is a line a reviewer has to ask about.
+    const payload: DwrLineInput[] = lines.flatMap((line): DwrLineInput[] =>
       line.kind === 'measured'
-        ? {
+        ? line.rows.filter(hasAnything).map((row) => ({
             paymentMode: 'work_basis' as const,
             ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
-            ...numeric('nos1', line.nos1),
-            ...numeric('nos2', line.nos2),
-            ...numeric('length', line.length),
-            ...numeric('breadth', line.breadth),
-            ...numeric('depth', line.depth),
-            ...numeric('density', line.density),
-            ...(line.remark ? { remark: line.remark } : {}),
-          }
-        : {
-            paymentMode: 'day_basis' as const,
-            ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
-            ...(line.equipmentId ? { equipmentId: line.equipmentId } : {}),
-            servedQty: line.servedQty,
-            ...(line.remark ? { remark: line.remark } : {}),
-          },
+            ...numeric('nos1', row.nos1),
+            ...numeric('length', row.length),
+            ...numeric('breadth', row.breadth),
+            ...numeric('depth', row.depth),
+            // Converted here, not validated away: the API's `chainageFrom` is `@IsNumberString`,
+            // so `21+300` would be a 400. `parseChainage` returns null for anything it cannot
+            // read, and a null is simply not sent — the alternative is sending a guess.
+            ...chainage('chainageFrom', row.chainageFrom),
+            ...chainage('chainageTo', row.chainageTo),
+            ...(row.roadSide.trim() ? { roadSide: row.roadSide.trim() } : {}),
+            ...(row.remark ? { remark: row.remark } : {}),
+          }))
+        : [
+            {
+              paymentMode: 'day_basis' as const,
+              ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
+              ...(line.equipmentId ? { equipmentId: line.equipmentId } : {}),
+              servedQty: line.servedQty,
+              ...(line.remark ? { remark: line.remark } : {}),
+            },
+          ],
     );
 
     save.mutate({
       workDate,
-      ...(weather ? { weather } : {}),
       ...(workerCount ? { workerCount: Number(workerCount) } : {}),
       ...(machineryCount ? { machineryCount: Number(machineryCount) } : {}),
       ...(description ? { description } : {}),
@@ -276,9 +377,11 @@ export default function DwrForm({
           {editing ? `Correct ${report?.dprNumber}` : 'Record a day'}
         </h2>
         <p className="text-sm text-gray-600">
-          Enter what the site did. <strong>Quantities are computed</strong> — a
-          measured line from its dimensions, a presence-paid line from the day
-          served. There is no field to type one into.
+          Enter what the site did. Choose a BOQ item once and measure it as
+          many times as the day needs — a row per position, as the sheet is
+          written. <strong>Quantities are computed</strong>: a measurement from
+          its dimensions, a presence-paid line from the day served. There is no
+          field to type one into.
           {editing && (
             <>
               {' '}
@@ -335,21 +438,16 @@ export default function DwrForm({
           </span>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">Weather</span>
-          <select
-            value={weather}
-            onChange={(event) => setWeather(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2"
-          >
-            <option value="">—</option>
-            {DWR_WEATHERS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/*
+          **Weather was here and is deliberately gone** (028 FR-023). Removed from entry at the
+          client's request: a field nobody filled in honestly and nobody read.
+
+          The column, its default and every recorded value are kept on the server — removing the
+          input is what was asked, discarding history is not — and the printable form still prints
+          what a report holds. The API no longer accepts the field at all, and its pipe runs at
+          `forbidNonWhitelisted`, so sending it from here would now be a 400 rather than a value
+          quietly ignored.
+        */}
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-gray-700">People on site</span>
@@ -392,7 +490,7 @@ export default function DwrForm({
               type="button"
               onClick={() => setLines((rows) => [...rows, emptyMeasured()])}
             >
-              Add a measured line
+              Add a BOQ item
             </Button>
             <Button
               type="button"
@@ -405,8 +503,9 @@ export default function DwrForm({
 
         {lines.length === 0 && (
           <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
-            No lines. A day with nothing measured is still a day that happened —
-            weather, people and machines are worth recording on their own.
+            Nothing recorded yet. A day with nothing measured is still a day
+            that happened — the people and the machines on site are worth
+            recording on their own.
           </p>
         )}
 
@@ -462,16 +561,22 @@ function LineEditor({
   onChange: (next: DraftLine) => void;
   onRemove: () => void;
 }) {
-  const preview =
+  /**
+   * The item's total across its rows, which the client's sheet carries per item.
+   *
+   * `null` where any row's product is — a factor of zero is refused by the server rather than
+   * treated as a blank, and a total that quietly skipped such a row would disagree with what gets
+   * saved. Computed from the same helper each row shows, so the parts and the total cannot differ.
+   */
+  const subtotal =
     line.kind === 'measured'
-      ? previewMeasuredQuantity({
-          nos1: line.nos1,
-          nos2: line.nos2,
-          length: line.length,
-          breadth: line.breadth,
-          depth: line.depth,
-          density: line.density,
-        })
+      ? line.rows
+          .filter(hasAnything)
+          .reduce<number | null>((total, row) => {
+            if (total === null) return null;
+            const value = rowQuantity(row);
+            return value === null ? null : total + Number(value);
+          }, 0)
       : null;
 
   return (
@@ -479,7 +584,7 @@ function LineEditor({
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           {line.kind === 'measured'
-            ? 'Measured — quantity from dimensions'
+            ? 'Measured — one BOQ item, measured where the work happened'
             : 'Presence — quantity is the day served'}
         </span>
         <Button type="button" onClick={onRemove}>
@@ -504,48 +609,170 @@ function LineEditor({
 
       {line.kind === 'measured' ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {(
-              [
-                ['nos1', 'Nos'],
-                ['nos2', 'Factor'],
-                ['length', 'Length'],
-                ['breadth', 'Breadth'],
-                ['depth', 'Depth'],
-                ['density', 'Density'],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-gray-700">{label}</span>
-                <input
-                  inputMode="decimal"
-                  value={line[key]}
-                  onChange={(event) =>
-                    onChange({ ...line, [key]: event.target.value })
-                  }
-                  className="rounded-md border border-gray-300 px-3 py-2"
-                />
-              </label>
-            ))}
+          {/*
+            **The item is chosen once; the measurements are a table under it.**
+
+            The client's sheet shows nine rows of pot-hole filling under item 1.1 — nine chainages,
+            nine sides, nine quantities, one item. This form used to make each of those a card with
+            its own picker, so recording that day meant finding 1.1 in a 120-line list nine times.
+
+            A table rather than nine stacked cards because a table is what the person is copying
+            from, and because eight dimensions stacked vertically nine times is a page nobody can
+            check a column of against their own sheet. It scrolls inside itself, so a long remark
+            never widens the page around it.
+          */}
+          <div className="overflow-x-auto rounded border border-gray-200">
+            <table className="w-full min-w-[56rem] text-sm">
+              <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+                <tr>
+                  <th className="px-2 py-2 font-medium">Chainage from</th>
+                  <th className="px-2 py-2 font-medium">To</th>
+                  <th className="px-2 py-2 font-medium">Side</th>
+                  <th className="px-2 py-2 font-medium">Nos.</th>
+                  <th className="px-2 py-2 font-medium">Length</th>
+                  <th className="px-2 py-2 font-medium">Width</th>
+                  <th className="px-2 py-2 font-medium">Height</th>
+                  <th className="px-2 py-2 text-right font-medium">Qty</th>
+                  <th className="px-2 py-2 font-medium">Remark</th>
+                  <th className="px-2 py-2" aria-label="Remove" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {line.rows.map((row, rowIndex) => {
+                  const update = (next: Partial<MeasurementRow>) =>
+                    onChange({
+                      ...line,
+                      rows: line.rows.map((existing, i) =>
+                        i === rowIndex ? { ...existing, ...next } : existing,
+                      ),
+                    });
+                  const quantity = hasAnything(row) ? rowQuantity(row) : null;
+
+                  return (
+                    <tr key={rowIndex}>
+                      <td className="px-2 py-1.5">
+                        <Cell
+                          value={row.chainageFrom}
+                          onChange={(chainageFrom) => update({ chainageFrom })}
+                          placeholder="21+300"
+                          width="w-28"
+                          label="Chainage from"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Cell
+                          value={row.chainageTo}
+                          onChange={(chainageTo) => update({ chainageTo })}
+                          placeholder="21+450"
+                          width="w-28"
+                          label="Chainage to"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Cell
+                          value={row.roadSide}
+                          onChange={(roadSide) => update({ roadSide })}
+                          placeholder="LHS"
+                          width="w-24"
+                          label="Side"
+                        />
+                      </td>
+                      {(
+                        [
+                          ['nos1', 'Nos'],
+                          ['length', 'Length'],
+                          ['breadth', 'Width'],
+                          ['depth', 'Height'],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <td key={key} className="px-2 py-1.5">
+                          <Cell
+                            value={row[key]}
+                            onChange={(value) => update({ [key]: value })}
+                            numeric
+                            width="w-20"
+                            label={label}
+                          />
+                        </td>
+                      ))}
+                      {/* Per row, and computed. The client's sheet carries this column and it is
+                          the one a reviewer checks against their own — so it is shown as the row
+                          is typed rather than after a save. */}
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {quantity ?? (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Cell
+                          value={row.remark}
+                          onChange={(remark) => update({ remark })}
+                          placeholder="RA-06"
+                          width="w-40"
+                          label="Remark"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        {/* Never the last row: removing it would leave an item measured nowhere,
+                            and the way to drop an item is to remove the item. */}
+                        {line.rows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onChange({
+                                ...line,
+                                rows: line.rows.filter(
+                                  (_row, i) => i !== rowIndex,
+                                ),
+                              })
+                            }
+                            className="min-h-11 px-2 text-sm text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                            aria-label={`Remove measurement ${rowIndex + 1}`}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="border-t border-gray-200 bg-gray-50">
+                <tr>
+                  <td className="px-2 py-2 text-xs text-gray-600" colSpan={7}>
+                    Chainage as the sheet writes it — <strong>21+300</strong> is
+                    21 km and 300 m. A plain <strong>21.300</strong> is accepted
+                    too. An empty box counts as one.
+                  </td>
+                  <td className="px-2 py-2 text-right font-semibold tabular-nums">
+                    {subtotal === null ? '—' : subtotal.toFixed(3)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-gray-600" colSpan={2}>
+                    Total for this item
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
-          <p className="mt-2 text-sm">
-            <span className="text-gray-600">
-              The server will compute a quantity of{' '}
-            </span>
-            <span className="font-semibold text-gray-900">
-              {preview ?? '—'}
-            </span>
-            {preview === null && (
-              <span className="text-gray-600">
-                {' '}
-                — a factor of zero is refused rather than treated as a blank,
-                because a line measuring nothing is usually a field left empty.
-              </span>
-            )}
-            <span className="text-gray-600">
-              . An empty box counts as one.
-            </span>
-          </p>
+
+          <div className="mt-3">
+            <Button
+              type="button"
+              onClick={() =>
+                onChange({ ...line, rows: [...line.rows, emptyRow()] })
+              }
+            >
+              Add a measurement
+            </Button>
+          </div>
+
+          {subtotal === null && line.rows.some(hasAnything) && (
+            <p className="mt-2 text-sm text-amber-800" role="status">
+              A row has a factor of zero. The server refuses that rather than
+              treating it as a blank, because a line measuring nothing is almost
+              always a field left empty by mistake.
+            </p>
+          )}
         </>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -583,27 +810,111 @@ function LineEditor({
         </div>
       )}
 
-      <label className="mt-3 flex flex-col gap-1 text-sm">
-        <span className="font-medium text-gray-700">
-          Remark{' '}
-          {line.kind === 'presence' &&
-            Number(line.servedQty) < FULL_DAY &&
-            '(required for a short day)'}
-        </span>
-        <textarea
-          rows={2}
-          value={line.remark}
-          onChange={(event) => onChange({ ...line, remark: event.target.value })}
-          className="rounded-md border border-gray-300 px-3 py-2"
-          placeholder="30% deduction — shoulder slope, supervisor labour, staff not available"
-        />
-      </label>
+      {/* Presence only. A measured item's remarks belong to its rows — the client's sheet writes
+          one per measurement ("RA-06"), and a single box under nine rows cannot say which of them
+          it is about. */}
+      {line.kind === 'presence' && (
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          <span className="font-medium text-gray-700">
+            Remark{' '}
+            {Number(line.servedQty) < FULL_DAY && '(required for a short day)'}
+          </span>
+          <textarea
+            rows={2}
+            value={line.remark}
+            onChange={(event) =>
+              onChange({ ...line, remark: event.target.value })
+            }
+            className="rounded-md border border-gray-300 px-3 py-2"
+            placeholder="30% deduction — shoulder slope, supervisor labour, staff not available"
+          />
+        </label>
+      )}
     </div>
   );
+}
+
+/**
+ * One cell of the measurement table.
+ *
+ * A bare input rather than a labelled field: the column header is the label, which is what makes
+ * nine rows readable where nine labelled stacks are not. The header is not announced to a screen
+ * reader by proximity though, so **every** cell carries an `aria-label` naming its column —
+ * otherwise each one is "edit text" and the table is unusable without sight of it.
+ *
+ * `label` is required, and it used to fall back to `placeholder`. That read plausibly and was
+ * wrong: the four text cells pass only a placeholder, so a screen reader announced the chainage
+ * boxes as "21+300" and "21+450", the side as "LHS" and the remark as "RA-06" — examples, not
+ * names. The fallback is gone so the compiler asks for the column name instead of inventing one.
+ */
+function Cell({
+  value,
+  onChange,
+  placeholder,
+  numeric: isNumeric,
+  width,
+  label,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  numeric?: boolean;
+  width: string;
+  label: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      inputMode={isNumeric ? 'decimal' : undefined}
+      aria-label={label}
+      className={`${width} min-h-11 rounded-md border border-gray-300 px-2 py-1.5 ${
+        isNumeric ? 'tabular-nums' : ''
+      }`}
+    />
+  );
+}
+
+/**
+ * One row's quantity, by the same rule the server applies.
+ *
+ * `null` where a factor is zero — refused rather than treated as a blank, because a line measuring
+ * nothing is almost always a field left empty by mistake rather than work that did not happen.
+ */
+function rowQuantity(row: MeasurementRow): string | null {
+  return previewMeasuredQuantity({
+    nos1: row.nos1,
+    length: row.length,
+    breadth: row.breadth,
+    depth: row.depth,
+  });
+}
+
+/**
+ * Whether a measurement row carries anything at all.
+ *
+ * A row of empty boxes would otherwise be sent as a line measuring 1 — every factor omitted, so
+ * the product is 1 — which is a quantity nobody entered appearing on a bill.
+ */
+function hasAnything(row: MeasurementRow): boolean {
+  return Object.values(row).some((value) => value.trim() !== '');
 }
 
 /** Only the fields that carry a value, because an empty string is not a decimal. */
 function numeric(key: string, value: string): Record<string, string> {
   return value.trim() === '' ? {} : { [key]: value.trim() };
+}
+
+/**
+ * A chainage, in whichever notation it was typed, as the decimal kilometres the API stores.
+ *
+ * Omitted rather than sent when it cannot be read. The API validates these as number strings, so
+ * `km 21` would come back a 400 naming a field the person cannot see the problem with — and a
+ * position nobody could parse is better absent than approximated.
+ */
+function chainage(key: string, value: string): Record<string, string> {
+  const parsed = parseChainage(value);
+  return parsed === null ? {} : { [key]: parsed };
 }
 

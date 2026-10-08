@@ -104,7 +104,17 @@ export const ROUTES = {
   projectsProjectDocuments: (id: string) =>
     `/dashboard/projects/portfolio/${id}/documents`,
   projectsClients: '/dashboard/projects/clients',
+  /**
+   * One client, and the projects it holds (2026-10-09).
+   *
+   * The list already showed a `projectCount`; the reader's next question is always *which
+   * ones*, and the only answer was to go to the portfolio and filter. Both masters now open
+   * the way the portfolio does.
+   */
+  projectsClient: (id: string) => `/dashboard/projects/clients/${id}`,
   projectsSites: '/dashboard/projects/sites',
+  /** One site: its geofence, its address and the project it belongs to. */
+  projectsSite: (id: string) => `/dashboard/projects/sites/${id}`,
 
   /**
    * The BOQ for one project — the schedule every bill below is measured against (008 US5,
@@ -901,11 +911,28 @@ export const BILLING_COPY = {
   retention: 'Retention',
   retentionBasis: (percent: string) => `${percent} of gross, withheld by the client`,
   advanceRecovery: 'Advance recovery',
+  /**
+   * Said on the sheet where the two inputs used to be (028 FR-004).
+   *
+   * Silence would be worse than the inputs were. Somebody who recorded a deduction here last month
+   * and finds the boxes gone needs to be told where it went, not left to conclude the capability
+   * was removed.
+   */
+  deductionsMovedNote:
+    'Recoveries and deductions are recorded on the bill package, which is what the issued document reads. Figures already on this bill are shown below and carried forward.',
   advanceRecoveryBasis: 'Money already advanced, coming back',
   otherDeductions: 'Other deductions',
   deductionTotal: 'Total deductions',
   net: 'Net',
   netPayable: 'Net payable',
+  /**
+   * Shown in place of a net on a bill whose package has not been issued.
+   *
+   * The recoveries, deductions and tax are decided on the package and settled at issue. Printing
+   * the gross there — which is what the bill row holds until then — states a figure the bill's own
+   * document will not agree with.
+   */
+  netNotYetSettled: 'Set when the bill package is issued',
   /**
    * The four-way distinction, said on the screen and not only in the code.
    *
@@ -919,6 +946,18 @@ export const BILLING_COPY = {
   composing: 'Composing…',
   composeFailed: 'That bill could not be composed.',
   submit: 'Submit bill',
+  /**
+   * Throwing away a draft raised by mistake (2026-10-08).
+   *
+   * Reported: "I raised the bill twice for the same date." A draft could be submitted, revised or
+   * left in the list for ever — and a duplicate left in the list is one somebody eventually
+   * submits.
+   */
+  discard: 'Discard bill',
+  discarding: 'Discarding…',
+  discardConfirm: (billNumber: string) =>
+    `Discard ${billNumber}? It has not been submitted, so nothing has been claimed — the bill and its measured lines are removed, and the period becomes free to bill again. This cannot be undone.`,
+  discardFailed: 'That bill could not be discarded.',
   submitting: 'Submitting…',
   submitFailed: 'That bill could not be submitted.',
   billNumberLabel: 'Bill number',
@@ -952,6 +991,21 @@ export const BILLING_COPY = {
    * and four tabs over two sections would be copying that page's shape rather than its point.
    */
   composeNew: 'Compose a bill',
+  /**
+   * The two routes to a client bill, named for what each is good at (028 FR-007).
+   *
+   * The package proposes every quantity from approved daily work — the capability has existed since
+   * 023 and was reachable only from a different tab, so this screen's manual sheet was the obvious
+   * route and the one that reads nothing the site recorded. A bill typed against a 231-line
+   * schedule when the application already knows what was built is work done twice, and the second
+   * answer is the one nobody can check.
+   */
+  composeFromWork: 'Compose from approved work',
+  composeFromWorkHint:
+    'Every quantity proposed from the daily work approved in the period — you review them rather than entering them, and a figure you change carries a reason.',
+  composeByHand: 'Enter quantities by hand',
+  composeByHandHint:
+    'The correction route, for scope measured outside a daily report. Nothing here is proposed, so every figure is typed and nothing checks it against what the site recorded.',
   composeCancel: 'Cancel',
   composeHeading: 'New bill to the client',
   pickBillPrompt: 'Pick a bill to read it, or compose a new one.',
@@ -1152,6 +1206,49 @@ export const WORK_ORDER_COPY = {
   /** Refused by the server, so said here rather than discovered on the save. */
   awardLockedByBills:
     'Bills have been raised against this award, so it can no longer be replaced — the remaining quantity on a bill already issued would move, and the subcontractor’s copy would then disagree with ours. Raise a variation instead.',
+
+  // --- 028 FR-009: the award is approved before it commits anything ---
+  /**
+   * The award approval, which did not exist until 028.
+   *
+   * A work order committing the company to several crore went `active` the moment one person saved
+   * it, while the first bill raised under it needed an approval. The commitment is made when the
+   * award is given; a bill only measures against it.
+   */
+  submitForApproval: 'Send the award for approval',
+  submitting: 'Sending…',
+  submitHint:
+    'A bill cannot be measured against this award until it has been approved. Capture the award lines first — there is nothing to approve in a work order that awards nothing.',
+  pendingHint:
+    'Waiting for approval. A bill against it is refused until the approval completes — which is a different thing from it never having been sent.',
+  activeHint:
+    'Approved. Bills may be measured against this award — and the award is now fixed. Reopen it to change a rate.',
+  submitFailed: 'That award could not be sent for approval.',
+
+  /**
+   * Reopening an approved award (2026-10-08).
+   *
+   * Reported from the screen: "once it is approved, if I'm changing the rate it's allowing me to
+   * update the rate". It was — capturing an award was refused only once a bill existed, so between
+   * approval and the first bill the rates could be rewritten while the order stayed approved.
+   *
+   * Now the editor is locked outside a draft, and this is the way back. Its own control rather
+   * than a side effect of saving: an edit that quietly cancelled an approval would remove one
+   * without the person noticing they had.
+   */
+  reopen: 'Reopen the award',
+  reopening: 'Reopening…',
+  reopenPrompt:
+    'Reopening sends this award back to draft and cancels its approval — it will have to be approved again. Why is it being reopened?',
+  reopenHint:
+    'The rates are fixed while the award is approved. Reopen it to correct one; the approval is given again afterwards.',
+  reopenedNotice:
+    'Back to draft. The approval has been cancelled — correct the award, then send it for approval again.',
+  reopenFailed: 'That award could not be reopened.',
+  awardLockedPending:
+    'Somebody is reviewing these figures, so they cannot be changed. Changing them under the approver would put a decision against a schedule they never saw.',
+  awardLockedApproved:
+    'This award was approved at the rates it holds, so it cannot be edited. Reopen it to make a change — that cancels the approval.',
 
   // --- 027: the number, the vendor, and the master–detail frame ---
   /** Shown where a code would be, for the work orders raised before 027 numbered them. */
@@ -2062,7 +2159,7 @@ export const PROJECT_TAB_SOURCES = {
    */
   materials:
     'Material is not added here. It appears once stock is issued from one of this project’s sites. The store has to hold the stock first — receive it on a purchase, or transfer it in — because the issue form offers only what that store actually has.',
-  materialsLink: 'Open Inventory → Issues',
+  materialsLink: 'Open Inventory → Issue / Consumption material',
   materialsSecondLink: 'Open Inventory → Purchases',
 } as const;
 
@@ -3690,6 +3787,16 @@ export const DOCUMENT_COPY = {
   projectDocumentsEmpty: 'Nothing has been filed against this project yet.',
   projectDocumentRequiredBadge: 'Answers a required kind',
   projectDocumentSupplementaryBadge: 'Supplementary',
+  /**
+   * An expired document stops answering its required kind, so the badge has to say so rather
+   * than leaving a reader to compare a date against today in their head. The required badge is
+   * replaced, not decorated: a row reading both "Answers a required kind" and "Expired" states
+   * the opposite of what readiness now counts.
+   */
+  projectDocumentExpiredBadge: 'Expired — no longer answers',
+  projectDocumentExpires: (when: string) => `Expires ${when}`,
+  projectDocumentExpired: (when: string) => `Expired ${when}`,
+  projectDocumentNumber: (value: string) => `No. ${value}`,
   projectDocumentFiledBy: (name: string, when: string) =>
     `Filed by ${name} · ${when}`,
   /** When the uploader's account has gone; the document and its date are still the point. */
@@ -3730,6 +3837,16 @@ export const DOCUMENT_COPY = {
     `${fileName} could not be uploaded. ${reason}`,
   /** T072: the server's refusal, said on the control it refers to. */
   creationRefusedHere: 'The server refused the project without this document.',
+  /**
+   * Where a project's documents live once it exists (028, reported 2026-10-07).
+   *
+   * The edit form shows no upload controls — an existing project is past the creation gate and its
+   * papers are filed on its own Documents tab. Said rather than left as an absence, because the
+   * reader's question when the controls are not there is "where did they go", and silence answers
+   * it with a hunt through ten tabs.
+   */
+  editFiledElsewhere: 'Documents for this project are filed on its Documents tab.',
+  editFiledElsewhereLink: 'Open Documents',
   /**
    * The summary beside the submit control. Names the count, not the kinds — the kinds are named on
    * their own controls, and repeating them here is the matching exercise T072 exists to remove.
@@ -3834,6 +3951,108 @@ export const PAYMENT_PROOF_COPY = {
  * project page that says *No machinery on this project* when Plant was never consulted is
  * stating as fact the one thing nobody knows.
  */
+/**
+ * What the Inventory issue screen is called (028 FR-030).
+ *
+ * **Labels only. The route stays `/dashboard/inventory/issues` and so does the API.** Renaming a
+ * URL breaks every link already sent — a bookmark, a message, a printed note — for no gain a user
+ * can see, and the complaint was about the word on the screen.
+ *
+ * One constant because the word appears in four places: the Inventory tab strip, the Inventory
+ * landing tile, the page heading, and the link out of a project's Materials tab. Three of them
+ * being renamed is the version of this that looks like a bug.
+ */
+/**
+ * The bill-package composer's subcontractor filter (028 FR-025 to FR-027).
+ *
+ * The control exists because a project can carry dozens of work orders and the composer offered
+ * them as one flat list: finding the right one meant reading every entry. Choosing the
+ * subcontractor first narrows it to their contracts, which is how anybody actually thinks about it.
+ */
+/**
+ * Payments against a bill, and the copy that comes back signed (028 FR-020, FR-021).
+ *
+ * A bill reached certified and stopped: nothing recorded that it had been paid, so what a
+ * subcontractor is still owed was answered from a spreadsheet — which is why two people had two
+ * answers.
+ */
+export const SETTLEMENT_COPY = {
+  heading: 'Payment and acknowledgement',
+  /** Only a certified bill has an agreed figure to be outstanding against. */
+  notCertified:
+    'This bill has not been certified, so there is no agreed figure to pay against and its quantities can still change. Money paid before certification is an advance — record it as an advance recovery on the bill package.',
+  certified: 'Certified',
+  paid: 'Paid',
+  outstanding: 'Outstanding',
+  /** Said once, where somebody might otherwise look for a stored balance. */
+  outstandingHint:
+    'Certified less paid, computed on this read. No balance is stored anywhere, so correcting a payment corrects the figure.',
+  settled: 'Settled in full',
+
+  paymentsHeading: 'Payments',
+  paymentsNone: 'Nothing has been paid against this bill yet.',
+  paidOnLabel: 'Paid on',
+  amountLabel: 'Amount',
+  instrumentLabel: 'Instrument',
+  referenceLabel: 'Reference',
+  referenceHint: 'UTR, cheque number, adjustment memo.',
+  remarksLabel: 'Remarks',
+  record: 'Record the payment',
+  recording: 'Recording…',
+  remove: 'Remove',
+  removeConfirm:
+    'Remove this payment? The outstanding figure moves with it. A payment is never edited — removing and re-recording is the correction route.',
+  instrumentLabels: {
+    bank_transfer: 'Bank transfer',
+    cheque: 'Cheque',
+    cash: 'Cash',
+    adjustment: 'Adjustment',
+  } as Record<string, string>,
+
+  signedHeading: 'Signed copy',
+  /** The state, which is the point of FR-020 — not merely a file in a list. */
+  acknowledged: (date: string) => `Acknowledged on ${date}`,
+  unacknowledged: 'No signed copy has come back yet.',
+  receivedOnLabel: 'Received on',
+  receivedOnHint:
+    'When the copy came back, not when it was scanned. A copy signed on site on Tuesday and scanned on Friday was acknowledged on Tuesday — and that is the date a payment term runs from.',
+  fileLabel: 'The signed copy',
+  upload: 'File the signed copy',
+  uploading: 'Uploading…',
+  download: 'Download',
+  /** A later scan does not move the acknowledgement date. */
+  replaceHint:
+    'The first copy sets the acknowledgement date. A later replacement scan is filed beside it and does not move the date.',
+  debitNote: 'Download the debit note',
+} as const;
+
+export const BILL_PACKAGE_PICKER_COPY = {
+  subcontractorLabel: 'Subcontractor',
+  subcontractorAll: 'All subcontractors',
+  subcontractorHint:
+    'Choose the subcontractor first and the work orders narrow to their contracts.',
+  /**
+   * `WorkOrder.partnerId` is nullable, so some work orders belong to nobody yet.
+   *
+   * They get **their own entry** rather than being filtered out (FR-027). Filtered, they are
+   * unbillable with nothing on screen to say why — and the thing to do about one is to set its
+   * subcontractor, which a reader cannot know to do if they cannot see it.
+   */
+  subcontractorUnassigned: 'No subcontractor set',
+  unassignedHint:
+    'These work orders have no subcontractor recorded. They can still be billed; set the subcontractor under Subcontractors so they appear under a name.',
+  /** Said after the subcontractor changes, because the work order deliberately cleared. */
+  selectionCleared:
+    'The work order has been cleared because the subcontractor changed. Choose one of theirs.',
+  noWorkOrders:
+    'This subcontractor has no work order on this project. Raise one under Subcontractors first.',
+} as const;
+
+export const INVENTORY_ISSUE_LABEL = 'Issue / Consumption material';
+
+/** The same label where a shorter one is needed — a tab strip, a breadcrumb. */
+export const INVENTORY_ISSUE_LABEL_SHORT = 'Issue / Consumption';
+
 export const PROJECT_SHELL_COPY = {
   loading: 'Loading this project…',
   loadFailed: 'This project could not be loaded.',
@@ -3842,6 +4061,16 @@ export const PROJECT_SHELL_COPY = {
 
   overviewHeading: 'Overview',
   contractHeading: 'Contract',
+  /**
+   * 028 FR-029. Commercial **terms**, in a card of their own.
+   *
+   * Retention and the quoted percentage are not descriptive facts about a project — they are the
+   * terms money is computed under, and both are refusals waiting to happen: a bill to the client
+   * is refused until retention is recorded, and the quoted percentage prices every line of the
+   * schedule. Mixed into Contract they read as two more fields among twelve.
+   */
+  commercialHeading: 'Commercial terms',
+  detailsHeading: 'Details',
   activityHeading: 'Activity',
   peopleHeading: 'People on this project',
   machineryHeading: 'Machinery deployed here',
@@ -3870,7 +4099,58 @@ export const PROJECT_SHELL_COPY = {
 
   locked:
     'This project is locked. Its details cannot be changed until it is unlocked on the edit screen.',
+
+  // --- 028 FR-029: the facts the response held and the page never showed ---
+  clientLabel: 'Client',
+  managerLabel: 'Project manager',
+  locationLabel: 'Location',
+  departmentLabel: 'Department',
+  projectTypeLabel: 'Project type',
+  siteStartLabel: 'Site start',
+  cgstLabel: 'CGST',
+  cgstApplicable: 'Applicable',
+  cgstNotApplicable: 'Not applicable',
+  retentionLabel: 'Client retention',
+  quotedLabel: 'Quoted percentage',
+  /** Null is not zero: a bill to the client is refused until a term is recorded. */
+  retentionUnset: 'Not recorded — a bill to the client is refused until it is set',
+  quotedAtPar: 'At par',
+  /**
+   * The sign carried in words as well as in the figure.
+   *
+   * `−10.79%` and `10.79% below the schedule` say the same thing, and the second cannot be
+   * misread. 027's defect was a dropped sign that read a tender quoted *below* the estimate as
+   * quoted above it — ₹88.96 lakh on one file — so this page says which way it goes.
+   */
+  quotedDirection: (fraction: number) =>
+    fraction === 0
+      ? 'At par with the schedule'
+      : `${(Math.abs(fraction) * 100).toFixed(2)}% ${fraction < 0 ? 'below' : 'above'} the schedule`,
+  managerUnknown: 'Recorded, but not on this project’s roster',
+  notRecorded: 'Not recorded',
+
+  // --- 028 FR-028: changing company while reading a project ---
+  /** Shown for the instant between the 404 and the redirect landing. */
+  otherCompanyRedirect: 'Taking you back to the portfolio…',
+  /**
+   * The explanation **on arrival**, which is the half that matters.
+   *
+   * A silent redirect reads as the application losing your place, and the reader's next move is to
+   * click into a project that will do it again. Says what happened, why, and what is in front of
+   * them now — without implying they did anything wrong, because they did not.
+   */
+  otherCompanyExplanation:
+    'That project belongs to the company you were in before. You are now looking at the portfolio of the company you have just selected.',
 } as const;
+
+/**
+ * The query parameter that carries FR-028's explanation to the portfolio.
+ *
+ * A parameter rather than client state, because the redirect is a navigation: state set before
+ * `router.replace` does not survive it, and a reader who reloads the page they landed on should
+ * still see why they are there.
+ */
+export const PROJECT_MOVED_PARAM = 'movedCompany';
 
 export const BOQ_COPY = {
   heading: 'Bill of Quantities',
@@ -3948,6 +4228,26 @@ export const BOQ_COPY = {
   columnAmount: 'Amount',
   estimateTotal: 'Estimated cost',
 
+  /**
+   * What the contract schedule is actually worth (2026-10-07).
+   *
+   * Reported: a project imported with a quote of −10.79% showed every line at its full schedule
+   * rate, with nothing on the screen mentioning the quote — so the only available reading was that
+   * the percentage had not been applied. It had been, on every bill; the schedule simply never
+   * said so.
+   *
+   * The **rate column stays the schedule rate**, because that is the figure the tender prints and
+   * the one a variation or a dispute is argued against. What was missing is the other number: what
+   * the same schedule is worth once the quote is on it.
+   */
+  scheduleTotalLabel: 'Schedule total',
+  quotedLabel: 'Quoted',
+  contractTotalLabel: 'Contract total at quote',
+  quotedAtPar: 'At par — priced from the schedule exactly',
+  quotedNote:
+    'Rates below are the schedule’s own. Every bill prices its lines at the quoted percentage, ' +
+    'and keeps the percentage it was priced at.',
+
   // Alert tabs — four, not three
   alertsHeading: 'What needs attention',
   tabToday: 'Due today',
@@ -3984,6 +4284,20 @@ export const BOQ_COPY = {
   reportDoesNotReconcile:
     'The totals do not agree with the figures stated in your file. Check the schedule before confirming.',
   reportPercentage: 'Quoted percentage',
+  /**
+   * The direction said in words, not left to a minus sign (027).
+   *
+   * A tender is quoted above the estimate or below it, and which one it is moves every bill on the
+   * project for the life of the contract — on this file, by ₹44 lakh. The importer read the
+   * magnitude and dropped the direction until 2026-10-06; this is the screen where a person
+   * confirms it, and `-10.79%` is one keystroke of rendering away from reading as `10.79%`.
+   */
+  reportPercentageDirection: (fraction: number) =>
+    fraction < 0
+      ? 'below the schedule rate'
+      : fraction > 0
+        ? 'above the schedule rate'
+        : 'at par with the schedule rate',
   /**
    * Shown where the percentage was not found (FR-028).
    *

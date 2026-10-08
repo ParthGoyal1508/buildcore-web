@@ -73,6 +73,13 @@ export type DwrStatus = (typeof DWR_STATUSES)[number];
 export const DWR_PAYMENT_MODES = ['work_basis', 'day_basis'] as const;
 export type DwrPaymentMode = (typeof DWR_PAYMENT_MODES)[number];
 
+/**
+ * The recorded weather vocabulary.
+ *
+ * **Kept, although entry no longer offers it** (028 FR-023). Reports recorded before this carry
+ * real values and still display them, and the printable form prints what a report holds — so the
+ * vocabulary is still needed to read one. It is the *input* that went, not the field.
+ */
 export const DWR_WEATHERS = ['clear', 'cloudy', 'rain', 'storm'] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,9 +179,31 @@ const dwrSchema = z
     description: z.string().nullable().optional(),
     createdByUserId: z.string().nullable().optional(),
     submittedByUserId: z.string().nullable().optional(),
+    /**
+     * Who filed it and who put it forward, **by name** (028 FR-024).
+     *
+     * Both, because on a report returned for correction they are different people — and the one
+     * who has to answer for a figure is usually the second. The ids above have been returned
+     * since 025 and name nobody: a report attributed to `cmuoe9b7l00q5v8…` answers half the
+     * question it was asked.
+     */
+    recordedByName: z.string().nullable().optional(),
+    submittedByName: z.string().nullable().optional(),
+    approvedByName: z.string().nullable().optional(),
     submittedAt: z.string().nullable().optional(),
     approvedByUserId: z.string().nullable().optional(),
     approvedAt: z.string().nullable().optional(),
+    /**
+     * Why a reviewer sent this back, and who (028).
+     *
+     * **The reason is the action.** It was typed into a prompt, sent on the request, and dropped
+     * by a route that read no body — so a returned report arrived at its author as a status of
+     * `draft` with no sentence anywhere saying what to change. Parsed here because the detail
+     * screen is where the author reads it.
+     */
+    returnedAt: z.string().nullable().optional(),
+    returnedByName: z.string().nullable().optional(),
+    returnReason: z.string().nullable().optional(),
     reversedAt: z.string().nullable().optional(),
     reversalReason: z.string().nullable().optional(),
     reversalCount: z.number().optional(),
@@ -348,7 +377,9 @@ export type DwrLineInput = MeasuredLineInput | PresenceLineInput;
 
 export interface CreateDwrInput {
   workDate: string;
-  weather?: string;
+  // `weather` removed by 028 FR-023. Not accepted by either DTO any more, and the API's pipe runs
+  // at `forbidNonWhitelisted`, so sending it is a 400 rather than a value quietly ignored. Gone
+  // from the type as well, so a caller that still sets it fails to compile rather than at runtime.
   workerCount?: number;
   machineryCount?: number;
   progress?: number;
@@ -586,11 +617,14 @@ export function factorsOf(line: DwrLine): [string, string][] {
   if (line.paymentMode !== 'work_basis') return [];
   return (
     [
-      ['nos 1', line.nos1],
-      ['nos 2', line.nos2],
+      // The client's own words (2026-10-07), not the column names. `nos 2` and `density` keep
+      // theirs: entry no longer offers either, so a line showing one carries a value that did not
+      // come from this form and naming it plainly is the point.
+      ['nos', line.nos1],
       ['length', line.length],
-      ['breadth', line.breadth],
-      ['depth', line.depth],
+      ['width', line.breadth],
+      ['height', line.depth],
+      ['factor', line.nos2],
       ['density', line.density],
     ] as const
   )
@@ -646,4 +680,60 @@ export function describeDwrError(err: unknown): string {
     anyErr?.message ??
     'The report was refused and the server gave no reason.'
   );
+}
+
+/**
+ * One report as the client's printable form (028 FR-022).
+ *
+ * The daily-work surface had **no download of any kind** — fifteen endpoints and none producing a
+ * file — so a report read on screen had to be retyped into the client's own spreadsheet to be sent
+ * anywhere, which is where the two copies start to disagree.
+ *
+ * The name comes from the server, which builds it from the report number and the work date. Never
+ * guessed here: a filename assembled in the browser is the one that arrives as a bare id the day
+ * somebody changes the convention on one side only.
+ */
+export async function downloadDwrReport(
+  dwrId: string,
+  dprNumber: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/dwr/${dwrId}/report.xlsx`,
+  );
+  // The server's name, which it builds from the report number and the work date. The fallback is
+  // the report number rather than a generic "report": a folder of files called `report.xlsx` is
+  // the thing 017 fixed for every other download in this product.
+  return { blob, filename: filename ?? `${dprNumber}.xlsx` };
+}
+
+/**
+ * `21+300` → `21.3`, for storage. Also accepts a plain decimal, unchanged.
+ *
+ * A road is measured from its start in kilometres and metres, and the client's measurement sheet
+ * writes every position that way. The column is `Decimal(18, 3)` kilometres for a reason better
+ * than tidiness: a bill measures a **range**, so chainage has to be comparable — two text fields
+ * reading `21+300` and `9+750` cannot be ordered, and the one that looks larger is smaller.
+ *
+ * Both notations are accepted because both get typed: off the client's sheet it is `21+300`, off a
+ * survey it is `21.3`. Returns `null` for anything else, so the form can refuse rather than send a
+ * guess the API would reject as a non-numeric string.
+ *
+ * Mirrors `buildcore-api/src/projects/dwr/chainage.ts`, which owns the printing half and carries
+ * the tests. Two copies of four lines across a repository boundary, rather than a shared package
+ * for one function.
+ */
+export function parseChainage(input: string): string | null {
+  const text = input.trim();
+  if (text === '') return null;
+
+  const plus = /^(-?)(\d+)\+(\d{1,3})$/.exec(text);
+  if (plus) {
+    const [, sign, km, metres] = plus;
+    // Padded on the right: `6+82` is 6 km 820 m. The metres are a position within the kilometre,
+    // not a count.
+    return `${sign}${Number(km) + Number(metres.padEnd(3, '0')) / 1000}`;
+  }
+
+  if (/^-?\d+(\.\d+)?$/.test(text)) return text;
+  return null;
 }

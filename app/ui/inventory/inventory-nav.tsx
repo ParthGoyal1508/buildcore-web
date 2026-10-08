@@ -1,6 +1,9 @@
 'use client';
 
-import { ROUTES } from '@/app/lib/constants';
+import {
+  INVENTORY_ISSUE_LABEL_SHORT,
+  ROUTES,
+} from '@/app/lib/constants';
 import SectionTabs from '@/app/ui/section-tabs';
 
 /**
@@ -15,7 +18,9 @@ import SectionTabs from '@/app/ui/section-tabs';
 const TABS = [
   { name: 'Stock', href: ROUTES.inventoryStock },
   { name: 'Purchases', href: ROUTES.inventoryPurchases },
-  { name: 'Issues', href: ROUTES.inventoryIssues },
+  // 028 FR-030: the label only. `ROUTES.inventoryIssues` is unchanged, because renaming a URL
+  // breaks every link already sent for no gain anybody can see.
+  { name: INVENTORY_ISSUE_LABEL_SHORT, href: ROUTES.inventoryIssues },
   { name: 'Transfers', href: ROUTES.inventoryTransfers },
   { name: 'Payments', href: ROUTES.inventoryPayments },
   { name: 'Indents', href: ROUTES.inventoryIndents },

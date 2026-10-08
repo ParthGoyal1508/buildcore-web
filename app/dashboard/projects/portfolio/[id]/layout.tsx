@@ -2,12 +2,18 @@
 
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
+import { ApiError } from '@/app/lib/api/client';
 import { getProjectDetail } from '@/app/lib/api/projects';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { PROJECT_SHELL_COPY, ROUTES } from '@/app/lib/constants';
+import {
+  PROJECT_MOVED_PARAM,
+  PROJECT_SHELL_COPY,
+  ROUTES,
+} from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
 import SectionTabs from '@/app/ui/section-tabs';
 import StatusBadge from '@/app/ui/status-badge';
@@ -42,6 +48,22 @@ import { ProjectShellProvider } from '@/app/ui/projects/project-shell-context';
  * fetches it once, under the key the section pages already used, and hands it down through
  * `ProjectShellProvider` — so the tab strip costs one request for all ten sections rather than
  * one per section, and People, Machinery and Materials need no endpoint of their own.
+ *
+ * ## Changing company, while reading a project (028 FR-028)
+ *
+ * Switching company leaves you on a project id belonging to the company you just left. The API
+ * answers **404** — correctly, and that must not change: a 403 would confirm the row exists, which
+ * is itself a leak across the boundary row-level security is there to hold. The screen had no
+ * handler, so it showed "This project could not be loaded" and left the reader on a dead page with
+ * ten tabs that would each fail the same way.
+ *
+ * Handled **once, here**, and not per page. This layout is the only thing all ten sections pass
+ * through, so a handler on it covers every one of them — including the ones nobody thinks of. The
+ * same pattern applies to every id-addressed page in the product; this is the first.
+ *
+ * A 404 redirects to the portfolio of the company now selected **and says why on arrival**. The
+ * explanation is the part that matters: a silent redirect looks like the application losing your
+ * place, and the reader's next move is to click back into a project that will do it again.
  */
 export default function ProjectShellLayout({
   children,
@@ -49,16 +71,34 @@ export default function ProjectShellLayout({
   children: React.ReactNode;
 }) {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params.id;
 
   const {
     data: detail,
     isLoading,
     isError,
+    error,
   } = useQuery({
     queryKey: ['projects', 'portfolio', id],
     queryFn: () => getProjectDetail(id),
+    // A 404 here is the company switch, and retrying it three times only delays the redirect.
+    retry: (failureCount, err) =>
+      !(err instanceof ApiError && err.status === 404) && failureCount < 2,
   });
+
+  // FR-028. Narrowed to 404: a 500 or a dropped connection is a different problem with a different
+  // answer, and bouncing somebody to the portfolio for a server error hides the error.
+  const notInThisCompany = error instanceof ApiError && error.status === 404;
+
+  useEffect(() => {
+    if (!notInThisCompany) return;
+    // `replace`, not `push`: Back would otherwise return to the project that just 404ed, and the
+    // reader would bounce between the two.
+    router.replace(
+      `${ROUTES.projectsPortfolio}?${PROJECT_MOVED_PARAM}=1`,
+    );
+  }, [notInThisCompany, router]);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -69,6 +109,16 @@ export default function ProjectShellLayout({
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
         {PROJECT_SHELL_COPY.loading}
+      </p>
+    );
+  }
+
+  // Mid-redirect. Says what is happening rather than flashing the failure message on the way
+  // out — the explanation then arrives on the portfolio, which is where the reader ends up.
+  if (notInThisCompany) {
+    return (
+      <p className="p-4 text-sm text-gray-500" role="status">
+        {PROJECT_SHELL_COPY.otherCompanyRedirect}
       </p>
     );
   }

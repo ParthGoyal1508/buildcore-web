@@ -10,8 +10,14 @@ import {
   getProjects,
   getSites,
 } from '@/app/lib/api/projects';
-import { MESSAGES, SITE_STATUSES, projectsLabel } from '@/app/lib/constants';
+import {
+  MESSAGES,
+  ROUTES,
+  SITE_STATUSES,
+  projectsLabel,
+} from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import { OpenLink } from '@/app/ui/projects/detail-card';
 import SiteModal from '@/app/ui/projects/site-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import {
@@ -173,6 +179,9 @@ export default function SitesPage() {
         emptyMessage="No sites yet. Add one so employees have somewhere to punch in."
         actions={(row) => (
           <>
+            {/* The list shows coordinates to five places; the detail page shows the geofence
+                somebody actually has to check. Same control as the portfolio's. */}
+            <OpenLink href={ROUTES.projectsSite(row.id)} />
             <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
             {/* Not pre-disabled like the client delete: whether a site is in use
                 depends on employee postings this list has no count of, so the only

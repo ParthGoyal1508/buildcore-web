@@ -5,15 +5,18 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { saveBlob } from '@/app/lib/api/hr-payroll';
 import {
   deleteDwr,
   describeDwrError,
+  downloadDwrReport,
   factorsOf,
   getDwr,
   quantityOf,
 } from '@/app/lib/api/dwr';
 import { ROUTES } from '@/app/lib/constants';
 import DwrAttachments from '@/app/ui/projects/dwr-attachments';
+import DwrReturnedNotice from '@/app/ui/projects/dwr-returned-notice';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import SectionGuard from '@/app/ui/projects/section-guard';
@@ -41,6 +44,24 @@ export default function DwrReportPage() {
   const { data: report, isLoading } = useQuery({
     queryKey: ['dwr', params.dwrId],
     queryFn: () => getDwr(params.dwrId),
+  });
+
+  /**
+   * The printable form (028 FR-022).
+   *
+   * Offered on every status, not only on an approved report. A draft downloads and says DRAFT on
+   * its face — which is what somebody checking their figures before submitting actually wants, and
+   * more honest than a clean-looking form for a report nobody has put forward.
+   */
+  const form = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await downloadDwrReport(
+        params.dwrId,
+        report?.dprNumber ?? 'report',
+      );
+      saveBlob(blob, filename);
+    },
+    onError: (err: unknown) => setError(describeDwrError(err)),
   });
 
   const remove = useMutation({
@@ -84,30 +105,48 @@ export default function DwrReportPage() {
             )}
           </div>
 
-          {/* Draft only. A submitted report is a claim somebody is reading and an approved one has
-              already moved quantities a bill may rest on — the routes back are return and reverse,
-              which the panel offers. Offering Edit on either would promise something the server
-              refuses by status. */}
-          {report.status === 'draft' && (
-            <div className="flex items-center gap-2">
-              <Link
-                href={ROUTES.projectsDwrEdit(projectId, report.id)}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Edit
-              </Link>
-              <Button
-                type="button"
-                disabled={remove.isPending}
-                onClick={() => {
-                  setError(null);
-                  remove.mutate();
-                }}
-              >
-                {remove.isPending ? 'Deleting…' : 'Delete'}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Every status, deliberately. A draft downloads and says DRAFT on its face, which is
+                what somebody checking their figures before submitting wants — and more honest than
+                a clean-looking form for a report nobody has put forward. */}
+            <Button
+              type="button"
+              disabled={form.isPending}
+              onClick={() => {
+                setError(null);
+                form.mutate();
+              }}
+            >
+              {form.isPending ? 'Preparing…' : 'Download the form'}
+            </Button>
+
+            {/* A draft, **or a report returned for correction** (028) — the server treats the two
+                identically, and the banner above tells the author to edit this one, so the screen
+                that says so must be the screen that lets them. A submitted report is a claim
+                somebody is reading and an approved one has already moved quantities a bill may
+                rest on; the routes back are return and reverse, which the panel offers. Offering
+                Edit on either would promise something the server refuses by status. */}
+            {(report.status === 'draft' || report.status === 'returned') && (
+              <>
+                <Link
+                  href={ROUTES.projectsDwrEdit(projectId, report.id)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Edit
+                </Link>
+                <Button
+                  type="button"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    setError(null);
+                    remove.mutate();
+                  }}
+                >
+                  {remove.isPending ? 'Deleting…' : 'Delete'}
+                </Button>
+              </>
+            )}
+          </div>
         </header>
 
         {error && (
@@ -117,6 +156,18 @@ export default function DwrReportPage() {
         )}
 
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          {/* FR-024, and both of them. The ids have been on this response since 025 and name
+              nobody; on a report returned for correction the person who recorded it and the
+              person who submitted it are different people, and the second is usually the one who
+              has to answer for a figure. */}
+          <div>
+            <dt className="text-gray-500">Recorded by</dt>
+            <dd>{report.recordedByName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Submitted by</dt>
+            <dd>{report.submittedByName ?? '—'}</dd>
+          </div>
           <div>
             <dt className="text-gray-500">Submitted</dt>
             <dd>{dateTimeLabel(report.submittedAt) || '—'}</dd>
@@ -124,6 +175,14 @@ export default function DwrReportPage() {
           <div>
             <dt className="text-gray-500">Approved</dt>
             <dd>{dateTimeLabel(report.approvedAt) || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Returned</dt>
+            <dd>
+              {report.returnedAt
+                ? `${dateTimeLabel(report.returnedAt)} by ${report.returnedByName ?? 'somebody no longer on record'}`
+                : '—'}
+            </dd>
           </div>
           <div>
             <dt className="text-gray-500">Reversed</dt>
@@ -134,6 +193,11 @@ export default function DwrReportPage() {
             </dd>
           </div>
         </dl>
+
+        {/* 028. The reviewer's own sentence, where the author will see it. Above the "not yet
+            approved" note deliberately: that note is true of every draft and says nothing to act
+            on, and this one is the only thing on the screen that does. */}
+        <DwrReturnedNotice report={report} />
 
         {report.status !== 'approved' && (
           <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
@@ -157,9 +221,13 @@ export default function DwrReportPage() {
                 <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-3 py-2">BOQ</th>
+                    {/* Where on the road. Collected since 2026-10-07 and shown here because a
+                        measurement without its position cannot be checked against the site. */}
+                    <th className="px-3 py-2">Chainage</th>
+                    <th className="px-3 py-2">Side</th>
                     <th className="px-3 py-2">Basis</th>
                     <th className="px-3 py-2">How it was measured</th>
-                    <th className="px-3 py-2 text-right">Quantity</th>
+                    <th className="px-3 py-2 text-right">Qty</th>
                     <th className="px-3 py-2">Remark</th>
                   </tr>
                 </thead>
@@ -174,6 +242,10 @@ export default function DwrReportPage() {
                           </span>
                         )}
                       </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {chainageRange(line.chainageFrom, line.chainageTo)}
+                      </td>
+                      <td className="px-3 py-2">{line.roadSide ?? '—'}</td>
                       <td className="px-3 py-2">
                         {line.paymentMode === 'work_basis'
                           ? 'measured'
@@ -225,4 +297,30 @@ export default function DwrReportPage() {
       </div>
     </SectionGuard>
   );
+}
+
+/**
+ * `21.3`, `21.45` → `21+300 – 21+450`, as the client's sheet writes a position.
+ *
+ * A dash where neither end was recorded, and the single end on its own where only one was: a line
+ * measured at a point rather than over a stretch has a from and no to, and printing `21+300 – —`
+ * reads as a range somebody failed to finish.
+ */
+function chainageRange(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): string {
+  const point = (value: string | null | undefined) => {
+    if (value === null || value === undefined || value === '') return null;
+    const km = Number(value);
+    if (Number.isNaN(km)) return null;
+    const metres = Math.round(Math.abs(km) * 1000);
+    return `${km < 0 ? '-' : ''}${Math.floor(metres / 1000)}+${String(
+      metres % 1000,
+    ).padStart(3, '0')}`;
+  };
+  const start = point(from);
+  const end = point(to);
+  if (start && end) return `${start} – ${end}`;
+  return start ?? end ?? '—';
 }

@@ -70,14 +70,20 @@ const freshKey = () => `row-${nextKey++}`;
 export default function AwardEditor({
   projectId,
   workOrderId,
-  /** True once a bill exists. The server refuses the write; this says so before the attempt. */
-  locked,
+  /**
+   * Why this award cannot be edited, or null when it can.
+   *
+   * A message rather than a boolean, because there are now three reasons and they need different
+   * things done about them: a bill exists (permanent), it is under review, or it is approved and
+   * must be reopened. The server refuses all three; this says which before the attempt.
+   */
+  lockedBecause,
   onSaved,
   onError,
 }: {
   projectId: string;
   workOrderId: string;
-  locked: boolean;
+  lockedBecause: string | null;
   onSaved: () => void;
   onError: (message: string | null) => void;
 }) {
@@ -261,13 +267,13 @@ export default function AwardEditor({
 
   return (
     <div className="space-y-4">
-      {locked && (
+      {lockedBecause !== null && (
         <p className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
-          {WORK_ORDER_COPY.awardLockedByBills}
+          {lockedBecause}
         </p>
       )}
 
-      {!locked && (
+      {lockedBecause === null && (
         <div className="space-y-3 rounded border border-gray-200 p-3">
           <div>
             <span className="mb-1 block text-sm font-medium text-gray-700">
@@ -376,7 +382,7 @@ export default function AwardEditor({
                 <th className="px-2 py-2 text-right">
                   {WORK_ORDER_COPY.awardColumns.amount}
                 </th>
-                {!locked && <th className="px-2 py-2" />}
+                {lockedBecause === null && <th className="px-2 py-2" />}
               </tr>
             </thead>
             <tbody>
@@ -398,7 +404,7 @@ export default function AwardEditor({
                     <td className="px-2 py-1.5">
                       <input
                         value={row.description}
-                        disabled={locked}
+                        disabled={lockedBecause !== null}
                         aria-label={WORK_ORDER_COPY.awardColumns.description}
                         onChange={(event) =>
                           update(row.key, { description: event.target.value })
@@ -409,7 +415,7 @@ export default function AwardEditor({
                     <td className="px-2 py-1.5">
                       <input
                         value={row.unit}
-                        disabled={locked}
+                        disabled={lockedBecause !== null}
                         aria-label={WORK_ORDER_COPY.awardColumns.unit}
                         onChange={(event) =>
                           update(row.key, { unit: event.target.value })
@@ -420,7 +426,7 @@ export default function AwardEditor({
                     <td className="px-2 py-1.5 text-right">
                       <input
                         value={row.awardedQty}
-                        disabled={locked}
+                        disabled={lockedBecause !== null}
                         inputMode="decimal"
                         aria-label={WORK_ORDER_COPY.awardColumns.quantity}
                         onChange={(event) =>
@@ -436,7 +442,7 @@ export default function AwardEditor({
                     <td className="px-2 py-1.5 text-right">
                       <input
                         value={row.rate}
-                        disabled={locked}
+                        disabled={lockedBecause !== null}
                         inputMode="decimal"
                         aria-label={WORK_ORDER_COPY.awardColumns.rate}
                         onChange={(event) =>
@@ -448,7 +454,7 @@ export default function AwardEditor({
                     <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
                       {Number.isFinite(amount) ? rupees(amount) : '—'}
                     </td>
-                    {!locked && (
+                    {lockedBecause === null && (
                       <td className="px-2 py-1.5 text-right">
                         <button
                           type="button"
@@ -477,14 +483,14 @@ export default function AwardEditor({
                 <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">
                   {rupees(total)}
                 </td>
-                {!locked && <td />}
+                {lockedBecause === null && <td />}
               </tr>
             </tfoot>
           </table>
         </div>
       )}
 
-      {!locked && (
+      {lockedBecause === null && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"

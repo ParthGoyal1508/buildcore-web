@@ -225,8 +225,11 @@ function Report({ report }: { report: BoqImportReport }) {
       <div>
         <p className="text-sm font-medium text-gray-900">{BOQ_COPY.reportPercentage}</p>
         {report.quotedPercentageFound && report.quotedPercentage !== null ? (
-          <p className="text-sm text-gray-700 tabular-nums">
-            {(report.quotedPercentage * 100).toFixed(2)}%
+          <p className="text-sm text-gray-700">
+            <span className="tabular-nums">
+              {Math.abs(report.quotedPercentage * 100).toFixed(2)}%
+            </span>{' '}
+            {BOQ_COPY.reportPercentageDirection(report.quotedPercentage)}
           </p>
         ) : (
           <p role="alert" className="text-sm text-amber-800">

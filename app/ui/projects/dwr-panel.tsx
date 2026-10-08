@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   type DwrSummary,
@@ -63,6 +63,15 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     queryFn: () => listDwrs(projectId),
   });
 
+  // Defaulted to the order the server already returns, so the first paint does not reshuffle
+  // under the reader: `workDate desc`, with the report number breaking ties.
+  const [sort, setSort] = useState<Sort>({
+    column: 'workDate',
+    direction: 'desc',
+  });
+
+  const rows = useSorted(reports ?? [], sort);
+
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['dwrs', projectId] });
     // Approval moved BOQ executed quantities, so anything reading them is now stale. Named
@@ -122,7 +131,6 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     );
   }
 
-  const rows = reports ?? [];
 
   return (
     <section className="flex flex-col gap-4">
@@ -167,8 +175,18 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-3 py-2">Report</th>
-                <th className="px-3 py-2">Work date</th>
+                <SortableHeader
+                  label="Report"
+                  column="dprNumber"
+                  sort={sort}
+                  onSort={setSort}
+                />
+                <SortableHeader
+                  label="Work date"
+                  column="workDate"
+                  sort={sort}
+                  onSort={setSort}
+                />
                 <th className="px-3 py-2">State</th>
                 <th className="px-3 py-2 text-right">Lines</th>
                 <th className="px-3 py-2">On site</th>
@@ -194,6 +212,89 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Which column the list is ordered by, and which way. */
+interface Sort {
+  column: 'dprNumber' | 'workDate';
+  direction: 'asc' | 'desc';
+}
+
+/**
+ * The list in the reader's chosen order — **a copy, sorted here rather than refetched**.
+ *
+ * The server already returns every report on the project in one response, so ordering is a
+ * question the page can answer by itself; asking the API to re-sort would be a round trip to
+ * rearrange rows the browser is holding. `toSorted` is avoided for the same reason the rest of
+ * this codebase avoids it — `reports` is TanStack Query's cached array, and sorting it in place
+ * would mutate the cache.
+ */
+function useSorted(reports: DwrSummary[], sort: Sort): DwrSummary[] {
+  return useMemo(() => {
+    const sign = sort.direction === 'asc' ? 1 : -1;
+    return [...reports].sort((a, b) => {
+      // Numeric collation, not plain text. The numbers are zero-padded today so the two agree,
+      // and a project that ever reaches DPR-10000 would otherwise sort it between 0001 and 0002.
+      const primary =
+        sort.column === 'dprNumber'
+          ? a.dprNumber.localeCompare(b.dprNumber, undefined, { numeric: true })
+          : a.workDate.localeCompare(b.workDate);
+      // Two reports on one day is ordinary — there are four such pairs on the project this was
+      // reported from. Without a tiebreak those rows would reorder arbitrarily between renders.
+      const tiebreak = a.dprNumber.localeCompare(b.dprNumber, undefined, {
+        numeric: true,
+      });
+      return sign * (primary || tiebreak);
+    });
+  }, [reports, sort]);
+}
+
+/**
+ * A column header that sorts, announcing its state to a screen reader through `aria-sort`.
+ *
+ * Clicking the column already sorted reverses it; clicking another takes that column descending,
+ * which is what a reader of a dated list wants first — the most recent day, not the oldest.
+ */
+function SortableHeader({
+  label,
+  column,
+  sort,
+  onSort,
+}: {
+  label: string;
+  column: Sort['column'];
+  sort: Sort;
+  onSort: (next: Sort) => void;
+}) {
+  const active = sort.column === column;
+  return (
+    <th
+      className="px-3 py-2"
+      aria-sort={
+        active
+          ? sort.direction === 'asc'
+            ? 'ascending'
+            : 'descending'
+          : 'none'
+      }
+    >
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 uppercase tracking-wide text-gray-500 hover:text-gray-900"
+        onClick={() =>
+          onSort({
+            column,
+            direction: active && sort.direction === 'desc' ? 'asc' : 'desc',
+          })
+        }
+      >
+        {label}
+        <span aria-hidden className={active ? 'text-gray-900' : 'text-gray-300'}>
+          {active && sort.direction === 'asc' ? '\u2191' : '\u2193'}
+        </span>
+      </button>
+    </th>
   );
 }
 
@@ -242,7 +343,12 @@ function ReportRow({
       </td>
       <td className="px-3 py-2">{dateLabel(report.workDate)}</td>
       <td className="px-3 py-2">
-        <StatusBadge status={reversed ? 'returned' : report.status} />
+        {/* The report's own status, and a marker beside it where an approval was taken back.
+            This read `reversed ? 'returned' : report.status`, which was a stand-in from when the
+            server had no `returned` value to send: a reversed report sits in `draft`, and showing
+            it as "Returned" said a reviewer had sent it back when nobody had. Now that a return
+            is a status of its own (028), the two cannot share one badge. */}
+        <StatusBadge status={report.status} />
         {reversed && (
           <span className="ml-2 text-xs text-gray-500">reversed</span>
         )}

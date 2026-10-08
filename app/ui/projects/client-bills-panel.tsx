@@ -3,8 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import Link from 'next/link';
+
 import { getClientBills, type ClientBill } from '@/app/lib/api/billing';
-import { BILLING_COPY } from '@/app/lib/constants';
+import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import BillSheet from '@/app/ui/projects/bill-sheet';
 import ClientBillView from '@/app/ui/projects/client-bill-view';
@@ -54,17 +56,43 @@ export default function ClientBillsPanel({ projectId }: { projectId: string }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <aside className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold text-gray-900">
-            {BILLING_COPY.billsHeading}
-          </h2>
+        <h2 className="text-base font-semibold text-gray-900">
+          {BILLING_COPY.billsHeading}
+        </h2>
+
+        {/*
+          Two routes, and the proposed one leads (028 FR-007).
+
+          The bill package proposes every quantity from the daily work approved in the period, for a
+          client bill exactly as it does for a subcontractor's. It has done since 023 and was
+          reachable only from another tab — so this screen's manual sheet was the obvious route, and
+          it is the one that reads nothing the site recorded. Typing quantities against a 231-line
+          schedule when the application already knows what was built is work done twice, and the
+          typed answer is the one nobody can check.
+
+          The sheet stays, labelled for what it is good at: scope measured outside a daily report.
+        */}
+        <div className="space-y-2 rounded border border-gray-200 p-3">
+          <Link
+            href={ROUTES.projectsBillPackages(projectId)}
+            className="block min-h-11 rounded bg-blue-700 px-3 py-2 text-center text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            {BILLING_COPY.composeFromWork}
+          </Link>
+          <p className="text-xs text-gray-500">
+            {BILLING_COPY.composeFromWorkHint}
+          </p>
+
           <SecondaryButton
             type="button"
             onClick={() => setComposing(true)}
             aria-pressed={composing}
           >
-            {BILLING_COPY.composeNew}
+            {BILLING_COPY.composeByHand}
           </SecondaryButton>
+          <p className="text-xs text-gray-500">
+            {BILLING_COPY.composeByHandHint}
+          </p>
         </div>
 
         {bills.isLoading && (
@@ -161,7 +189,13 @@ function BillRow({
       <span className="flex items-baseline justify-between gap-2">
         <span className="font-medium text-gray-900">{bill.billNumber}</span>
         <span className="tabular-nums text-gray-900">
-          {rupees(bill.netAmount)}
+          {bill.netAmount === null ? (
+            <span className="text-xs font-normal text-gray-500">
+              {BILLING_COPY.netNotYetSettled}
+            </span>
+          ) : (
+            rupees(bill.netAmount)
+          )}
         </span>
       </span>
       <span className="mt-0.5 block text-xs text-gray-500">

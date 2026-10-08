@@ -136,6 +136,16 @@ export async function getClients(query: ClientQuery = {}): Promise<ClientPage> {
   return clientPageSchema.parse(raw);
 }
 
+/**
+ * One client — the row only, without `projectCount`.
+ *
+ * The count is a list concern; a reader who has opened a client wants the projects
+ * themselves, which `getProjects({ clientId })` answers.
+ */
+export async function getClient(id: string): Promise<Client> {
+  return clientSchema.parse(await authFetch<unknown>(`/projects/clients/${id}`));
+}
+
 export interface ClientInput {
   name: string;
   contactPerson?: string;
@@ -213,6 +223,11 @@ export interface SiteQuery {
 export async function getSites(query: SiteQuery = {}): Promise<SitePage> {
   const raw = await authFetch<unknown>(`/projects/sites/list${qs({ ...query })}`);
   return sitePageSchema.parse(raw);
+}
+
+/** One site, including the geofence and weekly-off data feature 003 owns. */
+export async function getSite(id: string): Promise<Site> {
+  return siteSchema.parse(await authFetch<unknown>(`/projects/sites/${id}`));
 }
 
 export interface SiteInput {
@@ -312,6 +327,18 @@ export const projectSchema = z.object({
    * refused until it is set.
    */
   clientRetentionFraction: decimal.nullable().optional(),
+  /**
+   * The tender's quoted percentage **as a signed fraction** — `-0.1079` is 10.79% below the
+   * schedule, `0.0246` is 2.46% above it, `0` is at par.
+   *
+   * Already returned by `GET /projects/:id` and parsed away by this schema until 028 FR-029: zod
+   * strips what it is not told about, so the figure arrived on every project response and reached
+   * no screen. Optional so an older response still parses.
+   *
+   * Signed and never shown as a bare magnitude. 027 fixed a reader that dropped the sign on
+   * import, and ₹88.96 lakh of a single tender turned on it.
+   */
+  quotedPercentage: decimal.nullable().optional(),
   description: z.string().nullable(),
 });
 export type Project = z.infer<typeof projectSchema>;

@@ -2,13 +2,14 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 import { ApiError } from '@/app/lib/api/client';
-import { listEmployees } from '@/app/lib/api/hr-payroll';
+import { EMPLOYEE_PAGE_MAX, listEmployees } from '@/app/lib/api/hr-payroll';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import ProjectDocumentUploads, {
@@ -140,7 +141,27 @@ export default function ProjectForm({ project }: { project?: Project }) {
     queryFn: () => getDocumentRequirements(),
     enabled: !project,
   });
-  const requirements = requirementSet?.requirements ?? [];
+
+  /**
+   * **Empty on an edit, and `enabled: false` is not enough to make it so.**
+   *
+   * `enabled` stops the *fetch*; it does not stop `useQuery` returning what is already in the cache
+   * under this key. Create the project and then edit it — which is the ordinary order — and the
+   * requirement set is sitting in the cache from the create page, so an edit read four required
+   * kinds, found nothing staged against them (a fresh form stages nothing), disabled Save and said
+   * "4 required documents are still missing". With the upload section correctly hidden on an edit,
+   * the gate asked for something the screen gave no way to provide.
+   *
+   * Reported by the client on 6 October, triaged as not reproducing, and **that triage was wrong**:
+   * it was tested by loading the edit URL directly, where the cache is empty and nothing shows. It
+   * reproduces every time the two pages are visited in one session.
+   *
+   * Derived here rather than by widening `enabled`, because this is the one place both consumers
+   * read from — the upload section and the submit gate — and the bug was precisely that those two
+   * disagreed. An existing project is past FR-009's gate; its documents are filed through its own
+   * documents screen.
+   */
+  const requirements = project ? [] : (requirementSet?.requirements ?? []);
   const outstanding = unstagedMandatory(requirements, staged);
 
   const { data: clients } = useQuery({
@@ -150,9 +171,14 @@ export default function ProjectForm({ project }: { project?: Project }) {
 
   // The project manager picker. Active employees only — assigning a leaver is
   // never intended, and the list is long enough without them.
+  //
+  // `EMPLOYEE_PAGE_MAX`, not a guessed number: this asked for 200 against an endpoint
+  // that refuses anything over 100, so the request was a 400 and the control offered
+  // "Not assigned" and nothing else — on creating a project and on editing one.
   const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 200, isActive: true }],
-    queryFn: () => listEmployees({ pageSize: 200, isActive: true }),
+    queryKey: ['hr', 'employees', { pageSize: EMPLOYEE_PAGE_MAX, isActive: true }],
+    queryFn: () =>
+      listEmployees({ pageSize: EMPLOYEE_PAGE_MAX, isActive: true }),
   });
 
   const {
@@ -552,6 +578,10 @@ export default function ProjectForm({ project }: { project?: Project }) {
       {/*
         Creation only. An existing project is past FR-009's gate, and documents are filed against it
         through its own documents screen.
+
+        `!project` is now redundant — `requirements` is already empty on an edit — and is kept
+        deliberately: these two consumers disagreeing is what produced the defect reported on
+        7 October, and a second statement of the same rule costs nothing.
       */}
       {!project && requirements.length > 0 && (
         <section className="space-y-4">
@@ -566,6 +596,20 @@ export default function ProjectForm({ project }: { project?: Project }) {
             disabled={mutation.isPending}
           />
         </section>
+      )}
+
+      {/* Says where they went. The controls' absence on an edit is correct and unexplained
+          absences send people hunting. */}
+      {project && (
+        <p className="text-sm text-gray-600">
+          {DOCUMENT_COPY.editFiledElsewhere}{' '}
+          <Link
+            href={ROUTES.projectsProjectDocuments(project.id)}
+            className="font-medium text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            {DOCUMENT_COPY.editFiledElsewhereLink}
+          </Link>
+        </p>
       )}
 
       <div className="flex flex-wrap items-center gap-3">

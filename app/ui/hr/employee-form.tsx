@@ -103,7 +103,8 @@ const employeeFormSchema = z
     dailyRate: optionalNumber,
     calculationMode: optionalText,
     workmanId: optionalText,
-    isActive: z.boolean().optional(),
+    // `isActive` is deliberately absent. See the Active control below: the API has never accepted
+    // it on either route, and an employee becomes inactive by being offboarded.
 
     // Statutory
     pfApplicable: z.boolean().optional(),
@@ -210,7 +211,6 @@ function defaultsFrom(employee?: Employee): EmployeeFormValues {
     return {
       siteId: '',
       shiftId: '',
-      isActive: true,
       employmentType: 'full_time',
       calculationMode: 'monthly',
     };
@@ -236,7 +236,6 @@ function defaultsFrom(employee?: Employee): EmployeeFormValues {
     dailyRate: employee.dailyRate ?? undefined,
     calculationMode: employee.calculationMode ?? 'monthly',
     workmanId: employee.workmanId ?? '',
-    isActive: employee.isActive,
 
     pfApplicable: employee.pfApplicable,
     pfUpperLimit: employee.pfUpperLimit,
@@ -601,9 +600,29 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             {...register('musterCategory')}
           />
         </div>
-        <div className="mt-4">
-          <CheckboxField id="isActive" label="Active" {...register('isActive')} />
-        </div>
+        {/*
+          **This was an "Active" checkbox, and it broke every save.**
+
+          It put `isActive` in the payload, and neither `CreateEmployeeDto` nor `UpdateEmployeeDto`
+          has ever declared it — the only `isActive` in that file belongs to the *query* DTO that
+          filters the list. Under the API's `forbidNonWhitelisted` pipe that is a 400 reading
+          "property isActive should not exist", which is what creating an employee answered.
+
+          Removed rather than added to the API, because the checkbox was also wrong on its own
+          terms: `Employee.isActive` is set to false by `exit.service.ts` at the end of offboarding,
+          and a checkbox flipping it would walk around the clearance and settlement that process
+          exists for. A new employee is active, which is the column's default.
+        */}
+        {employee && (
+          <div className="mt-4 text-sm text-gray-600">
+            <span className="font-medium text-gray-900">
+              {employee.isActive ? 'Active' : 'Inactive'}
+            </span>{' '}
+            — an employee is made inactive by offboarding them, which records the
+            clearance and the settlement. Use <strong>Offboard</strong> on the
+            employee&rsquo;s own page.
+          </div>
+        )}
       </TabPanel>
 
       <TabPanel id="statutory" idPrefix="employee" active={tab}>
