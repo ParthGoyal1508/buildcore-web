@@ -916,6 +916,14 @@ export const BILLING_COPY = {
   net: 'Net',
   netPayable: 'Net payable',
   /**
+   * Shown in place of a net on a bill whose package has not been issued.
+   *
+   * The recoveries, deductions and tax are decided on the package and settled at issue. Printing
+   * the gross there — which is what the bill row holds until then — states a figure the bill's own
+   * document will not agree with.
+   */
+  netNotYetSettled: 'Set when the bill package is issued',
+  /**
    * The four-way distinction, said on the screen and not only in the code.
    *
    * A reader who drills from the summary's cost figure into a bill lands on a deduction line, and

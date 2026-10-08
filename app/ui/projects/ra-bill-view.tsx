@@ -162,7 +162,8 @@ function Line({
   strong = false,
 }: {
   label: string;
-  value: number;
+  /** Null where the figure is not yet settled — see `BILLING_COPY.netNotYetSettled`. */
+  value: number | null;
   muted?: boolean;
   strong?: boolean;
 }) {
@@ -176,7 +177,13 @@ function Line({
             : 'tabular-nums text-gray-900'
         }
       >
-        {rupees(value)}
+        {value === null ? (
+          <span className="text-sm font-normal text-gray-500">
+            {BILLING_COPY.netNotYetSettled}
+          </span>
+        ) : (
+          rupees(value)
+        )}
       </dd>
     </div>
   );

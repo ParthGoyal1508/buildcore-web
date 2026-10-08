@@ -892,7 +892,14 @@ function BillSummary({ bill }: { bill: RaBill }) {
         </span>
       </span>
       <span className="tabular-nums text-gray-900">
-        {`${BILLING_COPY.gross} ${rupees(bill.grossAmount)} · ${BILLING_COPY.netPayable} ${rupees(bill.netPayable)}`}
+        {`${BILLING_COPY.gross} ${rupees(bill.grossAmount)} · ${BILLING_COPY.netPayable} ${
+          // Null until the package behind this bill is issued. Printing the gross there — which
+          // is what the row held, its deduction columns having been retired by 028 — made this
+          // line disagree with the bill's own document by the tax and the deductions.
+          bill.netPayable === null
+            ? BILLING_COPY.netNotYetSettled.toLowerCase()
+            : rupees(bill.netPayable)
+        }`}
       </span>
     </div>
   );

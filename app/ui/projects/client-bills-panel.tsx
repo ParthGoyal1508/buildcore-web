@@ -189,7 +189,13 @@ function BillRow({
       <span className="flex items-baseline justify-between gap-2">
         <span className="font-medium text-gray-900">{bill.billNumber}</span>
         <span className="tabular-nums text-gray-900">
-          {rupees(bill.netAmount)}
+          {bill.netAmount === null ? (
+            <span className="text-xs font-normal text-gray-500">
+              {BILLING_COPY.netNotYetSettled}
+            </span>
+          ) : (
+            rupees(bill.netAmount)
+          )}
         </span>
       </span>
       <span className="mt-0.5 block text-xs text-gray-500">

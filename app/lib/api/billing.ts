@@ -163,7 +163,14 @@ export const clientBillSchema = z.object({
   quotedPercentage: decimal,
   grossAmount: decimal,
   retentionAmount: decimal,
-  netAmount: decimal,
+  /**
+   * **Null until the bill package behind this bill is issued.**
+   *
+   * The recoveries, deductions and tax on a package-composed bill are decided on the package and
+   * settled when it is issued. Before that there is no net, and the old answer — the gross, the
+   * bill row's own deduction columns being zero — was a figure the document would not agree with.
+   */
+  netAmount: nullableDecimal,
   certifiedAmount: nullableDecimal,
   certifiedAt: isoDate.nullable(),
   /**
@@ -289,7 +296,8 @@ export const raBillSchema = z.object({
   advanceRecovery: decimal,
   otherDeductions: decimal,
   deductionTotal: decimal,
-  netPayable: decimal,
+  /** Null until the bill package behind this bill is issued — see `netAmount` above. */
+  netPayable: nullableDecimal,
   /**
    * What the project summary takes from this bill: **gross**.
    *
