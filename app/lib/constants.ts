@@ -104,7 +104,17 @@ export const ROUTES = {
   projectsProjectDocuments: (id: string) =>
     `/dashboard/projects/portfolio/${id}/documents`,
   projectsClients: '/dashboard/projects/clients',
+  /**
+   * One client, and the projects it holds (2026-10-09).
+   *
+   * The list already showed a `projectCount`; the reader's next question is always *which
+   * ones*, and the only answer was to go to the portfolio and filter. Both masters now open
+   * the way the portfolio does.
+   */
+  projectsClient: (id: string) => `/dashboard/projects/clients/${id}`,
   projectsSites: '/dashboard/projects/sites',
+  /** One site: its geofence, its address and the project it belongs to. */
+  projectsSite: (id: string) => `/dashboard/projects/sites/${id}`,
 
   /**
    * The BOQ for one project — the schedule every bill below is measured against (008 US5,

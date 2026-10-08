@@ -136,6 +136,16 @@ export async function getClients(query: ClientQuery = {}): Promise<ClientPage> {
   return clientPageSchema.parse(raw);
 }
 
+/**
+ * One client — the row only, without `projectCount`.
+ *
+ * The count is a list concern; a reader who has opened a client wants the projects
+ * themselves, which `getProjects({ clientId })` answers.
+ */
+export async function getClient(id: string): Promise<Client> {
+  return clientSchema.parse(await authFetch<unknown>(`/projects/clients/${id}`));
+}
+
 export interface ClientInput {
   name: string;
   contactPerson?: string;
@@ -213,6 +223,11 @@ export interface SiteQuery {
 export async function getSites(query: SiteQuery = {}): Promise<SitePage> {
   const raw = await authFetch<unknown>(`/projects/sites/list${qs({ ...query })}`);
   return sitePageSchema.parse(raw);
+}
+
+/** One site, including the geofence and weekly-off data feature 003 owns. */
+export async function getSite(id: string): Promise<Site> {
+  return siteSchema.parse(await authFetch<unknown>(`/projects/sites/${id}`));
 }
 
 export interface SiteInput {
