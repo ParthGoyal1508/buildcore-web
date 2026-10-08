@@ -821,6 +821,16 @@ export async function submitWorkOrderForApproval(
  * A reason is required. The act removes a control somebody applied, and "why" is the only part of
  * that a reader can act on afterwards.
  */
+/**
+ * Throws away a draft RA bill raised by mistake (2026-10-08).
+ *
+ * A delete rather than a status: a bill nobody sent records nothing worth keeping. Its lines and
+ * its draft package go with it, so the dates it covered can be composed again.
+ */
+export async function discardRaBill(id: string): Promise<void> {
+  await authFetch<unknown>(`/projects/ra-bills/${id}`, { method: 'DELETE' });
+}
+
 export async function reopenWorkOrderAward(
   id: string,
   reason: string,

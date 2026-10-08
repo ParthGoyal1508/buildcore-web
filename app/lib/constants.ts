@@ -928,6 +928,18 @@ export const BILLING_COPY = {
   composing: 'Composing…',
   composeFailed: 'That bill could not be composed.',
   submit: 'Submit bill',
+  /**
+   * Throwing away a draft raised by mistake (2026-10-08).
+   *
+   * Reported: "I raised the bill twice for the same date." A draft could be submitted, revised or
+   * left in the list for ever — and a duplicate left in the list is one somebody eventually
+   * submits.
+   */
+  discard: 'Discard bill',
+  discarding: 'Discarding…',
+  discardConfirm: (billNumber: string) =>
+    `Discard ${billNumber}? It has not been submitted, so nothing has been claimed — the bill and its measured lines are removed, and the period becomes free to bill again. This cannot be undone.`,
+  discardFailed: 'That bill could not be discarded.',
   submitting: 'Submitting…',
   submitFailed: 'That bill could not be submitted.',
   billNumberLabel: 'Bill number',

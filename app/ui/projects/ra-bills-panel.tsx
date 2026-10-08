@@ -9,6 +9,7 @@ import {
   getRaBills,
   getWorkOrders,
   updateWorkOrder,
+  discardRaBill,
   submitRaBill,
   reopenWorkOrderAward,
   submitWorkOrderForApproval,
@@ -741,6 +742,32 @@ function BillsTab({
       ),
   });
 
+  /**
+   * Discarding a draft raised by mistake.
+   *
+   * The expanded set is cleared of the discarded id as well as invalidating the list: a row that
+   * no longer exists cannot be collapsed, and leaving its id behind would reopen the next bill
+   * that happened to take its place in the list.
+   */
+  const discard = useMutation({
+    mutationFn: (id: string) => discardRaBill(id),
+    onSuccess: (_void, id) => {
+      setOpened((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+      void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] });
+    },
+    onError: (err) =>
+      onError(
+        err instanceof ApiError
+          ? (err.details as { message?: string } | undefined)?.message ??
+              err.message
+          : BILLING_COPY.discardFailed,
+      ),
+  });
+
   return (
     <div className="space-y-4">
       {order.awardLineCount === 0 ? (
@@ -802,6 +829,30 @@ function BillsTab({
                     >
                       {BILLING_COPY.submit}
                     </RowAction>
+                  )}
+                  {/* The way out of a bill raised twice for the same date (2026-10-08). Draft
+                      only, and the server refuses anything else — a submitted bill is a claim
+                      somebody is reading. Confirmed because it cannot be undone. */}
+                  {bill.status === 'draft' && (
+                    <SecondaryButton
+                      type="button"
+                      disabled={discard.isPending}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            BILLING_COPY.discardConfirm(bill.billNumber),
+                          )
+                        ) {
+                          return;
+                        }
+                        onError(null);
+                        discard.mutate(bill.id);
+                      }}
+                    >
+                      {discard.isPending
+                        ? BILLING_COPY.discarding
+                        : BILLING_COPY.discard}
+                    </SecondaryButton>
                   )}
                   {/* A draft is edited; a bill somebody has acted on is revised. Saying "revise"
                       over a draft promised a formality that does not apply to it. */}

@@ -46,7 +46,10 @@ export function Button({
         // the design's `h-10` from `sm` up, where a pointer is doing the aiming. Applied here rather
         // than on the screens that need it: the two mobile-critical surfaces are a closed list today
         // and the next addition to it should not have to remember this.
-        'flex h-11 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white sm:h-10 sm:justify-start transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
+        // `whitespace-nowrap` because the height above is fixed: a label that wraps to two
+        // lines inside an `h-10` box does not grow it, it spills out of it. "Record the payment"
+        // in a one-fifth-width grid cell did exactly that.
+        'flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-medium text-white sm:h-10 sm:justify-start transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
         className,
       )}
     >

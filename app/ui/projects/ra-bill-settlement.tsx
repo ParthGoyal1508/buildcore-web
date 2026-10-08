@@ -257,77 +257,85 @@ function Payments({
         </ul>
       )}
 
+      {/*
+        The action sits below the fields rather than as a fifth column of them.
+        As a column it was a fifth of the width, which wrapped its label; and `self-end` aligned it
+        to the bottom of the tallest cell — the reference field, which carries a hint — so it
+        floated a line below the inputs it belongs to. Four fields, then the button.
+      */}
       <form
-        className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-5"
+        className="flex flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           record.mutate();
         }}
       >
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">
-            {SETTLEMENT_COPY.paidOnLabel}
-          </span>
-          <input
-            type="date"
-            required
-            value={paidOn}
-            onChange={(event) => setPaidOn(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2"
-          />
-        </label>
+        <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">
+              {SETTLEMENT_COPY.paidOnLabel}
+            </span>
+            <input
+              type="date"
+              required
+              value={paidOn}
+              onChange={(event) => setPaidOn(event.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2"
+            />
+          </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">
-            {SETTLEMENT_COPY.amountLabel}
-          </span>
-          <input
-            // `inputMode` rather than `type="number"`: a number input rounds what it hands back on
-            // some browsers, and the one thing this field must not do is change the figure.
-            inputMode="decimal"
-            required
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 tabular-nums"
-            placeholder="600000.00"
-          />
-        </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">
+              {SETTLEMENT_COPY.amountLabel}
+            </span>
+            <input
+              // `inputMode` rather than `type="number"`: a number input rounds what it hands back on
+              // some browsers, and the one thing this field must not do is change the figure.
+              inputMode="decimal"
+              required
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2 tabular-nums"
+              placeholder="600000.00"
+            />
+          </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">
-            {SETTLEMENT_COPY.instrumentLabel}
-          </span>
-          <select
-            value={instrument}
-            onChange={(event) =>
-              setInstrument(event.target.value as PaymentInstrument)
-            }
-            className="rounded-md border border-gray-300 px-3 py-2"
-          >
-            {PAYMENT_INSTRUMENTS.map((option) => (
-              <option key={option} value={option}>
-                {SETTLEMENT_COPY.instrumentLabels[option] ?? option}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">
+              {SETTLEMENT_COPY.instrumentLabel}
+            </span>
+            <select
+              value={instrument}
+              onChange={(event) =>
+                setInstrument(event.target.value as PaymentInstrument)
+              }
+              className="rounded-md border border-gray-300 px-3 py-2"
+            >
+              {PAYMENT_INSTRUMENTS.map((option) => (
+                <option key={option} value={option}>
+                  {SETTLEMENT_COPY.instrumentLabels[option] ?? option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">
-            {SETTLEMENT_COPY.referenceLabel}
-          </span>
-          <input
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2"
-            placeholder="UTR 316902847561"
-          />
-          <span className="text-xs text-gray-500">
-            {SETTLEMENT_COPY.referenceHint}
-          </span>
-        </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">
+              {SETTLEMENT_COPY.referenceLabel}
+            </span>
+            <input
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2"
+              placeholder="UTR 316902847561"
+            />
+            <span className="text-xs text-gray-500">
+              {SETTLEMENT_COPY.referenceHint}
+            </span>
+          </label>
+        </div>
 
-        <div className="self-end">
+        <div>
           <Button type="submit" disabled={record.isPending}>
             {record.isPending
               ? SETTLEMENT_COPY.recording
@@ -431,44 +439,46 @@ function SignedCopies({
       )}
 
       <form
-        className="grid items-start gap-3 sm:grid-cols-3"
+        className="flex flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           upload.mutate();
         }}
       >
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">
-            {SETTLEMENT_COPY.receivedOnLabel}
-          </span>
-          <input
-            type="date"
-            required
-            value={receivedOn}
-            onChange={(event) => setReceivedOn(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2"
-          />
-          <span className="text-xs text-gray-500">
-            {SETTLEMENT_COPY.receivedOnHint}
-          </span>
-        </label>
+        <div className="grid items-start gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">
+              {SETTLEMENT_COPY.receivedOnLabel}
+            </span>
+            <input
+              type="date"
+              required
+              value={receivedOn}
+              onChange={(event) => setReceivedOn(event.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2"
+            />
+            <span className="text-xs text-gray-500">
+              {SETTLEMENT_COPY.receivedOnHint}
+            </span>
+          </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700">
-            {SETTLEMENT_COPY.fileLabel}
-          </span>
-          <input
-            type="file"
-            required
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-          <span className="text-xs text-gray-500">
-            {SETTLEMENT_COPY.replaceHint}
-          </span>
-        </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">
+              {SETTLEMENT_COPY.fileLabel}
+            </span>
+            <input
+              type="file"
+              required
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            <span className="text-xs text-gray-500">
+              {SETTLEMENT_COPY.replaceHint}
+            </span>
+          </label>
+        </div>
 
-        <div className="self-end">
+        <div>
           <Button type="submit" disabled={upload.isPending || !file}>
             {upload.isPending
               ? SETTLEMENT_COPY.uploading
