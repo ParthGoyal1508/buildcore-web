@@ -3777,6 +3777,16 @@ export const DOCUMENT_COPY = {
   projectDocumentsEmpty: 'Nothing has been filed against this project yet.',
   projectDocumentRequiredBadge: 'Answers a required kind',
   projectDocumentSupplementaryBadge: 'Supplementary',
+  /**
+   * An expired document stops answering its required kind, so the badge has to say so rather
+   * than leaving a reader to compare a date against today in their head. The required badge is
+   * replaced, not decorated: a row reading both "Answers a required kind" and "Expired" states
+   * the opposite of what readiness now counts.
+   */
+  projectDocumentExpiredBadge: 'Expired — no longer answers',
+  projectDocumentExpires: (when: string) => `Expires ${when}`,
+  projectDocumentExpired: (when: string) => `Expired ${when}`,
+  projectDocumentNumber: (value: string) => `No. ${value}`,
   projectDocumentFiledBy: (name: string, when: string) =>
     `Filed by ${name} · ${when}`,
   /** When the uploader's account has gone; the document and its date are still the point. */

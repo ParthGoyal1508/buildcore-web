@@ -16,6 +16,14 @@ const requirementSchema = z.object({
   code: z.string(),
   name: z.string(),
   isMandatory: z.boolean().default(true),
+  /**
+   * Whether the kind lapses, and whether it carries a printed number.
+   *
+   * Defaulted so a client ahead of its server still parses — it then shows no expiry field,
+   * which is what the screen did before the column existed.
+   */
+  hasExpiry: z.boolean().default(false),
+  needsNumber: z.boolean().default(false),
 });
 export type ProjectDocumentRequirement = z.infer<typeof requirementSchema>;
 
@@ -30,6 +38,8 @@ const availableTypeSchema = z.object({
   code: z.string(),
   name: z.string(),
   isRequired: z.boolean().default(false),
+  hasExpiry: z.boolean().default(false),
+  needsNumber: z.boolean().default(false),
 });
 export type AvailableDocumentType = z.infer<typeof availableTypeSchema>;
 
@@ -95,6 +105,12 @@ export const projectDocumentSchema = z.object({
   uploadedByUserId: z.string(),
   /** Resolved server-side. Null when the account has gone — the document is still the point. */
   uploadedByName: z.string().nullable().optional(),
+  documentNumber: z.string().nullable().optional(),
+  /**
+   * When it lapses, where the kind carries an expiry. Null means no date was recorded — not
+   * that it has expired; every document filed before 2026-10-09 has none.
+   */
+  expiresAt: z.string().nullable().optional(),
 });
 export type ProjectDocument = z.infer<typeof projectDocumentSchema>;
 
@@ -152,6 +168,9 @@ export async function uploadProjectDocument(
     contentType: string;
     fileName?: string;
     remark?: string;
+    documentNumber?: string;
+    /** Required by the server when the kind lapses (`hasExpiry`). */
+    expiresAt?: string;
   },
   companyId?: string,
 ): Promise<ProjectDocument> {
@@ -242,6 +261,9 @@ export async function stageProjectDocument(
     contentType: string;
     /** The uploader's own file name, so the download is what they recognise. */
     fileName?: string;
+    documentNumber?: string;
+    /** Required by the server when the kind lapses (`hasExpiry`). */
+    expiresAt?: string;
   },
   companyId?: string,
 ): Promise<{ stagedDocumentId: string }> {
