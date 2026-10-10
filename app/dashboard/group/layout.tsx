@@ -7,7 +7,7 @@ export default function GroupDashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardPermissionGuard>
+    <DashboardPermissionGuard also="EMPLOYEES">
       <div className="flex flex-col gap-6">
         <DashboardNav />
         {children}
