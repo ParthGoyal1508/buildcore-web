@@ -5,12 +5,14 @@ import { Fragment, useMemo, useState } from 'react';
 
 import {
   certifyClientBill,
+  downloadCertificate,
   submitClientBill,
   type ClientBill,
   type ClientBillLine,
 } from '@/app/lib/api/billing';
 import { ApiError } from '@/app/lib/api/client';
 import { BILLING_COPY } from '@/app/lib/constants';
+import { openStoredFile } from '@/app/lib/download-file';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
@@ -57,6 +59,20 @@ export default function ClientBillView({
   const [error, setError] = useState<string | null>(null);
   const [certifying, setCertifying] = useState(false);
   const [certifiedAmount, setCertifiedAmount] = useState('');
+  /**
+   * Per-line certified quantities, keyed by bill line (2026-10-11).
+   *
+   * A line absent from this map is a line the client did not mention, and the server
+   * reads that as "billed quantity stands". Blank is therefore meaningfully different
+   * from `0`, which returns the whole quantity to the schedule — so the entries are
+   * strings and an empty one is dropped before sending rather than coerced to zero.
+   */
+  const [certifiedQtys, setCertifiedQtys] = useState<Record<string, string>>(
+    {},
+  );
+  /** Line by line, or a single figure. Line by line is what frees uncertified scope. */
+  const [perLine, setPerLine] = useState(true);
+  const [certificate, setCertificate] = useState<File | null>(null);
   const [showAllLines, setShowAllLines] = useState(false);
 
   const refresh = () => {
@@ -76,10 +92,26 @@ export default function ClientBillView({
   });
 
   const certify = useMutation({
-    mutationFn: () => certifyClientBill(bill.id, Number(certifiedAmount)),
+    mutationFn: () =>
+      certifyClientBill(bill.id, {
+        ...(perLine
+          ? {
+              lines: Object.entries(certifiedQtys)
+                // Blank means "not said" and must not reach the server as a zero.
+                .filter(([, value]) => value.trim() !== '')
+                .map(([lineId, value]) => ({
+                  lineId,
+                  certifiedQty: Number(value),
+                })),
+            }
+          : { certifiedAmount: Number(certifiedAmount) }),
+        ...(certificate ? { certificate } : {}),
+      }),
     onSuccess: () => {
       setCertifying(false);
       setCertifiedAmount('');
+      setCertifiedQtys({});
+      setCertificate(null);
       refresh();
     },
     onError: (err) =>
@@ -87,6 +119,16 @@ export default function ClientBillView({
         err instanceof ApiError ? err.message : BILLING_COPY.submitFailed,
       ),
   });
+
+  const openCertificate = async () => {
+    setError(null);
+    try {
+      const file = await downloadCertificate(bill.id);
+      openStoredFile(file, bill.certificate?.fileName ?? 'certificate');
+    } catch {
+      setError(BILLING_COPY.certifyCopyFailed);
+    }
+  };
 
   const shortfall =
     bill.certificationVariance !== null && bill.certificationVariance !== 0;
@@ -286,19 +328,124 @@ export default function ClientBillView({
           </dl>
         )}
 
+        {bill.certificate && (
+          <p className="text-sm">
+            <button
+              type="button"
+              className="text-blue-600 hover:underline"
+              onClick={() => void openCertificate()}
+            >
+              {BILLING_COPY.certifyCopyOpen} — {bill.certificate.fileName}
+            </button>
+          </p>
+        )}
+
         {certifying && (
-          <div className="max-w-sm space-y-2">
-            <TextField
-              id={`certified-${bill.id}`}
-              type="number"
-              step="0.01"
-              min="0"
-              label={BILLING_COPY.certifyLabel}
-              hint={BILLING_COPY.certifyHint}
-              value={certifiedAmount}
-              onChange={(event) => setCertifiedAmount(event.target.value)}
-            />
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <div className="space-y-3">
+            <button
+              type="button"
+              className="text-sm text-blue-600 hover:underline"
+              onClick={() => setPerLine((on) => !on)}
+            >
+              {perLine
+                ? BILLING_COPY.certifyAmountOnly
+                : BILLING_COPY.certifyLinesInstead}
+            </button>
+
+            {perLine ? (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-600">
+                  {BILLING_COPY.certifyPerLineHint}
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="py-1 pr-3">BOQ</th>
+                        <th className="py-1 pr-3 text-right">
+                          {BILLING_COPY.certifyBilledQty}
+                        </th>
+                        <th className="py-1 text-right">
+                          {BILLING_COPY.certifyCertifiedQty}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {billed.map((line) => (
+                        <tr key={line.id} className="border-t border-gray-100">
+                          <td className="py-1 pr-3">
+                            {line.boqNo}
+                            <span className="block text-xs text-gray-500">
+                              {line.taskName}
+                            </span>
+                          </td>
+                          <td className="py-1 pr-3 text-right tabular-nums">
+                            {line.quantity} {line.unit}
+                          </td>
+                          <td className="py-1 text-right">
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              inputMode="decimal"
+                              aria-label={`${BILLING_COPY.certifyCertifiedQty} — ${line.boqNo}`}
+                              // Blank, never pre-filled with the billed quantity: a
+                              // prefilled field is one somebody accepts, and accepting
+                              // it silently certifies in full.
+                              placeholder={String(line.certifiedQty ?? '')}
+                              value={certifiedQtys[line.id] ?? ''}
+                              onChange={(event) =>
+                                setCertifiedQtys((current) => ({
+                                  ...current,
+                                  [line.id]: event.target.value,
+                                }))
+                              }
+                              className="w-28 rounded border border-gray-300 px-2 py-1 text-right tabular-nums"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-sm">
+                <TextField
+                  id={`certified-${bill.id}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  label={BILLING_COPY.certifyLabel}
+                  hint={BILLING_COPY.certifyHint}
+                  value={certifiedAmount}
+                  onChange={(event) => setCertifiedAmount(event.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="max-w-sm">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor={`certificate-${bill.id}`}
+              >
+                {BILLING_COPY.certifyCopyLabel}
+              </label>
+              <input
+                id={`certificate-${bill.id}`}
+                type="file"
+                accept=".pdf,.xls,.xlsx,application/pdf"
+                className="mt-1 text-sm"
+                onChange={(event) =>
+                  setCertificate(event.target.files?.[0] ?? null)
+                }
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {BILLING_COPY.certifyCopyHint}
+              </p>
+            </div>
+
+            <div className="flex max-w-sm flex-col-reverse gap-2 sm:flex-row">
               <SecondaryButton
                 type="button"
                 onClick={() => setCertifying(false)}
@@ -307,7 +454,16 @@ export default function ClientBillView({
               </SecondaryButton>
               <Button
                 type="button"
-                disabled={certify.isPending || certifiedAmount === ''}
+                disabled={
+                  certify.isPending ||
+                  // Line by line needs at least one figure; a single amount needs the
+                  // amount. Neither path should post an empty certification.
+                  (perLine
+                    ? !Object.values(certifiedQtys).some(
+                        (value) => value.trim() !== '',
+                      )
+                    : certifiedAmount === '')
+                }
                 onClick={() => {
                   setError(null);
                   certify.mutate();
@@ -337,19 +493,22 @@ export default function ClientBillView({
         )}
         {/* Only once it has gone out: certifying a draft would record the client's answer to a
             bill they were never sent. */}
-        {bill.status !== 'draft' &&
-          bill.certifiedAmount === null &&
-          !certifying && (
-            <SecondaryButton
-              type="button"
-              onClick={() => {
-                setCertifying(true);
-                setCertifiedAmount(String(bill.grossAmount));
-              }}
-            >
-              {BILLING_COPY.certifyOpen}
-            </SecondaryButton>
-          )}
+        {/* **Also once it is certified (2026-10-11)**: re-certifying is how a
+            certification is corrected, which is what was asked for. The server accepts
+            an already-certified bill and replaces what it holds. */}
+        {bill.status !== 'draft' && !certifying && (
+          <SecondaryButton
+            type="button"
+            onClick={() => {
+              setCertifying(true);
+              setCertifiedAmount(String(bill.grossAmount));
+            }}
+          >
+            {bill.certifiedAmount === null
+              ? BILLING_COPY.certifyOpen
+              : BILLING_COPY.certifyAmend}
+          </SecondaryButton>
+        )}
       </div>
     </section>
   );

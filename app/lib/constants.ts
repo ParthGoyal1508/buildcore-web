@@ -1146,8 +1146,28 @@ export const BILLING_COPY = {
     'Kept alongside the billed amount, never instead of it. The variance between the two is the thing to chase, and overwriting the billed figure would erase the fact that there was one.',
   statusHeader: 'Status',
   certifyOpen: 'Record certification',
+  certifyAmend: 'Amend certification',
   certifySave: 'Save certification',
   certifySaving: 'Saving…',
+
+  // --- Certifying line by line (2026-10-11) ---
+  /**
+   * The reported case: nine items billed, eight certified, and the ninth stayed
+   * deducted from the outstanding BOQ — so it could never be claimed again without
+   * over-measuring. Certifying line by line is what frees it.
+   */
+  certifyPerLine: 'Certify line by line',
+  certifyPerLineHint:
+    'Only what you enter here counts against the BOQ. A line left blank keeps its billed quantity — blank is “the client did not say”, not “certified at nothing”. Enter 0 to return a line’s whole quantity to the schedule. The certified amount is worked out from these, so the figure and the schedule cannot disagree.',
+  certifyBilledQty: 'Billed',
+  certifyCertifiedQty: 'Certified',
+  certifyAmountOnly: 'Certify a single amount instead',
+  certifyLinesInstead: 'Certify line by line instead',
+  certifyCopyLabel: 'The client’s certification (PDF or workbook)',
+  certifyCopyHint:
+    'Whatever came back. Replaces any copy already held — re-certifying supersedes.',
+  certifyCopyOpen: 'Open the client’s certification',
+  certifyCopyFailed: 'That certification could not be opened.',
   cancel: 'Cancel',
   loading: 'Loading…',
 } as const;
