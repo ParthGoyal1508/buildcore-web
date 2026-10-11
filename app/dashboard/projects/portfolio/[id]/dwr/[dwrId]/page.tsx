@@ -15,7 +15,9 @@ import {
   quantityOf,
 } from '@/app/lib/api/dwr';
 import { ROUTES } from '@/app/lib/constants';
-import DwrAttachments from '@/app/ui/projects/dwr-attachments';
+import DwrAttachments, {
+  DwrLinePhotos,
+} from '@/app/ui/projects/dwr-attachments';
 import DwrReturnedNotice from '@/app/ui/projects/dwr-returned-notice';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
@@ -229,6 +231,8 @@ export default function DwrReportPage() {
                     <th className="px-3 py-2">How it was measured</th>
                     <th className="px-3 py-2 text-right">Qty</th>
                     <th className="px-3 py-2">Remark</th>
+                    {/* Evidence for this line, not for the day (2026-10-11). */}
+                    <th className="px-3 py-2">Photos</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -282,6 +286,15 @@ export default function DwrReportPage() {
                       <td className="max-w-sm px-3 py-2 text-xs text-gray-700">
                         {line.remark ?? ''}
                       </td>
+                      <td className="px-3 py-2">
+                        <DwrLinePhotos
+                          dwrId={params.dwrId}
+                          taskId={line.id}
+                          attachments={(report.attachments ?? []).filter(
+                            (a) => a.taskId === line.id,
+                          )}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -290,9 +303,12 @@ export default function DwrReportPage() {
           )}
         </section>
 
+        {/* The day's own evidence. A file bound to a line is shown on that line above,
+            so it is not listed twice — `!a.taskId` catches both the null a current
+            server sends and the absent field an older one does. */}
         <DwrAttachments
           dwrId={params.dwrId}
-          attachments={report.attachments ?? []}
+          attachments={(report.attachments ?? []).filter((a) => !a.taskId)}
         />
       </div>
     </SectionGuard>

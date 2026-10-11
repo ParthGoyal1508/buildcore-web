@@ -33,6 +33,11 @@ export default function DwrAttachments({
   attachments,
 }: {
   dwrId: string;
+  /**
+   * **Report-level only.** Filtered by the caller, not here: the lines table renders
+   * the rest beside the measurements they are evidence for, and a component that
+   * filtered its own input would leave the caller unable to say which half it wanted.
+   */
   attachments: DwrAttachment[];
 }) {
   const queryClient = useQueryClient();
@@ -93,8 +98,9 @@ export default function DwrAttachments({
 
       {attachments.length === 0 ? (
         <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
-          Nothing attached. The measurement sheet signed on site is what settles a
-          quantity somebody later disputes.
+          Nothing attached to the report itself. A photograph of one pour belongs on
+          its own line, in the table above; this is for what covers the whole day — the
+          signed measurement sheet, a general site view.
         </p>
       ) : (
         <ul className="divide-y divide-gray-100 rounded-md border border-gray-200">
@@ -119,5 +125,85 @@ export default function DwrAttachments({
         </ul>
       )}
     </section>
+  );
+}
+
+
+/**
+ * The same upload, scoped to one measurement line (2026-10-11).
+ *
+ * A thin control rather than a second screen: a photograph of one pour is evidence for
+ * *that* line, and twenty files in a list under the report is what it was before — a
+ * pile nobody can tie to the chainage being argued about.
+ *
+ * Deliberately not a copy of the component above. It shares the mutation, the cache key
+ * and the open-by-name behaviour; what differs is that it has one row to show and no
+ * heading, because it lives inside a table cell.
+ */
+export function DwrLinePhotos({
+  dwrId,
+  taskId,
+  attachments,
+}: {
+  dwrId: string;
+  taskId: string;
+  /** Already filtered to this line by the caller. */
+  attachments: DwrAttachment[];
+}) {
+  const queryClient = useQueryClient();
+  const input = useRef<HTMLInputElement>(null);
+
+  const upload = useMutation({
+    mutationFn: (file: File) => addDwrAttachment(dwrId, file, taskId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['dwr', dwrId] });
+      if (input.current) input.current.value = '';
+    },
+  });
+
+  const open = async (attachment: DwrAttachment) => {
+    try {
+      openStoredFile(
+        await downloadDwrAttachment(attachment.id),
+        attachment.fileName,
+      );
+    } catch {
+      // Silent here on purpose: the cell has no room for an error banner, and the
+      // report-level section above reports the same failure with somewhere to put it.
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {attachments.map((attachment) => (
+        <RowAction
+          key={attachment.id}
+          type="button"
+          intent="read"
+          onClick={() => void open(attachment)}
+        >
+          {attachment.fileName}
+        </RowAction>
+      ))}
+      <label className="cursor-pointer text-xs text-blue-600 hover:underline">
+        {upload.isPending ? 'Attaching…' : '+ Photo'}
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          disabled={upload.isPending}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) upload.mutate(file);
+          }}
+        />
+      </label>
+      {upload.isError && (
+        <span className="text-xs text-red-700" role="alert">
+          Could not attach that file.
+        </span>
+      )}
+    </div>
   );
 }
