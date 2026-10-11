@@ -33,6 +33,8 @@ export const ROUTES = {
   settingsLetterKinds: '/dashboard/settings/letter-kinds',
   /** Named signatories and their signature graphics (017 US4). */
   settingsSignatories: '/dashboard/settings/signatories',
+  /** The company's standard terms and conditions (2026-10-11). */
+  settingsTerms: '/dashboard/settings/terms',
   /** The four statutory rates a running-account bill is computed at (025 US4). */
   settingsBillingRates: '/dashboard/settings/billing-rates',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
@@ -1938,6 +1940,10 @@ export const SETTINGS_PERMISSIONS = {
   // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
   // computed at, guarded by the same permission as the registration numbers beside them.
   'billing-rates': 'COMPANY_SETTINGS',
+  // 2026-10-11. `SETTINGS`, matching the backend: these clauses go onto a document a
+  // subcontractor signs, which makes editing them a settings act rather than a
+  // project one.
+  terms: 'SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -4401,4 +4407,36 @@ export const BOQ_COPY = {
       'This import was prepared by someone else, or for a different project. Upload the file again here.',
   } as const,
   refusalFallback: 'The workbook could not be imported.',
+} as const;
+
+
+/**
+ * The company's standard terms and conditions (2026-10-11).
+ *
+ * The one sentence that has to be on the screen is that editing changes the **next**
+ * document and not one already raised. The opposite assumption — that rewording the
+ * standard set reworded every award signed under it — is the dangerous one, and it is
+ * exactly what somebody would assume from a page called "Terms and conditions".
+ */
+export const TERMS_COPY = {
+  intro:
+    'The clauses a new document starts from. Editing them changes what the next work order, letter of intent or purchase order is raised with — never one already raised, which keeps the terms it was signed under.',
+  kindsLabel: 'Document kind',
+  kindLabels: {
+    work_order: 'Work order',
+    letter_of_intent: 'Letter of intent',
+    purchase_order: 'Purchase order',
+  } as Record<string, string>,
+  shippedBadge: 'standard',
+  stillShipped:
+    'These are the clauses BuildCore ships. Nobody at your company has reviewed them yet — edit and save to make them yours.',
+  bodyLabel: 'Clauses',
+  bodyHint:
+    'Plain text, one clause per line. No formatting: what renders this is a PDF table cell and this box, and neither interprets any.',
+  save: 'Save terms',
+  saving: 'Saving…',
+  discard: 'Discard changes',
+  loading: 'Loading the standard terms…',
+  loadFailed: 'The standard terms could not be loaded.',
+  saveFailed: 'Those terms could not be saved.',
 } as const;
