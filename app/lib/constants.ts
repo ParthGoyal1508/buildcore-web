@@ -1306,6 +1306,15 @@ export const WORK_ORDER_COPY = {
     unit: 'Unit',
     quantity: 'Quantity',
     boqRate: 'BOQ rate',
+    /**
+     * What the client actually pays, after the quote (2026-10-11).
+     *
+     * The reported risk: the quote is −10.79%, the BOQ rate is what is printed on the
+     * tender in front of whoever is typing, and a subcontract gets awarded above what
+     * the job earns. The BOQ rate alone is the number that invites the mistake, so the
+     * figure the margin is actually measured against sits next to it.
+     */
+    quotedRate: 'You earn',
     rate: 'Their rate',
     amount: 'Amount',
     remove: '',
@@ -1321,7 +1330,9 @@ export const WORK_ORDER_COPY = {
    * anybody deciding it should be. Shown beside, never in the box.
    */
   awardRateHint:
-    'What you pay the subcontractor, which is not the BOQ rate — the BOQ rate is what the client pays you, and the difference is the margin. Shown beside for reference, never filled in for you.',
+    'What you pay the subcontractor. The margin is against “You earn” — the BOQ rate after the project’s quoted percentage — not against the BOQ rate itself, which is the tender figure before the quote. Both are shown beside, never filled in for you.',
+  /** Flagged on the row, because a total that is already negative is one found too late. */
+  awardRateAboveEarned: 'Above what this line earns',
   awardLinkedHint:
     'A line picked from the BOQ stays tied to it, so work recorded against that BOQ line counts towards this award. A typed line is not tied to anything, which is correct when the subcontract covers work the BOQ itemises differently.',
   awardRowIncomplete: (row: number) =>
