@@ -4202,6 +4202,32 @@ export const PROJECT_SHELL_COPY = {
    * the half somebody looking at a project's commercial position usually wants least.
    */
   subcontractorBillsLabel: 'Subcontractor bills',
+  /**
+   * The billing position, both directions, row by row (2026-10-12).
+   *
+   * Three states and they are three different questions: a bill is **raised** when somebody
+   * claims, **certified** when it is agreed, and **paid** when the money moves. Collapsing them
+   * loses the two gaps that are the whole of what a project manager chases — what is still being
+   * argued about, and what is agreed and unpaid.
+   */
+  billingHeading: 'Billing and payment',
+  billingRaised: 'Raised',
+  billingCertified: 'Certified',
+  billingSettled: 'Received / paid',
+  billingOutstanding: 'Outstanding',
+  billingCount: (count: number) => (count === 1 ? '1 bill' : `${count} bills`),
+  /**
+   * Said plainly, because it is true and the alternative is a figure that looks like an answer.
+   *
+   * Nothing in this system records money received **against a client bill** — there is no
+   * equivalent of the subcontractor side's payment record. The revenue ledger below is a separate
+   * hand-kept list that is not tied to any bill, and reporting it here as "received" would invite
+   * somebody to reconcile two figures that were never about the same thing.
+   */
+  billingClientReceiptsUnrecorded: 'Not recorded',
+  billingClientReceiptsNote:
+    'Money received against a client bill is not recorded anywhere yet, so what the client has actually paid — and what is still outstanding from them — cannot be shown. The revenue figures below are a separate ledger kept by hand, not receipts against these bills.',
+  billingRevenueHeading: 'Revenue ledger, kept separately',
   billsCount: (count: number) =>
     count === 1 ? '1 bill booked' : `${count} bills booked`,
   clientBillsLabel: 'Client bills',

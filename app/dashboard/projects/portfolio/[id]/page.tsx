@@ -47,6 +47,33 @@ const DOCUMENT_STATE_LABELS = {
   filed: PROJECT_SHELL_COPY.documentsFiledGroup,
 } as const;
 
+/**
+ * One figure in the billing table, with its bill count under it.
+ *
+ * `tabular-nums` so the columns line up digit for digit — two money columns that do not are two
+ * columns nobody can compare at a glance, which is the only reason to put them side by side.
+ */
+function Amount({
+  amount,
+  note,
+  strong,
+}: {
+  amount: number;
+  note?: string;
+  strong?: boolean;
+}) {
+  return (
+    <td className="py-2 text-right">
+      <span
+        className={clsx('tabular-nums', strong && 'font-medium text-gray-900')}
+      >
+        {formatRupees(amount)}
+      </span>
+      {note && <span className="block text-xs text-gray-500">{note}</span>}
+    </td>
+  );
+}
+
 function Card({
   heading,
   children,
@@ -253,65 +280,6 @@ export default function ProjectOverviewPage() {
                 </span>
               )}
             </Fact>
-            {/*
-              **Both directions, named** (2026-10-12). This said "Bills" and counted `RABill`
-              alone, on a screen whose tabs are "Client bills" and "RA bills" — so the figure
-              could have been either and was the one about money going out. The client side was
-              absent from the card entirely.
-            */}
-            <Fact term={PROJECT_SHELL_COPY.subcontractorBillsLabel}>
-              {PROJECT_SHELL_COPY.billsCount(tabs.billSummary.totalBills)}
-              <span className="block text-xs tabular-nums text-gray-500">
-                {formatRupees(tabs.billSummary.totalExpenses)}
-              </span>
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.clientBillsLabel}>
-              {tabs.clientBillSummary.totalBills === 0
-                ? PROJECT_SHELL_COPY.clientBillsNone
-                : PROJECT_SHELL_COPY.clientBillsCount(
-                    tabs.clientBillSummary.totalBills,
-                  )}
-              {tabs.clientBillSummary.totalBills > 0 && (
-                <span className="block text-xs tabular-nums text-gray-500">
-                  {PROJECT_SHELL_COPY.clientBillsBilled(
-                    formatRupees(tabs.clientBillSummary.totalBilled),
-                  )}
-                </span>
-              )}
-            </Fact>
-            {/*
-              Beside what was billed, never instead of it. The gap between the two is what a
-              project manager chases, and one figure can only say one of them.
-            */}
-            <Fact term={PROJECT_SHELL_COPY.certifiedLabel}>
-              {tabs.clientBillSummary.certifiedCount === 0 ? (
-                <span className="text-gray-500">
-                  {PROJECT_SHELL_COPY.certifiedNone}
-                </span>
-              ) : (
-                <>
-                  <span className="tabular-nums">
-                    {formatRupees(tabs.clientBillSummary.totalCertified)}
-                  </span>
-                  <span className="block text-xs text-gray-500">
-                    {PROJECT_SHELL_COPY.certifiedOf(
-                      tabs.clientBillSummary.certifiedCount,
-                      tabs.clientBillSummary.totalBills,
-                    )}
-                  </span>
-                </>
-              )}
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.revenueReceived}>
-              <span className="tabular-nums">
-                {formatRupees(tabs.revenueSummary.totalReceived)}
-              </span>
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.revenuePending}>
-              <span className="tabular-nums">
-                {formatRupees(tabs.revenueSummary.totalPending)}
-              </span>
-            </Fact>
             <Fact
               term={PROJECT_SHELL_COPY.documentsLabel}
               className="col-span-2"
@@ -368,6 +336,113 @@ export default function ProjectOverviewPage() {
           </dl>
         </Card>
       </div>
+
+      {/*
+        **Billing has a card of its own** (2026-10-12). It was one line reading "Bills", which
+        counted subcontractor claims and said nothing about the client side at all — on a project
+        whose own tabs are "Client bills" and "RA bills".
+
+        A table because it is one: two directions, the same three states, read across. Raised,
+        certified and paid are three different questions, and the two gaps between them — claimed
+        but not agreed, agreed but not paid — are the whole of what somebody chases.
+      */}
+      <Card heading={PROJECT_SHELL_COPY.billingHeading}>
+        <div className="overflow-x-auto">
+          {/* Capped rather than stretched across a full-width card: two money columns a page apart
+              are two columns nobody compares, which is the only reason to put them side by side. */}
+          <table className="w-full max-w-2xl text-sm">
+            <thead>
+              <tr className="text-xs uppercase tracking-wide text-gray-500">
+                <th scope="col" className="py-1 text-left font-medium">
+                  <span className="sr-only">Stage</span>
+                </th>
+                <th scope="col" className="py-1 text-right font-medium">
+                  {PROJECT_SHELL_COPY.clientBillsLabel}
+                </th>
+                <th scope="col" className="py-1 text-right font-medium">
+                  {PROJECT_SHELL_COPY.subcontractorBillsLabel}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingRaised}
+                </th>
+                <Amount
+                  amount={tabs.clientBillSummary.totalBilled}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.clientBillSummary.totalBills,
+                  )}
+                />
+                <Amount
+                  amount={tabs.billSummary.totalExpenses}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.billSummary.totalBills,
+                  )}
+                />
+              </tr>
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingCertified}
+                </th>
+                <Amount
+                  amount={tabs.clientBillSummary.totalCertified}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.clientBillSummary.certifiedCount,
+                  )}
+                />
+                <Amount
+                  amount={tabs.billSummary.certifiedAmount}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.billSummary.certifiedBills,
+                  )}
+                />
+              </tr>
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingSettled}
+                </th>
+                {/* Not a zero. Nothing records a receipt against a client bill, and ₹0 would read
+                    as "they have paid nothing" — a claim this system cannot make. */}
+                <td className="py-2 text-right text-xs text-gray-500">
+                  {PROJECT_SHELL_COPY.billingClientReceiptsUnrecorded}
+                </td>
+                <Amount amount={tabs.billSummary.paidAmount} />
+              </tr>
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingOutstanding}
+                </th>
+                <td className="py-2 text-right text-gray-400">—</td>
+                <Amount amount={tabs.billSummary.outstandingAmount} strong />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          {PROJECT_SHELL_COPY.billingClientReceiptsNote}
+        </p>
+
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <h3 className="text-xs uppercase tracking-wide text-gray-500">
+            {PROJECT_SHELL_COPY.billingRevenueHeading}
+          </h3>
+          <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
+            <Fact term={PROJECT_SHELL_COPY.revenueReceived}>
+              <span className="tabular-nums">
+                {formatRupees(tabs.revenueSummary.totalReceived)}
+              </span>
+            </Fact>
+            <Fact term={PROJECT_SHELL_COPY.revenuePending}>
+              <span className="tabular-nums">
+                {formatRupees(tabs.revenueSummary.totalPending)}
+              </span>
+            </Fact>
+          </dl>
+        </div>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card heading={PROJECT_SHELL_COPY.detailsHeading}>
