@@ -14,7 +14,11 @@ import type { WidgetResult } from '@/app/lib/api/dashboard';
 export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
   if (widget.unavailable) {
     return (
-      <ComingSoonCard title={widget.title} module={widget.unavailable.module} />
+      <ComingSoonCard
+        title={widget.title}
+        module={widget.unavailable.module}
+        note={widget.unavailable.note}
+      />
     );
   }
   switch (widget.displayType) {
@@ -177,16 +181,24 @@ export function WidgetList({ title, value }: { title: string; value: unknown }) 
 export function ComingSoonCard({
   title,
   module,
+  note,
 }: {
   title: string;
   module: string;
+  /**
+   * The card's own explanation, when the stock sentence is not true.
+   *
+   * The Statutory Calendar read "waiting on the challans module" long after Challans
+   * shipped, which sent anybody investigating to a module that was already there.
+   */
+  note?: string;
 }) {
   return (
     <div className={`${cardClass} border-dashed`}>
       <p className="text-sm text-gray-500">{title}</p>
       <p className="mt-1 text-sm font-medium text-gray-400">Coming soon</p>
       <p className="mt-1 text-xs text-gray-400">
-        Waiting on the {module} module.
+        {note ?? `Waiting on the ${module} module.`}
       </p>
     </div>
   );

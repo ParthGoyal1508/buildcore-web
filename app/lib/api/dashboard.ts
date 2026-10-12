@@ -170,7 +170,12 @@ const widgetResultSchema = z.object({
    */
   valueUnit: z.literal('currency').optional(),
   unavailable: z
-    .object({ reason: z.string(), module: z.string() })
+    .object({
+      reason: z.string(),
+      module: z.string(),
+      /** The card's own explanation, when "waiting on the X module" is not true. */
+      note: z.string().optional(),
+    })
     .optional(),
 });
 
