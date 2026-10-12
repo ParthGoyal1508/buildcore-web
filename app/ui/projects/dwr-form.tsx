@@ -1134,14 +1134,18 @@ function LineFiles({
           </button>
         </span>
       ))}
-      {/* The input is `sr-only` rather than hidden, so it stays focusable and keeps its name from
-          the label; the ring is drawn on the label, which is the part anybody can see. */}
-      <label className="cursor-pointer text-xs text-blue-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
+      {/* The input **covers the label** rather than being `sr-only`. A 1px absolutely-positioned
+          input is a focus target the browser scrolls an ancestor to reveal, and in a table wider
+          than the page that ancestor turned out to be the shell — which clips without a scrollbar,
+          so the layout shifted and stayed shifted. Sized to the label it is already in view, and
+          it is still a real focusable input named by the label; the ring is drawn on the label,
+          which is the part anybody can see. */}
+      <label className="relative cursor-pointer text-xs text-blue-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
         + File
         <input
           type="file"
           multiple
-          className="sr-only"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           onChange={(event) => {
             const picked = Array.from(event.target.files ?? []);
             if (picked.length > 0) onChange([...files, ...picked]);

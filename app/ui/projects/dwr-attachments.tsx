@@ -206,13 +206,23 @@ export function DwrLinePhotos({
       {/* Nothing offered on an approved report — not a disabled control, which reads as something
           that might work later. What is already filed above stays openable. */}
       {!sealed && (
-        <label className="cursor-pointer text-xs text-blue-600 hover:underline">
+        /*
+          **The input covers the label rather than being `sr-only`** (2026-10-12).
+
+          `sr-only` is `position: absolute` at 1px square, and clicking a label focuses the input
+          it wraps — so the browser scrolled an ancestor to bring that 1px box into view. In this
+          table the ancestor it chose was the dashboard shell, which clips without a scrollbar:
+          the sidebar slid off, everything shifted ~770px left, and there was no way to scroll
+          back. Sized to the label, the input is already where the person just clicked, so there
+          is nothing to scroll to. It stays a real focusable input with its name from the label.
+        */
+        <label className="relative cursor-pointer text-xs text-blue-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
           {upload.isPending ? 'Attaching…' : '+ Photo'}
           <input
             ref={input}
             type="file"
             accept="image/*"
-            className="sr-only"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             disabled={upload.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];
