@@ -65,6 +65,8 @@ export default function BillPackageDetail({
   const [error, setError] = useState<string | null>(null);
   /** Which line's measurement sheet is open. One at a time: two expanded sheets is a scroll. */
   const [sheetFor, setSheetFor] = useState<string | null>(null);
+  /** Opens the unmeasured lines back up on an issued bill — see `acted` below. */
+  const [showEveryLine, setShowEveryLine] = useState(false);
 
   const { data: pkg, isLoading } = useQuery({
     queryKey: ['billPackage', packageId],
@@ -178,6 +180,39 @@ export default function BillPackageDetail({
     pkg.claims.every(
       (claim) => claim.proposedQty === null || Number(claim.proposedQty) === 0,
     );
+
+  /**
+   * The lines this bill actually acted on (2026-10-13).
+   *
+   * Reported on an issued bill: 120 rows, of which two carried a quantity. A bill measures a
+   * handful of items out of the project's whole schedule, and printing every unmeasured line in
+   * between buries the two that are the bill.
+   *
+   * Three ways a line counts as acted on, and the last two matter as much as the first:
+   *
+   * - a claimed quantity — the obvious case, and `!== 0` rather than `> 0` so a negative
+   *   correction on a revision is still something this bill did;
+   * - a **proposed** quantity, even where the claim is nil — approved work was measured against
+   *   this line and somebody struck it out, which is a decision and not an absence;
+   * - a reason, which only exists where somebody changed a figure by hand.
+   *
+   * `proposedQty` is nullable and null is not zero: null is an award line mapped to no BOQ line,
+   * where there was nothing to read. Neither is an entry, so both fall out here.
+   */
+  const acted = pkg.claims.filter(
+    (claim) =>
+      Number(claim.claimedQty) !== 0 ||
+      Number(claim.proposedQty ?? 0) !== 0 ||
+      claim.reason !== null,
+  );
+  /**
+   * **Every line while the bill is a draft.** This table is the entry grid then, and a schedule
+   * line hidden because it carries nothing yet is a line nobody can claim against — collapsing it
+   * would remove the only way to bill it. The collapse is for a document that has been sent, where
+   * the rows are a record rather than a form.
+   */
+  const claims = editable || showEveryLine ? pkg.claims : acted;
+  const hiddenClaims = pkg.claims.length - claims.length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -346,12 +381,62 @@ export default function BillPackageDetail({
       {/* ── The lines ─────────────────────────────────────────────────── */}
       <section>
         <h3 className="mb-2 font-medium text-gray-900">
-          Proposed lines ({pkg.claims.length})
+          Proposed lines ({claims.length})
         </h3>
-        {/* Bounded on both axes, and the header sticks — the same reason `bill-sheet.tsx` gives:
+        {/* The count in the heading is what is on screen, and this says what is not. Both
+            numbers, because "118 hidden" without "2 shown" reads as a filter that has eaten the
+            bill. */}
+        {hiddenClaims > 0 && claims.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+            <p className="text-xs text-gray-500">
+              Showing the {claims.length} line
+              {claims.length === 1 ? '' : 's'} this bill claimed.{' '}
+              {hiddenClaims} other schedule line
+              {hiddenClaims === 1 ? ' carries' : 's carry'} no quantity.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowEveryLine(true)}
+              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            >
+              Show every schedule line
+            </button>
+          </div>
+        )}
+        {showEveryLine && !editable && (
+          <div className="mb-2">
+            <button
+              type="button"
+              onClick={() => setShowEveryLine(false)}
+              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            >
+              Show only what was claimed
+            </button>
+          </div>
+        )}
+        {/* Lines exist and none carries a quantity — a different fact from a bill with no lines,
+            and one a table of headers above nothing would not state. */}
+        {claims.length === 0 ? (
+          <div className="flex flex-wrap items-baseline gap-2 rounded-md border border-dashed border-gray-300 p-6">
+            <p className="text-sm text-gray-600">
+              No line on this bill carries a quantity. Every schedule line was
+              considered and nothing was claimed.
+            </p>
+            {hiddenClaims > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowEveryLine(true)}
+                className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              >
+                Show every schedule line
+              </button>
+            )}
+          </div>
+        ) : (
+        /* Bounded on both axes, and the header sticks — the same reason `bill-sheet.tsx` gives:
             a real schedule is 231 lines, several of them a full specification deep, and an
             unbounded grid pushes the document to tens of thousands of pixels behind a shell that
-            is clipped at the viewport. */}
+            is clipped at the viewport. */
         <div className="max-h-[70vh] overflow-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="sticky top-0 z-10 bg-white text-left text-xs uppercase tracking-wide text-gray-500 shadow-[0_1px_0_0_rgb(229,231,235)]">
@@ -367,7 +452,7 @@ export default function BillPackageDetail({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {pkg.claims.map((claim) => (
+              {claims.map((claim) => (
                 <ClaimRow
                   key={claim.id}
                   claim={claim}
@@ -398,6 +483,7 @@ export default function BillPackageDetail({
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       {/* ── The month's entered figures (025 FR-044) ──────────────────── */}
