@@ -179,10 +179,16 @@ export default function LetterKindFields({
               <div className="min-w-0">
                 <p className="truncate text-sm text-gray-900">
                   {field.label}
+                  {/* See the same spacing note in the template editor's field
+                      palette: a margin is not a space, and the text is what a
+                      screen reader announces and what gets copied. */}
                   {field.isRequired && (
-                    <span className="ml-1 text-xs text-amber-800">
-                      {LETTER_FIELD_COPY.requiredMark}
-                    </span>
+                    <>
+                      {' '}
+                      <span className="text-xs text-amber-800">
+                        {LETTER_FIELD_COPY.requiredMark}
+                      </span>
+                    </>
                   )}
                 </p>
                 <p className="break-all text-xs text-gray-500">
