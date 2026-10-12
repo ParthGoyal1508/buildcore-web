@@ -25,6 +25,22 @@ export function rupees(value: number | null | undefined): string {
 }
 
 /**
+ * A unit rate, with the symbol — two decimals, and up to four where the quote derives it.
+ *
+ * `rupees` is fixed at two because money is counted in paise. **A rate is not money**: it is a
+ * price per unit, and only the product of it and a quantity is ever paid. ₹178.00 at 10.79% below
+ * is ₹158.7938, and printed as ₹158.79 it stops multiplying out to the amount beside it — which is
+ * the only reason the column is on the page.
+ */
+export function unitRate(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return `₹${value.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })}`;
+}
+
+/**
  * "2026-07" → "July 2026".
  *
  * The API's period key is a sort key, not something to put in front of a person.

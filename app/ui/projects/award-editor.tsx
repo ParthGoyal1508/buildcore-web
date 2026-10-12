@@ -11,8 +11,9 @@ import {
   type BillableBoqItem,
 } from '@/app/lib/api/billing';
 import { ApiError } from '@/app/lib/api/client';
+import { earnedRate } from '@/app/lib/bill-totals';
 import { WORK_ORDER_COPY } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { rupees, unitRate } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import SearchableSelect, {
   type SearchableOption,
@@ -155,7 +156,6 @@ export default function AwardEditor({
    * the row amount the same way.
    */
   const quotedPercentage = boq.data?.quotedPercentage ?? 0;
-  const earnedRate = (boqRate: number) => boqRate * (1 + quotedPercentage);
 
   const used = useMemo(
     () =>
@@ -412,7 +412,7 @@ export default function AwardEditor({
                   ? boqById.get(row.boqTaskItemId)
                   : undefined;
                 const amount = Number(row.awardedQty) * Number(row.rate);
-                const earned = item ? earnedRate(item.rate) : null;
+                const earned = item ? earnedRate(item.rate, quotedPercentage) : null;
                 // Only when both are real numbers: a half-typed rate is not yet a rate,
                 // and warning about one is how a field becomes annoying to type in.
                 const overEarned =
@@ -469,7 +469,13 @@ export default function AwardEditor({
                       {item ? rupees(item.rate) : WORK_ORDER_COPY.awardUnlinked}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                      {item ? rupees(earned) : WORK_ORDER_COPY.awardUnlinked}
+                      {/*
+                        To four decimals, as the bill prints it: the same column under the same
+                        name on two screens must not show two different figures.
+                      */}
+                      {item
+                        ? unitRate(earned)
+                        : WORK_ORDER_COPY.awardUnlinked}
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <input

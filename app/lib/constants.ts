@@ -922,6 +922,17 @@ export const BILLING_COPY = {
     billedQty: 'Billed to date',
     remainingQty: 'Remaining',
     rate: 'Rate',
+    /**
+     * The two rates a quoted bill is priced at (2026-10-13).
+     *
+     * Named as the award editor already names them, because they are the same two figures and a
+     * reader moving between the two screens must not have to work out that they are.
+     *
+     * Shown only where the project is quoted: at par the two are one rate, and printing it twice
+     * under different headings invites the reader to look for a difference that is not there.
+     */
+    boqRate: 'BOQ rate',
+    quotedRate: 'You earn',
     quantity: 'This bill',
     amount: 'Amount',
   },
@@ -982,6 +993,22 @@ export const BILLING_COPY = {
    * against.
    */
   settlementHeading: 'How this net is arrived at',
+  /**
+   * The step between the schedule and the work done (2026-10-13).
+   *
+   * Reported on RA-05: a line at ₹178.00 for 37.25 Cum came to ₹5,915.07, where the multiplication
+   * gives ₹6,630.50. The project is quoted 10.79% below and the bill applies it line by line, so
+   * the figure a reader can check the tender against was nowhere on the screen. The client's own
+   * abstract prints exactly these three rows — `TOTAL`, `Total Amount after 14.92% below`,
+   * `Total Payable Amount` — which is the layout being matched.
+   */
+  quoteScheduleTotal: 'At BOQ rates',
+  /** "Less 10.79% below" / "Add 2.46% above" — the direction said, not left to be inferred. */
+  quoteAdjustmentLabel: (percent: string, below: boolean) =>
+    below ? `Less ${percent} below` : `Add ${percent} above`,
+  /** Under the table, where the two rate columns are. */
+  quotedRateNote: (percent: string) =>
+    `Each amount is the quantity at “You earn” — the BOQ rate after this project’s quoted ${percent}. The BOQ rate beside it is the tender figure, before the quote.`,
   settlementWorkDone: 'Work done',
   settlementReleaseWithheld: 'Release of withheld amount',
   settlementCgst: 'CGST',

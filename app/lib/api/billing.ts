@@ -141,8 +141,16 @@ export const clientBillLineSchema = z.object({
   unit: z.string(),
   scopeQty: decimal,
   quantity: decimal,
-  /** The rate **as billed**, frozen at composition. Never today's BOQ rate (FR-006). */
+  /** The schedule's own rate, frozen at composition. Never today's BOQ rate (FR-006). */
   rate: decimal,
+  /**
+   * That rate after the project's quoted percentage — **the rate the amount was computed at**
+   * (2026-10-13).
+   *
+   * Reported: a line reading 37.25 Cum at ₹178.00 for ₹5,915.07. Both right, and the column
+   * between them missing — the project is quoted 10.79% below and the bill applies it per line.
+   */
+  quotedRate: decimal,
   amount: decimal,
   cumulativeQty: decimal,
   remainingQty: decimal,
@@ -169,6 +177,10 @@ export const clientBillSchema = z.object({
   status: z.string(),
   /** Frozen at composition alongside each line's rate. */
   quotedPercentage: decimal,
+  /** These lines at the schedule's rates, before the quote. */
+  boqGrossAmount: decimal,
+  /** What the quote takes off or adds. Negative where the quote is below the schedule. */
+  quoteAdjustment: decimal,
   grossAmount: decimal,
   retentionAmount: decimal,
   /**

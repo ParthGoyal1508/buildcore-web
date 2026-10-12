@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 
 import {
   certifyClientBill,
@@ -13,7 +13,8 @@ import {
 import { ApiError } from '@/app/lib/api/client';
 import { BILLING_COPY } from '@/app/lib/constants';
 import { openStoredFile } from '@/app/lib/download-file';
-import { dateLabel, rupees } from '@/app/lib/format';
+import { percentLabel } from '@/app/lib/bill-totals';
+import { dateLabel, rupees, unitRate } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -172,6 +173,18 @@ export default function ClientBillView({
     return ordered;
   }, [lines]);
 
+  /**
+   * Whether this bill was priced away from the schedule, and by how much (2026-10-13).
+   *
+   * Everything the quote adds to this screen is behind it. At par there is one rate, one total and
+   * nothing to explain — and a second rate column repeating the first, under a heading that implies
+   * a difference, is worse than no column at all.
+   */
+  const quoted = bill.quotedPercentage !== 0;
+  const quotePercent = `${percentLabel(Math.abs(bill.quotedPercentage))} ${
+    bill.quotedPercentage < 0 ? 'below' : 'above'
+  }`;
+
   return (
     <section className="space-y-4">
       <header className="space-y-1 border-b border-gray-200 pb-3">
@@ -216,8 +229,15 @@ export default function ClientBillView({
                   {BILLING_COPY.columns.quantity}
                 </th>
                 <th className="px-2 py-2 text-right">
-                  {BILLING_COPY.columns.rate}
+                  {quoted
+                    ? BILLING_COPY.columns.boqRate
+                    : BILLING_COPY.columns.rate}
                 </th>
+                {quoted && (
+                  <th className="px-2 py-2 text-right">
+                    {BILLING_COPY.columns.quotedRate}
+                  </th>
+                )}
                 <th className="px-2 py-2 text-right">
                   {BILLING_COPY.columns.amount}
                 </th>
@@ -233,7 +253,7 @@ export default function ClientBillView({
                     */}
                     <th
                       scope="colgroup"
-                      colSpan={6}
+                      colSpan={quoted ? 7 : 6}
                       className="px-2 py-1.5 text-left text-sm font-semibold text-gray-900"
                     >
                       {section.name}
@@ -252,9 +272,19 @@ export default function ClientBillView({
                         {line.quantity}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
-                        {/* The rate **as billed**, frozen at composition. Never today's BOQ rate. */}
+                        {/* The schedule's rate, frozen at composition. Never today's BOQ rate. */}
                         {rupees(line.rate)}
                       </td>
+                      {quoted && (
+                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
+                          {/*
+                            What the quantity was actually priced at, and to four decimals where
+                            the quote needs them: at two it stops multiplying out to the amount in
+                            the next column, which is the whole reason this one is here.
+                          */}
+                          {unitRate(line.quotedRate)}
+                        </td>
+                      )}
                       <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
                         {rupees(line.amount)}
                       </td>
@@ -282,6 +312,11 @@ export default function ClientBillView({
             </button>
           </div>
         )}
+        {quoted && (
+          <p className="text-xs text-gray-500">
+            {BILLING_COPY.quotedRateNote(quotePercent)}
+          </p>
+        )}
         <p className="text-xs text-gray-500">
           {BILLING_COPY.historicalRatesNote}
         </p>
@@ -300,9 +335,13 @@ export default function ClientBillView({
         the bill does not have.
       */}
       {bill.settlement ? (
-        <Settlement settlement={bill.settlement} />
+        <Settlement
+          settlement={bill.settlement}
+          lead={<QuoteRows bill={bill} />}
+        />
       ) : (
         <dl className="max-w-sm space-y-1 rounded border border-gray-200 p-3 text-sm">
+          <QuoteRows bill={bill} />
           <Figure label={BILLING_COPY.gross} value={bill.grossAmount} />
           <Figure
             label={BILLING_COPY.retention}
@@ -540,8 +579,17 @@ export default function ClientBillView({
  */
 function Settlement({
   settlement,
+  lead,
 }: {
   settlement: NonNullable<ClientBill['settlement']>;
+  /**
+   * Rows printed above the work done, where the quote put something there (2026-10-13).
+   *
+   * Inside the first block rather than above the heading, because they are the same chain: the
+   * schedule total, what the quote took off, the work done, the tax added. Two blocks under two
+   * headings would make a reader stitch them back together.
+   */
+  lead?: ReactNode;
 }) {
   const row = (label: string, value: number, always = false) =>
     always || value !== 0 ? { label, value } : null;
@@ -615,6 +663,7 @@ function Settlement({
             key={block.total}
             className={index > 0 ? 'border-t border-gray-100 pt-2' : undefined}
           >
+            {index === 0 ? lead : null}
             {block.rows.map((r) => (
               <Figure key={r.label} label={r.label} value={r.value} muted />
             ))}
@@ -636,6 +685,38 @@ function Settlement({
       </dl>
       <p className="text-xs text-gray-500">{BILLING_COPY.settlementNote}</p>
     </section>
+  );
+}
+
+/**
+ * What the schedule said, and what the quote did to it (2026-10-13).
+ *
+ * Reported on RA-05: the lines came to ₹56,986.00 at the rates printed on the tender, the bill said
+ * ₹50,837.21, and nothing on the screen said why. The client's own abstract prints these two rows
+ * above its payable for exactly that reason.
+ *
+ * The figure is the magnitude and the label carries the direction, as the deduction rows below
+ * already do — a column of positive numbers with "Less" beside them reads at a glance, and a lone
+ * negative in the middle of it reads as a mistake.
+ */
+function QuoteRows({ bill }: { bill: ClientBill }) {
+  if (bill.quotedPercentage === 0) return null;
+  return (
+    <>
+      <Figure
+        label={BILLING_COPY.quoteScheduleTotal}
+        value={bill.boqGrossAmount}
+        muted
+      />
+      <Figure
+        label={BILLING_COPY.quoteAdjustmentLabel(
+          percentLabel(Math.abs(bill.quotedPercentage)),
+          bill.quotedPercentage < 0,
+        )}
+        value={Math.abs(bill.quoteAdjustment)}
+        muted
+      />
+    </>
   );
 }
 
