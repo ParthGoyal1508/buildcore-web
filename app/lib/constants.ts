@@ -4194,8 +4194,29 @@ export const PROJECT_SHELL_COPY = {
     count === 1 ? '1 daily work report' : `${count} daily work reports`,
   dwrNone: 'No daily work reports yet.',
   dwrLatest: (date: string) => `Latest ${date}`,
+  /**
+   * The two directions a project bills in, named (2026-10-12).
+   *
+   * The card said only "Bills" while the project carries a Client bills tab and an RA bills tab,
+   * so the one number on screen could have been either — and was the subcontractor one, which is
+   * the half somebody looking at a project's commercial position usually wants least.
+   */
+  subcontractorBillsLabel: 'Subcontractor bills',
   billsCount: (count: number) =>
     count === 1 ? '1 bill booked' : `${count} bills booked`,
+  clientBillsLabel: 'Client bills',
+  clientBillsCount: (count: number) =>
+    count === 1 ? '1 bill raised' : `${count} bills raised`,
+  clientBillsNone: 'None raised',
+  clientBillsBilled: (amount: string) => `${amount} billed`,
+  certifiedLabel: 'Certified by the client',
+  /**
+   * Said rather than left as a zero. A client who has certified nothing and a client who certified
+   * a bill at nil are different facts, and ₹0 on its own is both.
+   */
+  certifiedNone: 'Nothing certified yet',
+  certifiedOf: (certified: number, total: number) =>
+    `on ${certified} of ${total === 1 ? '1 bill' : `${total} bills`}`,
   revenueReceived: 'Received',
   revenuePending: 'Pending',
 

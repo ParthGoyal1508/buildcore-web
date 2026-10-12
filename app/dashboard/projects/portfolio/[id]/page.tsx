@@ -253,11 +253,54 @@ export default function ProjectOverviewPage() {
                 </span>
               )}
             </Fact>
-            <Fact term="Bills">
+            {/*
+              **Both directions, named** (2026-10-12). This said "Bills" and counted `RABill`
+              alone, on a screen whose tabs are "Client bills" and "RA bills" — so the figure
+              could have been either and was the one about money going out. The client side was
+              absent from the card entirely.
+            */}
+            <Fact term={PROJECT_SHELL_COPY.subcontractorBillsLabel}>
               {PROJECT_SHELL_COPY.billsCount(tabs.billSummary.totalBills)}
               <span className="block text-xs tabular-nums text-gray-500">
                 {formatRupees(tabs.billSummary.totalExpenses)}
               </span>
+            </Fact>
+            <Fact term={PROJECT_SHELL_COPY.clientBillsLabel}>
+              {tabs.clientBillSummary.totalBills === 0
+                ? PROJECT_SHELL_COPY.clientBillsNone
+                : PROJECT_SHELL_COPY.clientBillsCount(
+                    tabs.clientBillSummary.totalBills,
+                  )}
+              {tabs.clientBillSummary.totalBills > 0 && (
+                <span className="block text-xs tabular-nums text-gray-500">
+                  {PROJECT_SHELL_COPY.clientBillsBilled(
+                    formatRupees(tabs.clientBillSummary.totalBilled),
+                  )}
+                </span>
+              )}
+            </Fact>
+            {/*
+              Beside what was billed, never instead of it. The gap between the two is what a
+              project manager chases, and one figure can only say one of them.
+            */}
+            <Fact term={PROJECT_SHELL_COPY.certifiedLabel}>
+              {tabs.clientBillSummary.certifiedCount === 0 ? (
+                <span className="text-gray-500">
+                  {PROJECT_SHELL_COPY.certifiedNone}
+                </span>
+              ) : (
+                <>
+                  <span className="tabular-nums">
+                    {formatRupees(tabs.clientBillSummary.totalCertified)}
+                  </span>
+                  <span className="block text-xs text-gray-500">
+                    {PROJECT_SHELL_COPY.certifiedOf(
+                      tabs.clientBillSummary.certifiedCount,
+                      tabs.clientBillSummary.totalBills,
+                    )}
+                  </span>
+                </>
+              )}
             </Fact>
             <Fact term={PROJECT_SHELL_COPY.revenueReceived}>
               <span className="tabular-nums">

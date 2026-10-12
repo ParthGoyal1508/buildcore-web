@@ -409,10 +409,31 @@ export const projectDetailSchema = z.object({
       }),
     ),
     dwrSummary: z.object({ count: z.number(), latestDate: nullableIsoDate }),
+    /** **Subcontractor** running-account bills — the RA bills tab. Money going out. */
     billSummary: z.object({
       totalBills: z.number(),
       totalExpenses: decimal,
     }),
+    /**
+     * **Client** bills — the Client bills tab. Money coming in (2026-10-12).
+     *
+     * Defaulted rather than required, so a client deployed ahead of its server parses the project
+     * instead of failing the whole page over a field it has not started sending. Zeroes then read
+     * as "no client bills", which is what the screen showed before this existed.
+     */
+    clientBillSummary: z
+      .object({
+        totalBills: z.number().default(0),
+        totalBilled: decimal.default(0),
+        totalCertified: decimal.default(0),
+        certifiedCount: z.number().default(0),
+      })
+      .default({
+        totalBills: 0,
+        totalBilled: 0,
+        totalCertified: 0,
+        certifiedCount: 0,
+      }),
     revenueSummary: z.object({
       totalReceived: decimal,
       totalPending: decimal,
