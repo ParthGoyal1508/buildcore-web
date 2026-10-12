@@ -6,6 +6,7 @@ import {
   getOverClaimReport,
   getUnderstatementReport,
 } from '@/app/lib/api/bill-packages';
+import { projectsLabel } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 
 /**
@@ -62,9 +63,12 @@ export default function BillPackageReports({
         ) : understatement.data.rows.length === 0 ? (
           <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
             Every issued bill still matches the measurement approved for its
-            period. Compared across{' '}
-            {understatement.data.comparableDirections.join(' and ') || 'no'}{' '}
-            direction(s).
+            period.{' '}
+            {understatement.data.comparableDirections.length === 0
+              ? 'No direction had anything to compare.'
+              : `Compared across: ${understatement.data.comparableDirections
+                  .map(projectsLabel)
+                  .join(' and ')}.`}
           </p>
         ) : (
           understatement.data.rows.map((row) => (

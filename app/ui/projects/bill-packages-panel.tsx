@@ -11,7 +11,11 @@ import {
   listBillPackages,
 } from '@/app/lib/api/bill-packages';
 import { getWorkOrders } from '@/app/lib/api/billing';
-import { BILL_PACKAGE_PICKER_COPY, ROUTES } from '@/app/lib/constants';
+import {
+  BILL_PACKAGE_PICKER_COPY,
+  ROUTES,
+  projectsLabel,
+} from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { useVendorOptions } from '@/app/ui/projects/ra-bills-panel';
@@ -24,10 +28,6 @@ import { FieldLabelSpacer } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 
 
-const DIRECTION_LABEL: Record<BillDirection, string> = {
-  to_client: 'To the client',
-  to_subcontractor: 'To a subcontractor',
-};
 
 /**
  * Every running-account bill package on a project, and the form that opens the next (024 Story 3).
@@ -201,7 +201,7 @@ export default function BillPackagesPanel({
           >
             {BILL_DIRECTIONS.map((option) => (
               <option key={option} value={option}>
-                {DIRECTION_LABEL[option]}
+                {projectsLabel(option)}
               </option>
             ))}
           </select>
@@ -400,7 +400,7 @@ export default function BillPackagesPanel({
                     </Link>
                   </td>
                   <td className="px-3 py-2">
-                    {DIRECTION_LABEL[pkg.direction]}
+                    {projectsLabel(pkg.direction)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}

@@ -2506,6 +2506,18 @@ const ENUM_LABEL_OVERRIDES: Record<string, string> = {
   ok: 'OK',
   km: 'Kilometres',
   hours: 'Hours',
+
+  // Billing (023). The hyphen is GST's own spelling and the one on every invoice;
+  // `enumLabel` would give "Inter State", which reads as two words that got separated.
+  inter_state: 'Inter-state',
+  intra_state: 'Intra-state',
+  // Bill direction (024). These lived as a local map in `bill-packages-panel.tsx`, so the
+  // over-claims report beside it had nothing to call them and printed "to_client and
+  // to_subcontractor" into a sentence. One map, where the other enum labels are.
+  to_client: 'To the client',
+  to_subcontractor: 'To a subcontractor',
+  derived_from_gstin: 'derived from the GSTIN',
+  from_project_flag: "set on the project's own record",
 };
 
 export function hrLabel(value: string): string {

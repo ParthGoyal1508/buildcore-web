@@ -30,6 +30,33 @@ export function computeDocumentTypeFlag(
   return 'Optional';
 }
 
+/**
+ * What each derived flag is called on screen.
+ *
+ * The flag values are wire identifiers — the API computes and returns them, and the
+ * branch order in `computeDocumentTypeFlag` *is* the specification, so they cannot be
+ * renamed. But the Flags column and the modal's live preview were printing them
+ * verbatim, so a reader saw `MandatoryNumber` and `ExpiryNumber`: two words run
+ * together, which reads as a rendering fault even though it is a single legitimate
+ * value.
+ *
+ * A middle dot rather than "and": the two halves are independent properties of the
+ * document type, not a phrase.
+ */
+const FLAG_LABELS: Record<DocumentTypeFlag, string> = {
+  Mandatory: 'Mandatory',
+  MandatoryNumber: 'Mandatory · number required',
+  Expiry: 'Has an expiry date',
+  ExpiryNumber: 'Has an expiry date · number required',
+  Number: 'Number required',
+  Optional: 'Optional',
+};
+
+/** The flag as a reader should see it. An unrecognised value renders as it arrived. */
+export function documentTypeFlagLabel(flag: string): string {
+  return FLAG_LABELS[flag as DocumentTypeFlag] ?? flag;
+}
+
 /** Formats an ISO timestamp for the Users list's Last Login column, or "Never". */
 export function formatLastLogin(value: string | null | undefined): string {
   if (!value) return 'Never';

@@ -27,7 +27,7 @@ import {
   setClaim,
 } from '@/app/lib/api/bill-packages';
 import { downloadDebitNote } from '@/app/lib/api/billing';
-import { SETTLEMENT_COPY } from '@/app/lib/constants';
+import { SETTLEMENT_COPY, projectsLabel } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import BillAdjustments from '@/app/ui/projects/bill-adjustments';
 import { Button } from '@/app/ui/button';
@@ -419,8 +419,8 @@ export default function BillPackageDetail({
         <section>
           <h3 className="mb-1 font-medium text-gray-900">Abstract</h3>
           <p className="mb-2 text-xs text-gray-500">
-            Tax basis: <strong>{abstract.taxBasis}</strong> (
-            {abstract.taxBasisSource.replace(/_/g, ' ')}) — shown because a tax
+            Tax basis: <strong>{projectsLabel(abstract.taxBasis)}</strong> (
+            {projectsLabel(abstract.taxBasisSource)}) — shown because a tax
             decision nobody can see is a tax decision nobody made.
             {abstract.cumulativeProvisional && (
               <>
