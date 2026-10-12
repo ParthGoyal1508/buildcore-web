@@ -341,6 +341,14 @@ export type ReportType = z.infer<typeof reportTypeSchema>;
 const reportDataSchema = z.object({
   columns: z.array(z.object({ key: z.string(), label: z.string() })),
   rows: z.array(z.record(z.string(), z.unknown())),
+  /**
+   * Why there is nothing to show, or what is missing from what is.
+   *
+   * "This report returned no rows" is not the interesting fact for several of them: the
+   * Payroll report is empty when every run in the range is still a draft, and a reader
+   * told only "no rows" goes looking for missing employees rather than pressing Process.
+   */
+  note: z.string().optional(),
 });
 const reportResultSchema = z.union([
   reportDataSchema,
