@@ -3935,6 +3935,19 @@ export const DOCUMENT_COPY = {
   /** T072: the server's refusal, said on the control it refers to. */
   creationRefusedHere: 'The server refused the project without this document.',
   /**
+   * The expiry a kind that lapses requires, asked for **before** the file (reported 2026-10-12).
+   *
+   * The server has always refused a document of an expiring kind with no date, and this form had
+   * nowhere to type one — so a company whose required set contained an expiring kind could not
+   * create a project at all: every file was refused, and the submit button stayed shut on the
+   * mandatory kind the refusal had left unstaged.
+   */
+  creationExpiryLabel: 'Expires on',
+  creationExpiryHint: 'Required — this kind lapses.',
+  creationExpiryFirst: 'Enter the expiry date, then choose the file.',
+  creationAttachedUntil: (fileName: string, expiresAt: string) =>
+    `Attached: ${fileName} · expires ${expiresAt}`,
+  /**
    * Where a project's documents live once it exists (028, reported 2026-10-07).
    *
    * The edit form shows no upload controls — an existing project is past the creation gate and its

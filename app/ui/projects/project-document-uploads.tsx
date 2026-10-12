@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 
 import {
   fileToBase64,
@@ -8,7 +8,8 @@ import {
   type ProjectDocumentRequirement,
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
-import { FormError } from '@/app/ui/settings/form-fields';
+import { dateLabel } from '@/app/lib/format';
+import { FormError, TextField } from '@/app/ui/settings/form-fields';
 
 /**
  * One kind's staging state, as the form needs to reason about it.
@@ -22,6 +23,8 @@ import { FormError } from '@/app/ui/settings/form-fields';
 export interface StagedUpload {
   fileName: string;
   stagedDocumentId: string;
+  /** What was filed with it, so the row can show the date the document lapses on. */
+  expiresAt?: string;
 }
 
 export type StagedUploads = Record<string, StagedUpload>;
@@ -31,6 +34,21 @@ type UploadState =
   | { status: 'idle' }
   | { status: 'uploading'; fileName: string }
   | { status: 'failed'; fileName: string; message: string };
+
+/**
+ * What has been typed against one kind but not yet sent (2026-10-12).
+ *
+ * The file is **held** rather than uploaded the instant it is chosen, because a kind that expires
+ * cannot be staged without its date and the date may be typed second. Holding it is also what lets
+ * the date be corrected afterwards: the bytes are still here, so the row re-stages with the new
+ * date instead of asking somebody to find the file again.
+ */
+interface Pending {
+  file?: File;
+  expiresAt: string;
+}
+
+const emptyPending = (): Pending => ({ expiresAt: '' });
 
 /**
  * A file per document kind, staged before the project exists (017 FR-023, FR-023a, FR-023b).
@@ -65,21 +83,77 @@ export default function ProjectDocumentUploads({
 }: {
   requirements: ProjectDocumentRequirement[];
   staged: StagedUploads;
-  onStagedChange: (next: StagedUploads) => void;
+  /**
+   * The parent's own setter.
+   *
+   * Typed as a setter rather than as `(next) => void` so every write here is an **update of what
+   * is current** rather than of what was current when this render began. Two rows whose uploads
+   * finish at nearly the same moment would otherwise both write a copy of the same older map, and
+   * the second would silently drop the first's reference — leaving a file the server is holding
+   * and the form has forgotten.
+   */
+  onStagedChange: Dispatch<SetStateAction<StagedUploads>>;
   missingTypeIds?: string[];
   companyId?: string;
   disabled?: boolean;
 }) {
   const [uploads, setUploads] = useState<Record<string, UploadState>>({});
+  const [pending, setPending] = useState<Record<string, Pending>>({});
 
   const setState = (documentTypeId: string, state: UploadState) =>
     setUploads((current) => ({ ...current, [documentTypeId]: state }));
 
-  const choose = async (
+  const pendingOf = (documentTypeId: string): Pending =>
+    pending[documentTypeId] ?? emptyPending();
+
+  /**
+   * Records what was typed or chosen, and stages as soon as the kind's own rule is satisfied.
+   *
+   * **A kind that expires cannot be staged without its date** — the server refuses it, and said so
+   * on this very form with no field to answer it in (reported 2026-10-12). So the file is held
+   * until the date is there, and typing the date afterwards sends it: either order works, and
+   * neither is a dead end.
+   *
+   * `force` distinguishes the two callers. Choosing a file always re-stages, because the bytes
+   * have changed. Changing a date only re-stages when the date differs from what was filed with
+   * the document already staged — a date input fires on its way to a complete value, and
+   * re-uploading on each of those would be work nobody asked for.
+   */
+  const record = (
     requirement: ProjectDocumentRequirement,
-    file: File | undefined,
+    patch: Partial<Pending>,
+    force: boolean,
   ) => {
+    const next = { ...pendingOf(requirement.documentTypeId), ...patch };
+    setPending((current) => ({
+      ...current,
+      [requirement.documentTypeId]: next,
+    }));
+    if (!next.file) return;
+    const already = staged[requirement.documentTypeId];
+    if (!force && already?.expiresAt === (next.expiresAt || undefined)) return;
+    void stage(requirement, next);
+  };
+
+  const stage = async (
+    requirement: ProjectDocumentRequirement,
+    input: Pending,
+  ) => {
+    const file = input.file;
     if (!file) return;
+
+    // Asked for rather than attempted. The server would refuse this with the same rule, and a
+    // refusal the form could have prevented reads as the form's fault — which, until this field
+    // existed, it was.
+    if (requirement.hasExpiry && !input.expiresAt) {
+      setState(requirement.documentTypeId, {
+        status: 'failed',
+        fileName: file.name,
+        message: DOCUMENT_COPY.creationExpiryFirst,
+      });
+      return;
+    }
+
     setState(requirement.documentTypeId, {
       status: 'uploading',
       fileName: file.name,
@@ -96,16 +170,18 @@ export default function ProjectDocumentUploads({
           // Carried through the staging and the promotion, so the document downloads under the
           // name its uploader chose rather than `<kind>-<id>` with no extension.
           fileName: file.name,
+          expiresAt: input.expiresAt || undefined,
         },
         companyId,
       );
-      onStagedChange({
-        ...staged,
+      onStagedChange((current) => ({
+        ...current,
         [requirement.documentTypeId]: {
           fileName: file.name,
           stagedDocumentId,
+          expiresAt: input.expiresAt || undefined,
         },
-      });
+      }));
       setState(requirement.documentTypeId, { status: 'idle' });
     } catch (error) {
       // T075: a failure must be *visible on the control*. A form that holds submission closed for
@@ -123,9 +199,14 @@ export default function ProjectDocumentUploads({
   };
 
   const remove = (documentTypeId: string) => {
-    const next = { ...staged };
-    delete next[documentTypeId];
-    onStagedChange(next);
+    onStagedChange((current) => {
+      const next = { ...current };
+      delete next[documentTypeId];
+      return next;
+    });
+    // The typed date goes with the file it was filed against. Keeping it would offer the next
+    // document a date somebody chose for a different one.
+    setPending((current) => ({ ...current, [documentTypeId]: emptyPending() }));
     setState(documentTypeId, { status: 'idle' });
   };
 
@@ -188,7 +269,14 @@ export default function ProjectDocumentUploads({
                       {attached ? (
                         <div className="flex items-center gap-2">
                           <span className="break-all text-xs text-green-800">
-                            {DOCUMENT_COPY.creationAttached(attached.fileName)}
+                            {attached.expiresAt
+                              ? DOCUMENT_COPY.creationAttachedUntil(
+                                  attached.fileName,
+                                  dateLabel(attached.expiresAt),
+                                )
+                              : DOCUMENT_COPY.creationAttached(
+                                  attached.fileName,
+                                )}
                           </span>
                           <button
                             type="button"
@@ -204,16 +292,46 @@ export default function ProjectDocumentUploads({
                           id={`doc-${requirement.documentTypeId}`}
                           type="file"
                           disabled={disabled || state.status === 'uploading'}
-                          onChange={(event) =>
-                            void choose(
-                              requirement,
-                              event.target.files?.[0] ?? undefined,
-                            )
-                          }
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) record(requirement, { file }, true);
+                          }}
                           className="text-xs text-gray-700"
                         />
                       )}
                     </div>
+
+                    {/*
+                      Only for a kind that lapses, and the kind itself says which those are. The
+                      server refuses one of them with no date — this is the field that answers it,
+                      and its absence is why a company requiring an expiring document could not
+                      create a project at all.
+
+                      Left editable after the file is attached: a date typed wrong is corrected
+                      here, and the held file is re-staged with the new one rather than asking
+                      somebody to find it again.
+                    */}
+                    {requirement.hasExpiry && (
+                      <div className="max-w-[16rem]">
+                        <TextField
+                          id={`doc-expiry-${requirement.documentTypeId}`}
+                          type="date"
+                          label={DOCUMENT_COPY.creationExpiryLabel}
+                          {...(attached
+                            ? {}
+                            : { hint: DOCUMENT_COPY.creationExpiryHint })}
+                          disabled={disabled || state.status === 'uploading'}
+                          value={pendingOf(requirement.documentTypeId).expiresAt}
+                          onChange={(event) =>
+                            record(
+                              requirement,
+                              { expiresAt: event.target.value },
+                              false,
+                            )
+                          }
+                        />
+                      </div>
+                    )}
 
                     {state.status === 'uploading' && (
                       <p className="text-xs text-gray-500" role="status">
