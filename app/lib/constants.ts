@@ -973,6 +973,37 @@ export const BILLING_COPY = {
    */
   netNotYetSettled: 'Set when the bill package is issued',
   /**
+   * The abstract behind a packaged bill's net (reported 2026-10-12).
+   *
+   * Three rows — gross, retention, net — invited a subtraction that does not hold: the net on a
+   * packaged bill is the payable, tax **in** and retention and TDS **out**, so it is larger than
+   * the gross and the difference between them is four rows that were not on the screen. Named the
+   * way the client's own abstract names them, because that is the document a reader checks this
+   * against.
+   */
+  settlementHeading: 'How this net is arrived at',
+  settlementWorkDone: 'Work done',
+  settlementReleaseWithheld: 'Release of withheld amount',
+  settlementCgst: 'CGST',
+  settlementSgst: 'SGST',
+  settlementIgst: 'IGST',
+  settlementWorkTotal: 'Work total',
+  settlementRecoveryDiesel: 'Recovery — diesel',
+  settlementDebitAgainstCivil: 'Debit against civil',
+  settlementOtherRecoveries: 'Other recoveries',
+  settlementMechanicalDebit: 'Mechanical debit',
+  settlementRecoveriesTotal: 'Total recoveries',
+  settlementMobilizationAdvance: 'Mobilization advance',
+  settlementRetention: 'Retention',
+  settlementPerformanceSecurity: 'Performance security',
+  settlementTheftWithheld: 'Theft withheld',
+  settlementDeductionsTotal: 'Total deductions',
+  settlementTds: 'TDS',
+  settlementPayable: 'Payable',
+  /** Why gross and net cannot be subtracted, said once under the block that shows both. */
+  settlementNote:
+    'Tax is added to the work and retention and TDS are taken off it, so the payable is not the gross less the retention. Every row between them is shown above.',
+  /**
    * The four-way distinction, said on the screen and not only in the code.
    *
    * A reader who drills from the summary's cost figure into a bill lands on a deduction line, and

@@ -287,15 +287,31 @@ export default function ClientBillView({
         </p>
       </section>
 
-      <dl className="max-w-sm space-y-1 rounded border border-gray-200 p-3 text-sm">
-        <Figure label={BILLING_COPY.gross} value={bill.grossAmount} />
-        <Figure
-          label={BILLING_COPY.retention}
-          value={bill.retentionAmount}
-          muted
-        />
-        <Figure label={BILLING_COPY.net} value={bill.netAmount} strong />
-      </dl>
+      {/*
+        **Three rows only where three rows are true.**
+
+        A bill settled through a package has its net decided by the abstract: tax added to the work,
+        then recoveries, retention and TDS taken off. Gross, Retention and Net alone made that look
+        like a subtraction — and it is not one, which is why a bill reading ₹50,837.21 gross and
+        ₹56,937.68 net was reported as wrong when every figure on it was right.
+
+        A bill composed on the sheet carries no tax and no recoveries. There the three rows say
+        everything there is to say, and printing fourteen mostly-zero rows would imply a complexity
+        the bill does not have.
+      */}
+      {bill.settlement ? (
+        <Settlement settlement={bill.settlement} />
+      ) : (
+        <dl className="max-w-sm space-y-1 rounded border border-gray-200 p-3 text-sm">
+          <Figure label={BILLING_COPY.gross} value={bill.grossAmount} />
+          <Figure
+            label={BILLING_COPY.retention}
+            value={bill.retentionAmount}
+            muted
+          />
+          <Figure label={BILLING_COPY.net} value={bill.netAmount} strong />
+        </dl>
+      )}
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -510,6 +526,115 @@ export default function ClientBillView({
           </SecondaryButton>
         )}
       </div>
+    </section>
+  );
+}
+
+/**
+ * The abstract a packaged bill's payable comes from, in the client's own blocks.
+ *
+ * A row that is zero is left out, with one exception: the block totals and the payable always
+ * print. A reader checking this against the document they were sent needs the structure to be the
+ * same structure even on a bill that carries no recoveries — and a missing "Total recoveries"
+ * reads as a figure that was forgotten rather than one that is nil.
+ */
+function Settlement({
+  settlement,
+}: {
+  settlement: NonNullable<ClientBill['settlement']>;
+}) {
+  const row = (label: string, value: number, always = false) =>
+    always || value !== 0 ? { label, value } : null;
+
+  const blocks: { rows: { label: string; value: number }[]; total: string }[] =
+    [
+      {
+        rows: [
+          row(BILLING_COPY.settlementWorkDone, settlement.workDone, true),
+          row(
+            BILLING_COPY.settlementReleaseWithheld,
+            settlement.releaseWithheld,
+          ),
+          row(BILLING_COPY.settlementCgst, settlement.cgstAmount),
+          row(BILLING_COPY.settlementSgst, settlement.sgstAmount),
+          row(BILLING_COPY.settlementIgst, settlement.igstAmount),
+        ].filter((r): r is { label: string; value: number } => r !== null),
+        total: BILLING_COPY.settlementWorkTotal,
+      },
+      {
+        rows: [
+          row(
+            BILLING_COPY.settlementRecoveryDiesel,
+            settlement.recoveryDiesel,
+          ),
+          row(
+            BILLING_COPY.settlementDebitAgainstCivil,
+            settlement.debitAgainstCivil,
+          ),
+          row(
+            BILLING_COPY.settlementOtherRecoveries,
+            settlement.otherRecoveries,
+          ),
+          row(
+            BILLING_COPY.settlementMechanicalDebit,
+            settlement.mechanicalDebit,
+          ),
+        ].filter((r): r is { label: string; value: number } => r !== null),
+        total: BILLING_COPY.settlementRecoveriesTotal,
+      },
+      {
+        rows: [
+          row(
+            BILLING_COPY.settlementMobilizationAdvance,
+            settlement.mobilizationAdvance,
+          ),
+          row(BILLING_COPY.settlementRetention, settlement.retentionAmount),
+          row(
+            BILLING_COPY.settlementPerformanceSecurity,
+            settlement.performanceSecurity,
+          ),
+          row(BILLING_COPY.settlementTheftWithheld, settlement.theftWithheld),
+        ].filter((r): r is { label: string; value: number } => r !== null),
+        total: BILLING_COPY.settlementDeductionsTotal,
+      },
+    ];
+  const totals = [
+    settlement.workTotal,
+    settlement.recoveriesTotal,
+    settlement.deductionsTotal,
+  ];
+
+  return (
+    <section className="max-w-sm space-y-2">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+        {BILLING_COPY.settlementHeading}
+      </h3>
+      <dl className="space-y-1 rounded border border-gray-200 p-3 text-sm">
+        {blocks.map((block, index) => (
+          <div
+            key={block.total}
+            className={index > 0 ? 'border-t border-gray-100 pt-2' : undefined}
+          >
+            {block.rows.map((r) => (
+              <Figure key={r.label} label={r.label} value={r.value} muted />
+            ))}
+            <Figure label={block.total} value={totals[index]} />
+          </div>
+        ))}
+        <div className="border-t border-gray-100 pt-2">
+          <Figure
+            label={BILLING_COPY.settlementTds}
+            value={settlement.tdsAmount}
+            muted
+          />
+          <Figure
+            label={BILLING_COPY.settlementPayable}
+            value={settlement.payable}
+            strong
+          />
+        </div>
+      </dl>
+      <p className="text-xs text-gray-500">{BILLING_COPY.settlementNote}</p>
     </section>
   );
 }

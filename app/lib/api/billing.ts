@@ -179,6 +179,40 @@ export const clientBillSchema = z.object({
    * bill row's own deduction columns being zero — was a figure the document would not agree with.
    */
   netAmount: nullableDecimal,
+  /**
+   * How that net was arrived at, where a bill package settled it (2026-10-12).
+   *
+   * Reported: a bill reading Gross ₹50,837.21, Retention ₹2,033.49, Net ₹56,937.68 — three rows
+   * laid out to be subtracted, where the net is *larger* than the gross and the subtraction gives a
+   * figure that appears nowhere on the bill. Every number was right; the tax added and the tax
+   * deducted were simply not on the screen.
+   *
+   * Null for a bill composed on the sheet, which carries no tax — there the three rows are true —
+   * and null while the package is a draft, matching `netAmount`.
+   */
+  settlement: z
+    .object({
+      workDone: decimal,
+      releaseWithheld: decimal,
+      cgstAmount: decimal,
+      sgstAmount: decimal,
+      igstAmount: decimal,
+      workTotal: decimal,
+      recoveryDiesel: decimal,
+      debitAgainstCivil: decimal,
+      otherRecoveries: decimal,
+      mechanicalDebit: decimal,
+      recoveriesTotal: decimal,
+      mobilizationAdvance: decimal,
+      retentionAmount: decimal,
+      performanceSecurity: decimal,
+      theftWithheld: decimal,
+      deductionsTotal: decimal,
+      tdsAmount: decimal,
+      payable: decimal,
+    })
+    .nullable()
+    .default(null),
   certifiedAmount: nullableDecimal,
   /** The client's own certification document, where one was filed (2026-10-11). */
   certificate: z
