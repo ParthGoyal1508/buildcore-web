@@ -4,6 +4,10 @@ import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import { API_URL } from '@/app/lib/config';
 import { authFetch, getAccessToken } from '@/app/lib/session';
 import {
+  reimbursementCategorySchema,
+  type ReimbursementCategory,
+} from '@/app/lib/api/my-workspace';
+import {
   ATTENDANCE_STATUS_OVERRIDES,
   CALCULATION_MODES,
   EMPLOYMENT_TYPES,
@@ -1607,6 +1611,25 @@ export async function listAdminClaims(
     ])
     .parse(data);
   return Array.isArray(parsed) ? parsed : parsed.items;
+}
+
+/**
+ * The company's reimbursement categories, for an admin resolving a claim's category name.
+ *
+ * Reads the **settings** master, not `/my/reimbursements/categories`. That one is
+ * `@SelfService()` and resolves the caller's own employee record first, so it answered 403
+ * for every administrator who is not themselves an employee — and the Reimbursement claims
+ * table, which calls it only to turn a `categoryId` into a name, showed "—" in the Category
+ * column for every row. Same `EMPLOYEES` permission this screen already requires, same
+ * response shape, and it returns deactivated categories too, which is what a claim filed
+ * against one needs in order to still read correctly.
+ */
+export async function listReimbursementCategories(): Promise<
+  ReimbursementCategory[]
+> {
+  return z
+    .array(reimbursementCategorySchema)
+    .parse(await authFetch<unknown>('/settings/reimbursement-categories'));
 }
 
 export async function approveClaim(id: string, remarks?: string) {
