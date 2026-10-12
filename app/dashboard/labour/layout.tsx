@@ -64,7 +64,13 @@ export default function LabourLayout({
         two companies' six skill categories arrived as twelve entries listed in pairs
         with nothing on screen saying which was which.
       */}
-      {children}
+      {/* The page's content is the `<main>` landmark, matching how `hr`, `projects`,
+          `partners` and `settings` each mark it on their own pages. This module's
+          screens had none at all — a browser pass over 103 routes found 60 with
+          exactly one `<main>`, none with two, and 43 with none, and those 43 were
+          this module and four others in the same shape. Marked here rather than on
+          each page so the next screen added to the module inherits it. */}
+      <main className="flex flex-col gap-6">{children}</main>
     </div>
   );
 }

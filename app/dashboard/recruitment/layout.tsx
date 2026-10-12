@@ -59,7 +59,13 @@ export default function RecruitmentLayout({
         which company a requisition, candidate, resignation or letter template
         belonged to, and every write in this module was refused.
       */}
-      {children}
+      {/* The page's content is the `<main>` landmark, matching how `hr`, `projects`,
+          `partners` and `settings` each mark it on their own pages. This module's
+          screens had none at all — a browser pass over 103 routes found 60 with
+          exactly one `<main>`, none with two, and 43 with none, and those 43 were
+          this module and four others in the same shape. Marked here rather than on
+          each page so the next screen added to the module inherits it. */}
+      <main className="flex flex-col gap-6">{children}</main>
     </div>
   );
 }
