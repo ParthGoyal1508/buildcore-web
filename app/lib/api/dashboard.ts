@@ -160,6 +160,15 @@ const widgetResultSchema = z.object({
   title: z.string(),
   section: z.string(),
   value: z.unknown().optional(),
+  /**
+   * What the number means, when it is not just a count (2026-10-12).
+   *
+   * `'currency'` tells the renderer to put the figure through `rupees()`. Sent by the
+   * backend rather than decided here: a list of "these widget ids are money" kept on
+   * this side goes stale the first time a widget is added, and the renderer knows no
+   * widget's id by design.
+   */
+  valueUnit: z.literal('currency').optional(),
   unavailable: z
     .object({ reason: z.string(), module: z.string() })
     .optional(),

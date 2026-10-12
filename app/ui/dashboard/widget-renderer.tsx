@@ -1,5 +1,6 @@
 'use client';
 
+import { rupees } from '@/app/lib/format';
 import ResponsiveList, {
   type Column,
 } from '@/app/ui/settings/responsive-list';
@@ -18,7 +19,13 @@ export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
   }
   switch (widget.displayType) {
     case 'kpi':
-      return <KpiCard title={widget.title} value={widget.value} />;
+      return (
+        <KpiCard
+          title={widget.title}
+          value={widget.value}
+          unit={widget.valueUnit}
+        />
+      );
     case 'stat':
       return <StatCard title={widget.title} value={widget.value} />;
     case 'table':
@@ -44,11 +51,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** A single headline figure. Handles a plain number/string and the Group Dashboard's
  * company-card object (headcount + not-yet-computable sub-metrics). */
-export function KpiCard({ title, value }: { title: string; value: unknown }) {
+export function KpiCard({
+  title,
+  value,
+  unit,
+}: {
+  title: string;
+  value: unknown;
+  /** Declared by the widget itself — see `valueUnit` on the wire type. */
+  unit?: 'currency';
+}) {
   let display = '—';
   let subtitle: string | null = null;
   if (typeof value === 'number' || typeof value === 'string') {
-    display = String(value);
+    // A rupee figure is unreadable raw: the Contract Value card shipped showing
+    // `371100000`, which is ₹37.11 crore written so that nobody can tell it from
+    // ₹3.7 crore at a glance.
+    display =
+      unit === 'currency' && typeof value === 'number'
+        ? rupees(value)
+        : String(value);
   } else if (isRecord(value) && 'headcount' in value) {
     display = String(value.headcount);
     const pending = Array.isArray(value.unavailableMetrics)
