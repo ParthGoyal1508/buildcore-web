@@ -2444,7 +2444,18 @@ export const SALARY_ADVANCE_STATUSES = [
 ] as const;
 export const EXIT_REASONS = ['resignation', 'termination', 'contract_end'] as const;
 export const TAX_DECLARATION_STATUSES = ['declared', 'verified'] as const;
-export const CHALLAN_TYPES = ['pf', 'esic', 'pt', 'tds'] as const;
+/**
+ * The statutory challans this screen can produce — the three the API builds.
+ *
+ * `tds` used to be a fourth entry here and there is no such challan: `ChallanType` in
+ * `challans.service.ts` is `'pf' | 'esic' | 'pt'`, so the tab spent five seconds
+ * retrying and then printed the API's own validation message, "type must be one of
+ * pf, esic, pt.", on a tab the app itself had offered. Income tax is not withheld as a
+ * monthly challan here — it has its own screen at `ROUTES.hrTds`, with the slab set,
+ * the declarations and the quarterly return, and nothing is lost by this list matching
+ * what the endpoint accepts.
+ */
+export const CHALLAN_TYPES = ['pf', 'esic', 'pt'] as const;
 export type ChallanType = (typeof CHALLAN_TYPES)[number];
 
 /**
