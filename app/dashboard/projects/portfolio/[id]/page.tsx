@@ -68,7 +68,8 @@ function Card({
  * so is cheaper than leaving the next reader to find out.
  */
 export default function ProjectOverviewPage() {
-  const { project, tabs, unavailableModules } = useProjectShell();
+  const { project, tabs, documentReadiness, unavailableModules } =
+    useProjectShell();
 
   const unavailable = unavailableModules.map(
     (module) => PROJECT_SHELL_COPY.moduleNames[module] ?? module,
@@ -92,6 +93,25 @@ export default function ProjectOverviewPage() {
 
   const quoted =
     project.quotedPercentage == null ? null : Number(project.quotedPercentage);
+
+  /**
+   * How many mandatory documents are still to come — `null` when the company requires
+   * none, which is a different sentence from "none outstanding".
+   *
+   * Subtracted here rather than on the server: the response already carries both
+   * figures and the portfolio list renders them the other way round, as "3 of 5". A
+   * third field would have made the two screens disagree the first time one of them
+   * changed.
+   */
+  const outstandingDocuments =
+    documentReadiness.required === 0
+      ? null
+      : documentReadiness.required - documentReadiness.present;
+  // Both optional on the wire — a client ahead of the server degrades to not reporting
+  // the advisory split rather than failing to parse. Zero either way means no line.
+  const advisoryOutstanding =
+    (documentReadiness.advisoryRequired ?? 0) -
+    (documentReadiness.advisoryPresent ?? 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -172,6 +192,27 @@ export default function ProjectOverviewPage() {
               <span className="tabular-nums">
                 {formatRupees(tabs.revenueSummary.totalPending)}
               </span>
+            </Fact>
+            <Fact term={PROJECT_SHELL_COPY.documentsLabel}>
+              <Link
+                href={ROUTES.projectsProjectDocuments(project.id)}
+                className="text-blue-600 hover:underline"
+              >
+                {outstandingDocuments === null
+                  ? PROJECT_SHELL_COPY.documentsNoneRequired
+                  : outstandingDocuments === 0
+                    ? PROJECT_SHELL_COPY.documentsComplete
+                    : PROJECT_SHELL_COPY.documentsOutstanding(
+                        outstandingDocuments,
+                      )}
+              </Link>
+              {advisoryOutstanding > 0 && (
+                <span className="block text-xs text-gray-500">
+                  {PROJECT_SHELL_COPY.documentsAdvisoryOutstanding(
+                    advisoryOutstanding,
+                  )}
+                </span>
+              )}
             </Fact>
           </dl>
         </Card>

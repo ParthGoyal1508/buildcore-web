@@ -17,8 +17,18 @@ import AccessDenied from '@/app/ui/access-denied';
  */
 export default function DashboardPermissionGuard({
   children,
+  also,
 }: {
   children: React.ReactNode;
+  /**
+   * A second permission the page needs beyond `DASHBOARD` (2026-10-10).
+   *
+   * The Group Dashboard is the one sub-page whose data is not its own: per-company
+   * headcount and a cross-company employee search by name. The API now gates both on
+   * `EMPLOYEES`, so without this the page would render a search box and an error
+   * message instead of saying plainly that it is not the caller's.
+   */
+  also?: string;
 }) {
   const {
     data: user,
@@ -39,6 +49,10 @@ export default function DashboardPermissionGuard({
   }
 
   if (!user.permissions.includes('DASHBOARD')) {
+    return <AccessDenied />;
+  }
+
+  if (also && !user.permissions.includes(also)) {
     return <AccessDenied />;
   }
 

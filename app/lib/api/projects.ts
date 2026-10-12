@@ -418,6 +418,15 @@ export const projectDetailSchema = z.object({
       totalPending: decimal,
     }),
   }),
+  /**
+   * How much of the project's paperwork is in (2026-10-11).
+   *
+   * The same shape the list carries, but **not optional here**: the detail response
+   * always computes it, because there is one project to compute it for and the overview
+   * always shows it. Optional on the list is about `include=documentReadiness`, which
+   * this endpoint has no equivalent of.
+   */
+  documentReadiness: projectReadinessSchema,
   unavailableModules: z.array(z.string()),
 });
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;

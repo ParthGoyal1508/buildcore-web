@@ -4089,6 +4089,24 @@ export const PROJECT_SHELL_COPY = {
   revenueReceived: 'Received',
   revenuePending: 'Pending',
 
+  /**
+   * Documents outstanding, on the overview (2026-10-11).
+   *
+   * Counts what is **left**, not what is in. "3 of 5 filed" is the Documents tab's
+   * framing and is right there, where you are working through them; the overview is
+   * read to find out what still needs doing, and a reader scanning it should not have
+   * to subtract. Mandatory and advisory stay separate for the reason 017 FR-007b gave
+   * — one means the project cannot start, the other means somebody is still chasing
+   * paper.
+   */
+  documentsLabel: 'Documents',
+  documentsComplete: 'All filed',
+  documentsNoneRequired: 'None required',
+  documentsOutstanding: (count: number) =>
+    count === 1 ? '1 still to upload' : `${count} still to upload`,
+  documentsAdvisoryOutstanding: (count: number) =>
+    `${count} advisory outstanding`,
+
   /** Named modules, so the sentence says which answer is missing and why. */
   moduleUnavailable: (modules: string[]) =>
     `${modules.join(' and ')} could not be consulted, so anything they would contribute is missing from this page rather than absent. This is not the same as there being none.`,
