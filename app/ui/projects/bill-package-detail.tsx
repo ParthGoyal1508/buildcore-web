@@ -6,19 +6,15 @@ import { useState } from 'react';
 
 import {
   ABSTRACT_BLOCKS,
-  CHECK_LIST_ANSWERS,
   type BillPackageClaim,
-  type CheckListAnswer,
   certifyBillPackage,
   downloadWorkbook,
   getAbstract,
   getBillPackage,
-  getCheckList,
   getDebitRegister,
   isEditable,
   issueBillPackage,
   proposalLabel,
-  setCheckList,
   abandonBillPackage,
   applyDebit,
   downloadBillPdf,
@@ -80,18 +76,9 @@ export default function BillPackageDetail({
     queryKey: ['billRegister', packageId],
     queryFn: () => getDebitRegister(packageId),
   });
-  const { data: checkList } = useQuery({
-    queryKey: ['billCheckList', packageId],
-    queryFn: () => getCheckList(packageId),
-  });
 
   const refresh = () => {
-    for (const key of [
-      'billPackage',
-      'billAbstract',
-      'billRegister',
-      'billCheckList',
-    ]) {
+    for (const key of ['billPackage', 'billAbstract', 'billRegister']) {
       void queryClient.invalidateQueries({ queryKey: [key, packageId] });
     }
   };
@@ -107,11 +94,6 @@ export default function BillPackageDetail({
       if (result.missingHeaderFields.length > 0) {
         gaps.push(
           `Not on file: ${result.missingHeaderFields.join(', ')} — printed blank on every sheet.`,
-        );
-      }
-      if (result.checkListGaps.length > 0) {
-        gaps.push(
-          `${result.checkListGaps.length} check-list question(s) unanswered or answered no.`,
         );
       }
       setNotice(
@@ -689,65 +671,6 @@ export default function BillPackageDetail({
         </section>
       )}
 
-      {/* ── The check list ───────────────────────────────────────────── */}
-      {checkList && (
-        <section>
-          <h3 className="mb-1 font-medium text-gray-900">Check list</h3>
-          {!editable && (
-            // A disabled control that does not explain itself sends somebody to ask whether the
-            // screen is broken. It is not: the check list records what was attached when the bill
-            // went out, and a document that has been sent cannot acquire a different history.
-            <p className="mb-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
-              This bill has been <strong>issued</strong>, so its check list is
-              fixed. It records what was attached when the bill went out.
-              Answers belong on a draft — this one cannot be reopened.
-            </p>
-          )}
-          <p className="mb-2 text-xs text-gray-500">
-            An unanswered question is <strong>not</strong> an answer of no —
-            &ldquo;we checked and it is not attached&rdquo; and &ldquo;nobody has
-            looked&rdquo; call for different actions. Nothing here ever refuses
-            an issue.
-          </p>
-          <ul className="space-y-2">
-            {checkList.items.map((item) => (
-              <li
-                key={item.key}
-                className="flex flex-wrap items-center gap-3 text-sm"
-              >
-                <span className="w-6 text-gray-500">{item.position}.</span>
-                <span className="min-w-[18rem] flex-1">{item.text}</span>
-                <select
-                  value={item.answer ?? ''}
-                  disabled={!editable}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    void setCheckList(packageId, [
-                      {
-                        questionKey: item.key,
-                        ...(value
-                          ? { answer: value as CheckListAnswer }
-                          : {}),
-                      },
-                    ])
-                      .then(() => refresh())
-                      .catch((err: unknown) => setError(describe(err)));
-                  }}
-                  className="rounded-md border border-gray-300 px-2 py-1"
-                >
-                  <option value="">— unanswered —</option>
-                  {CHECK_LIST_ANSWERS.map((answer) => (
-                    <option key={answer} value={answer}>
-                      {answer.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </select>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-gray-500">{checkList.footer}</p>
-        </section>
-      )}
     </div>
   );
 }
