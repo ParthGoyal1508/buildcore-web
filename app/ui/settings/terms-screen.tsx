@@ -103,10 +103,17 @@ export function TermsScreen() {
             }
           >
             {TERMS_COPY.kindLabels[row.documentKind]}
+            {/* The space is load-bearing. `ml-2` separates the two for a sighted
+                reader, but the tab's *text* is what `getByRole('tab', { name })`
+                matches and what a screen reader announces — and without this the
+                accessible name was "Letter of intentstandard". */}
             {!row.isCustomised && (
-              <span className="ml-2 text-xs opacity-75">
-                {TERMS_COPY.shippedBadge}
-              </span>
+              <>
+                {' '}
+                <span className="ml-1 text-xs opacity-75">
+                  {TERMS_COPY.shippedBadge}
+                </span>
+              </>
             )}
           </button>
         ))}
