@@ -9,7 +9,7 @@ import { landingRoute } from '@/app/lib/permissions';
 import CashVisibility from '@/app/ui/settings/cash-visibility';
 import CompanySwitcher from '@/app/ui/company-switcher';
 import NotificationBell from '@/app/ui/dashboard/notification-bell';
-import Logo from '@/app/ui/logo';
+import CompanyLogo from '@/app/ui/company-logo';
 
 /**
  * The bar every shell opens with: a wordmark on mobile, the notifications bell on
@@ -59,7 +59,7 @@ export default function ShellHeader({
   // that a guard screen is a better outcome than a heading that shifts under a thumb.
   const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
 
-  const wordmark = <Logo className="h-7" />;
+  const wordmark = <CompanyLogo className="h-7 max-w-[9rem]" />;
 
   return (
     <header className="sticky top-0 z-30 flex h-14 flex-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-6 md:px-12">

@@ -6,7 +6,7 @@ import NavLinks from '@/app/ui/dashboard/nav-links';
 import { PowerIcon } from '@heroicons/react/24/outline';
 import { logout } from '@/app/lib/api/auth';
 import CurrentUser from '@/app/ui/dashboard/current-user';
-import Logo from '@/app/ui/logo';
+import CompanyLogo from '@/app/ui/company-logo';
 import ApprovalBadge from '@/app/ui/dashboard/approval-badge';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
 
@@ -30,11 +30,25 @@ export default function SideNav() {
           height is now what it looks like — and `items-center`, since a logo centred
           in a short band reads better than one dropped against the bottom edge the way
           the old text wordmark was. */}
+      {/* A light panel, not the brand navy, and no knockout (2026-10-12).
+          `brightness-0 invert` turns a mark white, which works only for artwork that is
+          one dark colour on transparency — the product PNG. A company's own logo is
+          whatever they sent: Tirupati Enterprises' is navy and grey on an opaque white
+          JPEG, and knocking that out rendered the entire rectangle, background included,
+          as a solid white block. `Logo`'s own note predicted this ("a future
+          multi-colour logo would need a real white variant instead").
+          A neutral panel is the one treatment that works for any logo, which is what
+          this has to be: the next company's could be any colour, and there is nothing to
+          knock out an arbitrary image into.
+          `bg-gray-50` rather than pure white because a JPEG logo carries its own opaque
+          background — Tirupati's is very slightly off-white — and against `bg-white`
+          that reads as a faint rectangle around the mark. A PNG with transparency would
+          sit happily on either. */}
       <Link
-        className="mb-2 flex h-20 shrink-0 items-center justify-start rounded-md bg-blue-600 px-4"
+        className="mb-2 flex h-20 shrink-0 items-center justify-start rounded-md border border-gray-200 bg-gray-50 px-4"
         href="/dashboard"
       >
-        <Logo knockout priority className="h-9" />
+        <CompanyLogo priority className="h-9 max-w-[11rem]" />
       </Link>
       {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets
           fill each row evenly at *any* count (feature 014 made the count variable —
