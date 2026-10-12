@@ -276,6 +276,18 @@ const createdDwrSchema = z
     dprNumber: z.string(),
     status: z.enum(DWR_STATUSES),
     warnings: z.array(warningSchema).default([]),
+    /**
+     * The stored line ids, **in the order the lines were sent** (2026-10-12).
+     *
+     * What makes a file attachable from the entry form at all: a file belongs to a line, and the
+     * form has files in hand while nothing has an id — the photograph of a pour is picked as the
+     * measurement is typed, and neither the report nor its lines exist until the day is saved.
+     *
+     * `.default([])` rather than required, so a client running ahead of a server that does not
+     * send it parses the save instead of reporting a successful save as a failure — which is
+     * exactly the defect this schema was split apart to fix.
+     */
+    lineIds: z.array(z.string()).default([]),
   })
   .passthrough();
 
@@ -295,6 +307,8 @@ const dwrActionSchema = z
       .optional(),
     reversalCount: z.number().optional(),
     warnings: z.array(warningSchema).default([]),
+    /** On an edit: the report's lines as they now stand. See {@link CreatedDwr}. */
+    lineIds: z.array(z.string()).default([]),
   })
   .passthrough();
 
@@ -338,6 +352,14 @@ export type PeriodFigures = z.infer<typeof periodFiguresSchema>;
  */
 export interface MeasuredLineInput {
   paymentMode: 'work_basis';
+  /**
+   * The stored line this replaces, on an edit (2026-10-12). Omit for a line being added.
+   *
+   * **A line left out of an edit is deleted, and its attachments with it.** Evidence cascades from
+   * the line it is filed against, so a correction that sent every line back as new would delete
+   * every photograph of the work — which is what editing a draft did until this existed.
+   */
+  id?: string;
   boqItemId?: string;
   /**
    * The server's own six names (`create-dwr.dto.ts`), not an approximation of them. The global
@@ -370,6 +392,8 @@ export interface MeasuredLineInput {
  */
 export interface PresenceLineInput {
   paymentMode: 'day_basis';
+  /** The stored line this replaces, on an edit. See {@link MeasuredLineInput.id}. */
+  id?: string;
   boqItemId?: string;
   equipmentId?: string;
   /** `1.000` is one full day. Below a full day, `remark` is required (022 FR-030c, FR-030e). */

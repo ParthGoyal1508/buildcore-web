@@ -10,6 +10,7 @@ import {
   type DwrLine,
   type DwrLineInput,
   type DwrWarning,
+  addDwrAttachment,
   createDwr,
   describeDwrError as describe,
   parseChainage,
@@ -74,7 +75,35 @@ interface MeasurementRow {
   breadth: string;
   depth: string;
   remark: string;
+  /**
+   * The stored line this row is, when correcting a report (2026-10-12).
+   *
+   * Sent back on an edit so the line keeps its identity — and with it the files filed against it.
+   * A line not sent back by id is deleted, and evidence cascades from the line it belongs to, so
+   * this is what stops correcting a chainage from deleting the photograph of it.
+   */
+  id?: string;
+  /**
+   * Files picked for this measurement and **not yet uploaded**.
+   *
+   * They cannot be uploaded while they are being picked: a file is attached to a line, and on a
+   * new report neither the report nor its lines exist until the day is saved. So they wait here
+   * and go up once the save answers with the line ids — see `attachAll`.
+   */
+  files: File[];
 }
+
+/** The text fields of a measurement, which are what decide whether a row was filled in. */
+const MEASUREMENT_FIELDS = [
+  'chainageFrom',
+  'chainageTo',
+  'roadSide',
+  'nos1',
+  'length',
+  'breadth',
+  'depth',
+  'remark',
+] as const satisfies readonly (keyof MeasurementRow)[];
 
 /**
  * The BOQ item is chosen **once** and measured as many times as the day needs.
@@ -104,6 +133,9 @@ type DraftLine =
       equipmentId: string;
       servedQty: string;
       remark: string;
+      /** See {@link MeasurementRow.id}. A presence card is one line, so it carries one. */
+      id?: string;
+      files: File[];
     };
 
 const emptyRow = (): MeasurementRow => ({
@@ -115,6 +147,7 @@ const emptyRow = (): MeasurementRow => ({
   breadth: '',
   depth: '',
   remark: '',
+  files: [],
 });
 
 /** A new item opens with one row, because an item measured nowhere is not an entry anybody wants. */
@@ -130,6 +163,7 @@ const emptyPresence = (): DraftLine => ({
   equipmentId: '',
   servedQty: '1.000',
   remark: '',
+  files: [],
 });
 
 /**
@@ -178,6 +212,8 @@ function draftsFrom(lines: DwrLine[]): DraftLine[] {
         equipmentId: line.equipmentId ?? '',
         servedQty: String(quantityOf(line) ?? '1.000'),
         remark: line.remark ?? '',
+        id: line.id,
+        files: [],
       });
       continue;
     }
@@ -200,6 +236,9 @@ function draftsFrom(lines: DwrLine[]): DraftLine[] {
       breadth: text(line.breadth),
       depth: text(line.depth),
       remark: line.remark ?? '',
+      // Carried so the stored line survives the edit with its evidence attached.
+      id: line.id,
+      files: [],
     });
   }
 
@@ -245,6 +284,26 @@ export default function DwrForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<DwrWarning[]>([]);
+  /** Files the day was saved without. Named rather than counted — the person knows which one. */
+  const [unattached, setUnattached] = useState<string[]>([]);
+  /** Set once the day is on file, so the form offers the report rather than a second save. */
+  const [savedReportId, setSavedReportId] = useState<string | null>(null);
+
+  /**
+   * What is already filed against each stored line, so a correction shows it rather than looking
+   * like nothing was ever attached. Names only — opening a file is the detail screen's job, and
+   * this form is for what the day was.
+   */
+  const attached = new Map<string, string[]>();
+  for (const file of report?.attachments ?? []) {
+    if (!file.taskId) continue;
+    attached.set(file.taskId, [
+      ...(attached.get(file.taskId) ?? []),
+      file.fileName,
+    ]);
+  }
+  const attachedTo = (lineId: string | undefined) =>
+    (lineId && attached.get(lineId)) || [];
 
   const { data: boqGroups } = useQuery({
     queryKey: ['boq', projectId],
@@ -280,37 +339,67 @@ export default function DwrForm({
     // does not accept it and the global pipe refuses an unknown field outright, so sending it on an
     // edit is a 400 rather than a value quietly ignored.
     mutationFn: async ({
-      workDate: day,
-      ...rest
-    }: Parameters<typeof createDwr>[1]): Promise<{
+      input: { workDate: day, ...rest },
+      pending,
+    }: {
+      input: Parameters<typeof createDwr>[1];
+      /** Files picked against each line, by that line's position in `input.lines`. */
+      pending: File[][];
+    }): Promise<{
+      dwrId: string;
       warnings: DwrWarning[];
+      /** Files the save went through for and the upload did not. Never silently dropped. */
+      unattached: string[];
     }> => {
-      if (report) {
-        await updateDwr(report.id, rest);
-        // An edit answers with no warnings: the three 022 reports — a date before the project
-        // started, a day already covered, a line past scope — are raised when the day is first
-        // recorded, and the report is already on file by the time it is being corrected.
-        return { warnings: [] };
-      }
-      return { warnings: (await createDwr(projectId, { workDate: day, ...rest })).warnings };
+      const saved = report
+        ? await updateDwr(report.id, rest)
+        : await createDwr(projectId, { workDate: day, ...rest });
+      const dwrId = report ? report.id : saved.id;
+
+      // **After the save, never before.** A file belongs to a line and a line has no id until the
+      // day is on file, so this is the first moment the two can be put together.
+      const unattached = await attachAll(dwrId, saved.lineIds, pending);
+
+      // An edit answers with no warnings: the three 022 reports — a date before the project
+      // started, a day already covered, a line past scope — are raised when the day is first
+      // recorded, and the report is already on file by the time it is being corrected.
+      return { dwrId, warnings: report ? [] : saved.warnings, unattached };
     },
     onSuccess: (saved) => {
+      void queryClient.invalidateQueries({ queryKey: ['dwr'] });
+      // The day is on file from here on, whatever else is reported below. Remembering that turns
+      // the save button into a way onward, because pressing Save twice on a new report files the
+      // day twice.
+      setSavedReportId(saved.dwrId);
+      setUnattached(saved.unattached);
       // 022 reports three things rather than refusing them: a work date before the project started,
       // a second report for a day already covered, and a line past its BOQ scope. Shown, because a
       // 201 that quietly carried a warning is a 201 nobody reads.
-      if (saved.warnings.length > 0) {
-        setWarnings(saved.warnings);
-        return;
-      }
-      void queryClient.invalidateQueries({ queryKey: ['dwr'] });
+      setWarnings(saved.warnings);
+      if (saved.warnings.length > 0 || saved.unattached.length > 0) return;
       router.push(
         report
-          ? ROUTES.projectsDwrReport(projectId, report.id)
+          ? ROUTES.projectsDwrReport(projectId, saved.dwrId)
           : ROUTES.projectsDwr(projectId),
       );
     },
     onError: (err: unknown) => setError(describe(err)),
   });
+
+  /**
+   * A file picked beside a row that measures nothing.
+   *
+   * An empty row is dropped rather than sent — adding one and not filling it is ordinary, and a nil
+   * line on a measurement sheet is a line a reviewer has to ask about. But dropping a row that has
+   * a photograph on it would discard the photograph silently, so this is said out loud instead. The
+   * file is not what makes a row a measurement: every factor defaults to 1, so a row with nothing
+   * in it would be saved as a quantity of 1 that nobody entered.
+   */
+  const fileWithoutMeasurement = lines.some(
+    (line) =>
+      line.kind === 'measured' &&
+      line.rows.some((row) => !hasAnything(row) && row.files.length > 0),
+  );
 
   /** FR-004. A short day needs a remark, and the form says so before the server has to. */
   const shortDayWithoutRemark = lines.some(
@@ -333,10 +422,18 @@ export default function DwrForm({
     // A row left entirely blank is dropped rather than sent. Adding a row and then not filling it
     // is ordinary — somebody clicks twice, or measures eight of the nine they expected — and a
     // nil line on a bill's measurement sheet is a line a reviewer has to ask about.
-    const payload: DwrLineInput[] = lines.flatMap((line): DwrLineInput[] =>
+    //
+    // Each entry carries the files picked beside it, so `pending[n]` is what belongs to
+    // `payload[n]` — and the save answers with a line id per position, which is how a photograph
+    // reaches the measurement it is evidence of rather than the one next to it.
+    const entries: { line: DwrLineInput; files: File[] }[] = lines.flatMap(
+      (line): { line: DwrLineInput; files: File[] }[] =>
       line.kind === 'measured'
         ? line.rows.filter(hasAnything).map((row) => ({
+          files: row.files,
+          line: {
             paymentMode: 'work_basis' as const,
+            ...(row.id ? { id: row.id } : {}),
             ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
             ...numeric('nos1', row.nos1),
             ...numeric('length', row.length),
@@ -349,24 +446,33 @@ export default function DwrForm({
             ...chainage('chainageTo', row.chainageTo),
             ...(row.roadSide.trim() ? { roadSide: row.roadSide.trim() } : {}),
             ...(row.remark ? { remark: row.remark } : {}),
-          }))
+          },
+        }))
         : [
             {
-              paymentMode: 'day_basis' as const,
-              ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
-              ...(line.equipmentId ? { equipmentId: line.equipmentId } : {}),
-              servedQty: line.servedQty,
-              ...(line.remark ? { remark: line.remark } : {}),
+              files: line.files,
+              line: {
+                paymentMode: 'day_basis' as const,
+                ...(line.id ? { id: line.id } : {}),
+                ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
+                ...(line.equipmentId ? { equipmentId: line.equipmentId } : {}),
+                servedQty: line.servedQty,
+                ...(line.remark ? { remark: line.remark } : {}),
+              },
             },
           ],
     );
+    const payload = entries.map((entry) => entry.line);
 
     save.mutate({
-      workDate,
-      ...(workerCount ? { workerCount: Number(workerCount) } : {}),
-      ...(machineryCount ? { machineryCount: Number(machineryCount) } : {}),
-      ...(description ? { description } : {}),
-      ...(payload.length > 0 ? { lines: payload } : {}),
+      input: {
+        workDate,
+        ...(workerCount ? { workerCount: Number(workerCount) } : {}),
+        ...(machineryCount ? { machineryCount: Number(machineryCount) } : {}),
+        ...(description ? { description } : {}),
+        ...(payload.length > 0 ? { lines: payload } : {}),
+      },
+      pending: entries.map((entry) => entry.files),
     });
   };
 
@@ -381,7 +487,8 @@ export default function DwrForm({
           many times as the day needs — a row per position, as the sheet is
           written. <strong>Quantities are computed</strong>: a measurement from
           its dimensions, a presence-paid line from the day served. There is no
-          field to type one into.
+          field to type one into. Files are optional on every line, and they go
+          up when the day is saved.
           {editing && (
             <>
               {' '}
@@ -514,6 +621,7 @@ export default function DwrForm({
             key={index}
             line={line}
             boqOptions={boqOptions}
+            attachedTo={attachedTo}
             onChange={(next) =>
               setLines((rows) =>
                 rows.map((row, i) => (i === index ? next : row)),
@@ -526,6 +634,32 @@ export default function DwrForm({
         ))}
       </section>
 
+      {unattached.length > 0 && (
+        <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+          <p className="font-medium">
+            The day was saved, and {unattached.length === 1 ? 'one file' : 'these files'} did not
+            attach:
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {unattached.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+          <p className="mt-1">
+            Nothing else was lost. Open the report and attach {unattached.length === 1 ? 'it' : 'them'}{' '}
+            there.
+          </p>
+        </div>
+      )}
+
+      {fileWithoutMeasurement && (
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+          A file is attached to a measurement that has nothing measured on it. A row with every box
+          empty is not saved, so the file would go with it — enter the measurement, or remove the
+          file.
+        </p>
+      )}
+
       {shortDayWithoutRemark && (
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="alert">
           A presence line below a full day needs a remark saying why. The real
@@ -536,9 +670,27 @@ export default function DwrForm({
       )}
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={save.isPending || shortDayWithoutRemark}>
-          {save.isPending ? 'Saving…' : 'Save the day'}
-        </Button>
+        {/* Once the day is on file the primary action is the way onward, not a second save: this
+            form creates a report, so pressing Save again files the day twice. */}
+        {savedReportId ? (
+          <Button
+            type="button"
+            onClick={() =>
+              router.push(ROUTES.projectsDwrReport(projectId, savedReportId))
+            }
+          >
+            Open the report
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            disabled={
+              save.isPending || shortDayWithoutRemark || fileWithoutMeasurement
+            }
+          >
+            {save.isPending ? 'Saving…' : 'Save the day'}
+          </Button>
+        )}
         <Button
           type="button"
           onClick={() => router.push(ROUTES.projectsDwr(projectId))}
@@ -553,11 +705,14 @@ export default function DwrForm({
 function LineEditor({
   line,
   boqOptions,
+  attachedTo,
   onChange,
   onRemove,
 }: {
   line: DraftLine;
   boqOptions: SearchableOption[];
+  /** File names already filed against a stored line, by that line's id. Empty on a new report. */
+  attachedTo: (lineId: string | undefined) => string[];
   onChange: (next: DraftLine) => void;
   onRemove: () => void;
 }) {
@@ -634,6 +789,7 @@ function LineEditor({
                   <th className="px-2 py-2 font-medium">Height</th>
                   <th className="px-2 py-2 text-right font-medium">Qty</th>
                   <th className="px-2 py-2 font-medium">Remark</th>
+                  <th className="px-2 py-2 font-medium">Files</th>
                   <th className="px-2 py-2" aria-label="Remove" />
                 </tr>
               </thead>
@@ -712,6 +868,16 @@ function LineEditor({
                           label="Remark"
                         />
                       </td>
+                      {/* Optional, on every measurement. The photograph of a pour is evidence for
+                          **this** chainage; filed under the report it joins a pile of twenty that
+                          argues for nothing in particular. */}
+                      <td className="px-2 py-1.5 align-top">
+                        <LineFiles
+                          files={row.files}
+                          attached={attachedTo(row.id)}
+                          onChange={(files) => update({ files })}
+                        />
+                      </td>
                       <td className="px-2 py-1.5 text-right">
                         {/* Never the last row: removing it would leave an item measured nowhere,
                             and the way to drop an item is to remove the item. */}
@@ -747,7 +913,7 @@ function LineEditor({
                   <td className="px-2 py-2 text-right font-semibold tabular-nums">
                     {subtotal === null ? '—' : subtotal.toFixed(3)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-gray-600" colSpan={2}>
+                  <td className="px-2 py-2 text-xs text-gray-600" colSpan={3}>
                     Total for this item
                   </td>
                 </tr>
@@ -791,6 +957,14 @@ function LineEditor({
               there for seven tenths of what was asked.
             </span>
           </label>
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">Files (optional)</span>
+            <LineFiles
+              files={line.files}
+              attached={attachedTo(line.id)}
+              onChange={(files) => onChange({ ...line, files })}
+            />
+          </div>
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-gray-700">
               Equipment id (optional)
@@ -877,6 +1051,110 @@ function Cell({
 }
 
 /**
+ * Uploads every picked file against the line it was picked beside, once the lines have ids.
+ *
+ * **Sequential, and it never throws.** The day is already on file by the time this runs, so a
+ * failure here is not a failed save — it is a saved day missing a photograph, which is a different
+ * thing to tell somebody. The names come back so the form can say which ones, rather than reporting
+ * a count or, worse, nothing.
+ *
+ * A line with no id is the case where the server answered without saying which row is which — an
+ * older API, or fewer ids than lines. The file is reported unattached rather than guessed at: one
+ * position out files a photograph against a chainage it is not evidence of, which is worse than
+ * not filing it at all.
+ */
+async function attachAll(
+  dwrId: string,
+  lineIds: string[],
+  pending: File[][],
+): Promise<string[]> {
+  const unattached: string[] = [];
+  for (const [index, files] of pending.entries()) {
+    const taskId = lineIds[index];
+    for (const file of files) {
+      if (!taskId) {
+        unattached.push(file.name);
+        continue;
+      }
+      try {
+        await addDwrAttachment(dwrId, file, taskId);
+      } catch {
+        unattached.push(file.name);
+      }
+    }
+  }
+  return unattached;
+}
+
+/**
+ * The files for one line: what is already filed against it, what is waiting to go up, and the way
+ * to add more.
+ *
+ * Optional, and that is the whole contract — a measurement with no photograph is an ordinary
+ * measurement. What it is **for** is the argument that comes later: the site says 20 cubic metres
+ * at 21+300, the client's engineer says fewer, and what settles it is the photograph taken at the
+ * edge of the carriageway on the day.
+ */
+function LineFiles({
+  files,
+  attached,
+  onChange,
+}: {
+  files: File[];
+  /** Already on the server, when a report is being corrected. Names only — the detail screen opens them. */
+  attached: string[];
+  onChange: (next: File[]) => void;
+}) {
+  return (
+    <div className="flex w-44 flex-col gap-1">
+      {attached.map((name) => (
+        <span
+          key={name}
+          title={`${name} — already attached`}
+          className="truncate text-xs text-gray-500"
+        >
+          {name}
+        </span>
+      ))}
+      {files.map((file, index) => (
+        <span
+          key={`${file.name}-${index}`}
+          className="flex items-center gap-1 text-xs"
+        >
+          <span className="truncate" title={file.name}>
+            {file.name}
+          </span>
+          <button
+            type="button"
+            aria-label={`Remove ${file.name}`}
+            onClick={() => onChange(files.filter((_f, i) => i !== index))}
+            className="text-red-700 hover:underline"
+          >
+            &times;
+          </button>
+        </span>
+      ))}
+      {/* The input is `sr-only` rather than hidden, so it stays focusable and keeps its name from
+          the label; the ring is drawn on the label, which is the part anybody can see. */}
+      <label className="cursor-pointer text-xs text-blue-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
+        + File
+        <input
+          type="file"
+          multiple
+          className="sr-only"
+          onChange={(event) => {
+            const picked = Array.from(event.target.files ?? []);
+            if (picked.length > 0) onChange([...files, ...picked]);
+            // Cleared so picking the same file twice in a row still fires a change.
+            event.target.value = '';
+          }}
+        />
+      </label>
+    </div>
+  );
+}
+
+/**
  * One row's quantity, by the same rule the server applies.
  *
  * `null` where a factor is zero — refused rather than treated as a blank, because a line measuring
@@ -898,7 +1176,11 @@ function rowQuantity(row: MeasurementRow): string | null {
  * the product is 1 — which is a quantity nobody entered appearing on a bill.
  */
 function hasAnything(row: MeasurementRow): boolean {
-  return Object.values(row).some((value) => value.trim() !== '');
+  // The text fields by name, not `Object.values`: the row also carries an id and a list of picked
+  // files, and a blanket `.trim()` over every value would both crash on those and count a row as
+  // measured because a file was picked beside it. A file is evidence **for** a measurement; it is
+  // not one, and a row sent with no dimensions is a quantity of 1 nobody entered.
+  return MEASUREMENT_FIELDS.some((key) => row[key].trim() !== '');
 }
 
 /** Only the fields that carry a value, because an empty string is not a decimal. */
