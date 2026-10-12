@@ -248,8 +248,16 @@ async function withAuth<T>(
               'Application \u2192 Cookies in DevTools.',
           );
         }
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
+        // Never from the sign-in page to the sign-in page. Nobody is signed in there, so a
+        // 401 is the expected answer rather than news — and reloading in response re-mounts
+        // whatever asked, which asks again. One such caller (the primary `Button`, through
+        // `useCanWrite`) turned that into a reload loop about five times a second, ended only
+        // by the API's rate limiter refusing the eleventh renewal. The caller is fixed; this
+        // keeps the next one from doing it again, since the reason is already on screen.
+        if (window.location.pathname !== ROUTES.login) {
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
+        }
       }
       throw refreshErr;
     }
