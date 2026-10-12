@@ -534,6 +534,43 @@ export const ACTIVITY_MODULES = [
 export type ActivityModule = (typeof ACTIVITY_MODULES)[number];
 
 /**
+ * What each filter option is called on screen.
+ *
+ * The values above are the API's bucket ids and the screen was rendering them straight
+ * into its two `<select>`s and the Module column — so the filter offered "hr",
+ * "machinery" and "7d". They cannot be renamed: `module-bucket-mapping.ts` keys the
+ * server's own filter on them.
+ *
+ * Not derived from `NAV_MODULES`, deliberately. The buckets are not the sidebar's
+ * modules: `payroll` is its own bucket while the sidebar folds it into HR, and
+ * `machinery` is the sidebar's `plant`. A lookup between the two would be a mapping
+ * that silently returns nothing the first time either list changes.
+ */
+export const ACTIVITY_MODULE_LABELS: Record<ActivityModule, string> = {
+  hr: 'HR',
+  settings: 'Settings',
+  payroll: 'Payroll',
+  machinery: 'Plant & Machinery',
+  projects: 'Projects',
+  inventory: 'Inventory',
+  partners: 'Partners',
+  recruitment: 'Recruitment',
+  labour: 'Labour',
+};
+
+export const ACTIVITY_TIME_RANGE_LABELS: Record<ActivityTimeRange, string> = {
+  today: 'Today',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+};
+
+/** A bucket id as a reader should see it; an unmapped one renders as it arrived. */
+export function activityModuleLabel(value: string): string {
+  return ACTIVITY_MODULE_LABELS[value as ActivityModule] ?? value;
+}
+
+/**
  * Copy for each severity band.
  *
  * Centralised per Principle III, and separate from the colour map below because the

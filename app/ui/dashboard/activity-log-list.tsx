@@ -12,7 +12,10 @@ import {
 } from '@/app/lib/api/dashboard';
 import {
   ACTIVITY_MODULES,
+  ACTIVITY_MODULE_LABELS,
   ACTIVITY_TIME_RANGES,
+  ACTIVITY_TIME_RANGE_LABELS,
+  activityModuleLabel,
   enumLabel,
 } from '@/app/lib/constants';
 import ResponsiveList, {
@@ -89,7 +92,11 @@ export default function ActivityLogList() {
     },
     { key: 'actor', header: 'User', render: (e) => e.actor },
     { key: 'action', header: 'Action', render: (e) => actionLabel(e.action) },
-    { key: 'module', header: 'Module', render: (e) => e.module },
+    {
+      key: 'module',
+      header: 'Module',
+      render: (e) => activityModuleLabel(e.module),
+    },
     { key: 'target', header: 'Target', render: (e) => e.target ?? '—' },
   ];
 
@@ -114,7 +121,7 @@ export default function ActivityLogList() {
             <option value="">All modules</option>
             {ACTIVITY_MODULES.map((m) => (
               <option key={m} value={m}>
-                {m}
+                {ACTIVITY_MODULE_LABELS[m]}
               </option>
             ))}
           </select>
@@ -133,7 +140,7 @@ export default function ActivityLogList() {
             <option value="">All time</option>
             {ACTIVITY_TIME_RANGES.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {ACTIVITY_TIME_RANGE_LABELS[t]}
               </option>
             ))}
           </select>
