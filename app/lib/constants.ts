@@ -4216,6 +4216,39 @@ export const BILL_PACKAGE_PICKER_COPY = {
     'This subcontractor has no work order on this project. Raise one under Subcontractors first.',
 } as const;
 
+/**
+ * The register of bills already composed (2026-10-13).
+ *
+ * Reported: one table carrying both directions, so `RA-04 · To the client` sat two rows above
+ * `RA-04 · To a subcontractor` and the Direction column was the only thing between them. They are
+ * two different series of two different documents to two different parties — money coming in and
+ * money going out — and a reader is always looking for one or the other, never for both
+ * interleaved.
+ *
+ * Split into two tables, which lets the Direction column go: a heading says it once for every row
+ * beneath it, where the cell repeated it on each.
+ */
+export const BILL_PACKAGE_LIST_COPY = {
+  toClientHeading: 'Bills to the client',
+  toClientHint: 'What this project has claimed. Money coming in.',
+  toSubcontractorHeading: 'Bills from subcontractors',
+  toSubcontractorHint:
+    'What has been certified to the people doing the work. Money going out, and numbered per contract — each subcontractor has their own RA-01.',
+  /**
+   * The column the split makes necessary.
+   *
+   * Separating the directions removes the one thing that told two `RA-04` rows apart, and within
+   * the subcontractor table it never told them apart at all: the number runs per work order, so
+   * two subcontractors both reach RA-01. Naming the counterparty is what makes the rows distinct.
+   */
+  subcontractorColumn: 'Subcontractor',
+  /** A work order with no `partnerId` — nullable, and those orders are still billable. */
+  subcontractorUnknown: 'No subcontractor set',
+  noneToClient: 'No bill has been raised to the client on this project yet.',
+  noneToSubcontractor:
+    'No bill has been raised from a subcontractor on this project yet.',
+} as const;
+
 export const INVENTORY_ISSUE_LABEL = 'Issue / Consumption material';
 
 /** The same label where a shorter one is needed — a tab strip, a breadcrumb. */

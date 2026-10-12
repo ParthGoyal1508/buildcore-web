@@ -135,6 +135,14 @@ const packageListItemSchema = z
     status: z.enum(BILL_PACKAGE_STATUSES),
     issuedAt: z.string().nullable(),
     payable: rendered,
+    /**
+     * Who the bill is to — the work order for a subcontractor, the client for the client
+     * (2026-10-13).
+     *
+     * The running number is per counterparty, so every subcontractor on a project holds their own
+     * `RA-01`. Without this the list cannot say which award a row belongs to.
+     */
+    counterpartyKey: z.string(),
   })
   .passthrough();
 
