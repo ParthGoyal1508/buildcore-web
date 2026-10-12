@@ -290,6 +290,7 @@ export default function DwrReportPage() {
                         <DwrLinePhotos
                           dwrId={params.dwrId}
                           taskId={line.id}
+                          sealed={report.status === 'approved'}
                           attachments={(report.attachments ?? []).filter(
                             (a) => a.taskId === line.id,
                           )}
@@ -308,6 +309,7 @@ export default function DwrReportPage() {
             server sends and the absent field an older one does. */}
         <DwrAttachments
           dwrId={params.dwrId}
+          sealed={report.status === 'approved'}
           attachments={(report.attachments ?? []).filter((a) => !a.taskId)}
         />
       </div>

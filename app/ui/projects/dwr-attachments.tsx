@@ -31,6 +31,7 @@ import { RowAction } from '@/app/ui/settings/form-fields';
 export default function DwrAttachments({
   dwrId,
   attachments,
+  sealed,
 }: {
   dwrId: string;
   /**
@@ -39,6 +40,13 @@ export default function DwrAttachments({
    * filtered its own input would leave the caller unable to say which half it wanted.
    */
   attachments: DwrAttachment[];
+  /**
+   * The report is approved, so it takes no further evidence (2026-10-12).
+   *
+   * What is already filed stays readable — this hides the way to add, not the record. The API
+   * refuses the upload as well; this is so nobody is offered an action that would be refused.
+   */
+  sealed?: boolean;
 }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
@@ -74,20 +82,26 @@ export default function DwrAttachments({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
           Evidence
         </h3>
-        <div className="flex items-center gap-2">
-          <input
-            ref={input}
-            type="file"
-            className="text-sm"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) upload.mutate(file);
-            }}
-          />
-          <Button type="button" disabled={upload.isPending}>
-            {upload.isPending ? 'Attaching…' : 'Attach'}
-          </Button>
-        </div>
+        {sealed ? (
+          <span className="text-xs text-gray-500">
+            Approved — reverse the report to file anything further.
+          </span>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              ref={input}
+              type="file"
+              className="text-sm"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) upload.mutate(file);
+              }}
+            />
+            <Button type="button" disabled={upload.isPending}>
+              {upload.isPending ? 'Attaching…' : 'Attach'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -98,9 +112,10 @@ export default function DwrAttachments({
 
       {attachments.length === 0 ? (
         <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
-          Nothing attached to the report itself. A photograph of one pour belongs on
-          its own line, in the table above; this is for what covers the whole day — the
-          signed measurement sheet, a general site view.
+          Nothing attached to the report itself.{' '}
+          {sealed
+            ? 'This report is approved, so nothing further can be filed against it.'
+            : 'A photograph of one pour belongs on its own line, in the table above; this is for what covers the whole day — the signed measurement sheet, a general site view.'}
         </p>
       ) : (
         <ul className="divide-y divide-gray-100 rounded-md border border-gray-200">
@@ -144,11 +159,14 @@ export function DwrLinePhotos({
   dwrId,
   taskId,
   attachments,
+  sealed,
 }: {
   dwrId: string;
   taskId: string;
   /** Already filtered to this line by the caller. */
   attachments: DwrAttachment[];
+  /** The report is approved. See {@link DwrAttachments}. */
+  sealed?: boolean;
 }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
@@ -185,20 +203,24 @@ export function DwrLinePhotos({
           {attachment.fileName}
         </RowAction>
       ))}
-      <label className="cursor-pointer text-xs text-blue-600 hover:underline">
-        {upload.isPending ? 'Attaching…' : '+ Photo'}
-        <input
-          ref={input}
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          disabled={upload.isPending}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) upload.mutate(file);
-          }}
-        />
-      </label>
+      {/* Nothing offered on an approved report — not a disabled control, which reads as something
+          that might work later. What is already filed above stays openable. */}
+      {!sealed && (
+        <label className="cursor-pointer text-xs text-blue-600 hover:underline">
+          {upload.isPending ? 'Attaching…' : '+ Photo'}
+          <input
+            ref={input}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={upload.isPending}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) upload.mutate(file);
+            }}
+          />
+        </label>
+      )}
       {upload.isError && (
         <span className="text-xs text-red-700" role="alert">
           Could not attach that file.
