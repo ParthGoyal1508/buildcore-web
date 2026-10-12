@@ -155,14 +155,25 @@ export function canWriteAt(
  * Returns `false` while the answer is loading. A control that appears a moment late is a smaller
  * problem than one that appears, invites a click, and then 403s — and on a warm cache, which is
  * the ordinary case once past the first screen, there is no such moment.
+ *
+ * **Not asked at all on a route no module claims.** Those routes are ungated — `canWriteAt`
+ * returns true for them whatever the answer is — so the request has no bearing on what renders.
+ * The sign-in page is one of them, and it carries this app's primary `Button`: an unconditional
+ * query there sent an authenticated `GET /users/me` from a page whose whole premise is that
+ * nobody is signed in, took the 401, failed to renew, and was redirected by `withAuth` to
+ * `/login` — the page it was already on. That reloaded, re-mounted the button, and asked again,
+ * about five times a second, until the API's rate limiter refused the eleventh renewal. The
+ * rate limiter was the only thing ending the loop.
  */
 export function useCanWrite(): boolean {
   const pathname = usePathname();
+  const ungated = writePermissionsFor(pathname ?? '') === null;
   const { data } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
+    enabled: !ungated,
   });
-  return canWriteAt(data, pathname ?? '');
+  return ungated || canWriteAt(data, pathname ?? '');
 }
 
 /**

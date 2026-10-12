@@ -30,6 +30,18 @@ const selectableCompanySchema = z.object({
    * had been sending all along.
    */
   selected: z.boolean(),
+  /**
+   * Whether this company has supplied its own logo (2026-10-12).
+   *
+   * **Declared, or it would be stripped** — see the note above about the permission
+   * levels this client discarded for exactly that reason.
+   *
+   * A flag rather than a URL: the logo is served through the API by company id, behind
+   * the same auth as everything else, so there is no address to hand the browser. The
+   * shell uses this to decide whether to fetch at all, which keeps a company with no
+   * logo from spending a 404 per navigation re-establishing that.
+   */
+  hasLogo: z.boolean().default(false),
 });
 
 export type SelectableCompany = z.infer<typeof selectableCompanySchema>;
@@ -84,4 +96,13 @@ export function useSelectedCompanyId(): string | null {
     queryFn: listSelectableCompanies,
   });
   return data?.find((company) => company.selected)?.id ?? null;
+}
+
+/** The company the caller is working in, with the fields the shell needs. */
+export function useSelectedCompany(): SelectableCompany | null {
+  const { data } = useQuery({
+    queryKey: ['companies', 'selectable'],
+    queryFn: listSelectableCompanies,
+  });
+  return data?.find((company) => company.selected) ?? null;
 }

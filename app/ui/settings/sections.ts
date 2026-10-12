@@ -90,6 +90,14 @@ export const SETTINGS_SECTIONS: {
     icon: BanknotesIcon,
   },
   {
+    key: 'terms',
+    href: ROUTES.settingsTerms,
+    title: 'Terms and conditions',
+    description:
+      'The standard clauses a new work order, LOI or purchase order starts from.',
+    icon: ClipboardDocumentCheckIcon,
+  },
+  {
     key: 'signatories',
     href: ROUTES.settingsSignatories,
     title: 'Signatories',

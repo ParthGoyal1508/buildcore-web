@@ -116,6 +116,16 @@ export default function ComplianceModal({
               ))}
             </SelectInput>
           </Field>
+          {/* The same treatment `contractor-modal.tsx` already gives its empty vendor
+              picker. Without it this form is a dead end: a select offering nothing, a
+              Save that refuses with "Choose a contractor", and no way to learn that the
+              thing to create first lives on another screen. */}
+          {contractors?.length === 0 && (
+            <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 sm:col-span-2">
+              No contractors have a compliance profile yet. Create one on the
+              Contractors screen first.
+            </p>
+          )}
           <Field
             id="compliance-month"
             label="Month"

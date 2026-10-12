@@ -1,5 +1,6 @@
 'use client';
 
+import { rupees } from '@/app/lib/format';
 import ResponsiveList, {
   type Column,
 } from '@/app/ui/settings/responsive-list';
@@ -13,16 +14,33 @@ import type { WidgetResult } from '@/app/lib/api/dashboard';
 export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
   if (widget.unavailable) {
     return (
-      <ComingSoonCard title={widget.title} module={widget.unavailable.module} />
+      <ComingSoonCard
+        title={widget.title}
+        module={widget.unavailable.module}
+        note={widget.unavailable.note}
+      />
     );
   }
   switch (widget.displayType) {
     case 'kpi':
-      return <KpiCard title={widget.title} value={widget.value} />;
+      return (
+        <KpiCard
+          title={widget.title}
+          value={widget.value}
+          unit={widget.valueUnit}
+          note={widget.note}
+        />
+      );
     case 'stat':
       return <StatCard title={widget.title} value={widget.value} />;
     case 'table':
-      return <WidgetTable title={widget.title} value={widget.value} />;
+      return (
+        <WidgetTable
+          title={widget.title}
+          value={widget.value}
+          note={widget.note}
+        />
+      );
     case 'list':
       return <WidgetList title={widget.title} value={widget.value} />;
     default:
@@ -44,11 +62,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** A single headline figure. Handles a plain number/string and the Group Dashboard's
  * company-card object (headcount + not-yet-computable sub-metrics). */
-export function KpiCard({ title, value }: { title: string; value: unknown }) {
+export function KpiCard({
+  title,
+  value,
+  unit,
+  note,
+}: {
+  title: string;
+  value: unknown;
+  /** Declared by the widget itself — see `valueUnit` on the wire type. */
+  unit?: 'currency';
+  /**
+   * A caveat from the widget, when its figure is true but incomplete.
+   *
+   * Shown, not swallowed: the site fuel cards use it to say how many of the month's
+   * entries carry no site and are therefore not in the number above. A card that
+   * quietly understates a site's diesel is the thing this prevents.
+   */
+  note?: string;
+}) {
   let display = '—';
   let subtitle: string | null = null;
   if (typeof value === 'number' || typeof value === 'string') {
-    display = String(value);
+    // A rupee figure is unreadable raw: the Contract Value card shipped showing
+    // `371100000`, which is ₹37.11 crore written so that nobody can tell it from
+    // ₹3.7 crore at a glance.
+    display =
+      unit === 'currency' && typeof value === 'number'
+        ? rupees(value)
+        : String(value);
   } else if (isRecord(value) && 'headcount' in value) {
     display = String(value.headcount);
     const pending = Array.isArray(value.unavailableMetrics)
@@ -61,6 +103,7 @@ export function KpiCard({ title, value }: { title: string; value: unknown }) {
       <p className="text-sm text-gray-500">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
       {subtitle && <p className="mt-1 text-xs text-gray-400">{subtitle}</p>}
+      {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </div>
   );
 }
@@ -98,9 +141,12 @@ function isTableValue(value: unknown): value is TableValue {
 export function WidgetTable({
   title,
   value,
+  note,
 }: {
   title: string;
   value: unknown;
+  /** See the same prop on `KpiCard`. */
+  note?: string;
 }) {
   if (!isTableValue(value)) {
     return <UnsupportedWidgetCard title={title} displayType="table" />;
@@ -126,11 +172,29 @@ export function WidgetTable({
         rowKey={(row) => JSON.stringify(row)}
         emptyMessage="No rows."
       />
+      {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </div>
   );
 }
 
 /** A simple bulleted list widget. */
+/** The colour a list row carries, by the severity the source declared. */
+const SEVERITY_CLASS: Record<string, string> = {
+  overdue: 'text-red-700',
+  warning: 'text-amber-700',
+  info: 'text-gray-700',
+};
+
+/**
+ * A list widget's rows.
+ *
+ * Items are `{ label, detail?, severity?, href? }`. A plain string still renders, for a
+ * widget that only has words to show.
+ *
+ * **`JSON.stringify` used to be the fallback for an object item**, so the first list
+ * widget to emit anything structured would have printed raw JSON onto the dashboard.
+ * Nothing had, which is the only reason nobody saw it; Alerts & Reminders emits objects.
+ */
 export function WidgetList({ title, value }: { title: string; value: unknown }) {
   const items = Array.isArray(value) ? value : [];
   return (
@@ -139,12 +203,39 @@ export function WidgetList({ title, value }: { title: string; value: unknown }) 
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">Nothing to show.</p>
       ) : (
-        <ul className="list-disc pl-5 text-sm text-gray-700">
-          {items.map((item, i) => (
-            <li key={i}>
-              {isRecord(item) ? JSON.stringify(item) : String(item)}
-            </li>
-          ))}
+        <ul className="divide-y divide-gray-100 text-sm">
+          {items.map((item, i) => {
+            if (!isRecord(item)) {
+              return (
+                <li key={i} className="py-1.5 text-gray-700">
+                  {String(item)}
+                </li>
+              );
+            }
+            const label = String(item.label ?? '');
+            const detail = item.detail ? String(item.detail) : null;
+            const tone =
+              SEVERITY_CLASS[String(item.severity ?? '')] ?? 'text-gray-700';
+            const body = (
+              <>
+                <span className={tone}>{label}</span>
+                {detail && (
+                  <span className="ml-2 text-xs text-gray-500">{detail}</span>
+                )}
+              </>
+            );
+            return (
+              <li key={i} className="py-1.5">
+                {typeof item.href === 'string' ? (
+                  <a className="hover:underline" href={item.href}>
+                    {body}
+                  </a>
+                ) : (
+                  body
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -155,16 +246,24 @@ export function WidgetList({ title, value }: { title: string; value: unknown }) 
 export function ComingSoonCard({
   title,
   module,
+  note,
 }: {
   title: string;
   module: string;
+  /**
+   * The card's own explanation, when the stock sentence is not true.
+   *
+   * The Statutory Calendar read "waiting on the challans module" long after Challans
+   * shipped, which sent anybody investigating to a module that was already there.
+   */
+  note?: string;
 }) {
   return (
     <div className={`${cardClass} border-dashed`}>
       <p className="text-sm text-gray-500">{title}</p>
       <p className="mt-1 text-sm font-medium text-gray-400">Coming soon</p>
       <p className="mt-1 text-xs text-gray-400">
-        Waiting on the {module} module.
+        {note ?? `Waiting on the ${module} module.`}
       </p>
     </div>
   );

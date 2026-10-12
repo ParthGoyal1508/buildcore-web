@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { fileToBase64 } from '@/app/lib/api/project-documents';
 import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
@@ -145,6 +146,13 @@ export const clientBillLineSchema = z.object({
   amount: decimal,
   cumulativeQty: decimal,
   remainingQty: decimal,
+  /**
+   * What the client certified on this line, or null where they did not say (2026-10-11).
+   *
+   * Null and zero are different answers: null is "not certified line by line", zero is
+   * "certified at nothing", and only the second returns the quantity to the schedule.
+   */
+  certifiedQty: nullableDecimal,
   exceedsScope: z.boolean(),
   overScopeReason: z.string().nullable(),
   isVariation: z.boolean(),
@@ -172,6 +180,15 @@ export const clientBillSchema = z.object({
    */
   netAmount: nullableDecimal,
   certifiedAmount: nullableDecimal,
+  /** The client's own certification document, where one was filed (2026-10-11). */
+  certificate: z
+    .object({
+      fileName: z.string(),
+      mimeType: z.string(),
+      sizeBytes: z.number(),
+    })
+    .nullable()
+    .optional(),
   certifiedAt: isoDate.nullable(),
   /**
    * The shortfall between billed and certified, where there is one.
@@ -237,15 +254,43 @@ export async function submitClientBill(id: string): Promise<ClientBill> {
   return clientBillSchema.parse(raw);
 }
 
+/**
+ * Record what the client certified (2026-10-11).
+ *
+ * `lines` and `certifiedAmount` are alternatives, not a pair: when lines are sent the
+ * server derives the total from them and ignores any amount, because two answers to one
+ * question is how the schedule and the money drift apart.
+ */
 export async function certifyClientBill(
   id: string,
-  certifiedAmount: number,
+  input: {
+    certifiedAmount?: number;
+    lines?: { lineId: string; certifiedQty: number }[];
+    certificate?: File;
+  },
 ): Promise<ClientBill> {
+  const certificate = input.certificate
+    ? {
+        certificateData: await fileToBase64(input.certificate),
+        certificateFileName: input.certificate.name,
+      }
+    : {};
   const raw = await authFetch<unknown>(`/projects/client-bills/${id}/certify`, {
     method: 'POST',
-    body: JSON.stringify({ certifiedAmount }),
+    body: JSON.stringify({
+      ...(input.certifiedAmount !== undefined
+        ? { certifiedAmount: input.certifiedAmount }
+        : {}),
+      ...(input.lines?.length ? { lines: input.lines } : {}),
+      ...certificate,
+    }),
   });
   return clientBillSchema.parse(raw);
+}
+
+/** The client's certification document, by the **bill's** id. */
+export function downloadCertificate(billId: string) {
+  return authFetchFile(`/projects/client-bills/${billId}/certificate`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

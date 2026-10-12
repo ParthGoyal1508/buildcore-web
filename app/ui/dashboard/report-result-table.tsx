@@ -20,11 +20,20 @@ export default function ReportResultTable({ data }: { data: ReportData }) {
     }),
   );
   return (
-    <ResponsiveList
-      columns={columns}
-      rows={data.rows}
-      rowKey={(row) => JSON.stringify(row)}
-      emptyMessage="This report returned no rows."
-    />
+    <div className="flex flex-col gap-2">
+      <ResponsiveList
+        columns={columns}
+        rows={data.rows}
+        rowKey={(row) => JSON.stringify(row)}
+        emptyMessage="This report returned no rows."
+      />
+      {/* The report's own account of an empty or partial result, which is usually more
+          use than "no rows" — see `ReportData.note`. */}
+      {data.note && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {data.note}
+        </p>
+      )}
+    </div>
   );
 }

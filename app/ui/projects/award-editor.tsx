@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useMemo, useState } from 'react';
 
 import {
@@ -138,6 +139,23 @@ export default function AwardEditor({
     () => new Map(boqItems.map((item) => [item.id, item])),
     [boqItems],
   );
+
+  /**
+   * What the project actually earns on a BOQ line, after the quoted percentage
+   * (2026-10-11).
+   *
+   * Derived here rather than fetched: `getBillableBoq` already returns both halves in
+   * the one query this editor already makes, and the rows being typed do not exist on
+   * the server yet — a column that is blank for exactly the lines you are entering is
+   * the opposite of useful.
+   *
+   * The same arithmetic a client bill line uses (`rate × (1 + quotedPercentage)`). It
+   * is a reference figure, not one anybody is billed from — the authoritative version
+   * stays on the server, where the bill is composed — and this file already computes
+   * the row amount the same way.
+   */
+  const quotedPercentage = boq.data?.quotedPercentage ?? 0;
+  const earnedRate = (boqRate: number) => boqRate * (1 + quotedPercentage);
 
   const used = useMemo(
     () =>
@@ -377,6 +395,9 @@ export default function AwardEditor({
                   {WORK_ORDER_COPY.awardColumns.boqRate}
                 </th>
                 <th className="px-2 py-2 text-right">
+                  {WORK_ORDER_COPY.awardColumns.quotedRate}
+                </th>
+                <th className="px-2 py-2 text-right">
                   {WORK_ORDER_COPY.awardColumns.rate}
                 </th>
                 <th className="px-2 py-2 text-right">
@@ -391,6 +412,14 @@ export default function AwardEditor({
                   ? boqById.get(row.boqTaskItemId)
                   : undefined;
                 const amount = Number(row.awardedQty) * Number(row.rate);
+                const earned = item ? earnedRate(item.rate) : null;
+                // Only when both are real numbers: a half-typed rate is not yet a rate,
+                // and warning about one is how a field becomes annoying to type in.
+                const overEarned =
+                  earned !== null &&
+                  row.rate.trim() !== '' &&
+                  Number.isFinite(Number(row.rate)) &&
+                  Number(row.rate) > earned;
                 return (
                   <tr key={row.key} className="border-t border-gray-100">
                     <td className="px-2 py-1.5 tabular-nums text-gray-600">
@@ -439,6 +468,9 @@ export default function AwardEditor({
                       {/* Reference only. Never copied into the next column — see the rate note. */}
                       {item ? rupees(item.rate) : WORK_ORDER_COPY.awardUnlinked}
                     </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
+                      {item ? rupees(earned) : WORK_ORDER_COPY.awardUnlinked}
+                    </td>
                     <td className="px-2 py-1.5 text-right">
                       <input
                         value={row.rate}
@@ -448,8 +480,18 @@ export default function AwardEditor({
                         onChange={(event) =>
                           update(row.key, { rate: event.target.value })
                         }
-                        className="w-28 rounded border border-gray-300 px-2 py-1 text-right tabular-nums disabled:border-transparent disabled:bg-transparent"
+                        className={clsx(
+                          'w-28 rounded border px-2 py-1 text-right tabular-nums disabled:border-transparent disabled:bg-transparent',
+                          overEarned
+                            ? 'border-amber-500 bg-amber-50'
+                            : 'border-gray-300',
+                        )}
                       />
+                      {overEarned && (
+                        <span className="mt-0.5 block text-xs text-amber-700">
+                          {WORK_ORDER_COPY.awardRateAboveEarned}
+                        </span>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
                       {Number.isFinite(amount) ? rupees(amount) : '—'}
@@ -477,7 +519,7 @@ export default function AwardEditor({
             </tbody>
             <tfoot className="border-t border-gray-300 bg-gray-50">
               <tr>
-                <td colSpan={6} className="px-2 py-2 font-medium text-gray-900">
+                <td colSpan={7} className="px-2 py-2 font-medium text-gray-900">
                   {WORK_ORDER_COPY.awardTotal}
                 </td>
                 <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">

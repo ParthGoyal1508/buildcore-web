@@ -33,6 +33,8 @@ export const ROUTES = {
   settingsLetterKinds: '/dashboard/settings/letter-kinds',
   /** Named signatories and their signature graphics (017 US4). */
   settingsSignatories: '/dashboard/settings/signatories',
+  /** The company's standard terms and conditions (2026-10-11). */
+  settingsTerms: '/dashboard/settings/terms',
   /** The four statutory rates a running-account bill is computed at (025 US4). */
   settingsBillingRates: '/dashboard/settings/billing-rates',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
@@ -530,6 +532,43 @@ export const ACTIVITY_MODULES = [
   'labour',
 ] as const;
 export type ActivityModule = (typeof ACTIVITY_MODULES)[number];
+
+/**
+ * What each filter option is called on screen.
+ *
+ * The values above are the API's bucket ids and the screen was rendering them straight
+ * into its two `<select>`s and the Module column — so the filter offered "hr",
+ * "machinery" and "7d". They cannot be renamed: `module-bucket-mapping.ts` keys the
+ * server's own filter on them.
+ *
+ * Not derived from `NAV_MODULES`, deliberately. The buckets are not the sidebar's
+ * modules: `payroll` is its own bucket while the sidebar folds it into HR, and
+ * `machinery` is the sidebar's `plant`. A lookup between the two would be a mapping
+ * that silently returns nothing the first time either list changes.
+ */
+export const ACTIVITY_MODULE_LABELS: Record<ActivityModule, string> = {
+  hr: 'HR',
+  settings: 'Settings',
+  payroll: 'Payroll',
+  machinery: 'Plant & Machinery',
+  projects: 'Projects',
+  inventory: 'Inventory',
+  partners: 'Partners',
+  recruitment: 'Recruitment',
+  labour: 'Labour',
+};
+
+export const ACTIVITY_TIME_RANGE_LABELS: Record<ActivityTimeRange, string> = {
+  today: 'Today',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+};
+
+/** A bucket id as a reader should see it; an unmapped one renders as it arrived. */
+export function activityModuleLabel(value: string): string {
+  return ACTIVITY_MODULE_LABELS[value as ActivityModule] ?? value;
+}
 
 /**
  * Copy for each severity band.
@@ -1146,8 +1185,28 @@ export const BILLING_COPY = {
     'Kept alongside the billed amount, never instead of it. The variance between the two is the thing to chase, and overwriting the billed figure would erase the fact that there was one.',
   statusHeader: 'Status',
   certifyOpen: 'Record certification',
+  certifyAmend: 'Amend certification',
   certifySave: 'Save certification',
   certifySaving: 'Saving…',
+
+  // --- Certifying line by line (2026-10-11) ---
+  /**
+   * The reported case: nine items billed, eight certified, and the ninth stayed
+   * deducted from the outstanding BOQ — so it could never be claimed again without
+   * over-measuring. Certifying line by line is what frees it.
+   */
+  certifyPerLine: 'Certify line by line',
+  certifyPerLineHint:
+    'Only what you enter here counts against the BOQ. A line left blank keeps its billed quantity — blank is “the client did not say”, not “certified at nothing”. Enter 0 to return a line’s whole quantity to the schedule. The certified amount is worked out from these, so the figure and the schedule cannot disagree.',
+  certifyBilledQty: 'Billed',
+  certifyCertifiedQty: 'Certified',
+  certifyAmountOnly: 'Certify a single amount instead',
+  certifyLinesInstead: 'Certify line by line instead',
+  certifyCopyLabel: 'The client’s certification (PDF or workbook)',
+  certifyCopyHint:
+    'Whatever came back. Replaces any copy already held — re-certifying supersedes.',
+  certifyCopyOpen: 'Open the client’s certification',
+  certifyCopyFailed: 'That certification could not be opened.',
   cancel: 'Cancel',
   loading: 'Loading…',
 } as const;
@@ -1306,6 +1365,15 @@ export const WORK_ORDER_COPY = {
     unit: 'Unit',
     quantity: 'Quantity',
     boqRate: 'BOQ rate',
+    /**
+     * What the client actually pays, after the quote (2026-10-11).
+     *
+     * The reported risk: the quote is −10.79%, the BOQ rate is what is printed on the
+     * tender in front of whoever is typing, and a subcontract gets awarded above what
+     * the job earns. The BOQ rate alone is the number that invites the mistake, so the
+     * figure the margin is actually measured against sits next to it.
+     */
+    quotedRate: 'You earn',
     rate: 'Their rate',
     amount: 'Amount',
     remove: '',
@@ -1321,7 +1389,9 @@ export const WORK_ORDER_COPY = {
    * anybody deciding it should be. Shown beside, never in the box.
    */
   awardRateHint:
-    'What you pay the subcontractor, which is not the BOQ rate — the BOQ rate is what the client pays you, and the difference is the margin. Shown beside for reference, never filled in for you.',
+    'What you pay the subcontractor. The margin is against “You earn” — the BOQ rate after the project’s quoted percentage — not against the BOQ rate itself, which is the tender figure before the quote. Both are shown beside, never filled in for you.',
+  /** Flagged on the row, because a total that is already negative is one found too late. */
+  awardRateAboveEarned: 'Above what this line earns',
   awardLinkedHint:
     'A line picked from the BOQ stays tied to it, so work recorded against that BOQ line counts towards this award. A typed line is not tied to anything, which is correct when the subcontract covers work the BOQ itemises differently.',
   awardRowIncomplete: (row: number) =>
@@ -1907,6 +1977,10 @@ export const SETTINGS_PERMISSIONS = {
   // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
   // computed at, guarded by the same permission as the registration numbers beside them.
   'billing-rates': 'COMPANY_SETTINGS',
+  // 2026-10-11. `SETTINGS`, matching the backend: these clauses go onto a document a
+  // subcontractor signs, which makes editing them a settings act rather than a
+  // project one.
+  terms: 'SETTINGS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -2407,7 +2481,18 @@ export const SALARY_ADVANCE_STATUSES = [
 ] as const;
 export const EXIT_REASONS = ['resignation', 'termination', 'contract_end'] as const;
 export const TAX_DECLARATION_STATUSES = ['declared', 'verified'] as const;
-export const CHALLAN_TYPES = ['pf', 'esic', 'pt', 'tds'] as const;
+/**
+ * The statutory challans this screen can produce — the three the API builds.
+ *
+ * `tds` used to be a fourth entry here and there is no such challan: `ChallanType` in
+ * `challans.service.ts` is `'pf' | 'esic' | 'pt'`, so the tab spent five seconds
+ * retrying and then printed the API's own validation message, "type must be one of
+ * pf, esic, pt.", on a tab the app itself had offered. Income tax is not withheld as a
+ * monthly challan here — it has its own screen at `ROUTES.hrTds`, with the slab set,
+ * the declarations and the quarterly return, and nothing is lost by this list matching
+ * what the endpoint accepts.
+ */
+export const CHALLAN_TYPES = ['pf', 'esic', 'pt'] as const;
 export type ChallanType = (typeof CHALLAN_TYPES)[number];
 
 /**
@@ -2458,6 +2543,18 @@ const ENUM_LABEL_OVERRIDES: Record<string, string> = {
   ok: 'OK',
   km: 'Kilometres',
   hours: 'Hours',
+
+  // Billing (023). The hyphen is GST's own spelling and the one on every invoice;
+  // `enumLabel` would give "Inter State", which reads as two words that got separated.
+  inter_state: 'Inter-state',
+  intra_state: 'Intra-state',
+  // Bill direction (024). These lived as a local map in `bill-packages-panel.tsx`, so the
+  // over-claims report beside it had nothing to call them and printed "to_client and
+  // to_subcontractor" into a sentence. One map, where the other enum labels are.
+  to_client: 'To the client',
+  to_subcontractor: 'To a subcontractor',
+  derived_from_gstin: 'derived from the GSTIN',
+  from_project_flag: "set on the project's own record",
 };
 
 export function hrLabel(value: string): string {
@@ -4370,4 +4467,36 @@ export const BOQ_COPY = {
       'This import was prepared by someone else, or for a different project. Upload the file again here.',
   } as const,
   refusalFallback: 'The workbook could not be imported.',
+} as const;
+
+
+/**
+ * The company's standard terms and conditions (2026-10-11).
+ *
+ * The one sentence that has to be on the screen is that editing changes the **next**
+ * document and not one already raised. The opposite assumption — that rewording the
+ * standard set reworded every award signed under it — is the dangerous one, and it is
+ * exactly what somebody would assume from a page called "Terms and conditions".
+ */
+export const TERMS_COPY = {
+  intro:
+    'The clauses a new document starts from. Editing them changes what the next work order, letter of intent or purchase order is raised with — never one already raised, which keeps the terms it was signed under.',
+  kindsLabel: 'Document kind',
+  kindLabels: {
+    work_order: 'Work order',
+    letter_of_intent: 'Letter of intent',
+    purchase_order: 'Purchase order',
+  } as Record<string, string>,
+  shippedBadge: 'standard',
+  stillShipped:
+    'These are the clauses BuildCore ships. Nobody at your company has reviewed them yet — edit and save to make them yours.',
+  bodyLabel: 'Clauses',
+  bodyHint:
+    'Plain text, one clause per line. No formatting: what renders this is a PDF table cell and this box, and neither interprets any.',
+  save: 'Save terms',
+  saving: 'Saving…',
+  discard: 'Discard changes',
+  loading: 'Loading the standard terms…',
+  loadFailed: 'The standard terms could not be loaded.',
+  saveFailed: 'Those terms could not be saved.',
 } as const;

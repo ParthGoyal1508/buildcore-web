@@ -15,7 +15,11 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { usePlantEquipment, usePlantVendors } from './use-plant-refs';
+import {
+  usePlantEquipment,
+  usePlantSites,
+  usePlantVendors,
+} from './use-plant-refs';
 
 /**
  * Record fuel drawn.
@@ -33,8 +37,18 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const equipment = usePlantEquipment();
   const vendors = usePlantVendors();
+  const sites = usePlantSites();
 
   const [equipmentId, setEquipmentId] = useState('');
+  /**
+   * Where the fuel was drawn, blank until the machine is chosen.
+   *
+   * `''` means "follow the machine's deployment", which the API resolves at write time
+   * and then stores. Captured rather than left to be derived on read: a site's fuel
+   * figure computed from where the machine *now* stands restates itself every time one
+   * is transferred.
+   */
+  const [siteId, setSiteId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
@@ -46,6 +60,12 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
       ? Math.round(Number(quantity) * Number(rate) * 100) / 100
       : null;
 
+  // Named in the default option, so "leave it alone" is a visible choice rather than a
+  // blank that hides which site the entry will actually land against.
+  const deployedSiteName =
+    (equipment.data ?? []).find((machine) => machine.id === equipmentId)
+      ?.siteName ?? null;
+
   const save = useMutation({
     mutationFn: () =>
       createFuelEntry({
@@ -54,6 +74,7 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
         quantity: Number(quantity),
         rate: Number(rate),
         ...(vendorId ? { vendorId } : {}),
+        ...(siteId ? { siteId } : {}),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
@@ -160,6 +181,25 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
           {(vendors.data ?? []).map((vendor) => (
             <option key={vendor.id} value={vendor.id}>
               {vendor.name}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          id="fuel-site"
+          label="Site"
+          hint="Where the fuel was drawn. Left alone it follows the machine's deployment, which is what the Site Dashboard's fuel cards read."
+          value={siteId}
+          onChange={(event) => setSiteId(event.target.value)}
+        >
+          <option value="">
+            {deployedSiteName
+              ? `Where the machine is deployed — ${deployedSiteName}`
+              : "Where the machine is deployed"}
+          </option>
+          {(sites.data ?? []).map((site) => (
+            <option key={site.id} value={site.id}>
+              {site.name}
             </option>
           ))}
         </SelectField>

@@ -160,8 +160,30 @@ const widgetResultSchema = z.object({
   title: z.string(),
   section: z.string(),
   value: z.unknown().optional(),
+  /**
+   * What the number means, when it is not just a count (2026-10-12).
+   *
+   * `'currency'` tells the renderer to put the figure through `rupees()`. Sent by the
+   * backend rather than decided here: a list of "these widget ids are money" kept on
+   * this side goes stale the first time a widget is added, and the renderer knows no
+   * widget's id by design.
+   */
+  valueUnit: z.literal('currency').optional(),
+  /**
+   * A caveat printed beside the value, when the figure is true but incomplete.
+   *
+   * The sibling of `unavailable.note`. The site fuel cards use it while the month still
+   * holds entries recorded before `FuelEntry.siteId` existed; it disappears on its own
+   * once none do, which is why it travels per request rather than being declared once.
+   */
+  note: z.string().optional(),
   unavailable: z
-    .object({ reason: z.string(), module: z.string() })
+    .object({
+      reason: z.string(),
+      module: z.string(),
+      /** The card's own explanation, when "waiting on the X module" is not true. */
+      note: z.string().optional(),
+    })
     .optional(),
 });
 
@@ -319,6 +341,14 @@ export type ReportType = z.infer<typeof reportTypeSchema>;
 const reportDataSchema = z.object({
   columns: z.array(z.object({ key: z.string(), label: z.string() })),
   rows: z.array(z.record(z.string(), z.unknown())),
+  /**
+   * Why there is nothing to show, or what is missing from what is.
+   *
+   * "This report returned no rows" is not the interesting fact for several of them: the
+   * Payroll report is empty when every run in the range is still a draft, and a reader
+   * told only "no rows" goes looking for missing employees rather than pressing Process.
+   */
+  note: z.string().optional(),
 });
 const reportResultSchema = z.union([
   reportDataSchema,

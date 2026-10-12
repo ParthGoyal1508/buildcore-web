@@ -355,10 +355,17 @@ function TemplateEditor({
                     >
                       <span className="block truncate text-gray-900">
                         {field.label}
+                        {/* The space is load-bearing: `ml-1` separates the two
+                            visually, but this button's *text* is its accessible
+                            name, and without it that read
+                            "Basic — annuallyrequired". */}
                         {field.isRequired && (
-                          <span className="ml-1 text-amber-800">
-                            {TEMPLATE_COPY.requiredMark}
-                          </span>
+                          <>
+                            {' '}
+                            <span className="text-amber-800">
+                              {TEMPLATE_COPY.requiredMark}
+                            </span>
+                          </>
                         )}
                       </span>
                       <code className="block break-all text-gray-500">

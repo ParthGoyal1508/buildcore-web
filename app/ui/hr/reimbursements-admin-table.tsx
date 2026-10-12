@@ -6,13 +6,13 @@ import { useState } from 'react';
 import {
   approveClaim,
   listAdminClaims,
+  listReimbursementCategories,
   payClaim,
   rejectClaim,
   type AdminClaim,
 } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES, MESSAGES, hrLabel } from '@/app/lib/constants';
 import { dateLabel, money } from '@/app/lib/format';
-import { getReimbursementCategories } from '@/app/lib/api/my-workspace';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
 import { Button } from '@/app/ui/button';
@@ -130,8 +130,8 @@ export default function ReimbursementsAdminTable() {
   const employees = useEmployeeNames();
   // The claim carries only `categoryId`; the category master supplies the name.
   const { data: categories } = useQuery({
-    queryKey: ['reimbursementCategories'],
-    queryFn: getReimbursementCategories,
+    queryKey: ['settings', 'reimbursementCategories'],
+    queryFn: listReimbursementCategories,
   });
   const categoryName = (id: string | null | undefined) =>
     (id && categories?.find((c) => c.id === id)?.name) || '—';

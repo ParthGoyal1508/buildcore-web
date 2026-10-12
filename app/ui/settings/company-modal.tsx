@@ -132,6 +132,7 @@ export default function CompanyModal({
       name: company?.name ?? '',
       shortCode: company?.shortCode ?? '',
       status: company?.status ?? 'active',
+      // Round-trips untouched; the field is no longer offered — see the note above.
       logoUrl: company?.logoUrl ?? '',
       gstin: company?.gstin ?? '',
       pan: company?.pan ?? '',
@@ -277,7 +278,12 @@ export default function CompanyModal({
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </SelectField>
-          <TextField id="logoUrl" label="Logo URL" error={err('logoUrl')} {...register('logoUrl')} />
+          {/* "Logo URL" is gone (2026-10-12). It was written here and read by nothing
+              since 002, and a company's logo is now an uploaded image — see
+              `Company.logoRef` and `PUT /settings/companies/:id/logo`. Two controls for
+              one thing, one of which does nothing, is worse than one.
+              Still registered below and still submitted unchanged, so whatever rows
+              already hold is preserved rather than blanked by a save. */}
         </div>
 
         <div className={tab === 'registration' ? 'space-y-4' : 'hidden'}>

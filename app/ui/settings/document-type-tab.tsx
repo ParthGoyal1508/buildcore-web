@@ -10,7 +10,10 @@ import {
   updateDocumentType,
 } from '@/app/lib/api/settings';
 import { MESSAGES } from '@/app/lib/constants';
-import { computeDocumentTypeFlag } from '@/app/lib/settings-utils';
+import {
+  computeDocumentTypeFlag,
+  documentTypeFlagLabel,
+} from '@/app/lib/settings-utils';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
@@ -118,7 +121,9 @@ export default function DocumentTypeTab() {
       key: 'flag',
       header: 'Flags',
       render: (d) => (
-        <span className="rounded bg-gray-100 px-2 py-1 text-xs">{d.flag}</span>
+        <span className="rounded bg-gray-100 px-2 py-1 text-xs">
+          {documentTypeFlagLabel(d.flag)}
+        </span>
       ),
     },
     { key: 'sortOrder', header: 'Sort', render: (d) => d.sortOrder, hideOnCard: true },
@@ -230,7 +235,9 @@ export default function DocumentTypeTab() {
             {/* Live preview — updates as the toggles change, before any save. */}
             <p className="rounded-md bg-gray-50 px-3 py-2 text-sm" aria-live="polite">
               Derived flag:{' '}
-              <span className="font-medium text-gray-900">{previewFlag}</span>
+              <span className="font-medium text-gray-900">
+                {documentTypeFlagLabel(previewFlag)}
+              </span>
             </p>
 
             <TextField

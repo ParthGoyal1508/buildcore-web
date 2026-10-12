@@ -132,6 +132,16 @@ const attachmentSchema = z
     fileName: z.string(),
     mimeType: z.string(),
     sizeBytes: z.number(),
+    /**
+     * The measurement line this file is evidence for, or null for the report as a whole
+     * (2026-10-11).
+     *
+     * `.optional()` as well as nullable so a client ahead of the server still parses:
+     * absent means the server does not report the binding, null means the file belongs
+     * to no single line. Both render the same way — under the report — which is why the
+     * distinction costs nothing here.
+     */
+    taskId: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -481,12 +491,18 @@ export async function updateDwr(
 export async function addDwrAttachment(
   dwrId: string,
   file: File,
+  /** The line this is evidence for. Omit to attach it to the report as a whole. */
+  taskId?: string,
 ): Promise<DwrAttachment> {
   const data = await fileToBase64(file);
   return attachmentSchema.parse(
     await authFetch<unknown>(`/projects/dwr/${dwrId}/attachments`, {
       method: 'POST',
-      body: JSON.stringify({ data, fileName: file.name }),
+      body: JSON.stringify({
+        data,
+        fileName: file.name,
+        ...(taskId ? { taskId } : {}),
+      }),
     }),
   );
 }
