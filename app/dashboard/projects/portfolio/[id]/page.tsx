@@ -1,22 +1,51 @@
 'use client';
 
 import Link from 'next/link';
+import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 
 import { getClients } from '@/app/lib/api/projects';
+import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
 import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
 /** One labelled fact. A definition list, because that is what this is. */
-function Fact({ term, children }: { term: string; children: React.ReactNode }) {
+function Fact({
+  term,
+  children,
+  className,
+}: {
+  term: string;
+  children: React.ReactNode;
+  /** For a fact that needs the whole row — the documents list, which is a list. */
+  className?: string;
+}) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-xs uppercase tracking-wide text-gray-500">{term}</dt>
       <dd className="mt-0.5 text-sm text-gray-900">{children}</dd>
     </div>
   );
 }
+
+/**
+ * Worst first: a project cannot start without the red ones, the amber ones are being chased, and
+ * the grey ones are done. The same order somebody works in.
+ */
+const DOCUMENT_STATE_ORDER = { needed: 0, advisory: 1, filed: 2 } as const;
+
+const DOCUMENT_STATE_STYLES = {
+  needed: 'bg-red-50 text-red-700 ring-red-600/20',
+  advisory: 'bg-amber-50 text-amber-800 ring-amber-200',
+  filed: 'bg-gray-50 text-gray-500 ring-gray-200',
+} as const;
+
+const DOCUMENT_STATE_LABELS = {
+  needed: PROJECT_SHELL_COPY.documentsNeededGroup,
+  advisory: PROJECT_SHELL_COPY.documentsAdvisoryGroup,
+  filed: PROJECT_SHELL_COPY.documentsFiledGroup,
+} as const;
 
 function Card({
   heading,
@@ -113,6 +142,53 @@ export default function ProjectOverviewPage() {
     (documentReadiness.advisoryRequired ?? 0) -
     (documentReadiness.advisoryPresent ?? 0);
 
+  /**
+   * The required kinds themselves, named (2026-10-12).
+   *
+   * Readiness arrives as counts and ids — "1 still to upload" — which raises exactly the question
+   * it does not answer. The names come from the required set, under the same query key the
+   * Documents tab and the settings screen already use, so for anybody who has opened either this
+   * is a cache read rather than a request.
+   */
+  const requirementSet = useQuery({
+    queryKey: ['projectDocumentRequirements'],
+    queryFn: () => getDocumentRequirements(),
+  });
+
+  /**
+   * Every kind this project owes, worst first.
+   *
+   * Three states, and the order is the order somebody acts in: a mandatory kind still missing
+   * stops the project and is red; an advisory one is being chased and is amber; one already filed
+   * is neither, and is shown grey rather than hidden — "which documents does this project need"
+   * and "which are missing" are different questions, and the card can answer both in one line.
+   *
+   * Derived from the ids readiness already sends rather than from a second count, so this list and
+   * the figure above it cannot disagree. An id with no kind behind it is dropped: the server
+   * computes both from the same set, so it would mean the set changed under the page.
+   */
+  const documentKinds = (() => {
+    const missing = new Set(documentReadiness.missingTypeIds);
+    const advisoryMissing = new Set(
+      documentReadiness.advisoryMissingTypeIds ?? [],
+    );
+    return (requirementSet.data?.requirements ?? [])
+      .map((kind) => ({
+        id: kind.documentTypeId,
+        name: kind.name,
+        state: missing.has(kind.documentTypeId)
+          ? ('needed' as const)
+          : advisoryMissing.has(kind.documentTypeId)
+            ? ('advisory' as const)
+            : ('filed' as const),
+      }))
+      .sort(
+        (a, b) =>
+          DOCUMENT_STATE_ORDER[a.state] - DOCUMENT_STATE_ORDER[b.state] ||
+          a.name.localeCompare(b.name),
+      );
+  })();
+
   return (
     <div className="flex flex-col gap-6">
       {/*
@@ -193,7 +269,10 @@ export default function ProjectOverviewPage() {
                 {formatRupees(tabs.revenueSummary.totalPending)}
               </span>
             </Fact>
-            <Fact term={PROJECT_SHELL_COPY.documentsLabel}>
+            <Fact
+              term={PROJECT_SHELL_COPY.documentsLabel}
+              className="col-span-2"
+            >
               <Link
                 href={ROUTES.projectsProjectDocuments(project.id)}
                 className="text-blue-600 hover:underline"
@@ -212,6 +291,35 @@ export default function ProjectOverviewPage() {
                     advisoryOutstanding,
                   )}
                 </span>
+              )}
+              {/*
+                The kinds by name, red for one that stops the project and amber for one that can
+                follow. A list, because it is one — and each carries its state in words as well as
+                in colour, which is the half a reader who cannot tell red from amber needs.
+              */}
+              {documentKinds.length > 0 && (
+                <ul className="mt-1.5 flex flex-wrap gap-1">
+                  {documentKinds.map((kind) => (
+                    <li key={kind.id}>
+                      <span
+                        className={clsx(
+                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                          DOCUMENT_STATE_STYLES[kind.state],
+                        )}
+                      >
+                        <span className="sr-only">
+                          {DOCUMENT_STATE_LABELS[kind.state]}:{' '}
+                        </span>
+                        {kind.state === 'filed' && (
+                          <span aria-hidden="true" className="mr-1">
+                            ✓
+                          </span>
+                        )}
+                        {kind.name}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </Fact>
           </dl>

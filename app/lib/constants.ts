@@ -4216,6 +4216,19 @@ export const PROJECT_SHELL_COPY = {
     count === 1 ? '1 still to upload' : `${count} still to upload`,
   documentsAdvisoryOutstanding: (count: number) =>
     `${count} advisory outstanding`,
+  /**
+   * The kinds themselves, named on the overview (2026-10-12).
+   *
+   * "1 still to upload" raises exactly one question — *which one* — and answering it meant opening
+   * the Documents tab. The same words the creation form uses for the two strengths, because a
+   * reader who met them there should not have to learn a second vocabulary here.
+   *
+   * Each is read out before the kind's name for anybody not seeing the colour: red and amber carry
+   * the distinction for everyone else, and colour alone is not a label.
+   */
+  documentsNeededGroup: 'Needed to create the project',
+  documentsAdvisoryGroup: 'Can follow later',
+  documentsFiledGroup: 'Filed',
 
   /** Named modules, so the sentence says which answer is missing and why. */
   moduleUnavailable: (modules: string[]) =>
