@@ -157,6 +157,23 @@ export function WidgetTable({
 }
 
 /** A simple bulleted list widget. */
+/** The colour a list row carries, by the severity the source declared. */
+const SEVERITY_CLASS: Record<string, string> = {
+  overdue: 'text-red-700',
+  warning: 'text-amber-700',
+  info: 'text-gray-700',
+};
+
+/**
+ * A list widget's rows.
+ *
+ * Items are `{ label, detail?, severity?, href? }`. A plain string still renders, for a
+ * widget that only has words to show.
+ *
+ * **`JSON.stringify` used to be the fallback for an object item**, so the first list
+ * widget to emit anything structured would have printed raw JSON onto the dashboard.
+ * Nothing had, which is the only reason nobody saw it; Alerts & Reminders emits objects.
+ */
 export function WidgetList({ title, value }: { title: string; value: unknown }) {
   const items = Array.isArray(value) ? value : [];
   return (
@@ -165,12 +182,39 @@ export function WidgetList({ title, value }: { title: string; value: unknown }) 
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">Nothing to show.</p>
       ) : (
-        <ul className="list-disc pl-5 text-sm text-gray-700">
-          {items.map((item, i) => (
-            <li key={i}>
-              {isRecord(item) ? JSON.stringify(item) : String(item)}
-            </li>
-          ))}
+        <ul className="divide-y divide-gray-100 text-sm">
+          {items.map((item, i) => {
+            if (!isRecord(item)) {
+              return (
+                <li key={i} className="py-1.5 text-gray-700">
+                  {String(item)}
+                </li>
+              );
+            }
+            const label = String(item.label ?? '');
+            const detail = item.detail ? String(item.detail) : null;
+            const tone =
+              SEVERITY_CLASS[String(item.severity ?? '')] ?? 'text-gray-700';
+            const body = (
+              <>
+                <span className={tone}>{label}</span>
+                {detail && (
+                  <span className="ml-2 text-xs text-gray-500">{detail}</span>
+                )}
+              </>
+            );
+            return (
+              <li key={i} className="py-1.5">
+                {typeof item.href === 'string' ? (
+                  <a className="hover:underline" href={item.href}>
+                    {body}
+                  </a>
+                ) : (
+                  body
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
