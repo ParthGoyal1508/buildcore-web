@@ -169,6 +169,14 @@ const widgetResultSchema = z.object({
    * widget's id by design.
    */
   valueUnit: z.literal('currency').optional(),
+  /**
+   * A caveat printed beside the value, when the figure is true but incomplete.
+   *
+   * The sibling of `unavailable.note`. The site fuel cards use it while the month still
+   * holds entries recorded before `FuelEntry.siteId` existed; it disappears on its own
+   * once none do, which is why it travels per request rather than being declared once.
+   */
+  note: z.string().optional(),
   unavailable: z
     .object({
       reason: z.string(),

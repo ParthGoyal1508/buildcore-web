@@ -28,12 +28,19 @@ export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
           title={widget.title}
           value={widget.value}
           unit={widget.valueUnit}
+          note={widget.note}
         />
       );
     case 'stat':
       return <StatCard title={widget.title} value={widget.value} />;
     case 'table':
-      return <WidgetTable title={widget.title} value={widget.value} />;
+      return (
+        <WidgetTable
+          title={widget.title}
+          value={widget.value}
+          note={widget.note}
+        />
+      );
     case 'list':
       return <WidgetList title={widget.title} value={widget.value} />;
     default:
@@ -59,11 +66,20 @@ export function KpiCard({
   title,
   value,
   unit,
+  note,
 }: {
   title: string;
   value: unknown;
   /** Declared by the widget itself — see `valueUnit` on the wire type. */
   unit?: 'currency';
+  /**
+   * A caveat from the widget, when its figure is true but incomplete.
+   *
+   * Shown, not swallowed: the site fuel cards use it to say how many of the month's
+   * entries carry no site and are therefore not in the number above. A card that
+   * quietly understates a site's diesel is the thing this prevents.
+   */
+  note?: string;
 }) {
   let display = '—';
   let subtitle: string | null = null;
@@ -87,6 +103,7 @@ export function KpiCard({
       <p className="text-sm text-gray-500">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
       {subtitle && <p className="mt-1 text-xs text-gray-400">{subtitle}</p>}
+      {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </div>
   );
 }
@@ -124,9 +141,12 @@ function isTableValue(value: unknown): value is TableValue {
 export function WidgetTable({
   title,
   value,
+  note,
 }: {
   title: string;
   value: unknown;
+  /** See the same prop on `KpiCard`. */
+  note?: string;
 }) {
   if (!isTableValue(value)) {
     return <UnsupportedWidgetCard title={title} displayType="table" />;
@@ -152,6 +172,7 @@ export function WidgetTable({
         rowKey={(row) => JSON.stringify(row)}
         emptyMessage="No rows."
       />
+      {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </div>
   );
 }

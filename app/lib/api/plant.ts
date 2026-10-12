@@ -498,6 +498,9 @@ export const fuelEntrySchema = z.object({
   amount: decimal,
   vendorId: z.string().nullable(),
   vendorName: z.string().nullable(),
+  /** Null on an entry recorded before the column existed — see `FuelEntry.siteId`. */
+  siteId: z.string().nullable(),
+  siteName: z.string().nullable(),
   variancePercent: nullableDecimal,
   varianceAlert: z.boolean(),
 });
@@ -526,6 +529,8 @@ export interface FuelInput {
   quantity: number;
   rate: number;
   vendorId?: string;
+  /** Omitted, the API takes it from where the machine is deployed, and stores it. */
+  siteId?: string;
 }
 
 export async function createFuelEntry(input: FuelInput): Promise<FuelEntry> {
