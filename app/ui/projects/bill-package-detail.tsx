@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useState } from 'react';
 
 import {
-  ABSTRACT_BLOCKS,
+  abstractBlocksFor,
   type BillPackageClaim,
   certifyBillPackage,
   downloadWorkbook,
@@ -472,6 +472,7 @@ export default function BillPackageDetail({
       {editable && abstract && (
         <BillAdjustments
           packageId={packageId}
+          direction={pkg.direction}
           abstract={abstract}
           debitTotal={register?.recoveredOnThisPackage ?? null}
           onSaved={() => {
@@ -510,7 +511,7 @@ export default function BillPackageDetail({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {ABSTRACT_BLOCKS.map((block) => (
+                {abstractBlocksFor(pkg.direction).map((block) => (
                   // The key belongs on the fragment, not on the first row inside it. A bare `<>` in
                   // a list is itself the child React is keying, so keying its children instead
                   // leaves the list unkeyed — which is what the warning was reporting.
@@ -525,7 +526,10 @@ export default function BillPackageDetail({
                     </tr>
                     {block.rows.map((row) => (
                       <tr
-                        key={`${block.title}-${row.key}`}
+                        // Keyed by the **label**, not the column: a client's abstract prints the
+                        // taxable amount twice, once as the total of 1A−1B and once as what the
+                        // tax was computed on, exactly as the authority's own sheet does.
+                        key={`${block.title}-${row.label}`}
                         className={row.isTotal ? 'font-semibold' : undefined}
                       >
                         <td className="px-3 py-2">{row.label}</td>

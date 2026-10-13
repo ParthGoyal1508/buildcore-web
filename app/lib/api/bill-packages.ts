@@ -413,6 +413,11 @@ export async function setClaim(
  * columns — every one of these was printed on the bill and settable nowhere until now.
  */
 export const BILL_ADJUSTMENTS = [
+  {
+    key: 'workDeduction',
+    label: 'Deduction from the bill of quantities',
+    block: '1',
+  },
   { key: 'releaseWithheld', label: 'Release of withheld amount', block: 'A' },
   { key: 'recoveryDiesel', label: 'Recovery of diesel', block: 'B' },
   { key: 'debitAgainstCivil', label: 'Debit against civil', block: 'B' },
@@ -432,6 +437,21 @@ export const BILL_ADJUSTMENT_TOTALS = [
   { key: 'mobilizationAdvanceTotal', of: 'mobilizationAdvance' },
   { key: 'performanceSecurityTotal', of: 'performanceSecurity' },
 ] as const;
+
+/**
+ * Which of them each direction's abstract has a row for (2026-10-13).
+ *
+ * The server refuses the rest with a 400, so a form that offered them would be a form whose fields
+ * fail on save. A client's payment abstract computes its four recoveries from statutory
+ * percentages; the only thing anybody enters on one is row 1B.
+ */
+export function adjustmentsFor(direction: BillDirection) {
+  return BILL_ADJUSTMENTS.filter((row) =>
+    direction === 'to_client'
+      ? row.key === 'workDeduction'
+      : row.key !== 'workDeduction',
+  );
+}
 
 export type BillAdjustmentKey =
   | (typeof BILL_ADJUSTMENTS)[number]['key']
@@ -639,10 +659,73 @@ export function isEditable(status: BillPackageStatus): boolean {
 }
 
 /** The abstract's rows, in the client's own order, with the labels their sheet uses. */
-export const ABSTRACT_BLOCKS: {
+type AbstractBlock = {
   title: string;
   rows: { key: string; label: string; isTotal?: boolean }[];
-}[] = [
+};
+
+/**
+ * Which blocks an abstract reads in, by who the bill is to (2026-10-13).
+ *
+ * **Two documents, one arithmetic.** A government client's payment abstract groups the figures its
+ * own sheet groups them in — the bill of quantities and a deduction, the taxes, then four statutory
+ * recoveries under one total. A subcontractor's keeps the four blocks it has always had. Every
+ * figure in both comes from the same column the API computed; only the grouping differs, and the
+ * server builds the printed documents from the same split.
+ *
+ * The percentages are not in the labels here, unlike the printed sheet, because the screen shows
+ * the frozen rates in their own row above the table — and a percentage typed into a label is one
+ * that goes on saying nine after somebody changes the rate to eight.
+ */
+export function abstractBlocksFor(direction: BillDirection): AbstractBlock[] {
+  return direction === 'to_client' ? CLIENT_BLOCKS : ABSTRACT_BLOCKS;
+}
+
+const CLIENT_BLOCKS: AbstractBlock[] = [
+  {
+    title: '1. Value of work done',
+    rows: [
+      { key: 'workDone', label: 'A) Bill of quantities' },
+      { key: 'workDeduction', label: 'B) Deduction' },
+      {
+        key: 'taxableAmount',
+        label: 'Total value of work done (1A−1B)',
+        isTotal: true,
+      },
+      { key: 'taxableAmount', label: 'Taxable amount' },
+      { key: 'cgstAmount', label: 'CGST' },
+      { key: 'sgstAmount', label: 'SGST' },
+      { key: 'igstAmount', label: 'IGST' },
+      {
+        key: 'workTotal',
+        label: 'Invoice value / work done value',
+        isTotal: true,
+      },
+    ],
+  },
+  {
+    title: '2. Recoveries',
+    rows: [
+      { key: 'labourCessAmount', label: '(A) Labour cess' },
+      { key: 'tdsAmount', label: '(B) Advance income tax' },
+      { key: 'gstTdsAmount', label: '(C) GST TDS' },
+      {
+        key: 'retentionAmount',
+        label: '(D) Security deposit / retention money',
+      },
+      { key: 'unlistedWithheld', label: '(E) Other recoveries recorded' },
+      {
+        // B + C + D, not block B — the client's sheet has one recoveries total and its payable is
+        // block 1 less that figure.
+        key: 'totalWithheld',
+        label: 'Total recoveries (2A+2B+2C+2D)',
+        isTotal: true,
+      },
+    ],
+  },
+];
+
+export const ABSTRACT_BLOCKS: AbstractBlock[] = [
   {
     title: 'A. Work',
     rows: [
