@@ -922,6 +922,17 @@ export const BILLING_COPY = {
     billedQty: 'Billed to date',
     remainingQty: 'Remaining',
     rate: 'Rate',
+    /**
+     * The two rates a quoted bill is priced at (2026-10-13).
+     *
+     * Named as the award editor already names them, because they are the same two figures and a
+     * reader moving between the two screens must not have to work out that they are.
+     *
+     * Shown only where the project is quoted: at par the two are one rate, and printing it twice
+     * under different headings invites the reader to look for a difference that is not there.
+     */
+    boqRate: 'BOQ rate',
+    quotedRate: 'You earn',
     quantity: 'This bill',
     amount: 'Amount',
   },
@@ -972,6 +983,53 @@ export const BILLING_COPY = {
    * document will not agree with.
    */
   netNotYetSettled: 'Set when the bill package is issued',
+  /**
+   * The abstract behind a packaged bill's net (reported 2026-10-12).
+   *
+   * Three rows — gross, retention, net — invited a subtraction that does not hold: the net on a
+   * packaged bill is the payable, tax **in** and retention and TDS **out**, so it is larger than
+   * the gross and the difference between them is four rows that were not on the screen. Named the
+   * way the client's own abstract names them, because that is the document a reader checks this
+   * against.
+   */
+  settlementHeading: 'How this net is arrived at',
+  /**
+   * The step between the schedule and the work done (2026-10-13).
+   *
+   * Reported on RA-05: a line at ₹178.00 for 37.25 Cum came to ₹5,915.07, where the multiplication
+   * gives ₹6,630.50. The project is quoted 10.79% below and the bill applies it line by line, so
+   * the figure a reader can check the tender against was nowhere on the screen. The client's own
+   * abstract prints exactly these three rows — `TOTAL`, `Total Amount after 14.92% below`,
+   * `Total Payable Amount` — which is the layout being matched.
+   */
+  quoteScheduleTotal: 'At BOQ rates',
+  /** "Less 10.79% below" / "Add 2.46% above" — the direction said, not left to be inferred. */
+  quoteAdjustmentLabel: (percent: string, below: boolean) =>
+    below ? `Less ${percent} below` : `Add ${percent} above`,
+  /** Under the table, where the two rate columns are. */
+  quotedRateNote: (percent: string) =>
+    `Each amount is the quantity at “You earn” — the BOQ rate after this project’s quoted ${percent}. The BOQ rate beside it is the tender figure, before the quote.`,
+  settlementWorkDone: 'Work done',
+  settlementReleaseWithheld: 'Release of withheld amount',
+  settlementCgst: 'CGST',
+  settlementSgst: 'SGST',
+  settlementIgst: 'IGST',
+  settlementWorkTotal: 'Work total',
+  settlementRecoveryDiesel: 'Recovery — diesel',
+  settlementDebitAgainstCivil: 'Debit against civil',
+  settlementOtherRecoveries: 'Other recoveries',
+  settlementMechanicalDebit: 'Mechanical debit',
+  settlementRecoveriesTotal: 'Total recoveries',
+  settlementMobilizationAdvance: 'Mobilization advance',
+  settlementRetention: 'Retention',
+  settlementPerformanceSecurity: 'Performance security',
+  settlementTheftWithheld: 'Theft withheld',
+  settlementDeductionsTotal: 'Total deductions',
+  settlementTds: 'TDS',
+  settlementPayable: 'Payable',
+  /** Why gross and net cannot be subtracted, said once under the block that shows both. */
+  settlementNote:
+    'Tax is added to the work and retention and TDS are taken off it, so the payable is not the gross less the retention. Every row between them is shown above.',
   /**
    * The four-way distinction, said on the screen and not only in the code.
    *
@@ -3935,6 +3993,19 @@ export const DOCUMENT_COPY = {
   /** T072: the server's refusal, said on the control it refers to. */
   creationRefusedHere: 'The server refused the project without this document.',
   /**
+   * The expiry a kind that lapses requires, asked for **before** the file (reported 2026-10-12).
+   *
+   * The server has always refused a document of an expiring kind with no date, and this form had
+   * nowhere to type one — so a company whose required set contained an expiring kind could not
+   * create a project at all: every file was refused, and the submit button stayed shut on the
+   * mandatory kind the refusal had left unstaged.
+   */
+  creationExpiryLabel: 'Expires on',
+  creationExpiryHint: 'Required — this kind lapses.',
+  creationExpiryFirst: 'Enter the expiry date, then choose the file.',
+  creationAttachedUntil: (fileName: string, expiresAt: string) =>
+    `Attached: ${fileName} · expires ${expiresAt}`,
+  /**
    * Where a project's documents live once it exists (028, reported 2026-10-07).
    *
    * The edit form shows no upload controls — an existing project is past the creation gate and its
@@ -4145,6 +4216,39 @@ export const BILL_PACKAGE_PICKER_COPY = {
     'This subcontractor has no work order on this project. Raise one under Subcontractors first.',
 } as const;
 
+/**
+ * The register of bills already composed (2026-10-13).
+ *
+ * Reported: one table carrying both directions, so `RA-04 · To the client` sat two rows above
+ * `RA-04 · To a subcontractor` and the Direction column was the only thing between them. They are
+ * two different series of two different documents to two different parties — money coming in and
+ * money going out — and a reader is always looking for one or the other, never for both
+ * interleaved.
+ *
+ * Split into two tables, which lets the Direction column go: a heading says it once for every row
+ * beneath it, where the cell repeated it on each.
+ */
+export const BILL_PACKAGE_LIST_COPY = {
+  toClientHeading: 'Bills to the client',
+  toClientHint: 'What this project has claimed. Money coming in.',
+  toSubcontractorHeading: 'Bills from subcontractors',
+  toSubcontractorHint:
+    'What has been certified to the people doing the work. Money going out, and numbered per contract — each subcontractor has their own RA-01.',
+  /**
+   * The column the split makes necessary.
+   *
+   * Separating the directions removes the one thing that told two `RA-04` rows apart, and within
+   * the subcontractor table it never told them apart at all: the number runs per work order, so
+   * two subcontractors both reach RA-01. Naming the counterparty is what makes the rows distinct.
+   */
+  subcontractorColumn: 'Subcontractor',
+  /** A work order with no `partnerId` — nullable, and those orders are still billable. */
+  subcontractorUnknown: 'No subcontractor set',
+  noneToClient: 'No bill has been raised to the client on this project yet.',
+  noneToSubcontractor:
+    'No bill has been raised from a subcontractor on this project yet.',
+} as const;
+
 export const INVENTORY_ISSUE_LABEL = 'Issue / Consumption material';
 
 /** The same label where a shorter one is needed — a tab strip, a breadcrumb. */
@@ -4181,8 +4285,55 @@ export const PROJECT_SHELL_COPY = {
     count === 1 ? '1 daily work report' : `${count} daily work reports`,
   dwrNone: 'No daily work reports yet.',
   dwrLatest: (date: string) => `Latest ${date}`,
+  /**
+   * The two directions a project bills in, named (2026-10-12).
+   *
+   * The card said only "Bills" while the project carries a Client bills tab and an RA bills tab,
+   * so the one number on screen could have been either — and was the subcontractor one, which is
+   * the half somebody looking at a project's commercial position usually wants least.
+   */
+  subcontractorBillsLabel: 'Subcontractor bills',
+  /**
+   * The billing position, both directions, row by row (2026-10-12).
+   *
+   * Three states and they are three different questions: a bill is **raised** when somebody
+   * claims, **certified** when it is agreed, and **paid** when the money moves. Collapsing them
+   * loses the two gaps that are the whole of what a project manager chases — what is still being
+   * argued about, and what is agreed and unpaid.
+   */
+  billingHeading: 'Billing and payment',
+  billingRaised: 'Raised',
+  billingCertified: 'Certified',
+  billingSettled: 'Received / paid',
+  billingOutstanding: 'Outstanding',
+  billingCount: (count: number) => (count === 1 ? '1 bill' : `${count} bills`),
+  /**
+   * Said plainly, because it is true and the alternative is a figure that looks like an answer.
+   *
+   * Nothing in this system records money received **against a client bill** — there is no
+   * equivalent of the subcontractor side's payment record. The revenue ledger below is a separate
+   * hand-kept list that is not tied to any bill, and reporting it here as "received" would invite
+   * somebody to reconcile two figures that were never about the same thing.
+   */
+  billingClientReceiptsUnrecorded: 'Not recorded',
+  billingClientReceiptsNote:
+    'Money received against a client bill is not recorded anywhere yet, so what the client has actually paid — and what is still outstanding from them — cannot be shown. The revenue figures below are a separate ledger kept by hand, not receipts against these bills.',
+  billingRevenueHeading: 'Revenue ledger, kept separately',
   billsCount: (count: number) =>
     count === 1 ? '1 bill booked' : `${count} bills booked`,
+  clientBillsLabel: 'Client bills',
+  clientBillsCount: (count: number) =>
+    count === 1 ? '1 bill raised' : `${count} bills raised`,
+  clientBillsNone: 'None raised',
+  clientBillsBilled: (amount: string) => `${amount} billed`,
+  certifiedLabel: 'Certified by the client',
+  /**
+   * Said rather than left as a zero. A client who has certified nothing and a client who certified
+   * a bill at nil are different facts, and ₹0 on its own is both.
+   */
+  certifiedNone: 'Nothing certified yet',
+  certifiedOf: (certified: number, total: number) =>
+    `on ${certified} of ${total === 1 ? '1 bill' : `${total} bills`}`,
   revenueReceived: 'Received',
   revenuePending: 'Pending',
 
@@ -4203,6 +4354,19 @@ export const PROJECT_SHELL_COPY = {
     count === 1 ? '1 still to upload' : `${count} still to upload`,
   documentsAdvisoryOutstanding: (count: number) =>
     `${count} advisory outstanding`,
+  /**
+   * The kinds themselves, named on the overview (2026-10-12).
+   *
+   * "1 still to upload" raises exactly one question — *which one* — and answering it meant opening
+   * the Documents tab. The same words the creation form uses for the two strengths, because a
+   * reader who met them there should not have to learn a second vocabulary here.
+   *
+   * Each is read out before the kind's name for anybody not seeing the colour: red and amber carry
+   * the distinction for everyone else, and colour alone is not a label.
+   */
+  documentsNeededGroup: 'Needed to create the project',
+  documentsAdvisoryGroup: 'Can follow later',
+  documentsFiledGroup: 'Filed',
 
   /** Named modules, so the sentence says which answer is missing and why. */
   moduleUnavailable: (modules: string[]) =>

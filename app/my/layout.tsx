@@ -133,7 +133,11 @@ export default function MyWorkspaceLayout({
       swUrl="/sw.js"
       disable={process.env.NODE_ENV === 'development'}
     >
-      <div className="flex min-h-screen flex-col bg-gray-50 md:fixed md:inset-0 md:h-screen md:flex-row md:overflow-hidden md:bg-transparent">
+      {/* `overflow-x-clip`, not `hidden`, for the reason `app/dashboard/layout.tsx` records at
+          length: `hidden` still makes this a scroll container, and the browser scrolls one to
+          bring a focused element into view — leaving the shell shifted sideways with no scrollbar
+          to bring it back. This shell carries the same wide tables, so it carries the same trap. */}
+      <div className="flex min-h-screen flex-col bg-gray-50 md:fixed md:inset-0 md:h-screen md:flex-row md:overflow-clip md:bg-transparent">
       {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
           keeps every module they can reach instead of being stranded in this one. */}
       <div className="hidden flex-none md:block md:w-64">

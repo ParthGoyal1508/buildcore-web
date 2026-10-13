@@ -413,8 +413,23 @@ export default function BillSheet({ projectId }: { projectId: string }) {
                 {BILLING_COPY.columns.remainingQty}
               </th>
               <th className="px-2 py-2 text-right">
-                {BILLING_COPY.columns.rate}
+                {quotedPercentage === 0
+                  ? BILLING_COPY.columns.rate
+                  : BILLING_COPY.columns.boqRate}
               </th>
+              {/*
+                The rate the amount in the last column is actually struck at (2026-10-13).
+
+                The schedule rate alone is what the tender prints, and on a quoted project it is
+                not what the line comes to: 37.25 Cum at ₹178.00 bills ₹5,915.07, not ₹6,630.50.
+                Shown here as well as on the saved bill, because this is the screen where somebody
+                is typing quantities and deciding whether a figure looks right.
+              */}
+              {quotedPercentage !== 0 && (
+                <th className="px-2 py-2 text-right">
+                  {BILLING_COPY.columns.quotedRate}
+                </th>
+              )}
               <th className="px-2 py-2 text-right">
                 {BILLING_COPY.columns.quantity}
               </th>
@@ -653,7 +668,7 @@ function HeadingAndItems({
         */}
         <th
           scope="colgroup"
-          colSpan={9}
+          colSpan={quotedPercentage === 0 ? 9 : 10}
           className="px-2 py-1.5 text-left text-sm font-semibold text-gray-900"
         >
           <button

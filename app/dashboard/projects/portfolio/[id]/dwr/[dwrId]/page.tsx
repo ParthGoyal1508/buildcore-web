@@ -238,15 +238,25 @@ export default function DwrReportPage() {
                 <tbody className="divide-y divide-gray-100">
                   {lines.map((line) => (
                     <tr key={line.id}>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {line.boqNo ?? '—'}
+                      {/*
+                        The number never wraps; **the description does**. `whitespace-nowrap` sat
+                        on the cell, so a BOQ line whose name runs to forty words — which the
+                        client's schedule routinely does — became one unbreakable 1,000px column.
+                        That is what made this table 2,090px wide in a 1,248px page, squeezed
+                        "How it was measured" into a vertical stack, and left every other column
+                        off the right-hand edge.
+                      */}
+                      <td className="px-3 py-2 align-top">
+                        <span className="whitespace-nowrap">
+                          {line.boqNo ?? '—'}
+                        </span>
                         {line.taskName && (
-                          <span className="block text-xs text-gray-500">
+                          <span className="block max-w-xs text-xs text-gray-500">
                             {line.taskName}
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-3 py-2 align-top whitespace-nowrap">
                         {chainageRange(line.chainageFrom, line.chainageTo)}
                       </td>
                       <td className="px-3 py-2">{line.roadSide ?? '—'}</td>
@@ -255,7 +265,9 @@ export default function DwrReportPage() {
                           ? 'measured'
                           : 'presence'}
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-600">
+                      {/* `min-w` so the arithmetic reads across rather than one word per line,
+                          which is what it did while the description column took the width. */}
+                      <td className="min-w-[11rem] px-3 py-2 align-top text-xs text-gray-600">
                         {line.paymentMode === 'work_basis' ? (
                           <>
                             {/* All six, in the order the server multiplies them. Four were
@@ -290,6 +302,7 @@ export default function DwrReportPage() {
                         <DwrLinePhotos
                           dwrId={params.dwrId}
                           taskId={line.id}
+                          sealed={report.status === 'approved'}
                           attachments={(report.attachments ?? []).filter(
                             (a) => a.taskId === line.id,
                           )}
@@ -308,6 +321,7 @@ export default function DwrReportPage() {
             server sends and the absent field an older one does. */}
         <DwrAttachments
           dwrId={params.dwrId}
+          sealed={report.status === 'approved'}
           attachments={(report.attachments ?? []).filter((a) => !a.taskId)}
         />
       </div>

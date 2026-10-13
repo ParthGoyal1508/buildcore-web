@@ -409,10 +409,43 @@ export const projectDetailSchema = z.object({
       }),
     ),
     dwrSummary: z.object({ count: z.number(), latestDate: nullableIsoDate }),
+    /** **Subcontractor** running-account bills — the RA bills tab. Money going out. */
     billSummary: z.object({
       totalBills: z.number(),
       totalExpenses: decimal,
+      /**
+       * Raised, certified, paid — three different questions (2026-10-12).
+       *
+       * The two above are everything **claimed**, drafts included. These are what was agreed and
+       * what has actually left. Defaulted so a client ahead of its server renders the project
+       * rather than failing the page, and zeroes then read as "nothing certified", which is what
+       * the card showed before this existed.
+       */
+      certifiedBills: z.number().default(0),
+      certifiedAmount: decimal.default(0),
+      paidAmount: decimal.default(0),
+      outstandingAmount: decimal.default(0),
     }),
+    /**
+     * **Client** bills — the Client bills tab. Money coming in (2026-10-12).
+     *
+     * Defaulted rather than required, so a client deployed ahead of its server parses the project
+     * instead of failing the whole page over a field it has not started sending. Zeroes then read
+     * as "no client bills", which is what the screen showed before this existed.
+     */
+    clientBillSummary: z
+      .object({
+        totalBills: z.number().default(0),
+        totalBilled: decimal.default(0),
+        totalCertified: decimal.default(0),
+        certifiedCount: z.number().default(0),
+      })
+      .default({
+        totalBills: 0,
+        totalBilled: 0,
+        totalCertified: 0,
+        certifiedCount: 0,
+      }),
     revenueSummary: z.object({
       totalReceived: decimal,
       totalPending: decimal,

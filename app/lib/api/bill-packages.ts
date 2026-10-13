@@ -48,9 +48,6 @@ export const CLAIM_PROPOSAL_SOURCES = [
   'no_measurement_source',
 ] as const;
 
-export const CHECK_LIST_ANSWERS = ['yes', 'no', 'not_required'] as const;
-export type CheckListAnswer = (typeof CHECK_LIST_ANSWERS)[number];
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemas
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,6 +132,14 @@ const packageListItemSchema = z
     status: z.enum(BILL_PACKAGE_STATUSES),
     issuedAt: z.string().nullable(),
     payable: rendered,
+    /**
+     * Who the bill is to — the work order for a subcontractor, the client for the client
+     * (2026-10-13).
+     *
+     * The running number is per counterparty, so every subcontractor on a project holds their own
+     * `RA-01`. Without this the list cannot say which award a row belongs to.
+     */
+    counterpartyKey: z.string(),
   })
   .passthrough();
 
@@ -262,52 +267,11 @@ const registerSchema = z
 export type DebitRegister = z.infer<typeof registerSchema>;
 export type DebitRow = z.infer<typeof debitRowSchema>;
 
-const checkListSchema = z
-  .object({
-    items: z.array(
-      z
-        .object({
-          key: z.string(),
-          position: z.number(),
-          text: z.string(),
-          /** **Null is unanswered, which is not an answer of no** (023 FR-042, 024 FR-011). */
-          answer: z.enum(CHECK_LIST_ANSWERS).nullable(),
-          answeredAt: z.string().nullable(),
-        })
-        .passthrough(),
-    ),
-    gaps: z.array(
-      z
-        .object({
-          position: z.number(),
-          key: z.string(),
-          text: z.string(),
-          state: z.enum(['unanswered', 'no']),
-        })
-        .passthrough(),
-    ),
-    footer: z.string(),
-    signatories: z.array(z.string()),
-  })
-  .passthrough();
-
-export type CheckList = z.infer<typeof checkListSchema>;
-
 const issueResultSchema = z
   .object({
     package: packageSchema,
     /** Reported, never a refusal (023 FR-027, FR-027a). */
     missingHeaderFields: z.array(z.string()),
-    checkListGaps: z.array(
-      z
-        .object({
-          position: z.number(),
-          key: z.string(),
-          text: z.string(),
-          state: z.enum(['unanswered', 'no']),
-        })
-        .passthrough(),
-    ),
   })
   .passthrough();
 
@@ -557,24 +521,6 @@ export async function applyDebit(
     await authFetch<unknown>(
       `/projects/bill-package-debits/${debitId}/apply/${packageId}`,
       { method: 'POST' },
-    ),
-  );
-}
-
-export async function getCheckList(packageId: string): Promise<CheckList> {
-  return checkListSchema.parse(
-    await authFetch<unknown>(`/projects/bill-packages/${packageId}/check-list`),
-  );
-}
-
-export async function setCheckList(
-  packageId: string,
-  answers: { questionKey: string; answer?: CheckListAnswer }[],
-): Promise<CheckList> {
-  return checkListSchema.parse(
-    await authFetch<unknown>(
-      `/projects/bill-packages/${packageId}/check-list`,
-      { method: 'POST', body: JSON.stringify({ answers }) },
     ),
   );
 }

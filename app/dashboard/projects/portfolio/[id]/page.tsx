@@ -1,20 +1,76 @@
 'use client';
 
 import Link from 'next/link';
+import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 
 import { getClients } from '@/app/lib/api/projects';
+import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
 import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
 /** One labelled fact. A definition list, because that is what this is. */
-function Fact({ term, children }: { term: string; children: React.ReactNode }) {
+function Fact({
+  term,
+  children,
+  className,
+}: {
+  term: string;
+  children: React.ReactNode;
+  /** For a fact that needs the whole row — the documents list, which is a list. */
+  className?: string;
+}) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-xs uppercase tracking-wide text-gray-500">{term}</dt>
       <dd className="mt-0.5 text-sm text-gray-900">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Worst first: a project cannot start without the red ones, the amber ones are being chased, and
+ * the grey ones are done. The same order somebody works in.
+ */
+const DOCUMENT_STATE_ORDER = { needed: 0, advisory: 1, filed: 2 } as const;
+
+const DOCUMENT_STATE_STYLES = {
+  needed: 'bg-red-50 text-red-700 ring-red-600/20',
+  advisory: 'bg-amber-50 text-amber-800 ring-amber-200',
+  filed: 'bg-gray-50 text-gray-500 ring-gray-200',
+} as const;
+
+const DOCUMENT_STATE_LABELS = {
+  needed: PROJECT_SHELL_COPY.documentsNeededGroup,
+  advisory: PROJECT_SHELL_COPY.documentsAdvisoryGroup,
+  filed: PROJECT_SHELL_COPY.documentsFiledGroup,
+} as const;
+
+/**
+ * One figure in the billing table, with its bill count under it.
+ *
+ * `tabular-nums` so the columns line up digit for digit — two money columns that do not are two
+ * columns nobody can compare at a glance, which is the only reason to put them side by side.
+ */
+function Amount({
+  amount,
+  note,
+  strong,
+}: {
+  amount: number;
+  note?: string;
+  strong?: boolean;
+}) {
+  return (
+    <td className="py-2 text-right">
+      <span
+        className={clsx('tabular-nums', strong && 'font-medium text-gray-900')}
+      >
+        {formatRupees(amount)}
+      </span>
+      {note && <span className="block text-xs text-gray-500">{note}</span>}
+    </td>
   );
 }
 
@@ -113,6 +169,53 @@ export default function ProjectOverviewPage() {
     (documentReadiness.advisoryRequired ?? 0) -
     (documentReadiness.advisoryPresent ?? 0);
 
+  /**
+   * The required kinds themselves, named (2026-10-12).
+   *
+   * Readiness arrives as counts and ids — "1 still to upload" — which raises exactly the question
+   * it does not answer. The names come from the required set, under the same query key the
+   * Documents tab and the settings screen already use, so for anybody who has opened either this
+   * is a cache read rather than a request.
+   */
+  const requirementSet = useQuery({
+    queryKey: ['projectDocumentRequirements'],
+    queryFn: () => getDocumentRequirements(),
+  });
+
+  /**
+   * Every kind this project owes, worst first.
+   *
+   * Three states, and the order is the order somebody acts in: a mandatory kind still missing
+   * stops the project and is red; an advisory one is being chased and is amber; one already filed
+   * is neither, and is shown grey rather than hidden — "which documents does this project need"
+   * and "which are missing" are different questions, and the card can answer both in one line.
+   *
+   * Derived from the ids readiness already sends rather than from a second count, so this list and
+   * the figure above it cannot disagree. An id with no kind behind it is dropped: the server
+   * computes both from the same set, so it would mean the set changed under the page.
+   */
+  const documentKinds = (() => {
+    const missing = new Set(documentReadiness.missingTypeIds);
+    const advisoryMissing = new Set(
+      documentReadiness.advisoryMissingTypeIds ?? [],
+    );
+    return (requirementSet.data?.requirements ?? [])
+      .map((kind) => ({
+        id: kind.documentTypeId,
+        name: kind.name,
+        state: missing.has(kind.documentTypeId)
+          ? ('needed' as const)
+          : advisoryMissing.has(kind.documentTypeId)
+            ? ('advisory' as const)
+            : ('filed' as const),
+      }))
+      .sort(
+        (a, b) =>
+          DOCUMENT_STATE_ORDER[a.state] - DOCUMENT_STATE_ORDER[b.state] ||
+          a.name.localeCompare(b.name),
+      );
+  })();
+
   return (
     <div className="flex flex-col gap-6">
       {/*
@@ -177,23 +280,10 @@ export default function ProjectOverviewPage() {
                 </span>
               )}
             </Fact>
-            <Fact term="Bills">
-              {PROJECT_SHELL_COPY.billsCount(tabs.billSummary.totalBills)}
-              <span className="block text-xs tabular-nums text-gray-500">
-                {formatRupees(tabs.billSummary.totalExpenses)}
-              </span>
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.revenueReceived}>
-              <span className="tabular-nums">
-                {formatRupees(tabs.revenueSummary.totalReceived)}
-              </span>
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.revenuePending}>
-              <span className="tabular-nums">
-                {formatRupees(tabs.revenueSummary.totalPending)}
-              </span>
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.documentsLabel}>
+            <Fact
+              term={PROJECT_SHELL_COPY.documentsLabel}
+              className="col-span-2"
+            >
               <Link
                 href={ROUTES.projectsProjectDocuments(project.id)}
                 className="text-blue-600 hover:underline"
@@ -213,10 +303,146 @@ export default function ProjectOverviewPage() {
                   )}
                 </span>
               )}
+              {/*
+                The kinds by name, red for one that stops the project and amber for one that can
+                follow. A list, because it is one — and each carries its state in words as well as
+                in colour, which is the half a reader who cannot tell red from amber needs.
+              */}
+              {documentKinds.length > 0 && (
+                <ul className="mt-1.5 flex flex-wrap gap-1">
+                  {documentKinds.map((kind) => (
+                    <li key={kind.id}>
+                      <span
+                        className={clsx(
+                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                          DOCUMENT_STATE_STYLES[kind.state],
+                        )}
+                      >
+                        <span className="sr-only">
+                          {DOCUMENT_STATE_LABELS[kind.state]}:{' '}
+                        </span>
+                        {kind.state === 'filed' && (
+                          <span aria-hidden="true" className="mr-1">
+                            ✓
+                          </span>
+                        )}
+                        {kind.name}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Fact>
           </dl>
         </Card>
       </div>
+
+      {/*
+        **Billing has a card of its own** (2026-10-12). It was one line reading "Bills", which
+        counted subcontractor claims and said nothing about the client side at all — on a project
+        whose own tabs are "Client bills" and "RA bills".
+
+        A table because it is one: two directions, the same three states, read across. Raised,
+        certified and paid are three different questions, and the two gaps between them — claimed
+        but not agreed, agreed but not paid — are the whole of what somebody chases.
+      */}
+      <Card heading={PROJECT_SHELL_COPY.billingHeading}>
+        <div className="overflow-x-auto">
+          {/* Capped rather than stretched across a full-width card: two money columns a page apart
+              are two columns nobody compares, which is the only reason to put them side by side. */}
+          <table className="w-full max-w-2xl text-sm">
+            <thead>
+              <tr className="text-xs uppercase tracking-wide text-gray-500">
+                <th scope="col" className="py-1 text-left font-medium">
+                  <span className="sr-only">Stage</span>
+                </th>
+                <th scope="col" className="py-1 text-right font-medium">
+                  {PROJECT_SHELL_COPY.clientBillsLabel}
+                </th>
+                <th scope="col" className="py-1 text-right font-medium">
+                  {PROJECT_SHELL_COPY.subcontractorBillsLabel}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingRaised}
+                </th>
+                <Amount
+                  amount={tabs.clientBillSummary.totalBilled}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.clientBillSummary.totalBills,
+                  )}
+                />
+                <Amount
+                  amount={tabs.billSummary.totalExpenses}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.billSummary.totalBills,
+                  )}
+                />
+              </tr>
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingCertified}
+                </th>
+                <Amount
+                  amount={tabs.clientBillSummary.totalCertified}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.clientBillSummary.certifiedCount,
+                  )}
+                />
+                <Amount
+                  amount={tabs.billSummary.certifiedAmount}
+                  note={PROJECT_SHELL_COPY.billingCount(
+                    tabs.billSummary.certifiedBills,
+                  )}
+                />
+              </tr>
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingSettled}
+                </th>
+                {/* Not a zero. Nothing records a receipt against a client bill, and ₹0 would read
+                    as "they have paid nothing" — a claim this system cannot make. */}
+                <td className="py-2 text-right text-xs text-gray-500">
+                  {PROJECT_SHELL_COPY.billingClientReceiptsUnrecorded}
+                </td>
+                <Amount amount={tabs.billSummary.paidAmount} />
+              </tr>
+              <tr>
+                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+                  {PROJECT_SHELL_COPY.billingOutstanding}
+                </th>
+                <td className="py-2 text-right text-gray-400">—</td>
+                <Amount amount={tabs.billSummary.outstandingAmount} strong />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          {PROJECT_SHELL_COPY.billingClientReceiptsNote}
+        </p>
+
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <h3 className="text-xs uppercase tracking-wide text-gray-500">
+            {PROJECT_SHELL_COPY.billingRevenueHeading}
+          </h3>
+          <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
+            <Fact term={PROJECT_SHELL_COPY.revenueReceived}>
+              <span className="tabular-nums">
+                {formatRupees(tabs.revenueSummary.totalReceived)}
+              </span>
+            </Fact>
+            <Fact term={PROJECT_SHELL_COPY.revenuePending}>
+              <span className="tabular-nums">
+                {formatRupees(tabs.revenueSummary.totalPending)}
+              </span>
+            </Fact>
+          </dl>
+        </div>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card heading={PROJECT_SHELL_COPY.detailsHeading}>

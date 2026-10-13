@@ -4,8 +4,8 @@ import clsx from 'clsx';
 import { memo, useEffect, useRef, useState } from 'react';
 
 import { BILLING_COPY } from '@/app/lib/constants';
-import { lineTotals } from '@/app/lib/bill-totals';
-import { rupees } from '@/app/lib/format';
+import { earnedRate, lineTotals } from '@/app/lib/bill-totals';
+import { rupees, unitRate } from '@/app/lib/format';
 
 /**
  * One measurable line, **owning its own value** (018 T010, NFR-001).
@@ -175,6 +175,18 @@ function BillLineRowImpl({
       <td className="px-2 py-1.5 align-top text-right text-sm tabular-nums text-gray-600">
         {unpriced ? '—' : rupees(rate)}
       </td>
+      {/*
+        What the line is actually struck at, where the project is quoted (2026-10-13).
+
+        To four decimals: ₹178.00 less 10.79% is ₹158.7938, and rounded to two it stops multiplying
+        out to the amount at the end of the same row — which is the confusion this column was added
+        to remove, not to restate in smaller type.
+      */}
+      {quotedPercentage !== 0 && (
+        <td className="px-2 py-1.5 align-top text-right text-sm tabular-nums text-gray-600">
+          {unpriced ? '—' : unitRate(earnedRate(rate, quotedPercentage))}
+        </td>
+      )}
       <td className="px-2 py-1.5 align-top text-right">
         {readOnly ? (
           <span className="text-sm tabular-nums text-gray-900">{quantity}</span>

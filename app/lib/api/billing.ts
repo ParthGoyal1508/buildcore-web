@@ -141,8 +141,16 @@ export const clientBillLineSchema = z.object({
   unit: z.string(),
   scopeQty: decimal,
   quantity: decimal,
-  /** The rate **as billed**, frozen at composition. Never today's BOQ rate (FR-006). */
+  /** The schedule's own rate, frozen at composition. Never today's BOQ rate (FR-006). */
   rate: decimal,
+  /**
+   * That rate after the project's quoted percentage — **the rate the amount was computed at**
+   * (2026-10-13).
+   *
+   * Reported: a line reading 37.25 Cum at ₹178.00 for ₹5,915.07. Both right, and the column
+   * between them missing — the project is quoted 10.79% below and the bill applies it per line.
+   */
+  quotedRate: decimal,
   amount: decimal,
   cumulativeQty: decimal,
   remainingQty: decimal,
@@ -169,6 +177,10 @@ export const clientBillSchema = z.object({
   status: z.string(),
   /** Frozen at composition alongside each line's rate. */
   quotedPercentage: decimal,
+  /** These lines at the schedule's rates, before the quote. */
+  boqGrossAmount: decimal,
+  /** What the quote takes off or adds. Negative where the quote is below the schedule. */
+  quoteAdjustment: decimal,
   grossAmount: decimal,
   retentionAmount: decimal,
   /**
@@ -179,6 +191,40 @@ export const clientBillSchema = z.object({
    * bill row's own deduction columns being zero — was a figure the document would not agree with.
    */
   netAmount: nullableDecimal,
+  /**
+   * How that net was arrived at, where a bill package settled it (2026-10-12).
+   *
+   * Reported: a bill reading Gross ₹50,837.21, Retention ₹2,033.49, Net ₹56,937.68 — three rows
+   * laid out to be subtracted, where the net is *larger* than the gross and the subtraction gives a
+   * figure that appears nowhere on the bill. Every number was right; the tax added and the tax
+   * deducted were simply not on the screen.
+   *
+   * Null for a bill composed on the sheet, which carries no tax — there the three rows are true —
+   * and null while the package is a draft, matching `netAmount`.
+   */
+  settlement: z
+    .object({
+      workDone: decimal,
+      releaseWithheld: decimal,
+      cgstAmount: decimal,
+      sgstAmount: decimal,
+      igstAmount: decimal,
+      workTotal: decimal,
+      recoveryDiesel: decimal,
+      debitAgainstCivil: decimal,
+      otherRecoveries: decimal,
+      mechanicalDebit: decimal,
+      recoveriesTotal: decimal,
+      mobilizationAdvance: decimal,
+      retentionAmount: decimal,
+      performanceSecurity: decimal,
+      theftWithheld: decimal,
+      deductionsTotal: decimal,
+      tdsAmount: decimal,
+      payable: decimal,
+    })
+    .nullable()
+    .default(null),
   certifiedAmount: nullableDecimal,
   /** The client's own certification document, where one was filed (2026-10-11). */
   certificate: z

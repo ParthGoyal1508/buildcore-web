@@ -190,6 +190,21 @@ export function scheduleTotals(
 }
 
 /**
+ * What a BOQ line is actually struck at, after the project's quoted percentage.
+ *
+ * The same arithmetic `lineTotals` applies per line, named once because three screens show the
+ * figure beside the schedule rate: the award editor, where it is what a subcontract's margin is
+ * measured against; the billing sheet, where quantities are typed; and a raised bill, where it is
+ * the only thing that makes the rate column multiply out to the amount column.
+ *
+ * Unrounded. A rate is not money — only the product of it and a quantity is paid — and rounding it
+ * to paise is what makes ₹158.79 × 37.25 land twenty-three paise from the billed ₹5,915.07.
+ */
+export function earnedRate(rate: number, quotedPercentage = 0): number {
+  return rate * (1 + quotedPercentage);
+}
+
+/**
  * A percentage for display, from the fraction the API carries.
  *
  * Three decimal places on the percentage, because the schema holds six on the fraction and the

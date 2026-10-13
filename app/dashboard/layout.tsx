@@ -28,6 +28,22 @@ import ShellHeader from '@/app/ui/shell-header';
  * Taking the shell out of flow leaves nothing for the viewport to scroll: `html.scrollHeight`
  * returns to exactly the viewport height. Only from `md`, because below it the shell is a normal
  * document that must scroll.
+ *
+ * **`overflow-clip` rather than `overflow-hidden`** (2026-10-12). `hidden` clips
+ * without a scrollbar but still makes the box a *scroll container*, and a scroll container with no
+ * scrollbar can still be scrolled — by script, and by the browser itself bringing a focused element
+ * into view. Clicking the photo control on a report whose table was wider than the page focused a
+ * hidden input out to the right, the browser scrolled this box 774px to reach it, the sidebar slid
+ * off the screen, and nothing could scroll it back. Measured, not reasoned about.
+ *
+ * `clip` does not create a scroll container, so there is nothing to scroll. Both axes, because the
+ * two cannot be mixed: CSS computes `clip` back to `hidden` when the other axis is `hidden`, which
+ * is exactly what the first attempt at this did — `overflow-x` read back as `hidden` with the class
+ * applied. Clipping is unchanged either way, and the content column inside is where scrolling
+ * belongs and is untouched.
+ *
+ * `overflow: clip` wants Chrome 90 / Firefox 81 / Safari 16. Only the `md` shell is affected, so
+ * this is a desktop floor, and a browser below it drops the declaration rather than misbehaving.
  */
 export default function DashboardLayout({
   children,
@@ -35,7 +51,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:flex-row md:overflow-hidden">
+    <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:flex-row md:overflow-clip">
       <SessionGuard />
       <div className="w-full flex-none md:w-64">
         <SideNav />

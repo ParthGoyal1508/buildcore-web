@@ -7,11 +7,13 @@ import { useState } from 'react';
 import {
   BILL_DIRECTIONS,
   type BillDirection,
+  type BillPackageListItem,
   composeBillPackage,
   listBillPackages,
 } from '@/app/lib/api/bill-packages';
 import { getWorkOrders } from '@/app/lib/api/billing';
 import {
+  BILL_PACKAGE_LIST_COPY,
   BILL_PACKAGE_PICKER_COPY,
   ROUTES,
   projectsLabel,
@@ -84,10 +86,15 @@ export default function BillPackagesPanel({
    * either, so what identifies one to a person is what it is for: the work detail, with its
    * retention and how much award has been captured against it.
    */
+  /*
+   * Fetched whatever the direction, since 2026-10-13: the list of bills already raised names the
+   * subcontractor each one is to, and that name is reached through the work order. Gated on the
+   * form's direction, the column was blank until somebody touched a control they had no reason to
+   * touch. The key is the Subcontractors tab's own, so on that tab's data this costs no request.
+   */
   const workOrders = useQuery({
     queryKey: ['workOrders', projectId],
     queryFn: () => getWorkOrders(projectId),
-    enabled: direction === 'to_subcontractor',
   });
 
   // The same hook, the same key and therefore the same fetch the Subcontractors tab makes
@@ -130,6 +137,32 @@ export default function BillPackagesPanel({
     setClearedFor(workOrderId ? next : null);
     setWorkOrderId('');
     setError(null);
+  };
+
+  /**
+   * Whose contract a subcontractor bill was raised against (2026-10-13).
+   *
+   * `counterpartyKey` is the **work order's** id, because that is what the running number is scoped
+   * to — so two subcontractors on one project both hold an `RA-01`, and the register could not say
+   * which was whose. The work order carries `partnerId` and the vendor names come from the hook
+   * this composer already uses, so the name is resolved from two lists already on the screen.
+   *
+   * Resolved here rather than served by the API: `WorkOrder.partnerId` is a bare column with no
+   * relation, deliberately — the vendor register belongs to another module's schema — so the server
+   * would have to cross a boundary it is built not to cross for a label.
+   *
+   * Three ways this comes back without a name, and each is said rather than left blank. A work
+   * order with no subcontractor set is the reported case and is still billable; a work order or a
+   * vendor the lists have not produced yet is a row rendered mid-load, where the key is the honest
+   * answer and an empty cell reads as a bill belonging to nobody.
+   */
+  const subcontractorOf = (counterpartyKey: string): string => {
+    const order = orders.find((candidate) => candidate.id === counterpartyKey);
+    if (!order) return workOrders.isLoading ? '…' : counterpartyKey;
+    if (order.partnerId === null) {
+      return BILL_PACKAGE_LIST_COPY.subcontractorUnknown;
+    }
+    return vendors.byId.get(order.partnerId) ?? counterpartyKey;
   };
 
   const { data: packages, isLoading } = useQuery({
@@ -371,9 +404,73 @@ export default function BillPackagesPanel({
         <p className="text-sm text-gray-500" role="status">
           Loading bills…
         </p>
-      ) : (packages ?? []).length === 0 ? (
+      ) : (
+        <>
+          <BillTable
+            projectId={projectId}
+            heading={BILL_PACKAGE_LIST_COPY.toClientHeading}
+            hint={BILL_PACKAGE_LIST_COPY.toClientHint}
+            empty={BILL_PACKAGE_LIST_COPY.noneToClient}
+            rows={(packages ?? []).filter(
+              (pkg) => pkg.direction === 'to_client',
+            )}
+          />
+          <BillTable
+            projectId={projectId}
+            heading={BILL_PACKAGE_LIST_COPY.toSubcontractorHeading}
+            hint={BILL_PACKAGE_LIST_COPY.toSubcontractorHint}
+            empty={BILL_PACKAGE_LIST_COPY.noneToSubcontractor}
+            rows={(packages ?? []).filter(
+              (pkg) => pkg.direction === 'to_subcontractor',
+            )}
+            counterparty={subcontractorOf}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * One direction's bills.
+ *
+ * Two tables rather than one with a Direction column (2026-10-13). The two are different series of
+ * different documents to different parties, and a reader arrives looking for one of them — `RA-04`
+ * to the client sitting two rows from `RA-04` to a subcontractor was a register nobody could scan.
+ * A heading says the direction once for every row beneath it, so the column goes.
+ *
+ * `counterparty` is given only for the subcontractor table, where the number alone cannot identify
+ * a bill: the series runs per work order, so each subcontractor holds their own `RA-01`.
+ */
+function BillTable({
+  projectId,
+  heading,
+  hint,
+  empty,
+  rows,
+  counterparty,
+}: {
+  projectId: string;
+  heading: string;
+  hint: string;
+  empty: string;
+  rows: BillPackageListItem[];
+  counterparty?: (counterpartyKey: string) => string;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <div>
+        <h3 className="text-base font-semibold text-gray-900">{heading}</h3>
+        <p className="text-sm text-gray-600">{hint}</p>
+      </div>
+      {/*
+        Said, not omitted. A direction with no bills is a fact about the project — nobody has
+        claimed from the client yet — and a section that simply vanished would read as a screen
+        that had not finished loading.
+      */}
+      {rows.length === 0 ? (
         <p className="rounded-md border border-dashed border-gray-300 p-6 text-sm text-gray-600">
-          No bill has been composed on this project yet.
+          {empty}
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -381,7 +478,11 @@ export default function BillPackagesPanel({
             <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-3 py-2">Bill</th>
-                <th className="px-3 py-2">Direction</th>
+                {counterparty && (
+                  <th className="px-3 py-2">
+                    {BILL_PACKAGE_LIST_COPY.subcontractorColumn}
+                  </th>
+                )}
                 <th className="px-3 py-2">Period</th>
                 <th className="px-3 py-2">State</th>
                 <th className="px-3 py-2">Issued</th>
@@ -389,7 +490,7 @@ export default function BillPackagesPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(packages ?? []).map((pkg) => (
+              {rows.map((pkg) => (
                 <tr key={pkg.id}>
                   <td className="px-3 py-2">
                     <Link
@@ -399,9 +500,11 @@ export default function BillPackagesPanel({
                       {pkg.label}
                     </Link>
                   </td>
-                  <td className="px-3 py-2">
-                    {projectsLabel(pkg.direction)}
-                  </td>
+                  {counterparty && (
+                    <td className="px-3 py-2">
+                      {counterparty(pkg.counterpartyKey)}
+                    </td>
+                  )}
                   <td className="px-3 py-2 whitespace-nowrap">
                     {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}
                   </td>
