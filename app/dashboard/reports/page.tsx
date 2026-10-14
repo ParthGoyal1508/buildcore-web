@@ -20,7 +20,10 @@ import ReportResultTable from '@/app/ui/dashboard/report-result-table';
 import ReportTypeList from '@/app/ui/dashboard/report-type-list';
 import PageHeader from '@/app/ui/page-header';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
-import { inlineSelectClass } from '@/app/ui/settings/form-fields';
+import {
+  inlineSelectClass,
+  SecondaryButton,
+} from '@/app/ui/settings/form-fields';
 
 function buildBody(values: Record<string, string>) {
   const { fromDate, toDate, ...rest } = values;
@@ -52,7 +55,10 @@ export default function ReportsPage() {
   const [viewing, setViewing] = useState(false);
   const { show, viewer } = useFileViewer();
 
-  const types = useQuery({ queryKey: ['report-types'], queryFn: getReportTypes });
+  const types = useQuery({
+    queryKey: ['report-types'],
+    queryFn: getReportTypes,
+  });
 
   function pick(type: ReportType) {
     setSelected(type);
@@ -82,11 +88,7 @@ export default function ReportsPage() {
       setError(null);
       if (outcome.mode === 'sync') {
         if (view) {
-          show(
-            { blob: outcome.blob },
-            `${selected!.id}.pdf`,
-            selected!.name,
-          );
+          show({ blob: outcome.blob }, `${selected!.id}.pdf`, selected!.name);
           setMessage(null);
           return;
         }
@@ -132,7 +134,10 @@ export default function ReportsPage() {
             );
             setMessage(null);
           } else {
-            triggerDownload(blob, `${selected?.id ?? 'report'}.${extFor(format)}`);
+            triggerDownload(
+              blob,
+              `${selected?.id ?? 'report'}.${extFor(format)}`,
+            );
             setMessage('Export ready — download started.');
           }
         } catch {
@@ -228,26 +233,24 @@ export default function ReportsPage() {
                 </label>
 
                 {format === 'pdf' && (
-                  <button
+                  <SecondaryButton
                     onClick={() => exportMut.mutate(true)}
                     disabled={exportMut.isPending || jobId !== null}
-                    className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     View PDF
-                  </button>
+                  </SecondaryButton>
                 )}
 
-                <button
+                <SecondaryButton
                   onClick={() => exportMut.mutate(false)}
                   disabled={exportMut.isPending || jobId !== null}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   {jobId !== null
                     ? 'Processing…'
                     : exportMut.isPending
                       ? 'Exporting…'
-                      : 'Export'}
-                </button>
+                      : `Export ${format === 'pdf' ? 'PDF' : 'Excel'}`}
+                </SecondaryButton>
               </div>
 
               {viewer}

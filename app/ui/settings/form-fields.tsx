@@ -9,6 +9,7 @@ import {
   labelText,
   type Icon as ActionIcon,
 } from '@/app/ui/action-icons';
+import { FileGlyph } from '@/app/ui/file-icons';
 import { Spinner } from '@/app/ui/spinner';
 
 /**
@@ -229,7 +230,12 @@ export function SecondaryButton({
         className,
       )}
     >
-      {rest.disabled && labelText(children).trim().endsWith('…') && <Spinner />}
+      {rest.disabled && labelText(children).trim().endsWith('…') ? (
+        <Spinner />
+      ) : (
+        // "Excel", "PDF", "Word" on a button get their format's mark (2026-10-15).
+        <FileGlyph label={labelText(children)} />
+      )}
       {children}
     </button>
   );

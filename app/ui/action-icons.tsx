@@ -29,6 +29,8 @@ import {
 } from '@heroicons/react/20/solid';
 import { createElement } from 'react';
 
+import { FileIcon, fileKind } from '@/app/ui/file-icons';
+
 export type Icon = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
 /**
@@ -97,6 +99,9 @@ export function ActionGlyph({
   label: React.ReactNode;
   icon?: Icon | null;
 }) {
+  // A label naming a file format — "Excel", "Download PDF" — shows that format's mark instead.
+  const kind = icon === undefined ? fileKind(labelText(label)) : null;
+  if (kind) return <FileIcon kind={kind} className="h-[18px] w-[18px]" />;
   const chosen = icon === undefined ? actionIcon(labelText(label)) : icon;
   if (!chosen) return null;
   return createElement(chosen, {

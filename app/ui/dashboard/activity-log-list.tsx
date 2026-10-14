@@ -18,10 +18,11 @@ import {
   activityModuleLabel,
   enumLabel,
 } from '@/app/lib/constants';
-import ResponsiveList, {
-  type Column,
-} from '@/app/ui/settings/responsive-list';
-import { inlineSelectClass } from '@/app/ui/settings/form-fields';
+import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import {
+  inlineSelectClass,
+  SecondaryButton,
+} from '@/app/ui/settings/form-fields';
 
 /**
  * What each audited action is called, for the person reading the log.
@@ -146,13 +147,13 @@ export default function ActivityLogList() {
           </select>
         </label>
 
-        <button
+        <SecondaryButton
           onClick={() => download.mutate()}
           disabled={download.isPending}
-          className="ml-auto rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="ml-auto"
         >
           {download.isPending ? 'Exporting…' : 'Export CSV'}
-        </button>
+        </SecondaryButton>
       </div>
 
       {error && (

@@ -4,6 +4,7 @@ import clsx from 'clsx';
 
 import { useCanWrite } from '@/app/lib/write-access';
 import { labelText } from '@/app/ui/action-icons';
+import { FileGlyph } from '@/app/ui/file-icons';
 import { Spinner } from '@/app/ui/spinner';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -61,7 +62,12 @@ export function Button({
     >
       {/* A button that says it is working — "Saving…", "Deleting…" — while disabled turns its
           spinner on, so every pending save looks the same without each screen adding one. */}
-      {rest.disabled && labelText(children).trim().endsWith('…') && <Spinner />}
+      {rest.disabled && labelText(children).trim().endsWith('…') ? (
+        <Spinner />
+      ) : (
+        // "Excel", "PDF", "Word" on a button get their format's mark (2026-10-15).
+        <FileGlyph label={labelText(children)} />
+      )}
       {children}
     </button>
   );
