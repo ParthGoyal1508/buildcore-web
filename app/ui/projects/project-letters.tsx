@@ -1,20 +1,28 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import type * as React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { decideApproval } from '@/app/lib/api/approvals';
 import {
+  type IssuedLetter,
   type LetterKind,
   composeLetter,
   downloadLetter,
   getLetterKindFields,
   getLetterKinds,
+  getLetterPrefill,
   getLetters,
   getSignatories,
+  issueLetter,
+  previewComposedLetter,
+  previewLetter,
 } from '@/app/lib/api/letters';
 import { GENERATE_LETTER_COPY, LETTER_COPY } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import ActionReview from '@/app/ui/approvals/action-review';
 import StatusBadge from '@/app/ui/status-badge';
 
 /**
@@ -47,10 +55,45 @@ const PROJECT_KINDS = [
   'letter_purchase_order',
 ];
 
+/**
+ * The order the typed fields read in on the letter (2026-10-14). The API lists a kind's fields by
+ * token, which put "Completion by" first and "Issued to" last — the reverse of how anybody fills in
+ * a work order. A token not listed here keeps the API's order, after these.
+ */
+const FIELD_ORDER = [
+  'vendorName',
+  'vendorAddress',
+  'scope',
+  'orderValue',
+  'completionDate',
+  'paymentTerms',
+  'termsAndConditions',
+];
+
+/** Free text that runs to several lines — an address, a scope, a set of payment terms. */
+const MULTI_LINE = new Set([
+  'vendorAddress',
+  'scope',
+  'paymentTerms',
+  'termsAndConditions',
+]);
+
+/**
+ * Fields read from a record that are still offered for editing (2026-10-14). The terms come from
+ * Settings → Terms for this kind of document, and a particular order sometimes needs a clause
+ * changed — edited here, for this letter, without touching the company's standard set.
+ */
+const EDITABLE_FROM_RECORD = new Set(['termsAndConditions']);
+
 export default function ProjectLetters({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [composing, setComposing] = useState<LetterKind | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** A composed letter's draft, open for reading before it is approved or issued. */
+  const [previewing, setPreviewing] = useState<{
+    title: string;
+    blob: Blob;
+  } | null>(null);
 
   const kinds = useQuery({
     queryKey: ['letter-kinds'],
@@ -67,17 +110,48 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
     (kind) => PROJECT_KINDS.includes(kind.key) && kind.isActive,
   );
 
-  const download = async (letterId: string, label: string) => {
+  const refresh = () =>
+    void queryClient.invalidateQueries({
+      queryKey: ['letters', 'project', projectId],
+    });
+
+  const download = async (letter: IssuedLetter) => {
     try {
-      const blob = await downloadLetter(letterId);
+      const blob = await downloadLetter(letter.id);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${label}.pdf`;
+      anchor.download = `${letter.referenceNo ?? letter.letterKindLabel}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {
       setError('That letter could not be downloaded.');
+    }
+  };
+
+  const preview = async (letter: IssuedLetter) => {
+    setError(null);
+    try {
+      setPreviewing({
+        title: `${letter.letterKindLabel} — draft`,
+        blob: await previewComposedLetter(letter.id),
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'That letter could not be previewed.',
+      );
+    }
+  };
+
+  const issue = async (letter: IssuedLetter) => {
+    setError(null);
+    try {
+      await issueLetter(letter.id, {});
+      refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'That letter could not be issued.',
+      );
     }
   };
 
@@ -120,10 +194,17 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
           onClose={() => setComposing(null)}
           onIssued={() => {
             setComposing(null);
-            void queryClient.invalidateQueries({
-              queryKey: ['letters', 'project', projectId],
-            });
+            refresh();
           }}
+          onComposed={refresh}
+        />
+      )}
+
+      {previewing && (
+        <PdfPreview
+          title={previewing.title}
+          blob={previewing.blob}
+          onClose={() => setPreviewing(null)}
         />
       )}
 
@@ -145,28 +226,77 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(letters.data ?? []).map((letter) => (
-                <tr key={letter.id}>
-                  <td className="px-3 py-2">{letter.letterKindKey}</td>
-                  <td className="px-3 py-2">
-                    <StatusBadge status={letter.status} />
-                  </td>
-                  <td className="px-3 py-2">
-                    {letter.issuedAt
-                      ? dateLabel(String(letter.issuedAt))
-                      : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Button
-                      onClick={() =>
-                        void download(letter.id, letter.letterKindKey)
-                      }
-                    >
-                      Download
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {(letters.data ?? []).map((letter) => {
+                // A composed letter has no document yet (2026-10-14). While its chain is running it
+                // is decided here, by whoever's turn it is; once approved — or where nothing gates
+                // it — it is issued here. Download is offered only for what has been issued.
+                const approval = letter.approval;
+                const awaiting =
+                  letter.status === 'composed' &&
+                  approval !== null &&
+                  approval.state !== 'approved';
+                return (
+                  <tr key={letter.id} className="align-top">
+                    <td className="px-3 py-2">
+                      {letter.letterKindLabel}
+                      {letter.referenceNo && (
+                        <span className="block text-xs text-gray-500">
+                          {letter.referenceNo}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={letter.status} />
+                      {awaiting && approval && (
+                        <div className="mt-2 max-w-md">
+                          <ActionReview
+                            state={approval}
+                            entityLabel={letter.letterKindLabel.toLowerCase()}
+                            size="full"
+                            onDecide={async (action, reason) => {
+                              await decideApproval(approval.instanceId, {
+                                action,
+                                reason,
+                              });
+                              refresh();
+                            }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {letter.issuedAt
+                        ? dateLabel(String(letter.issuedAt))
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {letter.status === 'composed' ? (
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            intent="write"
+                            onClick={() => void preview(letter)}
+                          >
+                            Preview
+                          </Button>
+                          {awaiting ? (
+                            <span className="text-xs text-gray-500">
+                              Issued once approved
+                            </span>
+                          ) : (
+                            <Button onClick={() => void issue(letter)}>
+                              Issue
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <Button onClick={() => void download(letter)}>
+                          Download
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -186,15 +316,20 @@ function ComposeLetter({
   projectId,
   onClose,
   onIssued,
+  onComposed,
 }: {
   kind: LetterKind;
   projectId: string;
   onClose: () => void;
   onIssued: () => void;
+  /** A gated letter was composed: it is in the list now, waiting on its approval. */
+  onComposed: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [signatoryId, setSignatoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Blob | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const fields = useQuery({
@@ -204,9 +339,33 @@ function ComposeLetter({
 
   // Only the manual ones: everything else the server reads from its own source, and offering a box
   // for a value the server will overwrite teaches people their typing does not matter.
-  const manual = (fields.data ?? []).filter(
-    (field) => field.sourceType === 'manual',
-  );
+  // What the records say for each field — the terms, from Settings — so an editable one opens
+  // filled in rather than empty.
+  const prefill = useQuery({
+    queryKey: ['letter-prefill', kind.key, 'project', projectId],
+    queryFn: () =>
+      getLetterPrefill({
+        letterKindKey: kind.key,
+        subjectType: 'project',
+        subjectId: projectId,
+      }),
+  });
+  const recordValue = (token: string) =>
+    prefill.data?.fields.find((f) => f.token === token)?.value ?? '';
+
+  const rank = (token: string) => {
+    const at = FIELD_ORDER.indexOf(token);
+    return at === -1 ? FIELD_ORDER.length : at;
+  };
+  const manual = (fields.data ?? [])
+    .filter(
+      (field) =>
+        field.sourceType === 'manual' || EDITABLE_FROM_RECORD.has(field.token),
+    )
+    .sort((a, b) => rank(a.token) - rank(b.token));
+  const valueOf = (token: string) =>
+    values[token] ??
+    (EDITABLE_FROM_RECORD.has(token) ? recordValue(token) : '');
 
   // A work order, LOI or purchase order is signed (2026-10-14). This composer never asked who signs,
   // so every one of them was refused by the server with "a signatory must be named" — whether or not
@@ -221,17 +380,36 @@ function ComposeLetter({
   const noSignatory =
     kind.requiresSignature && signatories.isSuccess && active.length === 0;
 
+  const input = () => ({
+    letterKindKey: kind.key,
+    subjectType: 'project',
+    subjectId: projectId,
+    // Only what was edited is sent. An untouched field is read from its record at issue, so a
+    // letter waiting on approval picks up a change made in Settings in the meantime.
+    variables: values,
+    ...(kind.requiresSignature && chosenSignatory
+      ? { signatoryId: chosenSignatory }
+      : {}),
+  });
+
+  // The letter as it would be issued, before anything is written — marked DRAFT, with no
+  // reference and no signature graphic. A blank required field prints as its label in brackets.
+  const showPreview = async () => {
+    setPreviewBusy(true);
+    setError(null);
+    try {
+      setDraft(await previewLetter(input()));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'The preview could not be produced.',
+      );
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
   const compose = useMutation({
-    mutationFn: () =>
-      composeLetter({
-        letterKindKey: kind.key,
-        subjectType: 'project',
-        subjectId: projectId,
-        variables: values,
-        ...(kind.requiresSignature && chosenSignatory
-          ? { signatoryId: chosenSignatory }
-          : {}),
-      }),
+    mutationFn: () => composeLetter(input()),
     onSuccess: (letter) => {
       setError(null);
       if (letter.status === 'issued') {
@@ -240,6 +418,7 @@ function ComposeLetter({
         setNotice(
           'Composed, and waiting on an approval. It is not issued yet, and raising it again would make a second one.',
         );
+        onComposed();
       }
     },
     onError: (err: Error) => setError(err.message),
@@ -263,25 +442,47 @@ function ComposeLetter({
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {manual.map((field) => (
-            <label key={field.token} className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-gray-700">
-                {field.label}
-                {field.isRequired && <span className="text-red-600"> *</span>}
-              </span>
-              <input
-                required={field.isRequired}
-                value={values[field.token] ?? ''}
-                onChange={(event) =>
-                  setValues((current) => ({
-                    ...current,
-                    [field.token]: event.target.value,
-                  }))
-                }
-                className="rounded-md border border-gray-300 px-3 py-2"
-              />
-            </label>
-          ))}
+          {manual.map((field) => {
+            const multiLine = MULTI_LINE.has(field.token);
+            const isTerms = field.token === 'termsAndConditions';
+            const common = {
+              required: field.isRequired,
+              value: valueOf(field.token),
+              onChange: (
+                event: React.ChangeEvent<
+                  HTMLInputElement | HTMLTextAreaElement
+                >,
+              ) =>
+                setValues((current) => ({
+                  ...current,
+                  [field.token]: event.target.value,
+                })),
+              className: 'rounded-md border border-gray-300 px-3 py-2',
+            };
+            return (
+              <label
+                key={field.token}
+                className={`flex flex-col gap-1 text-sm${
+                  multiLine ? ' sm:col-span-2' : ''
+                }`}
+              >
+                <span className="font-medium text-gray-700">
+                  {field.label}
+                  {field.isRequired && <span className="text-red-600"> *</span>}
+                </span>
+                {isTerms && (
+                  <span className="text-xs text-gray-500">
+                    From Settings → Terms and conditions. Changes here apply to this letter only.
+                  </span>
+                )}
+                {multiLine ? (
+                  <textarea rows={isTerms ? 10 : 3} {...common} />
+                ) : (
+                  <input {...common} />
+                )}
+              </label>
+            );
+          })}
         </div>
       )}
 
@@ -323,6 +524,14 @@ function ComposeLetter({
       )}
 
       <div className="flex gap-2">
+        <Button
+          type="button"
+          intent="write"
+          disabled={previewBusy || noSignatory}
+          onClick={() => void showPreview()}
+        >
+          {previewBusy ? 'Preparing…' : draft ? 'Refresh preview' : 'Preview'}
+        </Button>
         <Button type="submit" disabled={compose.isPending || noSignatory}>
           {compose.isPending ? 'Issuing…' : 'Issue'}
         </Button>
@@ -330,6 +539,55 @@ function ComposeLetter({
           Cancel
         </Button>
       </div>
+
+      {draft && (
+        <PdfPreview
+          title={`${kind.label} — draft`}
+          blob={draft}
+          onClose={() => setDraft(null)}
+        />
+      )}
     </form>
+  );
+}
+
+/**
+ * A PDF shown in the page (2026-10-14) — a preview is read beside the form it came from, and a new
+ * tab opened after a request is one most browsers block. The object URL is released on close.
+ */
+function PdfPreview({
+  title,
+  blob,
+  onClose,
+}: {
+  title: string;
+  blob: Blob;
+  onClose: () => void;
+}) {
+  const url = useMemo(() => URL.createObjectURL(blob), [blob]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900">{title}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-sm font-medium text-blue-700 underline"
+        >
+          Close preview
+        </button>
+      </div>
+      <p className="text-xs text-gray-500">
+        A draft: no reference number, and the signature is applied only when
+        the letter is issued.
+      </p>
+      <iframe
+        title={title}
+        src={url}
+        className="h-[75vh] w-full rounded border border-gray-200"
+      />
+    </div>
   );
 }

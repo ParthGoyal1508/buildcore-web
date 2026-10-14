@@ -508,6 +508,24 @@ export async function downloadLetter(letterId: string): Promise<Blob> {
   return authFetchBlob(`/letters/${encodeURIComponent(letterId)}/download`);
 }
 
+/**
+ * A letter as it would be issued, before it is composed (2026-10-14). Marked DRAFT, with no
+ * reference and no signature graphic; a missing required value prints as its label in brackets.
+ * Writes nothing.
+ */
+export async function previewLetter(input: ComposeLetterInput): Promise<Blob> {
+  return authFetchBlob('/letters/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+/** A composed letter as it would be issued — what its approver reads before deciding. */
+export async function previewComposedLetter(letterId: string): Promise<Blob> {
+  return authFetchBlob(`/letters/${encodeURIComponent(letterId)}/preview`);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Pre-fill (2026-10-13)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -540,10 +558,15 @@ export async function getLetterPrefill(query: {
   letterKindKey: string;
   employeeId?: string;
   candidateId?: string;
+  /** A project letter's subject (2026-10-14). */
+  subjectType?: string;
+  subjectId?: string;
 }): Promise<LetterPrefill> {
   const params = new URLSearchParams({ letterKindKey: query.letterKindKey });
   if (query.employeeId) params.set('employeeId', query.employeeId);
   if (query.candidateId) params.set('candidateId', query.candidateId);
+  if (query.subjectType) params.set('subjectType', query.subjectType);
+  if (query.subjectId) params.set('subjectId', query.subjectId);
   return letterPrefillSchema.parse(
     await authFetch<unknown>(`/letters/prefill?${params.toString()}`),
   );
