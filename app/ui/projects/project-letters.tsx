@@ -10,7 +10,9 @@ import {
   getLetterKindFields,
   getLetterKinds,
   getLetters,
+  getSignatories,
 } from '@/app/lib/api/letters';
+import { GENERATE_LETTER_COPY, LETTER_COPY } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import StatusBadge from '@/app/ui/status-badge';
@@ -191,6 +193,7 @@ function ComposeLetter({
   onIssued: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [signatoryId, setSignatoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -205,6 +208,19 @@ function ComposeLetter({
     (field) => field.sourceType === 'manual',
   );
 
+  // A work order, LOI or purchase order is signed (2026-10-14). This composer never asked who signs,
+  // so every one of them was refused by the server with "a signatory must be named" — whether or not
+  // the company had a signatory set up.
+  const signatories = useQuery({
+    queryKey: ['signatories'],
+    queryFn: () => getSignatories(),
+    enabled: kind.requiresSignature,
+  });
+  const active = (signatories.data ?? []).filter((s) => s.isActive);
+  const chosenSignatory = signatoryId || active[0]?.id || '';
+  const noSignatory =
+    kind.requiresSignature && signatories.isSuccess && active.length === 0;
+
   const compose = useMutation({
     mutationFn: () =>
       composeLetter({
@@ -212,6 +228,9 @@ function ComposeLetter({
         subjectType: 'project',
         subjectId: projectId,
         variables: values,
+        ...(kind.requiresSignature && chosenSignatory
+          ? { signatoryId: chosenSignatory }
+          : {}),
       }),
     onSuccess: (letter) => {
       setError(null);
@@ -266,6 +285,32 @@ function ComposeLetter({
         </div>
       )}
 
+      {kind.requiresSignature &&
+        (noSignatory ? (
+          <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+            {GENERATE_LETTER_COPY.noSignatories}
+          </p>
+        ) : (
+          <label className="flex flex-col gap-1 text-sm sm:max-w-sm">
+            <span className="font-medium text-gray-700">Signatory</span>
+            <select
+              required
+              value={chosenSignatory}
+              onChange={(event) => setSignatoryId(event.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2"
+            >
+              {active.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} — {s.title}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500">
+              {LETTER_COPY.signatoryRequired}
+            </span>
+          </label>
+        ))}
+
       {error && (
         <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
           {error}
@@ -278,7 +323,7 @@ function ComposeLetter({
       )}
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={compose.isPending}>
+        <Button type="submit" disabled={compose.isPending || noSignatory}>
           {compose.isPending ? 'Issuing…' : 'Issue'}
         </Button>
         <Button type="button" intent="write" onClick={onClose}>
