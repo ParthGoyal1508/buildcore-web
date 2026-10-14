@@ -191,6 +191,8 @@ const candidateDetailSchema = z.object({
   expectedCtc: nullableDecimal,
   source: z.enum(CANDIDATE_SOURCES).catch('portal'),
   referredByEmployeeId: z.string().nullable(),
+  fatherName: z.string().nullable().default(null),
+  address: z.string().nullable().default(null),
   stage: candidateStage,
   employeeId: z.string().nullable(),
   rejectionReason: z.string().nullable(),
@@ -248,6 +250,10 @@ export interface CandidateInput {
   expectedCtc?: number;
   source: string;
   referredByEmployeeId?: string;
+  /** Printed on the offer letter; carried onto the employee at joining. */
+  fatherName?: string;
+  /** Postal address, one line. Becomes the permanent address at joining. */
+  address?: string;
 }
 export async function createCandidate(input: CandidateInput) {
   return authFetch<{ id: string; stage: string }>('/recruitment/candidates', {
@@ -389,9 +395,23 @@ export async function createOffer(candidateId: string, input: OfferInput): Promi
     }),
   );
 }
-export async function generateOffer(offerId: string): Promise<Offer> {
+/**
+ * Issues a draft offer: renders its letter on the letterhead, moves the offer to issued, advances
+ * the candidate and sets `letterId`.
+ *
+ * `variables` carries the letter's manual fields (duty hours) and any corrections to the pre-fill
+ * from `GET /letters/prefill`; a required one left blank is refused with
+ * `LETTER_REQUIRED_FIELD_UNRESOLVED` naming it in `fields`.
+ */
+export async function generateOffer(
+  offerId: string,
+  input: { variables?: Record<string, string>; signatoryId?: string } = {},
+): Promise<Offer> {
   return offerSchema.parse(
-    await authFetch(`/recruitment/offers/${offerId}/generate`, { method: 'POST' }),
+    await authFetch(`/recruitment/offers/${offerId}/generate`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   );
 }
 export async function acceptOffer(

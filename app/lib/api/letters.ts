@@ -376,6 +376,11 @@ const issuedLetterSchema = z.object({
    */
   subjectType: z.string().nullable().default(null),
   subjectId: z.string().nullable().default(null),
+  /**
+   * `PRPL/HR/2026-27/0001` — what the recipient quotes, printed on the letter. Null until
+   * issued: the number is allocated at issue, not at compose.
+   */
+  referenceNo: z.string().nullable().default(null),
   version: z.number(),
   isSuperseded: z.boolean().default(false),
   signatoryId: z.string().nullable().default(null),
@@ -402,7 +407,12 @@ export interface ComposeLetterInput {
   candidateId?: string;
   subjectType?: string;
   subjectId?: string;
-  variables: Record<string, string>;
+  /**
+   * Only what the records cannot supply, or what HR typed over them. Optional since the
+   * api reads declared fields from the employee/candidate/company records itself
+   * (`GET /letters/prefill`); a non-empty value here overrides the record.
+   */
+  variables?: Record<string, string>;
   signatoryId?: string;
 }
 
@@ -496,4 +506,54 @@ export async function getLetters(
  */
 export async function downloadLetter(letterId: string): Promise<Blob> {
   return authFetchBlob(`/letters/${encodeURIComponent(letterId)}/download`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pre-fill (2026-10-13)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const prefilledFieldSchema = z.object({
+  token: z.string(),
+  label: z.string(),
+  sourceType: z.enum(LETTER_FIELD_SOURCES).catch('manual'),
+  isRequired: z.boolean().default(false),
+  /** `''` when no record holds it: HR types it, or issue is refused if it is required. */
+  value: z.string().default(''),
+});
+export type PrefilledLetterField = z.infer<typeof prefilledFieldSchema>;
+
+const letterPrefillSchema = z.object({
+  letterKindKey: z.string(),
+  letterKindLabel: z.string(),
+  fields: z.array(prefilledFieldSchema),
+});
+export type LetterPrefill = z.infer<typeof letterPrefillSchema>;
+
+/**
+ * The compose form, filled in from the records.
+ *
+ * Never refuses for a blank — that happens at compose, as `LETTER_REQUIRED_FIELD_UNRESOLVED`
+ * naming the tokens in `fields`. It does refuse with `LETTER_KIND_FORBIDDEN` when the caller
+ * lacks the kind's own permission, because the values are the person's pay and exit figures.
+ */
+export async function getLetterPrefill(query: {
+  letterKindKey: string;
+  employeeId?: string;
+  candidateId?: string;
+}): Promise<LetterPrefill> {
+  const params = new URLSearchParams({ letterKindKey: query.letterKindKey });
+  if (query.employeeId) params.set('employeeId', query.employeeId);
+  if (query.candidateId) params.set('candidateId', query.candidateId);
+  return letterPrefillSchema.parse(
+    await authFetch<unknown>(`/letters/prefill?${params.toString()}`),
+  );
+}
+
+/** The refusal compose raises when a required field has no value from anyone. */
+export const LETTER_REQUIRED_FIELD_UNRESOLVED = 'LETTER_REQUIRED_FIELD_UNRESOLVED';
+
+/** A file name for an issued letter: the reference number, made safe for a file system. */
+export function letterFileName(letter: IssuedLetter): string {
+  const base = letter.referenceNo ?? `${letter.letterKindKey}-v${letter.version}`;
+  return `${base.replace(/[^A-Za-z0-9._-]+/g, '-')}.pdf`;
 }

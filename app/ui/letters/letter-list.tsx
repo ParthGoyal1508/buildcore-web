@@ -62,15 +62,17 @@ export function LetterList({
               >
                 {LETTER_STATUS_LABELS[letter.status]}
               </span>
-              {letter.version > 1 && (
-                <span className="text-xs text-gray-500">
-                  v{letter.version}
-                </span>
-              )}
+              <span className="text-xs text-gray-500">v{letter.version}</span>
               {letter.isSuperseded && (
                 <span className="text-xs text-gray-500">superseded</span>
               )}
             </p>
+            {letter.referenceNo && (
+              // What the recipient quotes back, so it reads first and copies cleanly.
+              <p className="font-mono text-xs text-gray-700">
+                {letter.referenceNo}
+              </p>
+            )}
             <p className="text-xs text-gray-500">
               {letter.issuedAt
                 ? `Issued ${dateText(letter.issuedAt)}`

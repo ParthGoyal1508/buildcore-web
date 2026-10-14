@@ -84,6 +84,7 @@ const employeeFormSchema = z
     // Identity
     firstName: optionalText,
     lastName: optionalText,
+    fatherName: optionalText,
     title: optionalText,
     dob: optionalText,
     gender: optionalText,
@@ -218,6 +219,7 @@ function defaultsFrom(employee?: Employee): EmployeeFormValues {
   return {
     firstName: employee.firstName ?? '',
     lastName: employee.lastName ?? '',
+    fatherName: employee.fatherName ?? '',
     title: employee.title ?? '',
     dob: dateValue(employee.dob),
     gender: employee.gender ?? '',
@@ -449,6 +451,13 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             label="Last name"
             error={errorFor('lastName')}
             {...register('lastName')}
+          />
+          <TextField
+            id="fatherName"
+            label="Father’s name"
+            hint="Printed on letters (S/o …)."
+            maxLength={120}
+            {...register('fatherName')}
           />
           <TextField id="dob" label="Date of birth" type="date" {...register('dob')} />
           <SelectField id="gender" label="Gender" {...register('gender')}>

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import { API_URL } from '@/app/lib/config';
-import { authFetch, getAccessToken } from '@/app/lib/session';
+import { authFetch, authFetchFile, getAccessToken } from '@/app/lib/session';
 import {
   reimbursementCategorySchema,
   type ReimbursementCategory,
@@ -145,11 +145,14 @@ export const employeeSchema = z.object({
   companyId: z.string(),
   siteId: z.string(),
   shiftId: z.string(),
-  userId: z.string(),
+  /** Null for staff with no login — most of them (the API made it optional on 2026-10-10). */
+  userId: z.string().nullable(),
 
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
   title: z.string().nullable(),
+  /** Printed on letters ("S/o …"). Defaulted so a record from before the field parses. */
+  fatherName: z.string().nullable().default(null),
   dob: nullableIsoDate,
   gender: enumOf(GENDERS).nullable(),
   maritalStatus: enumOf(MARITAL_STATUSES).nullable(),
@@ -1980,4 +1983,83 @@ export async function assignLocationToMany(
     }
   }
   return outcomes;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Salary revisions (2026-10-13) — `PAYROLL`
+// ─────────────────────────────────────────────────────────────────────────────
+
+const salaryRevisionSchema = z.object({
+  id: z.string(),
+  employeeId: z.string(),
+  effectiveFrom: isoDate,
+  previousBasic: nullableDecimal,
+  previousHra: nullableDecimal,
+  previousConveyance: nullableDecimal,
+  previousSiteAllowance: nullableDecimal,
+  previousSpecialAllowance: nullableDecimal,
+  basic: nullableDecimal,
+  hra: nullableDecimal,
+  conveyance: nullableDecimal,
+  siteAllowance: nullableDecimal,
+  specialAllowance: nullableDecimal,
+  remarks: z.string().nullable().default(null),
+  createdAt: isoDate,
+  /** Monthly gross (sum of the five heads) before and after. */
+  previousGross: decimal,
+  gross: decimal,
+});
+export type SalaryRevision = z.infer<typeof salaryRevisionSchema>;
+
+/** Newest effective date first. */
+export async function listSalaryRevisions(employeeId: string): Promise<SalaryRevision[]> {
+  return z
+    .array(salaryRevisionSchema)
+    .parse(await authFetch<unknown>(`/hr/employees/${employeeId}/salary-revisions`));
+}
+
+export interface SalaryRevisionInput {
+  /** `YYYY-MM-DD`, today or earlier. */
+  effectiveFrom: string;
+  basic?: number;
+  hra?: number;
+  conveyance?: number;
+  siteAllowance?: number;
+  specialAllowance?: number;
+  remarks?: string;
+}
+
+/**
+ * Records a revision. **Applies immediately**: the new heads are written onto the employee,
+ * which is what payroll pays from. Omitted heads keep their value. Refused with
+ * `SALARY_REVISION_FUTURE_DATE`, `SALARY_REVISION_BEFORE_LATEST` or `SALARY_REVISION_NO_CHANGE`.
+ */
+export async function createSalaryRevision(
+  employeeId: string,
+  input: SalaryRevisionInput,
+): Promise<SalaryRevision> {
+  return salaryRevisionSchema.parse(
+    await authFetch<unknown>(`/hr/employees/${employeeId}/salary-revisions`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// An employee's payslips, from HR's side (2026-10-14) — `PAYROLL`
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Periods (`YYYY-MM`) this employee has a published payslip for, newest first. */
+export async function listEmployeeSlipPeriods(employeeId: string): Promise<string[]> {
+  return z
+    .array(z.string())
+    .parse(await authFetch<unknown>(`/hr/payroll/employees/${employeeId}/slips`));
+}
+
+/** One payslip as a PDF on the company letterhead, with the server's file name. */
+export async function downloadEmployeeSlipPdf(employeeId: string, period: string) {
+  return authFetchFile(
+    `/hr/payroll/employees/${employeeId}/slips/${encodeURIComponent(period)}/pdf`,
+  );
 }
