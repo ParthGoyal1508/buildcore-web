@@ -100,6 +100,13 @@ const claimSchema = z
      * mapped to no BOQ line. Billed at its own rate, measured on the bill, never by a DWR.
      */
     nonBoq: z.boolean().default(false),
+    /**
+     * What the client certified on this line, where they said line by line (2026-10-15). Null is
+     * "not said" — the claimed quantity stands. Zero is not null. Optional so an older server parses.
+     */
+    certifiedQty: nullableRendered.optional(),
+    /** The client bill line this claim measures — what Certify's `lines` name. */
+    billLineId: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -739,10 +746,98 @@ export async function reviseBillPackage(
   );
 }
 
+/**
+ * One bill line as the client's certified copy was read for it (2026-10-15). `certifiedQty` null =
+ * the file does not mention the line (or no file was read) — never "passed in full".
+ */
+const certifiedCopyLineSchema = z
+  .object({
+    lineId: z.string(),
+    boqNo: z.string(),
+    description: z.string(),
+    unit: z.string(),
+    billedQty: z.number(),
+    /** The frozen rate, before the tender premium. */
+    rate: z.number(),
+    nonBoq: z.boolean().optional(),
+    certifiedQty: z.number().nullable(),
+    source: z.object({ sheet: z.string(), row: z.number() }).nullable(),
+    matchedBy: z.enum(['item_number', 'description']).nullable(),
+  })
+  .passthrough();
+
+export type CertifiedCopyLine = z.infer<typeof certifiedCopyLineSchema>;
+
+const certifiedCopyReadingSchema = z
+  .object({
+    /** False when nothing could be read — the screen opens manual entry. */
+    readable: z.boolean(),
+    /** Why not, in words. Null when readable, or when no file was sent. */
+    reason: z.string().nullable(),
+    lines: z.array(certifiedCopyLineSchema),
+    unmatchedRows: z.array(
+      z
+        .object({
+          sheet: z.string(),
+          row: z.number(),
+          itemNo: z.string().nullable(),
+          description: z.string().nullable(),
+          qty: z.number(),
+          reason: z.enum(['no_line', 'duplicate']),
+        })
+        .passthrough(),
+    ),
+    columnsUsed: z.array(
+      z
+        .object({
+          sheet: z.string(),
+          headerRow: z.number(),
+          itemColumn: z.string(),
+          descriptionColumn: z.string().nullable(),
+          quantityColumn: z.string(),
+          basis: z.enum([
+            'certified',
+            'this_bill',
+            'upto_date_less_previous',
+            'quantity',
+          ]),
+        })
+        .passthrough(),
+    ),
+    matchedCount: z.number(),
+    /** The premium the bill was priced at — a non-BOQ line is priced without it. */
+    quotedPercentage: z.number(),
+  })
+  .passthrough();
+
+export type CertifiedCopyReading = z.infer<typeof certifiedCopyReadingSchema>;
+
+/**
+ * Reads the client's certified copy for the quantity passed on each line (2026-10-15). **Writes
+ * nothing.** Without a file it returns the bill's lines alone, for entering them by hand.
+ */
+export async function readCertifiedCopy(
+  packageId: string,
+  file?: { data: string; fileName: string },
+): Promise<CertifiedCopyReading> {
+  return certifiedCopyReadingSchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-packages/${packageId}/certified-copy/read`,
+      { method: 'POST', body: JSON.stringify(file ?? {}) },
+    ),
+  );
+}
+
 export async function certifyBillPackage(
   packageId: string,
   input: {
-    certifiedAmount: string;
+    /** Required unless `lines` are given; ignored when they are. */
+    certifiedAmount?: string;
+    /**
+     * A bill to the client, line by line (2026-10-15): the certified quantity of each billed line.
+     * The certified figure is then derived from them by the server.
+     */
+    lines?: { lineId: string; certifiedQty: number }[];
     remarks?: string;
     /** A bill to the client: the client's certification document, base64. */
     certificateData?: string;
