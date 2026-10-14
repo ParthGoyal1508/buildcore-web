@@ -19,7 +19,7 @@ Goal: free tier wherever possible.
 
 ## 3. Environment variables
 
-- [ ] Set **`API_ORIGIN`** to the deployed backend URL (e.g. `https://buildcore-api.onrender.com`). No
+- [ ] Set **`API_ORIGIN`** to the deployed backend URL (e.g. `https://buildcore-api-ohio.onrender.com` — keep it in the same region as the database). No
       `NEXT_PUBLIC_` prefix — the browser never talks to the API directly; it calls this app's own
       origin at `/bff` and `next.config.ts` rewrites server-side.
 
