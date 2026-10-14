@@ -70,7 +70,12 @@ import Logo from '@/app/ui/logo';
 export const COMPANY_LOGO_KEY = 'company-logo';
 
 const logoQuery = (company: Pick<SelectableCompany, 'id' | 'logoVersion'>) => ({
-  queryKey: [COMPANY_LOGO_KEY, company.id, company.logoVersion] as const,
+  queryKey: [
+    COMPANY_LOGO_KEY,
+    company.id,
+    company.logoVersion,
+    'clean',
+  ] as const,
   queryFn: () => companyLogoDataUrl(company.id, company.logoVersion),
   // A versioned image never changes, so it is fetched once per version and kept for the
   // session. A new upload is a new version and therefore a new key.
@@ -139,7 +144,7 @@ export default function CompanyLogo({
     <img
       src={logo.data}
       alt={logo.isPlaceholderData ? '' : (company?.name ?? '')}
-      className={`w-auto object-contain ${knockout ? 'brightness-0 invert' : ''} ${
+      className={`${className?.includes('w-full') ? '' : 'w-auto'} object-contain ${knockout ? 'brightness-0 invert' : ''} ${
         className ?? ''
       }`}
     />
@@ -177,7 +182,9 @@ async function companyLogoDataUrl(
   version: string | null,
 ): Promise<string> {
   const query = version ? `?v=${encodeURIComponent(version)}` : '';
-  const blob = await authFetchBlob(`/settings/companies/${companyId}/logo${query}`);
+  const blob = await authFetchBlob(
+    `/settings/companies/${companyId}/logo${query}`,
+  );
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = '';
   // Chunked: `String.fromCharCode(...bytes)` on a 42KB logo spreads 42,000 arguments
@@ -187,11 +194,135 @@ async function companyLogoDataUrl(
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
   const url = `data:${blob.type || 'image/png'};base64,${btoa(binary)}`;
-  if (typeof Image !== 'undefined') {
+  return typeof document === 'undefined' ? url : cleanLogo(url);
+}
+
+/**
+ * The logo as the shell shows it: its backdrop made transparent and its empty margin trimmed
+ * (2026-10-15).
+ *
+ * Companies upload whatever file they have, and the two live ones differ in exactly the ways that
+ * showed: Tirupati's sits on a grey panel, Parth's on white with wide margins. Drawn as uploaded,
+ * one read as a grey box on the sidebar and the two came out at visibly different sizes in the
+ * same slot. So the flat colour the four corners agree on is keyed out — softly, so edges stay
+ * smooth — and the picture is cropped to what remains, which lets every logo fill the slot the
+ * same way. Done in the browser, once per logo version (the query caches it forever), and the
+ * uploaded file is never touched.
+ *
+ * Left as uploaded when the corners disagree — a photograph, a gradient, a logo that already has
+ * transparency — because there is then no single backdrop to remove.
+ */
+async function cleanLogo(url: string): Promise<string> {
+  try {
     const image = new Image();
     image.src = url;
-    // A decode failure is not a reason to show nothing: the `<img>` will still try.
-    await image.decode().catch(() => undefined);
+    await image.decode();
+    const width = image.naturalWidth;
+    const height = image.naturalHeight;
+    if (!width || !height) return url;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return url;
+    context.drawImage(image, 0, 0);
+    const frame = context.getImageData(0, 0, width, height);
+    const px = frame.data;
+
+    const at = (x: number, y: number) => (y * width + x) * 4;
+    const corners = [
+      at(0, 0),
+      at(width - 1, 0),
+      at(0, height - 1),
+      at(width - 1, height - 1),
+    ];
+    const backdrop = [0, 1, 2].map(
+      (c) => corners.reduce((sum, i) => sum + px[i + c], 0) / corners.length,
+    );
+    const distance = (i: number) =>
+      Math.hypot(
+        px[i] - backdrop[0],
+        px[i + 1] - backdrop[1],
+        px[i + 2] - backdrop[2],
+      );
+    const flat = corners.every((i) => px[i + 3] > 250 && distance(i) < 24);
+
+    if (flat) {
+      // Within 28 of the backdrop is backdrop; beyond 64 is the mark; between, a soft edge.
+      for (let i = 0; i < px.length; i += 4) {
+        const d = distance(i);
+        if (d < 28) px[i + 3] = 0;
+        else if (d < 64) px[i + 3] = Math.round((px[i + 3] * (d - 28)) / 36);
+      }
+    }
+
+    let top = height;
+    let left = width;
+    let bottom = -1;
+    let right = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (px[at(x, y) + 3] > 16) {
+          if (x < left) left = x;
+          if (x > right) right = x;
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+        }
+      }
+    }
+    if (right < left || bottom < top) return url;
+
+    context.putImageData(frame, 0, 0);
+    const cropped = document.createElement('canvas');
+    cropped.width = right - left + 1;
+    cropped.height = bottom - top + 1;
+    cropped
+      .getContext('2d')
+      ?.drawImage(
+        canvas,
+        left,
+        top,
+        cropped.width,
+        cropped.height,
+        0,
+        0,
+        cropped.width,
+        cropped.height,
+      );
+    return cropped.toDataURL('image/png');
+  } catch {
+    return url;
   }
-  return url;
+}
+
+/**
+ * One company's logo, small, for the company menu (2026-10-15) — or its initials where it has
+ * none. Reads the same cached query the sidebar does, so opening the menu fetches nothing new.
+ */
+export function CompanyMark({
+  company,
+}: {
+  company: Pick<SelectableCompany, 'id' | 'name' | 'hasLogo' | 'logoVersion'>;
+}) {
+  const logo = useQuery({
+    ...logoQuery(company),
+    enabled: company.hasLogo,
+  });
+  if (company.hasLogo && logo.data) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- a data URL from the logo query; next/image cannot optimise it
+      <img
+        src={logo.data}
+        alt=""
+        className="max-h-full max-w-full object-contain"
+      />
+    );
+  }
+  const initials = company.name
+    .split(/\s+/)
+    .filter((word) => /^[A-Za-z]/.test(word))
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join('');
+  return <span className="text-xs font-bold text-brand-500">{initials}</span>;
 }

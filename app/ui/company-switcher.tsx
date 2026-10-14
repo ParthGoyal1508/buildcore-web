@@ -1,16 +1,20 @@
 'use client';
 
+import {
+  BuildingOffice2Icon,
+  CheckIcon,
+  ChevronDownIcon,
+} from '@heroicons/react/24/outline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   listSelectableCompanies,
   setCompanySelection,
 } from '@/app/lib/api/company-selection';
 import { COMPANY_SWITCHER } from '@/app/lib/constants';
-import { COMPANY_LOGO_KEY } from '@/app/ui/company-logo';
+import { COMPANY_LOGO_KEY, CompanyMark } from '@/app/ui/company-logo';
 import { hasUnsavedChanges, unsavedScreens } from '@/app/lib/unsaved-changes';
-import { inlineSelectClass } from '@/app/ui/settings/form-fields';
 
 /**
  * The key this control's own query lives under.
@@ -51,6 +55,18 @@ const survivesSwitch = (key: readonly unknown[]): boolean =>
 export default function CompanySwitcher() {
   const queryClient = useQueryClient();
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Closes on a click anywhere else, as a menu does.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    return () => document.removeEventListener('pointerdown', onPointer);
+  }, [open]);
 
   const { data: companies } = useQuery({
     queryKey: SELECTABLE_COMPANIES_KEY,
@@ -147,41 +163,91 @@ export default function CompanySwitcher() {
     switchCompany.mutate(companyId);
   };
 
+  const selected = companies.find(
+    (company) => company.id === (pending ?? selectedId),
+  );
+
+  // A menu of its own rather than a native <select> (2026-10-15): the browser's own list
+  // rendered as an OS menu that matched nothing around it on the navy bar. Each company shows
+  // its logo, so the choice reads the way the sidebar will look after it.
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <label
-        htmlFor="company-switcher"
-        className="hidden text-sm font-medium text-gray-500 sm:block"
-      >
+    <div
+      className="relative flex min-w-0 items-center gap-2"
+      ref={containerRef}
+    >
+      <span className="hidden text-sm font-medium text-white/70 sm:block">
         {COMPANY_SWITCHER.label}
-      </label>
-      <select
-        id="company-switcher"
-        // `pending` only while a switch is in flight; otherwise the company the **server** says we
-        // are in, which arrives with the refetched list the switch invalidated.
-        value={pending ?? selectedId}
+      </span>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${COMPANY_SWITCHER.label}: ${selected?.name ?? COMPANY_SWITCHER.allCompanies}`}
         disabled={switchCompany.isPending}
-        onChange={(event) => handleChange(event.target.value)}
-        className={inlineSelectClass}
+        onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false);
+        }}
+        className="flex h-10 min-w-0 max-w-[18rem] items-center gap-2 rounded-lg border border-white/15 bg-white/10 pl-2 pr-2.5 text-sm font-medium text-white transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400 disabled:opacity-60"
       >
-        {/* Only while nothing is selected, and deliberately not re-selectable: there is no
-            "unchoose" on the API, and offering one would imply a caller can widen their own scope
-            back out, which the backend does not allow once a selection exists. */}
-        {selectedId === '' && (
-          <option value="" disabled>
-            {COMPANY_SWITCHER.allCompanies}
-          </option>
-        )}
-        {companies.map((company) => (
-          <option key={company.id} value={company.id}>
-            {company.name}
-          </option>
-        ))}
-      </select>
+        <BuildingOffice2Icon
+          className="h-5 w-5 shrink-0 text-accent-300"
+          aria-hidden="true"
+        />
+        <span className="truncate">
+          {selected?.name ?? COMPANY_SWITCHER.allCompanies}
+        </span>
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          aria-label={COMPANY_SWITCHER.label}
+          className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 text-gray-900 shadow-xl ring-1 ring-black/5"
+        >
+          {companies.map((company) => {
+            const isSelected = company.id === (pending ?? selectedId);
+            return (
+              <li key={company.id} role="option" aria-selected={isSelected}>
+                <button
+                  type="button"
+                  autoFocus={isSelected}
+                  onClick={() => {
+                    setOpen(false);
+                    if (!isSelected) handleChange(company.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 ${
+                    isSelected
+                      ? 'bg-brand-50 font-semibold text-brand-600'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="flex h-9 w-14 shrink-0 items-center justify-center rounded-md bg-gray-50 p-1 ring-1 ring-gray-200">
+                    <CompanyMark company={company} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {company.name}
+                  </span>
+                  {isSelected && (
+                    <CheckIcon
+                      className="h-4 w-4 shrink-0 text-accent-600"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {failed && (
-        // Visible rather than a toast that may already have gone: the consequence of a silently
-        // failed switch is reading one company's numbers believing they are another's.
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-red-200">
           {COMPANY_SWITCHER.switchFailed}
         </p>
       )}

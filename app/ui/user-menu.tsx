@@ -61,7 +61,7 @@ export default function UserMenu() {
     .join('');
 
   return (
-    <div className="flex shrink-0 items-center gap-2 border-l border-gray-200 pl-3">
+    <div className="flex shrink-0 items-center gap-2 border-l border-white/15 pl-3">
       <div
         className="flex min-w-0 items-center gap-2"
         title={[name, user ? `@${user.username}` : null, role]
@@ -70,17 +70,17 @@ export default function UserMenu() {
       >
         <span
           aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-xs font-semibold text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-400 to-emerald-400 text-xs font-semibold text-brand-700 ring-2 ring-white/20"
         >
           {initials}
         </span>
         <div className="hidden min-w-0 max-w-[12rem] leading-tight lg:block">
-          <p className="truncate text-sm font-medium text-gray-900">
+          <p className="truncate text-sm font-medium text-white">
             {name ?? 'Checking session…'}
           </p>
           {role && (
             <p
-              className={`truncate text-xs ${isError ? 'text-red-600' : 'text-gray-500'}`}
+              className={`truncate text-xs ${isError ? 'text-red-200' : 'text-brand-100'}`}
             >
               {role}
             </p>
@@ -96,7 +96,7 @@ export default function UserMenu() {
         onClick={handleSignOut}
         disabled={signingOut}
         aria-label="Sign out"
-        className="flex h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-50 sm:h-9"
+        className="flex h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400 disabled:opacity-50 sm:h-9"
       >
         <ArrowRightStartOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
         <span className="hidden xl:inline">Sign out</span>

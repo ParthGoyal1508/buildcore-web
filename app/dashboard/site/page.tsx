@@ -15,9 +15,12 @@ import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import PageHeader from '@/app/ui/page-header';
 
 export default function SiteDashboardPage() {
-  const [siteId, setSiteId] = useState('');
+  // The site chosen here; until somebody chooses, the first one the list offers (2026-10-15).
+  // An empty page asking for a choice is a wasted click when most users have one site.
+  const [chosenSiteId, setSiteId] = useState('');
 
   const sites = useQuery({ queryKey: ['sites'], queryFn: getSites });
+  const siteId = chosenSiteId || sites.data?.[0]?.id || '';
 
   const widgets = useQuery({
     queryKey: ['site-widgets', siteId],

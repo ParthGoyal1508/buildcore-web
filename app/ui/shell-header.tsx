@@ -60,7 +60,7 @@ export default function ShellHeader({
   const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
 
   const wordmark = (
-    <CompanyLogo className="h-8 max-w-[8rem] mix-blend-multiply" />
+    <CompanyLogo knockout className="h-8 max-w-[8rem]" />
   );
 
   return (
@@ -68,7 +68,7 @@ export default function ShellHeader({
     // accent — is the one splash of the brand on a bar that is otherwise white and has to stay
     // calm behind search and the company selector. `before:` so it costs no extra element and
     // cannot be pushed around by the flex row.
-    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-200 bg-white px-4 py-2 before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-gradient-to-r before:from-brand-600 before:via-accent-500 before:to-emerald-400 md:flex-nowrap md:px-8 md:py-0 lg:px-12">
+    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-4 py-2 text-white shadow-md after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-gradient-to-r after:from-accent-400 after:via-accent-500 after:to-emerald-400 md:flex-nowrap md:px-8 md:py-0 lg:px-12">
       <div className="md:hidden">
         {home ? (
           <Link

@@ -24,12 +24,13 @@ export default function DashboardPage() {
 
   return (
     <main>
+      {/* The tab strip first, then the page's own header — the order every other screen in
+          the Dashboard module has (their layouts render the strip above the page), so the
+          Overview's heading no longer sits above the divider while the rest sit below it
+          (2026-10-15). */}
+      <DashboardNav className="mb-6" />
       <WelcomeBanner />
       <PageHeader title="Dashboard" className="mb-4" />
-      {/* The row of buttons this replaces lived only here, so reaching the Activity
-          Log from the Site Dashboard meant coming back to /dashboard first. The strip
-          now rides along on all six screens. */}
-      <DashboardNav className="mb-6" />
 
       {widgets.isPending && (
         <p className="p-4 text-sm text-gray-500" role="status">

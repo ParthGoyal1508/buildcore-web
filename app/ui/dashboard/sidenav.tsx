@@ -36,12 +36,15 @@ export default function SideNav() {
   return (
     <div className="flex h-full flex-col border-gray-200 bg-brand-50 px-3 py-3 md:border-r md:px-3 md:py-4">
       <Link
-        className="mb-3 hidden h-16 shrink-0 items-center rounded-lg px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 md:flex"
+        className="mb-4 hidden h-16 shrink-0 items-center rounded-lg px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 md:flex"
         href="/dashboard"
       >
+        {/* A fixed box the logo fills, now that the logo arrives trimmed and transparent
+            (`cleanLogo`): every company's mark takes the same height, or the same width when
+            it is a long one, rather than its file's own margins deciding (2026-10-15). */}
         <CompanyLogo
           priority
-          className="h-full max-h-16 w-auto max-w-full mix-blend-multiply"
+          className="h-full w-full object-contain object-left"
         />
       </Link>
       {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets fill each
