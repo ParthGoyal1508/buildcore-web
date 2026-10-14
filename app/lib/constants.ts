@@ -31,6 +31,7 @@ export const ROUTES = {
   settingsProjectDocuments: '/dashboard/settings/project-documents',
   /** Letter kinds as data — a new kind without a release (017 US5, FR-011). */
   settingsLetterKinds: '/dashboard/settings/letter-kinds',
+  settingsLetterTemplates: '/dashboard/settings/letter-templates',
   /** Named signatories and their signature graphics (017 US4). */
   settingsSignatories: '/dashboard/settings/signatories',
   /** The company's standard terms and conditions (2026-10-11). */
@@ -773,7 +774,52 @@ export const STANDARD_WORDING_KIND_KEYS: readonly string[] = [
   'termination',
   'fnf_settlement',
   'payment_advice',
+  // Shipped as standard on 2026-10-14, with the terms from Settings.
+  'letter_loi',
+  'letter_work_order',
+  'letter_purchase_order',
 ];
+
+/**
+ * Where each kind of letter is issued, for Settings → Letter templates (2026-10-14). The one
+ * template screen used to be Recruitment's and listed every kind — a relieving letter beside the
+ * offer letter — because recruitment happened to ship letters first. Settings shows them all,
+ * grouped by the module that issues them; Recruitment shows its own two.
+ */
+export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonly string[] }[] = [
+  {
+    title: 'HR & Payroll',
+    kindKeys: [
+      'confirmation',
+      'increment',
+      'transfer',
+      'experience',
+      'relieving',
+      'termination',
+      'suspension',
+      'fnf_settlement',
+      'salary_slip',
+    ],
+  },
+  { title: 'Recruitment', kindKeys: ['offer', 'appointment'] },
+  {
+    title: 'Projects',
+    kindKeys: ['letter_loi', 'letter_work_order', 'letter_purchase_order'],
+  },
+  {
+    title: 'Plant, stores and payments',
+    kindKeys: [
+      'payment_advice',
+      'indent',
+      'service_order',
+      'service_bill',
+      'maintenance_bill',
+    ],
+  },
+];
+
+/** Recruitment's own letters — what its Templates tab lists. */
+export const RECRUITMENT_TEMPLATE_KIND_KEYS = ['offer', 'appointment'] as const;
 
 export const TEMPLATE_COPY = {
   title: 'Letter Templates',
@@ -2053,6 +2099,7 @@ export const SETTINGS_PERMISSIONS = {
   // settings act, so the section is gated on the write.
   'project-documents': 'SETTINGS',
   'letter-kinds': 'SETTINGS',
+  'letter-templates': 'SETTINGS',
   signatories: 'SETTINGS',
   // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
   // computed at, guarded by the same permission as the registration numbers beside them.

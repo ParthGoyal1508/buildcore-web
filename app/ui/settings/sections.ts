@@ -82,6 +82,14 @@ export const SETTINGS_SECTIONS: {
     icon: PencilSquareIcon,
   },
   {
+    key: 'letter-templates',
+    href: ROUTES.settingsLetterTemplates,
+    title: 'Letter Templates',
+    description:
+      'The wording of every letter the company issues — HR, recruitment, project and payment — grouped by where it is issued.',
+    icon: DocumentTextIcon,
+  },
+  {
     key: 'billing-rates',
     href: ROUTES.settingsBillingRates,
     title: 'Billing Rates',

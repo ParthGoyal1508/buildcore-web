@@ -25,6 +25,7 @@ import {
   recruitmentLabel,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import CandidateTimeline from '@/app/ui/recruitment/candidate-timeline';
 import JoinModal from '@/app/ui/recruitment/join-modal';
 import { offerLetterSubmit } from '@/app/ui/recruitment/offer-letter-submit';
 import OfferModal from '@/app/ui/recruitment/offer-modal';
@@ -483,6 +484,11 @@ function CandidateDrawer({
           )}
         </div>
 
+        <section>
+          <h3 className="mb-2 font-medium text-gray-700">Timeline</h3>
+          <CandidateTimeline candidateId={candidate.id} />
+        </section>
+
         {/*
           017 US6 (T030). The candidate's own letters, on the candidate's own surface.
           `/dashboard/recruitment/letters` already exists and lists feature 011's letters across
@@ -490,9 +496,12 @@ function CandidateDrawer({
           issued lately" rather than "what has this person been sent"). This is the second, and the
           drawer is where a reader already has one candidate in front of them.
         */}
-        <SubjectLetters query={{ candidateId: candidate.id }} />
-        {/* Once joined, the appointment letter is to the employee record joining created. */}
-        {candidate.employeeId && <SubjectLetters query={{ employeeId: candidate.employeeId }} />}
+        {/* Once joined, the appointment letter is to the employee record joining created — listed
+            with the candidate's own, once (it is addressed to both). */}
+        <SubjectLetters
+          query={{ candidateId: candidate.id }}
+          also={candidate.employeeId ? { employeeId: candidate.employeeId } : undefined}
+        />
       </div>
     </Modal>
   );
