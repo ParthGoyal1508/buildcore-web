@@ -2096,6 +2096,12 @@ export const PERMISSIONS = [
   'RECRUITMENT',
   'RECRUITMENT_APPROVE',
   /**
+   * Issuing the HR & Payroll letters (2026-10-15) — appointment, experience, relieving,
+   * increment, termination, transfer, F&F. HR's alone: held by HO User and Super Admin, and
+   * grantable here to any other role.
+   */
+  'HR_LETTERS',
+  /**
    * Added by 012. `ASSETS` opens the module; `ASSETS_APPROVE` gates the approvals
    * the backend reserves — request approval, transfer cancellation and
    * condemnation. Both are assignable, so both need a checkbox here.
@@ -2106,8 +2112,14 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
+const PERMISSION_LABELS: Record<string, string> = {
+  HR_LETTERS: 'HR Letters',
+};
+
 /** Human-readable label for a permission value, for checkbox lists and summaries. */
 export function permissionLabel(permission: string): string {
+  // Spelled out where the generated form would mangle an acronym ("Hr Letters").
+  if (permission in PERMISSION_LABELS) return PERMISSION_LABELS[permission];
   return permission
     .toLowerCase()
     .split('_')
@@ -4238,15 +4250,16 @@ export const CANDIDATE_LETTER_KIND_KEYS = ['offer'] as const;
  */
 export const HR_LETTER_KIND_PERMISSIONS: Record<string, string> = {
   offer: 'RECRUITMENT',
-  appointment: 'EMPLOYEES',
-  confirmation: 'EMPLOYEES',
-  relieving: 'EMPLOYEES',
-  experience: 'EMPLOYEES',
-  transfer: 'EMPLOYEES',
-  suspension: 'EMPLOYEES',
-  termination: 'EMPLOYEES',
-  increment: 'PAYROLL',
-  fnf_settlement: 'PAYROLL',
+  // HR's alone since 2026-10-15 — see `HR_LETTERS` in `PERMISSIONS`.
+  appointment: 'HR_LETTERS',
+  confirmation: 'HR_LETTERS',
+  relieving: 'HR_LETTERS',
+  experience: 'HR_LETTERS',
+  transfer: 'HR_LETTERS',
+  suspension: 'HR_LETTERS',
+  termination: 'HR_LETTERS',
+  increment: 'HR_LETTERS',
+  fnf_settlement: 'HR_LETTERS',
 };
 
 /** Copy for the generate-a-document flow (HR documents, 2026-10-13). */

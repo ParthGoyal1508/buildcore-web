@@ -75,6 +75,7 @@ export const LEVEL_AGNOSTIC_PERMISSIONS: readonly string[] = [
   'INVENTORY_APPROVE',
   'RECRUITMENT_APPROVE',
   'ASSETS_APPROVE',
+  'HR_LETTERS',
 ];
 
 /**
