@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { rupees } from '@/app/lib/format';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import type { WidgetResult } from '@/app/lib/api/dashboard';
+import { widgetIcon } from '@/app/ui/dashboard/widget-metrics';
 
 /**
  * The single switch that renders any widget from its `displayType` (spec FR-001,
@@ -52,11 +53,17 @@ export default function WidgetRenderer({
           value={widget.value}
           note={widget.note}
           href={href}
+          icon={widgetIcon(widget.id)}
         />
       );
     case 'list':
       return (
-        <WidgetList title={widget.title} value={widget.value} href={href} />
+        <WidgetList
+          title={widget.title}
+          value={widget.value}
+          href={href}
+          icon={widgetIcon(widget.id)}
+        />
       );
     default:
       return (
@@ -68,7 +75,8 @@ export default function WidgetRenderer({
   }
 }
 
-const cardClass = 'rounded-lg border border-gray-200 bg-white p-4 shadow-sm';
+// The Group Dashboard's card since 2026-10-15, so the three dashboards match.
+const cardClass = 'rounded-xl border border-gray-200 bg-white p-4 shadow-sm';
 
 /** The focus ring every link on the dashboard carries — keyboard users must see where they are. */
 const focusRing =
@@ -108,15 +116,31 @@ function CardHeading({
   title,
   href,
   className,
+  icon: Icon,
 }: {
   title: string;
   href?: string;
   className: string;
+  /** The card's icon, in the accent tile the Group Dashboard's metrics use (2026-10-15). */
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }) {
-  if (!href) return <p className={className}>{title}</p>;
+  const mark = Icon && (
+    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-accent-50 text-accent-700">
+      <Icon className="h-4 w-4" aria-hidden />
+    </span>
+  );
+  if (!href) {
+    return (
+      <p className={`flex items-center gap-2 ${className}`}>
+        {mark}
+        {title}
+      </p>
+    );
+  }
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <p className={className}>
+    <div className="flex items-center justify-between gap-2">
+      <p className={`flex items-center gap-2 ${className}`}>
+        {mark}
         <Link href={href} className={`rounded hover:underline ${focusRing}`}>
           {title}
         </Link>
@@ -225,6 +249,7 @@ export function WidgetTable({
   value,
   note,
   href,
+  icon,
 }: {
   title: string;
   value: unknown;
@@ -232,6 +257,7 @@ export function WidgetTable({
   note?: string;
   /** The module screen behind the table — linked from the heading. */
   href?: string;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }) {
   if (!isTableValue(value)) {
     return <UnsupportedWidgetCard title={title} displayType="table" />;
@@ -254,7 +280,8 @@ export function WidgetTable({
         <CardHeading
           title={title}
           href={href}
-          className="text-sm font-medium text-gray-700"
+          className="text-sm font-semibold text-gray-900"
+          icon={icon}
         />
       </div>
       <ResponsiveList
@@ -290,11 +317,13 @@ export function WidgetList({
   title,
   value,
   href,
+  icon,
 }: {
   title: string;
   value: unknown;
   /** The screen listing every item, linked from the heading. */
   href?: string;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }) {
   const items = Array.isArray(value) ? value : [];
   return (
@@ -303,7 +332,8 @@ export function WidgetList({
         <CardHeading
           title={title}
           href={href}
-          className="text-sm font-medium text-gray-700"
+          className="text-sm font-semibold text-gray-900"
+          icon={icon}
         />
       </div>
       {items.length === 0 ? (

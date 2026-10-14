@@ -110,7 +110,9 @@ export default function EmployeeList() {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <StatusBadge status={row.isActive ? 'active' : 'closed'} />,
+      render: (row) => (
+        <StatusBadge status={row.isActive ? 'active' : 'closed'} />
+      ),
     },
   ];
 
@@ -176,7 +178,7 @@ export default function EmployeeList() {
             <option value="inactive">Inactive</option>
           </SelectField>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* 020 FR-010. Beside the filters rather than on a screen of its own: "a site's staff"
               is already expressible here, and a second employee picker would be a second place
               for the two to disagree about who counts. */}
@@ -221,7 +223,9 @@ export default function EmployeeList() {
             </button>
             <button
               type="button"
-              onClick={() => setPage((current) => Math.min(lastPage, current + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(lastPage, current + 1))
+              }
               disabled={page >= lastPage}
               className="rounded-md border border-gray-200 px-3 py-1.5 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-40"
             >

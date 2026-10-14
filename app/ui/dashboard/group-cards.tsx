@@ -21,9 +21,13 @@ import type {
 } from '@/app/lib/api/dashboard';
 import type { SelectableCompany } from '@/app/lib/api/company-selection';
 import { dateLabel, rupees } from '@/app/lib/format';
-import { formatRupees } from '@/app/lib/utils';
 import { CompanyMark } from '@/app/ui/company-logo';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import {
+  MetricTile,
+  compactRupees,
+  type Metric,
+} from '@/app/ui/dashboard/metric-tile';
 
 /**
  * The Group Dashboard's own cards (2026-10-15): one per company, a Group Total, and the
@@ -52,22 +56,6 @@ function shortPeriod(period: string): string {
   });
 }
 
-/**
- * A rupee figure short enough for a card tile — ₹32.93 Cr, ₹8.85 L — with the exact amount
- * kept for the tooltip. Below a lakh the full figure already fits.
- */
-function compactRupees(value: number): string {
-  const abs = Math.abs(value);
-  const fixed = (n: number) =>
-    n.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  if (abs >= 1e7) return `₹${fixed(value / 1e7)} Cr`;
-  if (abs >= 1e5) return `₹${fixed(value / 1e5)} L`;
-  return formatRupees(value);
-}
-
 /** "Sep 2026", or "Sep – Oct 2026" when the companies' latest runs differ. */
 function periodsLabel(periods: string[]): string | null {
   if (periods.length === 0) return null;
@@ -78,21 +66,6 @@ function periodsLabel(periods: string[]): string | null {
   return periods[0].slice(0, 4) === periods[periods.length - 1].slice(0, 4)
     ? `${first.split(' ')[0]} – ${last}`
     : `${first} – ${last}`;
-}
-
-type Tone = 'default' | 'warning' | 'ok';
-
-interface Metric {
-  key: string;
-  label: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  value: string;
-  /** The exact figure, where `value` is abbreviated. */
-  title?: string;
-  hint?: string;
-  tone?: Tone;
-  /** Spans both columns — the documents strip, which reads as a status line. */
-  wide?: boolean;
 }
 
 /** The tiles a card shows, from whichever metrics arrived. */
@@ -196,76 +169,6 @@ function metricsFor(card: GroupCompanyCard | GroupTotal): Metric[] {
   }
 
   return metrics;
-}
-
-const TONE_ICON: Record<Tone, string> = {
-  default: 'bg-accent-50 text-accent-700',
-  warning: 'bg-amber-50 text-amber-700',
-  ok: 'bg-emerald-50 text-emerald-700',
-};
-
-function MetricTile({
-  metric,
-  inverted = false,
-}: {
-  metric: Metric;
-  inverted?: boolean;
-}) {
-  const Icon = metric.icon;
-  const tone = metric.tone ?? 'default';
-  // Labels and hints wrap rather than truncate: "PF + ESIC (Sep 2026)" cut to "PF + ESIC
-  // (S…" loses the month, which is the one thing that keeps the figure honest.
-  return (
-    <div
-      className={clsx(
-        'min-w-0 rounded-lg p-3',
-        inverted ? 'bg-white/10' : 'bg-gray-50',
-        metric.wide && 'col-span-2',
-      )}
-    >
-      <dt
-        className={clsx(
-          'flex items-start gap-2 text-xs font-medium leading-snug',
-          inverted ? 'text-brand-100' : 'text-gray-500',
-        )}
-      >
-        <span
-          className={clsx(
-            'grid h-6 w-6 shrink-0 place-items-center rounded-md',
-            inverted ? 'bg-white/15 text-white' : TONE_ICON[tone],
-          )}
-        >
-          <Icon className="h-4 w-4" aria-hidden />
-        </span>
-        <span className="pt-1">{metric.label}</span>
-      </dt>
-      <dd
-        className={clsx(
-          'mt-1.5 truncate text-lg font-semibold tabular-nums',
-          inverted
-            ? 'text-white'
-            : tone === 'warning'
-              ? 'text-amber-800'
-              : tone === 'ok'
-                ? 'text-emerald-700'
-                : 'text-gray-900',
-        )}
-        title={metric.title}
-      >
-        {metric.value}
-      </dd>
-      {metric.hint && (
-        <dd
-          className={clsx(
-            'text-xs leading-snug',
-            inverted ? 'text-brand-100/80' : 'text-gray-400',
-          )}
-        >
-          {metric.hint}
-        </dd>
-      )}
-    </div>
-  );
 }
 
 /** One company: its mark, its name, and its figures in a two-column grid. */

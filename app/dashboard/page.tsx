@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { useSelectedCompany } from '@/app/lib/api/company-selection';
 import { getWidgets, type WidgetResult } from '@/app/lib/api/dashboard';
 import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
 import ApprovalsCard from '@/app/ui/dashboard/approvals-card';
@@ -10,7 +11,21 @@ import RecentActivity from '@/app/ui/dashboard/recent-activity';
 import { widgetHref } from '@/app/ui/dashboard/widget-links';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import WelcomeBanner from '@/app/ui/dashboard/welcome-banner';
+import type { Metric } from '@/app/ui/dashboard/metric-tile';
+import { SummaryBanner, widgetMetric } from '@/app/ui/dashboard/widget-metrics';
+import { CompanyMark } from '@/app/ui/company-logo';
+import { LoadingText } from '@/app/ui/spinner';
 import PageHeader from '@/app/ui/page-header';
+
+/** "Thursday, 15 October 2026". */
+function todayLabel(): string {
+  return new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
 
 function section(widgets: WidgetResult[], name: string): WidgetResult[] {
   return widgets.filter((w) => w.section === name);
@@ -22,6 +37,17 @@ export default function DashboardPage() {
     queryFn: getWidgets,
     refetchInterval: DASHBOARD_REFRESH_INTERVAL_MS,
   });
+  const company = useSelectedCompany();
+
+  const headline = [
+    ...section(widgets.data ?? [], 'kpi'),
+    ...section(widgets.data ?? [], 'sidebar'),
+  ];
+  const tiles = headline
+    .map(widgetMetric)
+    .filter((m): m is Metric => m !== null);
+  // A headline figure a tile cannot carry — a module not yet available — keeps its card.
+  const cards = headline.filter((w) => widgetMetric(w) === null);
 
   return (
     <main>
@@ -35,7 +61,7 @@ export default function DashboardPage() {
 
       {widgets.isPending && (
         <p className="p-4 text-sm text-gray-500" role="status">
-          Loading dashboard…
+          <LoadingText>Loading dashboard…</LoadingText>
         </p>
       )}
 
@@ -56,26 +82,39 @@ export default function DashboardPage() {
 
       {widgets.data && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {section(widgets.data, 'kpi').map((w) => (
-              <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
-            ))}
-          </div>
+          {/* The page's figures in the navy summary the Group Dashboard opens with
+              (2026-10-15 — the client: "similar to Group Dashboard, can we enhance the
+              Overview"). Every KPI and sidebar figure is a tile there, linking to its
+              screen; anything a tile cannot carry keeps its card below. */}
+          <SummaryBanner
+            title={company?.name ?? 'Today'}
+            subtitle={`Today · ${todayLabel()}`}
+            mark={
+              company && (
+                <span className="grid h-11 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-white p-1.5">
+                  <CompanyMark company={company} />
+                </span>
+              )
+            }
+            metrics={tiles}
+          />
 
+          {/* `min-w-0` on both columns: a grid item grows to its widest content by default,
+              and one wide table pushed the whole page sideways on a phone. */}
           <div className="grid gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
+            <div className="min-w-0 space-y-6 lg:col-span-2">
               {section(widgets.data, 'table').map((w) => (
                 <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
             </div>
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {/* First in the column: a decision waiting on the reader is the one thing here
                   they act on rather than read (2026-10-15). */}
               <ApprovalsCard />
-              {section(widgets.data, 'sidebar').map((w) => (
+              {section(widgets.data, 'alerts').map((w) => (
                 <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
-              {section(widgets.data, 'alerts').map((w) => (
+              {cards.map((w) => (
                 <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
             </div>
