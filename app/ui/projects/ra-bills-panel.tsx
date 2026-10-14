@@ -33,6 +33,7 @@ import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import RaBillView from '@/app/ui/projects/ra-bill-view';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import WorkOrderApproval from '@/app/ui/projects/work-order-approval';
+import WorkOrderDocuments from '@/app/ui/projects/work-order-documents';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
@@ -374,6 +375,18 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   </div>
                 )}
               </header>
+
+              {/* Rates → LOI → work order (2026-10-15): where the record stands in that order, and
+                  the two letters issued from its approved rates. Above the tabs, because it is the
+                  next thing to do on the record whichever tab is open. */}
+              <WorkOrderDocuments
+                key={`documents-${chosen.id}`}
+                order={chosen}
+                vendorName={
+                  (chosen.partnerId && vendors.byId.get(chosen.partnerId)) ||
+                  ''
+                }
+              />
 
               <div role="tablist" className="flex flex-wrap gap-1 border-b border-gray-200">
                 {TABS.map((name) => (

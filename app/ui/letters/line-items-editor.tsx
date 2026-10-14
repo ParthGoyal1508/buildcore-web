@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { getItems } from '@/app/lib/api/inventory';
 import { getBOQ } from '@/app/lib/api/projects';
 import { money, rupees, unitRate } from '@/app/lib/format';
 import SearchableSelect, {
@@ -21,7 +22,13 @@ import SearchableSelect, {
  * **The rate starts empty, not at the BOQ's.** The BOQ rate is the client's; a work order or LOI
  * goes to a subcontractor at the rate agreed with them. Prefilled, the client's rate would go out
  * on any line nobody changed. It is shown beside the box instead, for reference.
+ *
+ * **Or from the item master (2026-10-15).** A purchase order buys materials for the company, not a
+ * project's work, so it has no BOQ to pick from: its rows come from Inventory's item master —
+ * the item's name and code, its unit and HSN — with the quantity and the vendor's rate typed.
  */
+export type LineItemsSource = 'boq' | 'items' | 'none';
+
 interface Row {
   key: number;
   boqNo: string;
@@ -94,23 +101,43 @@ export default function LineItemsEditor({
   value,
   onChange,
   withHsn,
-  fromBoq,
+  source,
 }: {
-  projectId: string;
+  /** The project whose BOQ is offered. Needed only for `source: 'boq'`. */
+  projectId?: string;
   value: string;
   onChange: (value: string) => void;
   /** The work order prints an HSN column; the LOI and purchase order do not. */
   withHsn: boolean;
-  /** Offer the project's BOQ to pick from. Off for a purchase order, which buys materials. */
-  fromBoq: boolean;
+  /**
+   * What rows are picked from: the project's BOQ (an LOI or work order), Inventory's item master
+   * (a purchase order), or nothing — every row typed.
+   */
+  source: LineItemsSource;
 }) {
   const [rows, setRows] = useState<Row[]>(() => parse(value));
+  const fromBoq = source === 'boq' && Boolean(projectId);
+  const fromItems = source === 'items';
 
   const boq = useQuery({
     queryKey: ['boq', projectId],
-    queryFn: () => getBOQ(projectId),
+    queryFn: () => getBOQ(projectId ?? ''),
     enabled: fromBoq,
   });
+  // Active items only, as every inventory form offers them — and under the same key, so the cache
+  // the purchase and indent forms filled is the one read here.
+  const master = useQuery({
+    queryKey: ['inventory', 'items', { active: true }],
+    queryFn: () => getItems({ active: true, pageSize: 200 }),
+    select: (page) => page.items,
+    enabled: fromItems,
+  });
+  const itemOptions: SearchableOption[] = (master.data ?? []).map((item) => ({
+    id: item.id,
+    label: item.name,
+    sublabel: item.code,
+    note: item.unit,
+  }));
   // The contract schedule only, as the DWR offers it: an internal estimate describes the same work
   // in the same words, and listing both would show every item twice.
   const items = (boq.data ?? [])
@@ -147,6 +174,24 @@ export default function LineItemsEditor({
         rate: '',
         hsn: '',
         boqRate: Number.isFinite(item.rate) ? item.rate : null,
+      },
+    ]);
+  };
+  const addFromMaster = (id: string) => {
+    const item = (master.data ?? []).find((candidate) => candidate.id === id);
+    if (!item) return;
+    update([
+      ...rows,
+      {
+        key: nextKey++,
+        boqNo: '',
+        // The code with the name, as the client's PO prints "Material No. / Description".
+        description: `${item.code} - ${item.name}`,
+        unit: item.unit,
+        quantity: '',
+        rate: '',
+        hsn: item.hsnCode ?? '',
+        boqRate: null,
       },
     ]);
   };
@@ -190,6 +235,32 @@ export default function LineItemsEditor({
           {boq.isSuccess && options.length === 0 && (
             <span className="text-xs text-gray-500">
               This project has no BOQ yet. Add the items below instead.
+            </span>
+          )}
+        </div>
+      )}
+
+      {fromItems && (
+        <div className="flex flex-col gap-1">
+          <SearchableSelect
+            value=""
+            onChange={addFromMaster}
+            options={itemOptions}
+            placeholder={
+              master.isLoading
+                ? 'Reading the item master…'
+                : 'Add from the item master — search by name or code'
+            }
+            disabled={master.isLoading || itemOptions.length === 0}
+          />
+          {master.isSuccess && itemOptions.length === 0 && (
+            <span className="text-xs text-gray-500">
+              The item master has no active items. Add the items below instead.
+            </span>
+          )}
+          {master.isError && (
+            <span className="text-xs text-gray-500">
+              The item master could not be read. Add the items below instead.
             </span>
           )}
         </div>
@@ -322,7 +393,11 @@ export default function LineItemsEditor({
         onClick={addOther}
         className="text-sm font-medium text-blue-700 hover:underline"
       >
-        {fromBoq ? '+ Add an item not in the BOQ' : '+ Add item'}
+        {fromBoq
+          ? '+ Add an item not in the BOQ'
+          : fromItems
+            ? '+ Add an item not in the master'
+            : '+ Add item'}
       </button>
     </div>
   );

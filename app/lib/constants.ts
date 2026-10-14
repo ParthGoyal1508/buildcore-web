@@ -205,6 +205,8 @@ export const ROUTES = {
   // --- Inventory (feature 009) ---
   inventoryStock: '/dashboard/inventory/stock',
   inventoryPurchases: '/dashboard/inventory/purchases',
+  /** Purchase orders, which belong to no project (2026-10-15) — addressed to a vendor. */
+  inventoryPurchaseOrders: '/dashboard/inventory/purchase-orders',
   inventoryIssues: '/dashboard/inventory/issues',
   inventoryTransfers: '/dashboard/inventory/transfers',
   inventoryPayments: '/dashboard/inventory/payments',
@@ -1345,13 +1347,22 @@ export const BILLING_COPY = {
  * it, and keeping them in their own block is what makes that a move rather than an extraction.
  */
 export const WORK_ORDER_COPY = {
-  heading: 'Work orders',
+  /**
+   * Rates first, then the LOI, then the work order (2026-10-15).
+   *
+   * The client finalises a subcontractor's rates before any document goes out, issues the LOI with
+   * those rates as its BOQ annexure, and generates the work order later. One record carries all
+   * three: its draft is the rates being finalised, its approval approves the rates, and the two
+   * letters are issued from it afterwards. The copy below reads in that order — "award" was the
+   * word for the rates when the work order was the first thing issued.
+   */
+  heading: 'Rates & work orders',
   loading: 'Loading work orders…',
   loadFailed: 'Could not load this project’s work orders.',
   empty:
-    'No work order has been raised on this project yet. A subcontractor bill is measured against a work order’s award, so one has to exist first.',
+    'Nothing yet. Start by finalising a subcontractor’s rates: once they are approved, the LOI and then the work order are issued from the same record, and bills are measured against those rates.',
   summary: (retentionPercent: string, awardLines: number, bills: number) =>
-    `Retention ${retentionPercent} · ${awardLines} award line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
+    `Retention ${retentionPercent} · ${awardLines} rate line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
   /**
    * A heading above the row, and a label on the field — not one string doing both.
    *
@@ -1359,16 +1370,16 @@ export const WORK_ORDER_COPY = {
    * two lines in its column and pushed that field's input a line below its neighbours'. A label
    * that wraps is a row that does not line up.
    */
-  newHeading: 'New work order',
+  newHeading: 'Finalise a subcontractor’s rates',
   detailLabel: 'What the subcontractor is doing',
   retentionLabel: 'Retention (%)',
   retentionHint:
     'Cannot be changed once a bill has been raised: the retention on an issued bill is already withheld at the old rate, and moving the basis would make the subcontractor’s copy disagree with ours about money already held.',
-  raise: 'Raise work order',
+  raise: 'Continue to the rates',
   raising: 'Raising…',
-  raiseFailed: 'That work order could not be raised.',
+  raiseFailed: 'That record could not be created.',
   // --- Award capture ---
-  awardHeading: 'Capture the award',
+  awardHeading: 'Finalise the rates',
   awardHint:
     'One line per awarded item: description, unit, quantity, rate — separated by a tab or a pipe. Paste it from the order; nothing is saved until you choose to.',
   awardPlaceholder: 'RCC M25 in foundations | Cum | 100 | 4500',
@@ -1379,7 +1390,7 @@ export const WORK_ORDER_COPY = {
   awardUnparseable:
     'No usable lines were found. Each line needs a description, a unit, a quantity and a rate, separated by a tab or a pipe.',
   awardMissing:
-    'This work order has no award captured yet, so there is nothing to measure against.',
+    'No rates have been finalised on this record yet, so there is nothing to measure against.',
   /**
    * Saving an award replaces it — the server deletes the old lines and writes the new ones. Said
    * before the save, because a person pasting a corrected line expects it to be *added*.
@@ -1387,7 +1398,7 @@ export const WORK_ORDER_COPY = {
   awardReplaceWarning:
     'Saving replaces the award entirely. Paste every line, not just the ones you are correcting.',
   awardCaptured: (lines: number) =>
-    `${lines} line${lines === 1 ? '' : 's'} captured. Bills are measured against these.`,
+    `${lines} rate line${lines === 1 ? '' : 's'}. The LOI and work order print these, and bills are measured against them.`,
   /** Refused by the server, so said here rather than discovered on the save. */
   awardLockedByBills:
     'Bills have been raised against this award, so it can no longer be replaced — the remaining quantity on a bill already issued would move, and the subcontractor’s copy would then disagree with ours. Raise a variation instead.',
@@ -1400,15 +1411,15 @@ export const WORK_ORDER_COPY = {
    * it, while the first bill raised under it needed an approval. The commitment is made when the
    * award is given; a bill only measures against it.
    */
-  submitForApproval: 'Send the award for approval',
+  submitForApproval: 'Send rates for approval',
   submitting: 'Sending…',
   submitHint:
-    'A bill cannot be measured against this award until it has been approved. Capture the award lines first — there is nothing to approve in a work order that awards nothing.',
+    'Once the rates are approved, the LOI and the work order can be issued from them, and bills measured against them. Enter the rates first — there is nothing to approve without them.',
   pendingHint:
-    'Waiting for approval. A bill against it is refused until the approval completes — which is a different thing from it never having been sent.',
+    'The rates are waiting for approval. No LOI, work order or bill can be issued from them until it completes — which is a different thing from them never having been sent.',
   activeHint:
-    'Approved. Bills may be measured against this award — and the award is now fixed. Reopen it to change a rate.',
-  submitFailed: 'That award could not be sent for approval.',
+    'Rates approved and fixed. Issue the LOI and, later, the work order below; bills may be measured against these rates. Reopen them to change a rate.',
+  submitFailed: 'The rates could not be sent for approval.',
 
   /**
    * Reopening an approved award (2026-10-08).
@@ -1421,10 +1432,10 @@ export const WORK_ORDER_COPY = {
    * than a side effect of saving: an edit that quietly cancelled an approval would remove one
    * without the person noticing they had.
    */
-  reopen: 'Reopen the award',
+  reopen: 'Reopen the rates',
   reopening: 'Reopening…',
   reopenPrompt:
-    'Reopening sends this award back to draft and cancels its approval — it will have to be approved again. Why is it being reopened?',
+    'Reopening sends these rates back to draft and cancels their approval — they will have to be approved again, and an LOI or work order already issued keeps the old rates. Why are they being reopened?',
   reopenHint:
     'The rates are fixed while the award is approved. Reopen it to correct one; the approval is given again afterwards.',
   reopenedNotice:
@@ -1433,7 +1444,7 @@ export const WORK_ORDER_COPY = {
   awardLockedPending:
     'Somebody is reviewing these figures, so they cannot be changed. Changing them under the approver would put a decision against a schedule they never saw.',
   awardLockedApproved:
-    'This award was approved at the rates it holds, so it cannot be edited. Reopen it to make a change — that cancels the approval.',
+    'These rates were approved, so they cannot be edited — the LOI and work order are issued from them. Reopen them to make a change; that cancels the approval.',
 
   // --- 027: the number, the vendor, and the master–detail frame ---
   /** Shown where a code would be, for the work orders raised before 027 numbered them. */
@@ -1450,19 +1461,19 @@ export const WORK_ORDER_COPY = {
   vendorLoading: 'Loading vendors…',
 
   /** The list is the master; one of these fills the panel beside it. */
-  pickPrompt: 'Pick a work order to see its award, its bills and its retention.',
-  raiseNew: 'Raise a work order',
+  pickPrompt: 'Pick a record to see its rates, its documents, its bills and its retention.',
+  raiseNew: 'Finalise rates',
   raiseCancel: 'Cancel',
   tabs: {
-    award: 'Award',
+    award: 'Rates',
     bills: 'Bills',
     retention: 'Retention',
     settings: 'Settings',
   },
   /** Each tab says in one line what it is for, so the four names are not guessed at. */
   tabHints: {
-    award: 'What this subcontractor was given: the item, the quantity and their rate. Bills are measured against it.',
-    bills: 'Running account bills measured against the award — what was done this period, and what is payable after deductions.',
+    award: 'The rates agreed with this subcontractor: the item, the quantity and their rate. Approved, they are what the LOI and work order print, and what bills are measured against.',
+    bills: 'Running account bills measured against the approved rates — what was done this period, and what is payable after deductions.',
     retention: 'Money withheld from each bill as security, and every release of it back to the subcontractor.',
     settings: 'Correcting the detail, the subcontractor and the retention basis on this work order.',
   },
@@ -1485,6 +1496,29 @@ export const WORK_ORDER_COPY = {
     'The project BOQ could not be loaded, so lines cannot be picked from it. Typing and pasting still work.',
   awardNoBoq:
     'This project has no BOQ yet, so there is nothing to pick from. Type the lines or paste them.',
+  // --- 2026-10-15: the documents issued from approved rates ---
+  documentsHeading: 'Documents',
+  stageRates: 'Rates finalised',
+  stageLoi: 'LOI issued',
+  stageWorkOrder: 'Work order issued',
+  stageRatesDraft: 'Being entered — send them for approval',
+  stageRatesApproved: 'Approved',
+  stageAwaiting: 'Waiting for approval',
+  stageNotYet: 'Not yet',
+  stageIssued: (reference: string | null) =>
+    reference ? `Issued — ${reference}` : 'Issued',
+  issueLoi: 'Issue LOI',
+  issueWorkOrder: 'Issue work order',
+  documentsLocked:
+    'The LOI and the work order are issued from approved rates. Finalise the rates and send them for approval first.',
+  documentsHint:
+    'Each opens filled from this record — the subcontractor, the approved rates and the scope — for the rest to be typed. Both also list on the project’s Letters tab.',
+  documentsHintNoLoi:
+    'Issue the LOI first: the work order quotes its number and date. Each opens filled from this record — the subcontractor, the approved rates and the scope.',
+  documentsNoKinds:
+    'No LOI or work order letter is set up. They are configured in Settings → Letters.',
+  documentsRatesUnreadable:
+    'The approved rates could not be read, so the letters cannot be filled from them. Try again.',
   awardColumns: {
     boq: 'BOQ',
     description: 'Description',
@@ -1523,11 +1557,11 @@ export const WORK_ORDER_COPY = {
   awardRowIncomplete: (row: number) =>
     `Line ${row} needs a description, a unit, a quantity and a rate.`,
   awardNothingToSave: 'Add at least one line before saving.',
-  awardSaveChanges: 'Save award',
+  awardSaveChanges: 'Save rates',
   awardDiscard: 'Discard changes',
   awardRemoveRow: 'Remove this line',
-  awardTotal: 'Award total',
-  awardLoading: 'Loading the award…',
+  awardTotal: 'Total at these rates',
+  awardLoading: 'Loading the rates…',
 
   /** Bills whose work order was never recorded. Listed rather than hidden by the master–detail. */
   orphanBillsHeading: 'Bills not attached to a work order',
@@ -2974,6 +3008,8 @@ export const TRANSFER_NEXT_STATUSES: Record<
 export const INVENTORY_PERMISSIONS = {
   stock: 'INVENTORY',
   purchases: 'INVENTORY',
+  // The API maps `letter_purchase_order` to `INVENTORY` since 2026-10-15, so a buyer can raise one.
+  purchaseOrders: 'INVENTORY',
   issues: 'INVENTORY',
   transfers: 'INVENTORY',
   payments: 'INVENTORY',
