@@ -52,6 +52,9 @@ const schema = z.object({
   city: optionalText,
   state: optionalText,
   pinCode: optionalText.refine((v) => !v || /^[0-9]{6}$/.test(v), 'Must be 6 digits'),
+  phone: optionalText,
+  email: optionalText.refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Not a valid email'),
+  website: optionalText,
   pfEstablishmentCode: optionalText,
   esicCode: optionalText,
   professionalTaxRegNumber: optionalText,
@@ -95,6 +98,9 @@ const FIELD_TAB: Record<string, TabId> = {
   city: 'address',
   state: 'address',
   pinCode: 'address',
+  phone: 'address',
+  email: 'address',
+  website: 'address',
   pfEstablishmentCode: 'statutory',
   esicCode: 'statutory',
   professionalTaxRegNumber: 'statutory',
@@ -147,6 +153,9 @@ export default function CompanyModal({
       city: company?.city ?? '',
       state: company?.state ?? '',
       pinCode: company?.pinCode ?? '',
+      phone: company?.phone ?? '',
+      email: company?.email ?? '',
+      website: company?.website ?? '',
       pfEstablishmentCode: company?.pfEstablishmentCode ?? '',
       esicCode: company?.esicCode ?? '',
       professionalTaxRegNumber: company?.professionalTaxRegNumber ?? '',
@@ -304,6 +313,9 @@ export default function CompanyModal({
           <TextField id="city" label="City" error={err('city')} {...register('city')} />
           <TextField id="state" label="State" error={err('state')} {...register('state')} />
           <TextField id="pinCode" label="PIN code" error={err('pinCode')} {...register('pinCode')} />
+          <TextField id="phone" label="Phone" hint="Printed at the head of work orders and purchase orders" error={err('phone')} {...register('phone')} />
+          <TextField id="email" label="Email" error={err('email')} {...register('email')} />
+          <TextField id="website" label="Website" error={err('website')} {...register('website')} />
         </div>
 
         <div className={tab === 'statutory' ? 'space-y-4' : 'hidden'}>

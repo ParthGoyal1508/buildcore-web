@@ -24,6 +24,11 @@ export const companySchema = z.object({
   city: z.string().nullable(),
   state: z.string().nullable(),
   pinCode: z.string().nullable(),
+  // Printed at the head of a work order or purchase order (2026-10-14). Optional in the schema so
+  // a server that predates them still parses.
+  phone: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
   pfEstablishmentCode: z.string().nullable(),
   esicCode: z.string().nullable(),
   professionalTaxRegNumber: z.string().nullable(),
