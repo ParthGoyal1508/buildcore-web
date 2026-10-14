@@ -88,6 +88,12 @@ const STATUS_STYLES: Record<string, string> = {
   // every indent an approver correctly turned down.
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-800',
+  // Bill packages (2026-10-13). Amber while an approver holds it — somebody specific owes a
+  // decision — blue once issued (sent, money not yet agreed), green once certified.
+  pending_approval: 'bg-amber-100 text-amber-900',
+  issued: 'bg-blue-100 text-blue-800',
+  certified: 'bg-green-100 text-green-800',
+  abandoned: 'bg-gray-200 text-gray-700',
   approved: 'bg-green-100 text-green-800',
   // Returned for correction (028 — a daily work report, a muster). Amber rather than the grey
   // `draft` carries, and that difference is the point: a returned report is waiting on somebody

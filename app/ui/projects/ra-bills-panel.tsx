@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -17,7 +19,7 @@ import {
   type WorkOrder,
 } from '@/app/lib/api/billing';
 import { getVendors } from '@/app/lib/api/partners';
-import { BILLING_COPY, WORK_ORDER_COPY } from '@/app/lib/constants';
+import { BILLING_COPY, ROUTES, WORK_ORDER_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import AwardEditor from '@/app/ui/projects/award-editor';
@@ -779,13 +781,31 @@ function BillsTab({
             {WORK_ORDER_COPY.awardHeading}
           </SecondaryButton>
         </div>
-      ) : (
+      ) : revising ? (
+        // Editing a bill raised on this sheet before bills were generated as packages. New bills
+        // are generated below, from the work order, and go through approval.
         <RaBillSheet
           projectId={projectId}
           workOrderId={order.id}
-          revising={revising ?? undefined}
-          key={`${order.id}:${revising?.id ?? 'new'}`}
+          revising={revising}
+          key={`${order.id}:${revising.id}`}
         />
+      ) : (
+        <div className="space-y-1 rounded border border-gray-200 p-3">
+          <Link
+            href={`${ROUTES.projectsBillPackages(projectId)}?direction=to_subcontractor&workOrderId=${encodeURIComponent(order.id)}${
+              order.partnerId ? `&partnerId=${encodeURIComponent(order.partnerId)}` : ''
+            }`}
+            className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            Generate the next bill on this work order
+          </Link>
+          <p className="text-xs text-gray-500">
+            Quantities are proposed from approved daily work against this
+            award. Add recoveries and deductions, send it for approval, then
+            issue, certify and pay it — with a payment advice for each payment.
+          </p>
+        </div>
       )}
 
       <section className="space-y-2">

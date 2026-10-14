@@ -125,19 +125,7 @@ export async function downloadFile(
   };
 }
 
-/** Hands a downloaded blob to the browser as a save. */
-export function saveBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  // Revoked on the next tick rather than immediately: revoking synchronously can
-  // beat the browser to reading the URL and produce an empty file.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
+export { saveBlob } from '@/app/lib/download-file';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Employees (US1)

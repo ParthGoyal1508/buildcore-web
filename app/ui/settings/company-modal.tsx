@@ -6,7 +6,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ApiError } from '@/app/lib/api/client';
-import { Company, createCompany, updateCompany } from '@/app/lib/api/settings';
+import {
+  Company,
+  createCompany,
+  updateCompany,
+  uploadCompanyLogo,
+} from '@/app/lib/api/settings';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
@@ -278,6 +283,7 @@ export default function CompanyModal({
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </SelectField>
+          {company && <LogoUpload companyId={company.id} />}
           {/* "Logo URL" is gone (2026-10-12). It was written here and read by nothing
               since 002, and a company's logo is now an uploaded image — see
               `Company.logoRef` and `PUT /settings/companies/:id/logo`. Two controls for
@@ -317,5 +323,54 @@ export default function CompanyModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * The company's logo, uploaded as an image (2026-10-13). Shown in the sidebar and at the head of
+ * every payment advice. Saved on its own, the moment a file is chosen — it is not part of the form.
+ */
+function LogoUpload({ companyId }: { companyId: string }) {
+  const queryClient = useQueryClient();
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor="company-logo" className="text-sm font-medium text-gray-700">
+        Logo
+      </label>
+      <input
+        id="company-logo"
+        type="file"
+        accept="image/png,image/jpeg"
+        disabled={busy}
+        className="text-sm"
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          setBusy(true);
+          setMessage(null);
+          try {
+            await uploadCompanyLogo(companyId, file);
+            setMessage('Logo saved.');
+            void queryClient.invalidateQueries({
+              queryKey: ['companies', companyId, 'logo'],
+            });
+          } catch (err) {
+            setMessage(
+              (err as { message?: string })?.message ??
+                'The logo could not be saved.',
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+      <p className="text-xs text-gray-500">
+        PNG or JPEG. Shown in the sidebar and printed on payment advices — a
+        wide, short image reads best.
+      </p>
+      {message && <p className="text-xs text-gray-700">{message}</p>}
+    </div>
   );
 }

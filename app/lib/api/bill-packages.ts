@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { authFetchBlob, authFetch } from '@/app/lib/session';
+import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
+import { authFetchBlob, authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every bill-package call to `buildcore-api` — the routes under `projects/bill-packages` (feature 023, 024 FR-001).
@@ -37,6 +38,8 @@ export type BillDirection = (typeof BILL_DIRECTIONS)[number];
 
 export const BILL_PACKAGE_STATUSES = [
   'draft',
+  'pending_approval',
+  'approved',
   'issued',
   'certified',
   'abandoned',
@@ -61,6 +64,19 @@ export const CLAIM_PROPOSAL_SOURCES = [
  * nothing. The screens must never print the same thing for both: on the subcontractor direction
  * that would read as "no work was done this month" for every unmapped line of every bill.
  */
+export const DEDUCTION_SECTIONS = ['recovery', 'deduction'] as const;
+export type DeductionSection = (typeof DEDUCTION_SECTIONS)[number];
+
+const deductionLineSchema = z
+  .object({
+    section: z.enum(DEDUCTION_SECTIONS),
+    label: z.string(),
+    amount: rendered,
+  })
+  .passthrough();
+
+export type DeductionLine = z.infer<typeof deductionLineSchema>;
+
 const claimSchema = z
   .object({
     id: z.string(),
@@ -116,6 +132,31 @@ const packageSchema = z
       .object({ workDate: z.string(), dprNumber: z.string() })
       .nullable()
       .optional(),
+    // ── The road out of the building (2026-10-13) ──────────────────────────
+    // Optional throughout, so a package read from an older server still parses.
+    submittedAt: z.string().nullable().optional(),
+    approvedAt: z.string().nullable().optional(),
+    issuedAt: z.string().nullable().optional(),
+    sharedAt: z.string().nullable().optional(),
+    sharedTo: z.string().nullable().optional(),
+    certifiedAmount: nullableRendered.optional(),
+    certifiedAt: z.string().nullable().optional(),
+    certifiedRemarks: z.string().nullable().optional(),
+    revisionCount: z.number().optional(),
+    lastRevisionReason: z.string().nullable().optional(),
+    /** A subcontractor bill's own recovery / deduction lines, as entered. */
+    deductionLines: z.array(deductionLineSchema).optional(),
+    /** The RA bill under a subcontractor package — payments and the advice hang off it. */
+    raBillId: z.string().nullable().optional(),
+    clientBillId: z.string().nullable().optional(),
+    workOrderId: z.string().nullable().optional(),
+    /** Who the bill is to, by name. Sent on the single read, not on every write. */
+    counterpartyName: z.string().nullable().optional(),
+    /**
+     * The caller's own position in the approval chain — `canActNow` is what puts Approve / Reject
+     * on the bill for the person whose turn it is. Null before the bill was ever sent.
+     */
+    approval: approvalStateSchemaForModules.nullable().optional(),
   })
   .passthrough();
 
@@ -140,6 +181,10 @@ const packageListItemSchema = z
      * `RA-01`. Without this the list cannot say which award a row belongs to.
      */
     counterpartyKey: z.string(),
+    /** The client's or subcontractor's name — "RA-01" alone repeats once per counterparty. */
+    counterpartyName: z.string().nullable().optional(),
+    /** True where this bill is waiting on the caller's own approval. */
+    awaitingMe: z.boolean().optional(),
   })
   .passthrough();
 
@@ -164,6 +209,20 @@ const abstractSchema = z
       uptoPrevious: columnSchema,
       uptoDate: columnSchema,
     }),
+    /** Each of a subcontractor bill's own lines, in three columns. */
+    deductionLines: z
+      .array(
+        z
+          .object({
+            section: z.enum(DEDUCTION_SECTIONS),
+            label: z.string(),
+            thisBill: rendered,
+            uptoPrevious: rendered,
+            uptoDate: rendered,
+          })
+          .passthrough(),
+      )
+      .optional(),
   })
   .passthrough();
 
@@ -295,6 +354,8 @@ const understatementSchema = z
                 claimed: rendered,
                 approvedNow: rendered,
                 understatedBy: rendered,
+                /** Already claimed back by later bills' over-claims, and netted off. */
+                recoveredLater: rendered.optional(),
               })
               .passthrough(),
           ),
@@ -336,6 +397,32 @@ const overClaimSchema = z
     ),
     totalOverClaimed: z.number(),
     totalLines: z.number(),
+    /**
+     * Issued bills whose period's measurement was reduced after they went out — they now claim
+     * more than was measured, though nobody over-claimed at the time.
+     */
+    reversedAfterIssue: z
+      .array(
+        z
+          .object({
+            packageId: z.string(),
+            label: z.string(),
+            periodFrom: z.string(),
+            periodTo: z.string(),
+            lines: z.array(
+              z
+                .object({
+                  boqNo: z.string(),
+                  claimed: rendered,
+                  approvedNow: rendered,
+                  overBy: rendered,
+                })
+                .passthrough(),
+            ),
+          })
+          .passthrough(),
+      )
+      .default([]),
   })
   .passthrough();
 
@@ -446,11 +533,15 @@ export const BILL_ADJUSTMENT_TOTALS = [
  * percentages; the only thing anybody enters on one is row 1B.
  */
 export function adjustmentsFor(direction: BillDirection) {
-  return BILL_ADJUSTMENTS.filter((row) =>
-    direction === 'to_client'
-      ? row.key === 'workDeduction'
-      : row.key !== 'workDeduction',
-  );
+  if (direction === 'to_client') {
+    // The client's payment abstract names these three in its own words.
+    return [
+      { key: 'workDeduction', label: 'B) Deduction from the bill of quantities', block: '1' },
+      { key: 'theftWithheld', label: '(E) Amount withheld', block: '2' },
+      { key: 'releaseWithheld', label: 'Released amount (from an earlier withholding)', block: '2' },
+    ] as const;
+  }
+  return BILL_ADJUSTMENTS.filter((row) => row.key !== 'workDeduction');
 }
 
 export type BillAdjustmentKey =
@@ -569,14 +660,86 @@ export async function reviseBillPackage(
 
 export async function certifyBillPackage(
   packageId: string,
-  certifiedAmount: string,
+  input: { certifiedAmount: string; remarks?: string },
 ): Promise<BillPackage> {
   return packageSchema.parse(
     await authFetch<unknown>(`/projects/bill-packages/${packageId}/certify`, {
       method: 'POST',
-      body: JSON.stringify({ certifiedAmount }),
+      body: JSON.stringify(input),
     }),
   );
+}
+
+/** Sends a draft into its approval chain — `client_bill` or `ra_bill`, set in Settings → Approvals. */
+export async function submitBillPackage(packageId: string): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(`/projects/bill-packages/${packageId}/submit`, {
+      method: 'POST',
+    }),
+  );
+}
+
+/** Takes a bill back to draft from approval, so it can be changed and sent again. */
+export async function withdrawBillPackage(
+  packageId: string,
+  reason?: string,
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(`/projects/bill-packages/${packageId}/withdraw`, {
+      method: 'POST',
+      body: JSON.stringify(reason ? { reason } : {}),
+    }),
+  );
+}
+
+/** Records that the issued bill was sent — by hand, to whom and how. */
+export async function markBillShared(
+  packageId: string,
+  sharedTo?: string,
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(`/projects/bill-packages/${packageId}/share`, {
+      method: 'POST',
+      body: JSON.stringify(sharedTo ? { sharedTo } : {}),
+    }),
+  );
+}
+
+/** Replaces a subcontractor bill's own recovery / deduction lines — the whole list. Draft only. */
+export async function setDeductionLines(
+  packageId: string,
+  lines: { section: DeductionSection; label: string; amount: string }[],
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-packages/${packageId}/deduction-lines`,
+      { method: 'PATCH', body: JSON.stringify({ lines }) },
+    ),
+  );
+}
+
+export type BillDocumentFormat = 'xlsx' | 'pdf' | 'docx';
+
+/**
+ * The bill in any of three formats, or its abstract alone — on a bill to the client, the
+ * *Payment Abstract*. All three are rendered from one view on the server, so they cannot disagree.
+ */
+export async function downloadBillDocument(
+  packageId: string,
+  label: string,
+  format: BillDocumentFormat,
+  options: { abstractOnly?: boolean; abstractName?: string } = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/bill-packages/${packageId}/document.${format}${
+      options.abstractOnly ? '?part=abstract' : ''
+    }`,
+  );
+  const suffix = options.abstractOnly
+    ? ` ${options.abstractName ?? 'Abstract'}`
+    : '';
+  // The server's name carries the party and the bill, as the client names the file they are sent.
+  return { blob, filename: filename ?? `${label}${suffix}.${format}` };
 }
 
 /**
@@ -653,6 +816,18 @@ export function proposalLabel(claim: BillPackageClaim): string {
   return claim.proposedQty;
 }
 
+/**
+ * Where a bill stands, in the words a reader uses. One place, so the list and the detail agree.
+ */
+export const BILL_STATUS_LABELS: Record<BillPackageStatus, string> = {
+  draft: 'Draft',
+  pending_approval: 'Awaiting approval',
+  approved: 'Approved — ready to issue',
+  issued: 'Issued',
+  certified: 'Certified',
+  abandoned: 'Abandoned',
+};
+
 /** Whether a claim can still be edited. An issued bill is a document that was sent. */
 export function isEditable(status: BillPackageStatus): boolean {
   return status === 'draft';
@@ -661,7 +836,15 @@ export function isEditable(status: BillPackageStatus): boolean {
 /** The abstract's rows, in the client's own order, with the labels their sheet uses. */
 type AbstractBlock = {
   title: string;
-  rows: { key: string; label: string; isTotal?: boolean }[];
+  rows: {
+    key: string;
+    label: string;
+    isTotal?: boolean;
+    /** Left off the screen where it is zero in every column. */
+    hideWhenNil?: boolean;
+  }[];
+  /** Where a subcontractor bill's own lines of this section are listed, before the total. */
+  customSection?: DeductionSection;
 };
 
 /**
@@ -697,7 +880,8 @@ const CLIENT_BLOCKS: AbstractBlock[] = [
       { key: 'sgstAmount', label: 'SGST' },
       { key: 'igstAmount', label: 'IGST' },
       {
-        key: 'workTotal',
+        // Without the release, which the client's sheet prints beneath the recoveries.
+        key: 'invoiceValue',
         label: 'Invoice value / work done value',
         isTotal: true,
       },
@@ -713,14 +897,20 @@ const CLIENT_BLOCKS: AbstractBlock[] = [
         key: 'retentionAmount',
         label: '(D) Security deposit / retention money',
       },
-      { key: 'unlistedWithheld', label: '(E) Other recoveries recorded' },
+      { key: 'theftWithheld', label: '(E) Amount withheld' },
       {
-        // B + C + D, not block B — the client's sheet has one recoveries total and its payable is
-        // block 1 less that figure.
+        key: 'unlistedWithheld',
+        label: '(F) Other recoveries recorded',
+        hideWhenNil: true,
+      },
+      {
+        // Everything withheld — the client's sheet has one recoveries total.
         key: 'totalWithheld',
-        label: 'Total recoveries (2A+2B+2C+2D)',
+        label: 'Total recoveries',
         isTotal: true,
       },
+      // A withholding from an earlier bill paid out on this one — added back to the payable.
+      { key: 'releaseWithheld', label: 'Released amount' },
     ],
   },
 ];
@@ -739,6 +929,7 @@ export const ABSTRACT_BLOCKS: AbstractBlock[] = [
   },
   {
     title: 'B. Recoveries',
+    customSection: 'recovery',
     rows: [
       { key: 'recoveryDiesel', label: 'Recovery of diesel' },
       { key: 'debitAgainstCivil', label: 'Debit against civil' },
@@ -749,6 +940,7 @@ export const ABSTRACT_BLOCKS: AbstractBlock[] = [
   },
   {
     title: 'C. Deductions',
+    customSection: 'deduction',
     rows: [
       { key: 'mobilizationAdvance', label: 'Deduction for mobilisation advance' },
       { key: 'retentionAmount', label: 'Retention money' },
