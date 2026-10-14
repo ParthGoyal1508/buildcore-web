@@ -159,6 +159,26 @@ const packageSchema = z
     raBillId: z.string().nullable().optional(),
     clientBillId: z.string().nullable().optional(),
     workOrderId: z.string().nullable().optional(),
+    /**
+     * The certified copy filed at Certify, once the bill is certified (2026-10-14) — which download
+     * serves it. A bill to the client keeps it as the client bill's certificate; a subcontractor's
+     * as the latest signed copy on its RA bill. Null where none was filed.
+     */
+    certifiedCopy: z
+      .discriminatedUnion('kind', [
+        z.object({
+          kind: z.literal('client_certificate'),
+          clientBillId: z.string(),
+          fileName: z.string(),
+        }),
+        z.object({
+          kind: z.literal('signed_copy'),
+          signedCopyId: z.string(),
+          fileName: z.string(),
+        }),
+      ])
+      .nullable()
+      .optional(),
     /** Who the bill is to, by name. Sent on the single read, not on every write. */
     counterpartyName: z.string().nullable().optional(),
     /**

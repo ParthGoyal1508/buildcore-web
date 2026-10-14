@@ -921,9 +921,10 @@ function BillsTab({
                 {!bill.package && opened.has(bill.id) && (
                   <>
                     <RaBillView bill={bill} />
-                    {/* 028 FR-020, FR-021. Beside the bill rather than inside `RaBillView`, which
-                        fetches nothing by design: payments and signed copies are different data
-                        and change without the bill changing. */}
+                    {/* 028 FR-021. Beside the bill rather than inside `RaBillView`, which fetches
+                        nothing by design: payments are different data and change without the bill
+                        changing. A bill raised before packages, so certified by its own `ra_bill`
+                        chain — the settlement shows nothing payable until that chain approves it. */}
                     <RaBillSettlement bill={bill} />
                   </>
                 )}

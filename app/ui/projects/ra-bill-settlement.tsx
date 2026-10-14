@@ -6,11 +6,8 @@ import { useState } from 'react';
 import {
   type PaymentInstrument,
   type RaBill,
-  downloadSignedCopy,
   getBillOutstanding,
-  getBillSignedCopies,
   removeBillPayment,
-  uploadBillSignedCopy,
   downloadPaymentAdvice,
 } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
@@ -23,13 +20,21 @@ import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import HiddenAmount from '@/app/ui/hidden-amount';
 
 /**
- * What has been paid against one bill, and whether the signed copy came back (028 FR-020, FR-021).
+ * What has been paid against one bill (028 FR-021).
+ *
+ * ## No signed-copy section any more (2026-10-14)
+ *
+ * The countersigned copy used to be filed here, after the bill was already certified and paid
+ * against. It is now the **certified copy uploaded at Certify** on the bill package — filed as the
+ * RA bill's signed copy, so the acknowledgement it sets is unchanged — and downloaded from the
+ * package's lifecycle panel. Two places to file one document is two answers to "which copy is the
+ * certified one".
  *
  * ## Why this is a panel of its own rather than part of `RaBillView`
  *
  * `RaBillView` fetches nothing, deliberately: every figure it shows is already on the bill the list
  * carried, so a detail request there would be a second chance for two renderings of one bill to
- * disagree. Payments and signed copies are **different data**, and they change without the bill
+ * disagree. Payments are **different data**, and they change without the bill
  * changing — so they are read here, beside it, rather than by making that component fetch.
  *
  * ## Outstanding is never computed in this file
@@ -63,19 +68,10 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
     enabled: certified,
   });
 
-  const copies = useQuery({
-    queryKey: ['raBillSignedCopies', bill.id],
-    queryFn: () => getBillSignedCopies(bill.id),
-  });
-
   const refresh = () => {
     void queryClient.invalidateQueries({
       queryKey: ['raBillOutstanding', bill.id],
     });
-    void queryClient.invalidateQueries({
-      queryKey: ['raBillSignedCopies', bill.id],
-    });
-    // The bill's own row carries `acknowledgedOn`, which a filed copy has just changed.
     void queryClient.invalidateQueries({ queryKey: ['raBills'] });
   };
 
@@ -149,13 +145,6 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
         onChanged={refresh}
       />
 
-      <SignedCopies
-        billId={bill.id}
-        acknowledgedOn={position?.acknowledgedOn ?? null}
-        copies={copies.data ?? []}
-        onError={setError}
-        onChanged={refresh}
-      />
     </section>
   );
 }
@@ -301,163 +290,6 @@ function Payments({
       )}
     </div>
   );
-}
-
-function SignedCopies({
-  billId,
-  acknowledgedOn,
-  copies,
-  onError,
-  onChanged,
-}: {
-  billId: string;
-  acknowledgedOn: string | null;
-  copies: { id: string; fileName: string; receivedOn: string }[];
-  onError: (message: string | null) => void;
-  onChanged: () => void;
-}) {
-  const [receivedOn, setReceivedOn] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-
-  const upload = useMutation({
-    mutationFn: async () => {
-      if (!file) return;
-      const data = await base64Of(file);
-      await uploadBillSignedCopy(billId, {
-        data,
-        fileName: file.name,
-        receivedOn,
-      });
-    },
-    onSuccess: () => {
-      onError(null);
-      setFile(null);
-      setReceivedOn('');
-      onChanged();
-    },
-    onError: (err: unknown) => onError(describe(err)),
-  });
-
-  const download = useMutation({
-    mutationFn: async (copy: { id: string; fileName: string }) => {
-      const { blob, filename } = await downloadSignedCopy(
-        copy.id,
-        copy.fileName,
-      );
-      saveBlob(blob, filename);
-    },
-    onError: (err: unknown) => onError(describe(err)),
-  });
-
-  return (
-    <div className="space-y-2">
-      <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-        {SETTLEMENT_COPY.signedHeading}
-      </h5>
-
-      {/* **The state, not the file.** FR-020 exists because a file in a list cannot answer "which
-          bills are unacknowledged", and this line is the answer. */}
-      <p className="text-sm">
-        {acknowledgedOn ? (
-          <span className="font-medium text-green-800">
-            {SETTLEMENT_COPY.acknowledged(dateLabel(acknowledgedOn))}
-          </span>
-        ) : (
-          <span className="text-gray-600">
-            {SETTLEMENT_COPY.unacknowledged}
-          </span>
-        )}
-      </p>
-
-      {copies.length > 0 && (
-        <ul className="divide-y divide-gray-100 text-sm">
-          {copies.map((copy) => (
-            <li
-              key={copy.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-1.5"
-            >
-              <span className="text-gray-700">
-                {copy.fileName}
-                <span className="ml-2 text-xs text-gray-500">
-                  {dateLabel(copy.receivedOn)}
-                </span>
-              </span>
-              <Button
-                type="button"
-                disabled={download.isPending}
-                onClick={() => download.mutate(copy)}
-              >
-                {SETTLEMENT_COPY.download}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          upload.mutate();
-        }}
-      >
-        <div className="grid items-start gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-gray-700">
-              {SETTLEMENT_COPY.receivedOnLabel}
-            </span>
-            <input
-              type="date"
-              required
-              value={receivedOn}
-              onChange={(event) => setReceivedOn(event.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2"
-            />
-            <span className="text-xs text-gray-500">
-              {SETTLEMENT_COPY.receivedOnHint}
-            </span>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-gray-700">
-              {SETTLEMENT_COPY.fileLabel}
-            </span>
-            <input
-              type="file"
-              required
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            />
-            <span className="text-xs text-gray-500">
-              {SETTLEMENT_COPY.replaceHint}
-            </span>
-          </label>
-        </div>
-
-        <div>
-          <Button type="submit" disabled={upload.isPending || !file}>
-            {upload.isPending
-              ? SETTLEMENT_COPY.uploading
-              : SETTLEMENT_COPY.upload}
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-/** The file's bytes, base64-encoded, the shape every upload in this product takes. */
-async function base64Of(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  // Chunked rather than one spread: `String.fromCharCode(...bytes)` on a multi-megabyte scan
-  // exceeds the argument limit and throws, which would make a large signed copy unuploadable.
-  const CHUNK = 8192;
-  for (let index = 0; index < bytes.length; index += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + CHUNK));
-  }
-  return btoa(binary);
 }
 
 function describe(err: unknown): string {

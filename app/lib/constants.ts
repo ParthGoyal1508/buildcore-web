@@ -2681,7 +2681,7 @@ const ENUM_LABEL_OVERRIDES: Record<string, string> = {
   to_client: 'To the client',
   to_subcontractor: 'To a subcontractor',
   derived_from_gstin: 'derived from the GSTIN',
-  from_project_flag: "set on the project's own record",
+  from_project_flag: 'as chosen on the project',
 };
 
 export function hrLabel(value: string): string {
@@ -4294,7 +4294,7 @@ export const PAYMENT_PROOF_COPY = {
  * answers.
  */
 export const SETTLEMENT_COPY = {
-  heading: 'Payment and acknowledgement',
+  heading: 'Payment',
   /** Only a certified bill has an agreed figure to be outstanding against. */
   notCertified:
     'This bill has not been certified, so there is no agreed figure to pay against and its quantities can still change. Money paid before certification is an advance — record it as an advance recovery on the bill package.',
@@ -4326,20 +4326,8 @@ export const SETTLEMENT_COPY = {
     adjustment: 'Adjustment',
   } as Record<string, string>,
 
-  signedHeading: 'Signed copy',
-  /** The state, which is the point of FR-020 — not merely a file in a list. */
-  acknowledged: (date: string) => `Acknowledged on ${date}`,
-  unacknowledged: 'No signed copy has come back yet.',
-  receivedOnLabel: 'Received on',
-  receivedOnHint:
-    'When the copy came back, not when it was scanned. A copy signed on site on Tuesday and scanned on Friday was acknowledged on Tuesday — and that is the date a payment term runs from.',
-  fileLabel: 'The signed copy',
-  upload: 'File the signed copy',
-  uploading: 'Uploading…',
-  download: 'Download',
-  /** A later scan does not move the acknowledgement date. */
-  replaceHint:
-    'The first copy sets the acknowledgement date. A later replacement scan is filed beside it and does not move the date.',
+  // The signed-copy section's wording went with the section (2026-10-14): the certified copy is
+  // uploaded at Certify on the bill package and downloaded from its lifecycle panel.
   debitNote: 'Download the debit note',
 } as const;
 
@@ -4402,6 +4390,20 @@ export const INVENTORY_ISSUE_LABEL = 'Issue / Consumption material';
 
 /** The same label where a shorter one is needed — a tab strip, a breadcrumb. */
 export const INVENTORY_ISSUE_LABEL_SHORT = 'Issue / Consumption';
+
+/**
+ * The project's GST choice (2026-10-14). It decides the tax on every bill on the project — to the
+ * client and from each subcontractor — rather than the two parties' GSTINs, because the company
+ * holds more than one.
+ */
+export const PROJECT_GST_COPY = {
+  legend: 'GST on bills',
+  options: [
+    { label: 'CGST + SGST', cgstApplicable: true },
+    { label: 'IGST', cgstApplicable: false },
+  ],
+  hint: "Applies to every client and subcontractor bill on this project. A bill already raised keeps the tax it was raised with.",
+} as const;
 
 export const PROJECT_SHELL_COPY = {
   loading: 'Loading this project…',
@@ -4535,9 +4537,9 @@ export const PROJECT_SHELL_COPY = {
   departmentLabel: 'Department',
   projectTypeLabel: 'Project type',
   siteStartLabel: 'Site start',
-  cgstLabel: 'CGST',
-  cgstApplicable: 'Applicable',
-  cgstNotApplicable: 'Not applicable',
+  cgstLabel: 'GST on bills',
+  cgstApplicable: 'CGST + SGST',
+  cgstNotApplicable: 'IGST',
   retentionLabel: 'Client retention',
   quotedLabel: 'Quoted percentage',
   /** Null is not zero: a bill to the client is refused until a term is recorded. */

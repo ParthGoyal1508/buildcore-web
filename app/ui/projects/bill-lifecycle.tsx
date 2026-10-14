@@ -17,6 +17,7 @@ import {
   submitBillPackage,
   withdrawBillPackage,
 } from '@/app/lib/api/bill-packages';
+import { downloadCertificate, downloadSignedCopy } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
 import { dateLabel } from '@/app/lib/format';
 import { useCanWrite } from '@/app/lib/write-access';
@@ -286,6 +287,7 @@ export default function BillLifecycle({
       )}
 
       <Facts pkg={pkg} />
+      <CertifiedCopy pkg={pkg} onError={(m) => onError(m)} />
       <Downloads pkg={pkg} onError={(m) => onError(m)} />
     </section>
   );
@@ -379,6 +381,54 @@ function Facts({ pkg }: { pkg: BillPackage }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/**
+ * The certified copy filed at Certify, once the bill is certified (2026-10-14).
+ *
+ * Either direction, one link: the server says which download holds it — the client bill's
+ * certificate, or the signed copy on a subcontractor's RA bill — so this asks no question of its
+ * own about where a direction keeps its paper.
+ */
+function CertifiedCopy({
+  pkg,
+  onError,
+}: {
+  pkg: BillPackage;
+  onError: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const copy = pkg.certifiedCopy;
+  if (pkg.status !== 'certified' || !copy) return null;
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      const { blob, filename } =
+        copy.kind === 'client_certificate'
+          ? await downloadCertificate(copy.clientBillId)
+          : await downloadSignedCopy(copy.signedCopyId, copy.fileName);
+      saveBlob(blob, filename || copy.fileName);
+    } catch (err) {
+      onError(describe(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <button
+        type="button"
+        className="font-medium text-blue-700 underline hover:text-blue-900 disabled:opacity-50"
+        onClick={() => void download()}
+        disabled={busy}
+      >
+        {busy ? 'Downloading…' : 'Download certified copy'}
+      </button>
+      <span className="text-gray-500">{copy.fileName}</span>
+    </div>
   );
 }
 
@@ -551,20 +601,20 @@ function CertifyForm({
           onChange={(e) => setRemarks(e.target.value)}
         />
       </div>
-      {toClient && (
-        <div className="flex flex-col gap-1">
-          <label htmlFor="bill-certificate" className="text-sm font-medium text-gray-700">
-            Client’s certificate
-          </label>
-          <input
-            id="bill-certificate"
-            type="file"
-            accept="application/pdf,image/*,.xlsx,.xls"
-            className="text-sm"
-            onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
-          />
-        </div>
-      )}
+      {/* Both directions (2026-10-14). On a subcontractor's bill this is the certified copy —
+          filed as the RA bill's signed copy, which also acknowledges the bill. */}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="bill-certificate" className="text-sm font-medium text-gray-700">
+          {toClient ? 'Client’s certificate' : 'Certified copy'}
+        </label>
+        <input
+          id="bill-certificate"
+          type="file"
+          accept="application/pdf,image/*,.xlsx,.xls"
+          className="text-sm"
+          onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
+        />
+      </div>
       <div className="shrink-0">
         <FieldLabelSpacer />
         <Button type="submit" disabled={busy || !amount.trim()}>

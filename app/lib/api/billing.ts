@@ -857,27 +857,6 @@ export async function getSubcontractorOutstanding(
   );
 }
 
-/**
- * Files the countersigned copy of a bill, which **acknowledges it** (FR-020).
- *
- * `receivedOn` is asked for rather than taken from the clock: a copy signed on site on Tuesday and
- * scanned on Friday was acknowledged on Tuesday, and that is the date a payment term runs from.
- *
- * Base64 in a JSON body, the shape `addDwrAttachment` established — one upload mechanism in this
- * product rather than two.
- */
-export async function uploadBillSignedCopy(
-  raBillId: string,
-  input: { data: string; fileName: string; receivedOn: string },
-): Promise<SignedCopy> {
-  return signedCopySchema.parse(
-    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/signed-copy`, {
-      method: 'POST',
-      body: JSON.stringify({ ...input, subjectType: 'ra_bill' }),
-    }),
-  );
-}
-
 /** Files the countersigned copy of a debit note (FR-020). */
 export async function uploadDebitSignedCopy(
   debitId: string,
@@ -892,16 +871,6 @@ export async function uploadDebitSignedCopy(
       },
     ),
   );
-}
-
-export async function getBillSignedCopies(
-  raBillId: string,
-): Promise<SignedCopy[]> {
-  return z
-    .array(signedCopySchema)
-    .parse(
-      await authFetch<unknown>(`/projects/ra-bills/${raBillId}/signed-copies`),
-    );
 }
 
 export async function getDebitSignedCopies(
