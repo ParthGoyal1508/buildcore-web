@@ -2,12 +2,19 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { listSelectableCompanies } from '@/app/lib/api/company-selection';
 import {
   getGroupCompanies,
   getStatutoryCalendar,
 } from '@/app/lib/api/dashboard';
-import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
+import {
+  CompanyCard,
+  GroupTotalCard,
+  StatutoryCalendarCard,
+} from '@/app/ui/dashboard/group-cards';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
+import { TABLE } from '@/app/ui/table-classes';
 
 export default function GroupDashboardPage() {
   const companies = useQuery({
@@ -18,13 +25,19 @@ export default function GroupDashboardPage() {
     queryKey: ['group-statutory-calendar'],
     queryFn: getStatutoryCalendar,
   });
+  // The logos. Same key the sidebar's company logo and switcher use, so this is normally
+  // already cached and costs nothing; a company missing from it shows its initials.
+  const selectable = useQuery({
+    queryKey: ['companies', 'selectable'],
+    queryFn: listSelectableCompanies,
+  });
+  const logos = new Map((selectable.data ?? []).map((c) => [c.id, c]));
 
   return (
-    <main>
+    <main className="flex flex-col gap-4">
       <PageHeader
         title="Group Dashboard"
         description="Every company you can access, plus a group total."
-        className="mb-4"
       />
 
       {/* The "Search Employees" box sat here until 2026-10-15. The client asked for it
@@ -32,26 +45,44 @@ export default function GroupDashboardPage() {
           → Employees is for. */}
 
       {companies.isPending && (
-        <p className="text-sm text-gray-500" role="status">
-          Loading companies…
+        <p className={TABLE.empty} role="status">
+          <LoadingText>Loading companies…</LoadingText>
         </p>
       )}
       {companies.isError && (
-        <p className="text-sm text-red-600" role="alert">
+        <p className={TABLE.failed} role="alert">
           Could not load the group dashboard.
         </p>
       )}
 
       {companies.data && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {companies.data.map((w) => (
-            <WidgetRenderer key={w.id} widget={w} />
-          ))}
-          {statutory.data && (
-            <WidgetRenderer widget={statutory.data} />
+        <>
+          {companies.data.total && (
+            <GroupTotalCard total={companies.data.total} />
           )}
-        </div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {companies.data.companies.map((card) => (
+              <CompanyCard
+                key={card.companyId}
+                card={card}
+                logo={logos.get(card.companyId)}
+              />
+            ))}
+          </div>
+        </>
       )}
+
+      {statutory.isPending && (
+        <p className={TABLE.empty} role="status">
+          <LoadingText>Loading statutory calendar…</LoadingText>
+        </p>
+      )}
+      {statutory.isError && (
+        <p className={TABLE.failed} role="alert">
+          Could not load the statutory calendar.
+        </p>
+      )}
+      {statutory.data && <StatutoryCalendarCard calendar={statutory.data} />}
     </main>
   );
 }

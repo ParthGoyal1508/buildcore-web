@@ -3,9 +3,7 @@
 import Link from 'next/link';
 
 import { rupees } from '@/app/lib/format';
-import ResponsiveList, {
-  type Column,
-} from '@/app/ui/settings/responsive-list';
+import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import type { WidgetResult } from '@/app/lib/api/dashboard';
 
 /**
@@ -70,8 +68,7 @@ export default function WidgetRenderer({
   }
 }
 
-const cardClass =
-  'rounded-lg border border-gray-200 bg-white p-4 shadow-sm';
+const cardClass = 'rounded-lg border border-gray-200 bg-white p-4 shadow-sm';
 
 /** The focus ring every link on the dashboard carries — keyboard users must see where they are. */
 const focusRing =
@@ -140,7 +137,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** A single headline figure. Handles a plain number/string and the Group Dashboard's
- * company-card object (headcount + not-yet-computable sub-metrics). */
+ * company-card object's headcount. */
 export function KpiCard({
   title,
   value,
@@ -164,7 +161,6 @@ export function KpiCard({
   note?: string;
 }) {
   let display = '—';
-  let subtitle: string | null = null;
   if (typeof value === 'number' || typeof value === 'string') {
     // A rupee figure is unreadable raw: the Contract Value card shipped showing
     // `371100000`, which is ₹37.11 crore written so that nobody can tell it from
@@ -174,17 +170,15 @@ export function KpiCard({
         ? rupees(value)
         : String(value);
   } else if (isRecord(value) && 'headcount' in value) {
+    // The Group Dashboard renders its company cards itself since 2026-10-15
+    // (`app/ui/dashboard/group-cards.tsx`); kept so a card object landing here still
+    // shows its headline rather than a dash.
     display = String(value.headcount);
-    const pending = Array.isArray(value.unavailableMetrics)
-      ? value.unavailableMetrics.length
-      : 0;
-    if (pending > 0) subtitle = `${pending} more metrics coming soon`;
   }
   return (
     <CardShell href={href} label={`${title}: ${display}`}>
       <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
-      {subtitle && <p className="mt-1 text-xs text-gray-400">{subtitle}</p>}
       {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </CardShell>
   );
@@ -221,9 +215,7 @@ interface TableValue {
 
 function isTableValue(value: unknown): value is TableValue {
   return (
-    isRecord(value) &&
-    Array.isArray(value.columns) &&
-    Array.isArray(value.rows)
+    isRecord(value) && Array.isArray(value.columns) && Array.isArray(value.rows)
   );
 }
 
