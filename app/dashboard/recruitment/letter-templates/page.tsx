@@ -10,18 +10,19 @@ import {
 import LetterTemplatesManager from "@/app/ui/letters/letter-templates-manager";
 
 /**
- * Recruitment's own letter templates — the offer and appointment letters (2026-10-14). Every other
- * kind is HR's, a project's or a payment's, and is managed in Settings → Letter templates.
+ * Recruitment's own letter template — the offer letter (2026-10-14; the appointment letter moved to
+ * HR & Payroll on 2026-10-15). Every other kind is HR's, a project's or a payment's, and is managed
+ * in Settings → Letter templates.
  */
 export default function RecruitmentLetterTemplatesPage() {
   return (
     <LetterTemplatesManager
       kindKeys={RECRUITMENT_TEMPLATE_KIND_KEYS}
       title={TEMPLATE_COPY.title}
-      description="The offer and appointment letters recruitment issues."
+      description="The offer letter recruitment issues."
       footnote={
         <>
-          Relieving, experience and the other HR letters, and project and
+          The appointment, relieving, experience and other HR letters, and project and
           payment letters, are in{" "}
           <Link
             href={ROUTES.settingsLetterTemplates}

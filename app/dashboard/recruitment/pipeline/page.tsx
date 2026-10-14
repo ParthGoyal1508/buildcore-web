@@ -19,7 +19,6 @@ import {
 } from '@/app/lib/api/recruitment';
 import {
   CANDIDATE_LETTER_KIND_KEYS,
-  RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS,
   CANDIDATE_SOURCES,
   PIPELINE_COLUMNS,
   recruitmentLabel,
@@ -303,10 +302,8 @@ function CandidateDrawer({
   const [showOffer, setShowOffer] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showLetter, setShowLetter] = useState(false);
-  // The appointment letter is to the employee joining created — from the join flow's result, or
-  // from the candidate once joined.
-  const [appointmentFor, setAppointmentFor] = useState<string | null>(null);
-  const appointmentLetter = useOfferableLetterKinds(RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS);
+  // No appointment letter here (2026-10-15): Recruitment issues the offer letter and nothing else.
+  // The appointment letter is HR & Payroll's, issued from the new employee's Letters tab.
   const [error, setError] = useState<string | null>(null);
   // The offer letter through the pre-filled compose flow — reads the candidate's latest offer.
   const offerLetter = useOfferableLetterKinds(CANDIDATE_LETTER_KIND_KEYS);
@@ -368,17 +365,6 @@ function CandidateDrawer({
         onClose={() => setShowLetter(false)}
       />
     );
-  if (appointmentFor)
-    return (
-      <GenerateLetterDialog
-        recipient={{ employeeId: appointmentFor }}
-        recipientLabel={candidate.fullName}
-        kindKeys={RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS}
-        initialKindKey="appointment"
-        onIssued={onChanged}
-        onClose={() => setAppointmentFor(null)}
-      />
-    );
   if (showJoin)
     return (
       <JoinModal
@@ -386,14 +372,6 @@ function CandidateDrawer({
         candidateName={candidate.fullName}
         onClose={() => setShowJoin(false)}
         onJoined={onChanged}
-        onGenerateAppointment={
-          appointmentLetter.kinds.length > 0
-            ? (employeeId) => {
-                setShowJoin(false);
-                setAppointmentFor(employeeId);
-              }
-            : undefined
-        }
       />
     );
 
@@ -472,13 +450,6 @@ function CandidateDrawer({
               )}
             </div>
           )}
-          {candidate.stage === 'joined' &&
-            candidate.employeeId &&
-            appointmentLetter.kinds.length > 0 && (
-              <Button onClick={() => setAppointmentFor(candidate.employeeId)}>
-                Generate appointment letter
-              </Button>
-            )}
           {candidate.stage !== 'joined' && candidate.stage !== 'rejected' && (
             <SecondaryButton onClick={() => reject.mutate()}>Reject</SecondaryButton>
           )}
@@ -496,8 +467,8 @@ function CandidateDrawer({
           issued lately" rather than "what has this person been sent"). This is the second, and the
           drawer is where a reader already has one candidate in front of them.
         */}
-        {/* Once joined, the appointment letter is to the employee record joining created — listed
-            with the candidate's own, once (it is addressed to both). */}
+        {/* Once joined, letters HR has issued to the employee record joining created — the
+            appointment letter first among them — are listed with the candidate's own, once. */}
         <SubjectLetters
           query={{ candidateId: candidate.id }}
           also={candidate.employeeId ? { employeeId: candidate.employeeId } : undefined}

@@ -792,6 +792,7 @@ export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonl
   {
     title: 'HR & Payroll',
     kindKeys: [
+      'appointment',
       'confirmation',
       'increment',
       'transfer',
@@ -803,7 +804,8 @@ export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonl
       'salary_slip',
     ],
   },
-  { title: 'Recruitment', kindKeys: ['offer', 'appointment'] },
+  // The offer letter only (2026-10-15): the appointment letter is issued from HR & Payroll.
+  { title: 'Recruitment', kindKeys: ['offer'] },
   {
     title: 'Projects',
     kindKeys: ['letter_loi', 'letter_work_order', 'letter_purchase_order'],
@@ -820,8 +822,11 @@ export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonl
   },
 ];
 
-/** Recruitment's own letters — what its Templates tab lists. */
-export const RECRUITMENT_TEMPLATE_KIND_KEYS = ['offer', 'appointment'] as const;
+/**
+ * Recruitment's own letters — what its Templates tab lists. The offer letter alone since
+ * 2026-10-15; the appointment letter moved to HR & Payroll with every other employee letter.
+ */
+export const RECRUITMENT_TEMPLATE_KIND_KEYS = ['offer'] as const;
 
 export const TEMPLATE_COPY = {
   title: 'Letter Templates',
@@ -4207,12 +4212,13 @@ export const LETTER_STATUS_LABELS = {
  * offered. What this decides is only *which screen* a kind belongs on: a work order is a letter
  * too, and an employee's Letters tab is not where it is issued.
  *
- * **No appointment letter here** (2026-10-14): it is Recruitment's document, issued from the
- * pipeline when the candidate joins — see `RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS`. **No
- * confirmation or suspension letter** either: the client issues neither, and has no wording for
- * them.
+ * **The appointment letter is here** (2026-10-15). It was Recruitment's, issued from the pipeline
+ * on joining; the client moved it: Recruitment issues the offer letter and nothing else, and every
+ * letter to an employee is issued from HR & Payroll. **No confirmation or suspension letter**: the
+ * client issues neither, and has no wording for them.
  */
 export const EMPLOYEE_LETTER_KIND_KEYS = [
+  'appointment',
   'increment',
   'transfer',
   'experience',
@@ -4220,13 +4226,6 @@ export const EMPLOYEE_LETTER_KIND_KEYS = [
   'termination',
   'fnf_settlement',
 ] as const;
-
-/**
- * Recruitment's document for somebody who has just joined. Addressed to the new employee record,
- * because it prints the employee code, joining date and salary annexure, none of which exist
- * before joining; issued from Recruitment, because joining is the last step of hiring.
- */
-export const RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS = ['appointment'] as const;
 
 /** A candidate is issued an offer, and nothing else, before they join. */
 export const CANDIDATE_LETTER_KIND_KEYS = ['offer'] as const;
@@ -4239,7 +4238,7 @@ export const CANDIDATE_LETTER_KIND_KEYS = ['offer'] as const;
  */
 export const HR_LETTER_KIND_PERMISSIONS: Record<string, string> = {
   offer: 'RECRUITMENT',
-  appointment: 'RECRUITMENT',
+  appointment: 'EMPLOYEES',
   confirmation: 'EMPLOYEES',
   relieving: 'EMPLOYEES',
   experience: 'EMPLOYEES',
