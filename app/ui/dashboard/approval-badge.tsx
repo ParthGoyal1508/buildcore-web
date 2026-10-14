@@ -1,13 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircleIcon } from '@heroicons/react/24/outline';
-import clsx from 'clsx';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { getApprovalCount } from '@/app/lib/api/approvals';
 import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
+import SideNavItem from '@/app/ui/dashboard/sidenav-item';
 
 /**
  * The approvals shortcut and its pending count (spec FR-012).
@@ -18,7 +16,7 @@ import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
  * one number updates after an action and the other does not.
  *
  * Distinguished from the reminders badge by icon and colour, which FR-027 of feature 004
- * required of *that* badge for the same reason: a check against a clock, blue against
+ * required of *that* badge for the same reason: a check against a clock, green against
  * amber/red. A reminder is something falling due; an approval is somebody waiting on you.
  *
  * **No permission gate.** Unlike `ReminderBadge`, which is enabled only for a holder of
@@ -26,7 +24,15 @@ import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
  * grants the right to approve. Authority is the chain's slot mapping, resolved per item
  * by the server, and a user holding nothing but `ATTENDANCE` may be the first approver on
  * every attendance exception in the company. The count is per-caller by construction, so
- * somebody no chain level resolves to simply sees nothing.
+ * somebody no chain level resolves to simply sees an empty queue.
+ *
+ * **Permanent since 2026-10-14.** It used to hide itself whenever the queue was empty, on the
+ * theory that an always-present "Approvals 0" trains people to read past it. The client asked
+ * for the opposite — "Make Approvals a permanent item in the sidebar. Right now it only appears
+ * when there are pending approvals" — and they have the better argument: an entry that comes and
+ * goes is one nobody can find on purpose, to look up what they already decided or to check that
+ * the queue really is empty. The *count* still appears only when there is something waiting, so
+ * the signal that something needs attention is unchanged.
  */
 export default function ApprovalBadge() {
   const pathname = usePathname();
@@ -46,35 +52,28 @@ export default function ApprovalBadge() {
   });
 
   const count = data?.count ?? 0;
-  const active = pathname === ROUTES.approvals;
-
-  // Hidden when there is nothing waiting, unlike the reminders link which is a permanent
-  // destination. Approvals is a queue: an always-present "Approvals 0" trains people to
-  // read past it, and the one week it says 3 they will read past it too.
-  if (count === 0 && !active) return null;
+  const active =
+    pathname === ROUTES.approvals || pathname.startsWith(`${ROUTES.approvals}/`);
 
   return (
-    <Link
+    <SideNavItem
       href={ROUTES.approvals}
-      aria-current={active ? 'page' : undefined}
-      className={clsx(
-        'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md p-3 text-sm font-medium hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:w-full md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3',
-        active ? 'bg-blue-50 text-blue-600' : 'bg-gray-50',
-      )}
-    >
-      <CheckCircleIcon className="w-6 shrink-0" />
-      <span className="hidden md:block">Approvals</span>
-      {count > 0 && (
-        <span className="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-blue-800">
-          {/* The screen-reader text carries what the colour and position convey. */}
-          <span aria-hidden="true">{count}</span>
-          <span className="sr-only">
-            {count === 1
-              ? '1 item awaiting your approval'
-              : `${count} items awaiting your approval`}
+      area="approvals"
+      label="Approvals"
+      active={active}
+      badge={
+        count > 0 && (
+          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-green-800">
+            {/* The screen-reader text carries what the colour and position convey. */}
+            <span aria-hidden="true">{count}</span>
+            <span className="sr-only">
+              {count === 1
+                ? '1 item awaiting your approval'
+                : `${count} items awaiting your approval`}
+            </span>
           </span>
-        </span>
-      )}
-    </Link>
+        )
+      }
+    />
   );
 }

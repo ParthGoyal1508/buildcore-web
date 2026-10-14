@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 
+import AreaChip from '@/app/ui/area-chip';
 import { lusitana } from '@/app/ui/fonts';
 
 /**
@@ -18,6 +19,11 @@ import { lusitana } from '@/app/ui/fonts';
  * Deliberately carries no margin of its own: a page that lays itself out with
  * `flex flex-col gap-6` would then have two spacings stacked. Call sites that need
  * one pass it through `className`.
+ *
+ * **The module's icon, in the module's colour, beside the title** (2026-10-14 colour pass).
+ * Read from the route rather than passed in, so all hundred-odd screens got it without one of
+ * them changing, and so it cannot disagree with the sidebar: both resolve the module by the same
+ * longest-prefix rule (`areaForPath`). A path no module claims simply gets no chip.
  */
 export default function PageHeader({
   title,
@@ -39,15 +45,18 @@ export default function PageHeader({
         className,
       )}
     >
-      <div className="min-w-0">
-        <h1
-          className={`${lusitana.className} text-xl text-gray-900 md:text-2xl`}
-        >
-          {title}
-        </h1>
-        {description ? (
-          <div className="mt-1 text-sm text-gray-600">{description}</div>
-        ) : null}
+      <div className="flex min-w-0 items-start gap-3">
+        <AreaChip className="mt-0.5 hidden h-10 w-10 rounded-xl sm:flex" />
+        <div className="min-w-0">
+          <h1
+            className={`${lusitana.className} text-xl text-gray-900 md:text-2xl`}
+          >
+            {title}
+          </h1>
+          {description ? (
+            <div className="mt-1 text-sm text-gray-600">{description}</div>
+          ) : null}
+        </div>
       </div>
       {actions ? (
         <div className="flex flex-wrap items-center gap-2">{actions}</div>

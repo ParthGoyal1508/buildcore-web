@@ -147,7 +147,11 @@ export default function StatusBadge({
   return (
     <span
       className={clsx(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+        // 2026-10-14 colour pass: a dot in the badge's own colour and a hairline inset ring.
+        // The dot is what makes a column of statuses scannable by colour at a glance — the pale
+        // fills alone were close enough to each other that amber and orange, or green and teal,
+        // read as one — and the ring keeps a pale badge from dissolving into a tinted row.
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ring-black/5 before:h-1.5 before:w-1.5 before:shrink-0 before:rounded-full before:bg-current before:opacity-70',
         STATUS_STYLES[status] ?? FALLBACK_STYLE,
         className,
       )}

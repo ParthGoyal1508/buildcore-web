@@ -4,6 +4,7 @@ import {
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
   DocumentTextIcon,
+  EyeSlashIcon,
   IdentificationIcon,
   PencilSquareIcon,
   UsersIcon,
@@ -112,6 +113,17 @@ export const SETTINGS_SECTIONS: {
     description:
       'Who signs letters, and the signature applied to them. Replacing a signature leaves issued letters untouched.',
     icon: IdentificationIcon,
+  },
+  {
+    // 2026-10-14. Listed only for a Super Admin — `visibleSettingsSections` filters on
+    // `SETTINGS_PERMISSIONS['cash-visibility']`, which is `CROSS_COMPANY_ACCESS` — so nobody
+    // else learns the setting exists. Even a Super Admin sees only a password prompt inside.
+    key: 'cash-visibility',
+    href: ROUTES.settingsCashVisibility,
+    title: 'Cash visibility',
+    description:
+      'Hide cash amounts across screens, reports and exports. Super Admin only — your password reveals it.',
+    icon: EyeSlashIcon,
   },
   {
     key: 'employee-setup',

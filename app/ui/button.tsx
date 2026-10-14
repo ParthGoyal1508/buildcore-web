@@ -49,7 +49,11 @@ export function Button({
         // `whitespace-nowrap` because the height above is fixed: a label that wraps to two
         // lines inside an `h-10` box does not grow it, it spills out of it. "Record the payment"
         // in a one-fifth-width grid cell did exactly that.
-        'flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-medium text-white sm:h-10 sm:justify-start transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
+        // 2026-10-14 consistency pass: `gap-2` so an icon beside the label is spaced the same on
+        // every screen without each call site remembering, `shadow-sm` so the primary action
+        // lifts off the new tinted page ground, and the focus ring in the accent — a navy ring
+        // around a navy button was all but invisible.
+        'flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-medium text-white shadow-sm sm:h-10 sm:justify-start transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
         className,
       )}
     >

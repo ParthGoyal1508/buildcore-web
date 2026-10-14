@@ -8,6 +8,7 @@ import {
   setCompanySelection,
 } from '@/app/lib/api/company-selection';
 import { COMPANY_SWITCHER } from '@/app/lib/constants';
+import { COMPANY_LOGO_KEY } from '@/app/ui/company-logo';
 import { hasUnsavedChanges, unsavedScreens } from '@/app/lib/unsaved-changes';
 import { inlineSelectClass } from '@/app/ui/settings/form-fields';
 
@@ -23,6 +24,17 @@ const SELECTABLE_COMPANIES_KEY = ['companies', 'selectable'] as const;
 const isSelectableCompanies = (key: readonly unknown[]): boolean =>
   key.length === SELECTABLE_COMPANIES_KEY.length &&
   SELECTABLE_COMPANIES_KEY.every((part, index) => key[index] === part);
+
+/**
+ * Queries a company switch must not reset: the switcher's own list, and the company logos.
+ *
+ * The logos are keyed by company id *and* logo version (see `company-logo.tsx`), so a cached
+ * one can never be the wrong company's or an out-of-date image — there is nothing for the sweep
+ * to protect against. Resetting them is what made every switch re-download the mark the shell
+ * was about to show (2026-10-14).
+ */
+const survivesSwitch = (key: readonly unknown[]): boolean =>
+  isSelectableCompanies(key) || key[0] === COMPANY_LOGO_KEY;
 
 /**
  * Chooses which company the whole application is working in (019 FR-001 – FR-006).
@@ -57,7 +69,14 @@ export default function CompanySwitcher() {
 
   const switchCompany = useMutation({
     mutationFn: setCompanySelection,
-    onSuccess: () => {
+    onSuccess: (companies) => {
+      /**
+       * The list first, from the response itself (2026-10-14), so the shell — the logo above
+       * all — knows the new company in the same render that resets everything else, instead of
+       * after a refetch that waited its turn behind every other reset query.
+       */
+      queryClient.setQueryData(SELECTABLE_COMPANIES_KEY, companies);
+      setPending(null);
       /**
        * FR-005. Everything cached was fetched against the previous company.
        *
@@ -79,21 +98,11 @@ export default function CompanySwitcher() {
        * reader who glances during that window has no way to know which company they are looking at.
        */
       void queryClient.resetQueries({
-        predicate: (query) => !isSelectableCompanies(query.queryKey),
+        predicate: (query) => !survivesSwitch(query.queryKey),
       });
-      /**
-       * This control's own list is invalidated rather than reset, and `pending` is held until it
-       * settles.
-       *
-       * Resetting it would empty `companies` for as long as the refetch took, and the guard below
-       * renders nothing without at least two — so the switcher would vanish from the top bar in the
-       * middle of a switch and reappear a moment later. Invalidating keeps the previous list on
-       * screen while the new `selected` flag is fetched, which is safe precisely because the set of
-       * companies somebody may work in does not change when they switch between them.
-       */
-      void queryClient
-        .invalidateQueries({ queryKey: SELECTABLE_COMPANIES_KEY })
-        .finally(() => setPending(null));
+      // This control's own list is not reset: it was just replaced with the server's answer
+      // above, and resetting it would empty `companies` for a moment — the guard below renders
+      // nothing without at least two, so the switcher would blink out of the top bar mid-switch.
     },
     onError: () => {
       // Back to whatever the server last confirmed. A select left showing a company the session is

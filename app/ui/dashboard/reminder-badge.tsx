@@ -1,14 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ClockIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { getReminderCount } from '@/app/lib/api/dashboard';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
+import SideNavItem from '@/app/ui/dashboard/sidenav-item';
 
 /**
  * The reminders shortcut and its count (spec FR-027).
@@ -48,37 +47,35 @@ export default function ReminderBadge() {
 
   const total = data?.total ?? 0;
   const overdue = data?.bySeverity.overdue ?? 0;
-  const active = pathname === ROUTES.reminders;
+  const active =
+    pathname === ROUTES.reminders || pathname.startsWith(`${ROUTES.reminders}/`);
 
   return (
-    <Link
+    <SideNavItem
       href={ROUTES.reminders}
-      aria-current={active ? 'page' : undefined}
-      className={clsx(
-        'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md p-3 text-sm font-medium hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:w-full md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3',
-        active ? 'bg-blue-50 text-blue-600' : 'bg-gray-50',
-      )}
-    >
-      <ClockIcon className="w-6 shrink-0" />
-      <span className="hidden md:block">Reminders</span>
-      {total > 0 && (
-        <span
-          className={clsx(
-            'ml-auto rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
-            overdue > 0
-              ? 'bg-red-100 text-red-800'
-              : 'bg-amber-100 text-amber-900',
-          )}
-        >
-          {/* The screen-reader text carries what the colour conveys visually. */}
-          <span aria-hidden="true">{total}</span>
-          <span className="sr-only">
-            {overdue > 0
-              ? `${total} reminders, ${overdue} overdue`
-              : `${total} reminders due`}
+      area="reminders"
+      label="Reminders"
+      active={active}
+      badge={
+        total > 0 && (
+          <span
+            className={clsx(
+              'rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+              overdue > 0
+                ? 'bg-red-100 text-red-800'
+                : 'bg-amber-100 text-amber-900',
+            )}
+          >
+            {/* The screen-reader text carries what the colour conveys visually. */}
+            <span aria-hidden="true">{total}</span>
+            <span className="sr-only">
+              {overdue > 0
+                ? `${total} reminders, ${overdue} overdue`
+                : `${total} reminders due`}
+            </span>
           </span>
-        </span>
-      )}
-    </Link>
+        )
+      }
+    />
   );
 }

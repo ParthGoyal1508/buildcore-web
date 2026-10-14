@@ -4,12 +4,24 @@ import clsx from 'clsx';
 
 import { useCanWrite } from '@/app/lib/write-access';
 
+/**
+ * The box every field shares (2026-10-14 consistency pass).
+ *
+ * - **`border-gray-300`**, not 200: at 200 an empty input on the new tinted page ground was a
+ *   barely-there outline, and a field you cannot see is a field nobody fills in.
+ * - **`bg-white`** stated, so a field reads as a field on a tinted panel as well as a white one.
+ * - **One focus treatment.** It used to be an offset outline *and* the forms plugin's own ring,
+ *   drawn together — two concentric rectangles. Now the border itself turns accent with a
+ *   one-pixel ring of the same colour, the convention every other control in the shell follows.
+ */
 const FIELD_BOX =
-  'rounded-md border border-gray-200 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:bg-gray-50 disabled:text-gray-500';
+  'rounded-md border border-gray-300 bg-white text-sm text-gray-900 shadow-sm transition-colors focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 disabled:bg-gray-50 disabled:text-gray-500';
 
 /** The box a text input, textarea or date field gets. Exported for the handful of
  *  screens that build their own labelled field rather than using `TextField`. */
-export const fieldClass = `block w-full py-2 px-3 placeholder:text-gray-500 ${FIELD_BOX}`;
+// `min-h-10`: 40px, the same as `Button` and `SecondaryButton` from `sm` up, so a field and the
+// button beside it line up instead of differing by the 2px they used to.
+export const fieldClass = `block min-h-10 w-full py-2 px-3 placeholder:text-gray-400 ${FIELD_BOX}`;
 
 /**
  * The box a `<select>` gets, which is deliberately not the one a text input gets.
@@ -24,7 +36,7 @@ export const fieldClass = `block w-full py-2 px-3 placeholder:text-gray-500 ${FI
  * wide as its widest option, so "PDF"/"Excel" collapsed to a stub while the field
  * beside it filled the row. This is the one dropdown box.
  */
-export const selectClass = `block w-full py-2 pl-3 pr-9 ${FIELD_BOX}`;
+export const selectClass = `block min-h-10 w-full py-2 pl-3 pr-9 ${FIELD_BOX}`;
 
 /**
  * The same select sized to its content, for a toolbar or filter row rather than a
@@ -32,7 +44,7 @@ export const selectClass = `block w-full py-2 pl-3 pr-9 ${FIELD_BOX}`;
  * button. The floor is what stops those from shrinking to a stub; without a ceiling
  * on the options, a long site name is still allowed to make the control wider.
  */
-export const inlineSelectClass = `block min-w-[10rem] py-2 pl-3 pr-9 ${FIELD_BOX}`;
+export const inlineSelectClass = `block min-h-10 min-w-[10rem] py-2 pl-3 pr-9 ${FIELD_BOX}`;
 
 /** A select inside a dense table cell, where a full-height field would grow the row. */
 export const compactSelectClass = `block w-full py-1 pl-2 pr-7 ${FIELD_BOX}`;
@@ -165,7 +177,7 @@ export function CheckboxField({
         id={id}
         type="checkbox"
         {...rest}
-        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-accent-500"
       />
       <div>
         <label htmlFor={id} className="text-sm text-gray-700">
@@ -190,7 +202,9 @@ export function SecondaryButton({
         // 44px below `sm`, the design's 40px above it — see `Button`, which does the same for the
         // same reason. A Cancel that is hard to hit is how somebody submits a form they meant to
         // abandon.
-        'flex h-11 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:h-10 sm:justify-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50',
+        // 2026-10-14: the same `gap-2`, shadow and accent focus as `Button`, and a border that
+        // picks up the brand on hover so it reads as a control rather than a box.
+        'flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:h-10 sm:justify-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
     >
@@ -231,7 +245,7 @@ export function RowAction({
     <button
       {...rest}
       className={clsx(
-        'rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40',
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40',
         className,
       )}
     >
@@ -247,7 +261,7 @@ export function FormError({ message }: { message: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+      className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
     >
       {message}
     </p>

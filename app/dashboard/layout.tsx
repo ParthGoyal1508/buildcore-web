@@ -60,14 +60,17 @@ export default function DashboardLayout({
           scrolling body. `min-w-0` because a flex child defaults to `min-width: auto`
           and would otherwise be forced wide by a table or a long unbroken string
           instead of scrolling inside itself. */}
-      <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
+      {/* `bg-gray-50` (slate since the 2026-10-14 colour pass): a faint cool ground under the
+          content, so the white cards and tables every screen is built from read as surfaces
+          instead of dissolving into a white page — half of what made the old look washed out. */}
+      <div className="flex min-w-0 flex-grow flex-col bg-gray-50 md:overflow-hidden">
         {/* Search is mounted here and not inside `ShellHeader`, which three shells
             share: FR-001 puts it on the dashboard, and a site employee in My Workspace
             has no register to search. */}
         <ShellHeader>
           <DashboardSearch />
         </ShellHeader>
-        <div className="flex-grow p-6 md:overflow-y-auto md:px-12 md:pb-12 md:pt-8">
+        <div className="flex-grow p-4 sm:p-6 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
           <ModuleGuard>{children}</ModuleGuard>
         </div>
       </div>

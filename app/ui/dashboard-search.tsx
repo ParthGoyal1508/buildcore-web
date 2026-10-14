@@ -204,7 +204,7 @@ export default function DashboardSearch() {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          className="block w-full rounded-md border border-gray-200 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="block h-10 w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 transition-colors placeholder:text-gray-500 hover:border-gray-300 focus:border-accent-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
         <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
       </div>

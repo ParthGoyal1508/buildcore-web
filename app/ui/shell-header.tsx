@@ -6,14 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { landingRoute } from '@/app/lib/permissions';
-import CashVisibility from '@/app/ui/settings/cash-visibility';
 import CompanySwitcher from '@/app/ui/company-switcher';
 import NotificationBell from '@/app/ui/dashboard/notification-bell';
 import CompanyLogo from '@/app/ui/company-logo';
+import UserMenu from '@/app/ui/user-menu';
 
 /**
- * The bar every shell opens with: a wordmark on mobile, the notifications bell on
- * the right, at every width.
+ * The bar every shell opens with: a wordmark on mobile; the company switcher, the
+ * notifications bell and the signed-in user with Sign Out on the right, at every width.
  *
  * Shared because the app has three shells — `/dashboard`, `/my` and the muster
  * capture screen — and only the first had one. On a phone that meant `/my/punch`
@@ -27,8 +27,8 @@ import CompanyLogo from '@/app/ui/company-logo';
  * this is already fixed above it and `sticky` is a no-op.
  *
  * The wordmark is `md:hidden` — on a desktop the sidebar two inches to the left
- * already carries it — which is why the bell sits at the end on mobile and is the only
- * thing here on desktop.
+ * already carries it, and the sidebar's own copy is now desktop-only, so a phone shows
+ * the mark once, here, rather than twice.
  *
  * It links to `landingRoute()`, not to `/dashboard`. Hardcoding `/dashboard` makes it
  * a dead link for exactly the users most likely to tap it: a site employee holding
@@ -59,10 +59,16 @@ export default function ShellHeader({
   // that a guard screen is a better outcome than a heading that shifts under a thumb.
   const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
 
-  const wordmark = <CompanyLogo className="h-7 max-w-[9rem]" />;
+  const wordmark = (
+    <CompanyLogo className="h-8 max-w-[8rem] mix-blend-multiply" />
+  );
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 flex-none items-center justify-between gap-3 border-b border-gray-100 bg-white px-6 md:px-12">
+    // The 2026-10-14 colour pass: a thin brand rule along the top edge — navy into the azure
+    // accent — is the one splash of the brand on a bar that is otherwise white and has to stay
+    // calm behind search and the company selector. `before:` so it costs no extra element and
+    // cannot be pushed around by the flex row.
+    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-gray-200 bg-white px-4 py-2 before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-gradient-to-r before:from-brand-600 before:via-accent-500 before:to-emerald-400 md:flex-nowrap md:px-8 md:py-0 lg:px-12">
       <div className="md:hidden">
         {home ? (
           <Link
@@ -77,24 +83,26 @@ export default function ShellHeader({
       </div>
       {/* `justify-between` on the header no longer ends in the bell on desktop, so the
           slot takes the slack and keeps the bell at the right edge. An empty slot
-          collapses, which is what leaves `/my` and the muster shell as they were. */}
-      <div className="flex min-w-0 flex-grow justify-end md:justify-start">
+          collapses, which is what leaves `/my` and the muster shell as they were.
+          On a phone the bar wraps, and the slot (search) takes a full row of its own
+          rather than being squeezed to a stub between the logo and the bell. */}
+      <div className="order-last flex min-w-0 basis-full justify-start empty:hidden md:order-none md:flex-grow md:basis-auto">
         {children}
       </div>
-      {/* Mounted here rather than in the slot above, unlike search — and the difference is
-          deliberate. Search belongs to one shell: a site employee in My Workspace has no register to
-          search, so putting it here would be wrong for them. The switcher is right everywhere and
-          hides itself where there is nothing to choose, so FR-001's "present on every screen" is met
-          by mounting it once in the shared header instead of in each shell that remembers to. */}
-      <CompanySwitcher />
-      {/* `bugs.md` item 16 asked for this "in the main menu", and the situation it is for is
-          situational — somebody walks into the room — so it has to be reachable without
-          navigating to Settings first. It renders nothing at all for anybody who cannot change
-          it, which is almost everybody, and hides below `sm` where the bar has no room. The same
-          component also appears on the Companies settings screen, where somebody goes looking
-          for it. */}
-      <CashVisibility variant="compact" />
-      <NotificationBell />
+      <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+        {/* Mounted here rather than in the slot above, unlike search — and the difference is
+            deliberate. Search belongs to one shell: a site employee in My Workspace has no
+            register to search, so putting it here would be wrong for them. The switcher is right
+            everywhere and hides itself where there is nothing to choose, so FR-001's "present on
+            every screen" is met by mounting it once in the shared header instead of in each shell
+            that remembers to. */}
+        <CompanySwitcher />
+        {/* The "Hide cash" toggle that sat here moved to Settings → Cash visibility on
+            2026-10-14, Super Admin only and behind their password — the client: "Remove the
+            'Hide Cash' option from the top navbar and move it into Settings only." */}
+        <NotificationBell />
+        <UserMenu />
+      </div>
     </header>
   );
 }

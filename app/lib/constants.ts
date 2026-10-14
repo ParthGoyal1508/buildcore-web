@@ -38,6 +38,8 @@ export const ROUTES = {
   settingsTerms: '/dashboard/settings/terms',
   /** The four statutory rates a running-account bill is computed at (025 US4). */
   settingsBillingRates: '/dashboard/settings/billing-rates',
+  /** Hide cash amounts — Super Admin only, behind their own password (2026-10-14). */
+  settingsCashVisibility: '/dashboard/settings/cash-visibility',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -2159,6 +2161,10 @@ export const SETTINGS_PERMISSIONS = {
   // subcontractor signs, which makes editing them a settings act rather than a
   // project one.
   terms: 'SETTINGS',
+  // 2026-10-14. Super Admin only — which is `CROSS_COMPANY_ACCESS` here, as on the backend,
+  // never the role's display name. The API refuses everybody else on both routes, and the
+  // change itself also needs a password confirmation (`app/ui/settings/cash-visibility.tsx`).
+  'cash-visibility': 'CROSS_COMPANY_ACCESS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -4184,7 +4190,7 @@ export const LETTER_COPY = {
    */
   subjectHeading: 'Letters',
   subjectEmpty: 'No letters have been issued for this yet.',
-  subjectOpen: 'Open',
+  subjectOpen: 'View',
 
   awaitingApproval:
     'This letter is waiting for approval and cannot be issued yet.',

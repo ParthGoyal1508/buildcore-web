@@ -1,115 +1,66 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import NavLinks from '@/app/ui/dashboard/nav-links';
-import { PowerIcon } from '@heroicons/react/24/outline';
-import { logout } from '@/app/lib/api/auth';
-import CurrentUser from '@/app/ui/dashboard/current-user';
 import CompanyLogo from '@/app/ui/company-logo';
 import ApprovalBadge from '@/app/ui/dashboard/approval-badge';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
 
+/**
+ * The sidebar: the company's mark, then every place you can go (2026-10-14 rework).
+ *
+ * ## Full height, nothing pinned below the list
+ *
+ * The identity panel and Sign Out used to be pinned under the scrolling list, and on a short
+ * laptop screen they took the bottom 130px — which is exactly where Reminders and Approvals sat,
+ * so those two were "hidden behind Sign Out". Both moved to the top bar (`user-menu.tsx`), where
+ * the client asked for them, and the list now has the whole column. It still scrolls inside
+ * itself on a screen too short for it, but at 700px tall the desktop rows (36px — see
+ * `sidenav-item.tsx`) fit every module and both shortcuts without scrolling at all.
+ *
+ * FR-004's "a way out in every state" is still met — the top bar renders the user menu in every
+ * shell and every state, including a user whose permissions could not be read.
+ *
+ * ## The brand panel
+ *
+ * The whole column sits on the brand's palest tint, and the logo sits on it **without a box**
+ * (the client: "make the background transparent, make it larger, and match the website's colour
+ * scheme"). The logo is whatever each company uploaded — Parth Realcon's is navy on an opaque
+ * white JPEG — so transparency cannot come from the file. `mix-blend-multiply` supplies it: white
+ * multiplied by the tint *is* the tint, so a white backing disappears into the panel, while the
+ * mark's own colours (anything darker than the tint) come through unchanged. It works for any
+ * logo on a white or transparent background, which is what a company uploads in practice, and it
+ * never alters the stored file.
+ */
 export default function SideNav() {
-  const router = useRouter();
-
-  async function handleSignOut() {
-    try {
-      await logout();
-    } finally {
-      router.push('/login');
-    }
-  }
-
   return (
-    <div className="flex h-full flex-col px-3 py-4 md:px-2">
-      {/* A compact brand bar at one height, not `md:h-40`. That 160px was always the
-          declared height but was never seen: before `shrink-0` this was a flex child
-          with the default `flex-shrink: 1`, so a full module list squashed it to about
-          70px, and pinning it for the scroll fix let it spring to its real size. The
-          height is now what it looks like — and `items-center`, since a logo centred
-          in a short band reads better than one dropped against the bottom edge the way
-          the old text wordmark was. */}
-      {/* A light panel, not the brand navy, and no knockout (2026-10-12).
-          `brightness-0 invert` turns a mark white, which works only for artwork that is
-          one dark colour on transparency — the product PNG. A company's own logo is
-          whatever they sent: Tirupati Enterprises' is navy and grey on an opaque white
-          JPEG, and knocking that out rendered the entire rectangle, background included,
-          as a solid white block. `Logo`'s own note predicted this ("a future
-          multi-colour logo would need a real white variant instead").
-          A neutral panel is the one treatment that works for any logo, which is what
-          this has to be: the next company's could be any colour, and there is nothing to
-          knock out an arbitrary image into.
-          `bg-gray-50` rather than pure white because a JPEG logo carries its own opaque
-          background — Tirupati's is very slightly off-white — and against `bg-white`
-          that reads as a faint rectangle around the mark. A PNG with transparency would
-          sit happily on either. */}
+    <div className="flex h-full flex-col border-gray-200 bg-brand-50 px-3 py-3 md:border-r md:px-3 md:py-4">
       <Link
-        className="mb-2 flex h-20 shrink-0 items-center justify-start rounded-md border border-gray-200 bg-gray-50 px-4"
+        className="mb-3 hidden h-16 shrink-0 items-center rounded-lg px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 md:flex"
         href="/dashboard"
       >
-        <CompanyLogo priority className="h-9 max-w-[11rem]" />
+        <CompanyLogo
+          priority
+          className="h-full max-h-16 w-auto max-w-full mix-blend-multiply"
+        />
       </Link>
-      {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets
-          fill each row evenly at *any* count (feature 014 made the count variable —
-          it was fixed at ten before, and a five-column grid sized for exactly that
-          left three modules stranded in five narrow tracks). Ten still wrap into two
-          tidy rows inside a 320px viewport, without the shell scrolling sideways, and
-          every target keeps the 44px minimum Principle VI requires of this surface.
-          Desktop keeps the stacked column via `md:flex-col md:flex-nowrap`. */}
-      <div className="flex flex-wrap gap-2 md:min-h-0 md:grow md:flex-col md:flex-nowrap md:gap-2">
-        {/*
-          The scrolling half, desktop only. The module list grew past the viewport as
-          features landed — twelve modules, Reminders, then the identity panel — and
-          `flex-nowrap` inside the shell's `md:overflow-hidden` meant the overflow was
-          simply clipped: Sign Out was still in the DOM, drawn below the fold, with
-          nothing to scroll it into view.
-
-          `contents` on anything below `md`, so these stay direct items of the wrapping
-          mobile row rather than becoming one nested item of it. At `md` the display
-          flips to `flex` and this becomes the scroll container.
-
-          `min-h-0` on both this and its parent is what actually makes it scroll: a
-          flex child defaults to `min-height: auto`, which refuses to shrink below its
-          content, so `overflow-y-auto` would never have anything to do.
-        */}
-        <div className="contents md:flex md:min-h-0 md:flex-1 md:flex-col md:gap-2 md:overflow-y-auto">
-          <NavLinks />
-          {/* Reminders is not a module, so it is not in NAV_MODULES and not part of
-              NavLinks — it is a shortcut into the Dashboard module, rendered only for
-              a user who holds DASHBOARD. It sits after the modules so it never pushes
-              one out of the first mobile row. */}
-          <ReminderBadge />
-          {/* Approvals, for the same reason and by the same mechanism — but with no
-              permission gate, because no permission grants the right to approve. It
-              hides itself when the queue is empty, so it never pushes a module out of
-              the first mobile row for somebody who has nothing waiting. */}
-          <ApprovalBadge />
-          {/* The notifications bell was here too, and moved to the shell's top bar: a
-              dropdown anchored to the bottom of this column could only open over the
-              module links above it. See notification-bell.tsx. */}
-          {/* Spacer, desktop only: fills the gap under a short module list so the
-              identity panel sits against the bottom. Inside the scroller rather than
-              below it, because `grow` only distributes *spare* space — once the list
-              is long enough to scroll there is none, and it collapses to nothing
-              instead of adding a screenful of grey to scroll past. */}
-          <div className="hidden h-auto w-full grow rounded-md bg-gray-50 md:block"></div>
-        </div>
-        {/* Pinned below the scroller, not carried inside it. FR-004 wants the identity
-            panel and a way out present in every state — including a user whose
-            permissions filtered to nothing, or could not be read at all — and a Sign
-            Out you have to go looking for is not that. */}
-        <div className="hidden md:block">
-          <CurrentUser />
-        </div>
-        <button
-          onClick={handleSignOut}
-          className="flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:w-full md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3"
-        >
-          <PowerIcon className="w-6" />
-          <div className="hidden md:block">Sign Out</div>
-        </button>
-      </div>
+      {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets fill each
+          row evenly at any count. Desktop: one scrolling column. `min-h-0` is what lets a flex
+          child shrink below its content so `overflow-y-auto` has something to do. */}
+      <nav
+        aria-label="Main"
+        className="flex flex-wrap gap-2 md:-mx-1 md:min-h-0 md:flex-1 md:flex-col md:flex-nowrap md:gap-0.5 md:overflow-y-auto md:px-1 md:pb-2"
+      >
+        <NavLinks />
+        {/* Not modules — shortcuts into the Dashboard module and the approvals queue — so they
+            are not in NAV_MODULES and sit after the modules under a label of their own. The
+            label is desktop-only: on a phone the icons speak for themselves. */}
+        <p className="mt-3 hidden px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 md:block">
+          Workflow
+        </p>
+        <ApprovalBadge />
+        <ReminderBadge />
+      </nav>
     </div>
   );
 }

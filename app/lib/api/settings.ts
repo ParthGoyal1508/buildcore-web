@@ -477,13 +477,21 @@ export async function getCashVisibility(
   );
 }
 
+/**
+ * Changes it. Super Admin only, and only with a live password confirmation from
+ * `confirmPassword('cash-visibility')` (2026-10-14) — the API refuses the change without one
+ * with a 403 coded `PASSWORD_CONFIRMATION_REQUIRED`, never a 401, so a lapsed confirmation
+ * asks for the password again instead of signing anybody out.
+ */
 export async function setCashVisibility(
   hideCashTransactions: boolean,
+  confirmationToken: string,
   companyId?: string,
 ): Promise<CashVisibility> {
   return cashVisibilitySchema.parse(
     await authFetch(withCompany('/settings/cash-visibility', companyId), {
       method: 'PATCH',
+      headers: { 'X-Confirmation-Token': confirmationToken },
       body: JSON.stringify({ hideCashTransactions }),
     }),
   );
