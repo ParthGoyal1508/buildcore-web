@@ -59,16 +59,14 @@ export default function ShellHeader({
   // that a guard screen is a better outcome than a heading that shifts under a thumb.
   const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
 
-  const wordmark = (
-    <CompanyLogo knockout className="h-8 max-w-[8rem]" />
-  );
+  const wordmark = <CompanyLogo knockout className="h-8 max-w-[8rem]" />;
 
   return (
     // The 2026-10-14 colour pass: a thin brand rule along the top edge — navy into the azure
     // accent — is the one splash of the brand on a bar that is otherwise white and has to stay
     // calm behind search and the company selector. `before:` so it costs no extra element and
     // cannot be pushed around by the flex row.
-    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-4 py-2 text-white shadow-md after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-gradient-to-r after:from-accent-400 after:via-accent-500 after:to-emerald-400 md:flex-nowrap md:px-8 md:py-0 lg:px-12">
+    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-4 py-2 text-white shadow-md after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-gradient-to-r after:from-accent-400 after:via-accent-500 after:to-emerald-400 md:flex-nowrap md:py-0 md:pl-6 md:pr-3">
       <div className="md:hidden">
         {home ? (
           <Link
@@ -86,7 +84,7 @@ export default function ShellHeader({
           collapses, which is what leaves `/my` and the muster shell as they were.
           On a phone the bar wraps, and the slot (search) takes a full row of its own
           rather than being squeezed to a stub between the logo and the bell. */}
-      <div className="order-last flex min-w-0 basis-full justify-start empty:hidden md:order-none md:flex-grow md:basis-auto">
+      <div className="order-last flex min-w-0 basis-full justify-start empty:hidden md:order-none md:flex-grow md:basis-auto md:pr-4">
         {children}
       </div>
       <div className="flex min-w-0 items-center gap-1 sm:gap-2">

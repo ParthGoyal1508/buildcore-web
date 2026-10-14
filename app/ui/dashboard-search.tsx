@@ -109,7 +109,8 @@ export default function DashboardSearch() {
    * end would highlight nothing and make Enter do nothing. Clamping on render handles
    * both without a second state update chasing the first.
    */
-  const activeIndex = flat.length === 0 ? -1 : Math.min(active, flat.length - 1);
+  const activeIndex =
+    flat.length === 0 ? -1 : Math.min(active, flat.length - 1);
   const activeRow = activeIndex >= 0 ? flat[activeIndex] : undefined;
 
   // Close on a click anywhere else. Without this the panel stays open over the page
@@ -170,13 +171,14 @@ export default function DashboardSearch() {
   const panelVisible = open && debounced.length > 0;
 
   const unavailable = (results.data?.unavailableSources ?? [])
-    .map((register) =>
-      SEARCH_COPY.registers[register as SearchRegister] ?? register,
+    .map(
+      (register) =>
+        SEARCH_COPY.registers[register as SearchRegister] ?? register,
     )
     .join(', ');
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div ref={containerRef} className="relative w-full max-w-2xl">
       <label htmlFor="dashboard-search" className="sr-only">
         {SEARCH_COPY.label}
       </label>
@@ -189,7 +191,9 @@ export default function DashboardSearch() {
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={
-            panelVisible && activeRow ? `${listboxId}-${activeRow.id}` : undefined
+            panelVisible && activeRow
+              ? `${listboxId}-${activeRow.id}`
+              : undefined
           }
           autoComplete="off"
           value={term}
