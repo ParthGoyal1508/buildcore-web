@@ -187,7 +187,10 @@ function usePlacement(
             window.innerWidth - 8 - (panel.current?.offsetWidth ?? 0),
           ),
         ),
-        minWidth: rect.width,
+        // Exactly the field's width, so the menu lines up under it; a long option wraps rather
+        // than widening the menu past the field. A narrow field (a compact filter) still gets a
+        // readable 10rem.
+        width: Math.max(rect.width, 160),
         maxHeight: Math.max(160, (flip ? rect.top : below) - 8),
         ...(flip
           ? { bottom: window.innerHeight - rect.top + 4 }
@@ -354,7 +357,7 @@ function SelectMenu({
       ref={panel}
       style={style}
       className={clsx(
-        'z-[1000] flex max-w-[min(32rem,calc(100vw-16px))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-sm shadow-xl ring-1 ring-black/5',
+        'z-[1000] flex max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-sm shadow-xl ring-1 ring-black/5',
         above ? 'animate-pop-up' : 'animate-pop-down',
       )}
     >
@@ -379,7 +382,7 @@ function SelectMenu({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(choice)}
                 className={clsx(
-                  'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors',
+                  'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 leading-snug transition-colors',
                   choice.disabled && 'cursor-not-allowed opacity-40',
                   active === choice.index && !choice.disabled
                     ? 'bg-brand-50 text-brand-800'
@@ -518,7 +521,7 @@ function Calendar({
   return createPortal(
     <div
       ref={panel}
-      style={{ ...style, minWidth: undefined }}
+      style={{ ...style, width: undefined }}
       onMouseDown={(event) => event.preventDefault()}
       className={clsx(
         'z-[1000] w-72 select-none overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 text-sm shadow-xl ring-1 ring-black/5',
