@@ -123,7 +123,7 @@ export default function BoqImport({
             ref={inputRef}
             type="file"
             accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700"
+            className="block w-full text-sm text-gray-700"
             disabled={read.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];

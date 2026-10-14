@@ -29,6 +29,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      animation: {
+        'pop-down': 'pop-down 140ms ease-out',
+        'pop-up': 'pop-up 140ms ease-out',
+        'fade-in': 'fade-in 160ms ease-out',
+      },
       gridTemplateColumns: {
         '13': 'repeat(13, minmax(0, 1fr))',
       },
@@ -83,6 +88,19 @@ const config: Config = {
       },
     },
     keyframes: {
+      // The popups' entrance (2026-10-15): a short drop and fade from the edge they open on.
+      'pop-down': {
+        from: { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
+        to: { opacity: '1', transform: 'none' },
+      },
+      'pop-up': {
+        from: { opacity: '0', transform: 'translateY(4px) scale(0.98)' },
+        to: { opacity: '1', transform: 'none' },
+      },
+      'fade-in': {
+        from: { opacity: '0' },
+        to: { opacity: '1' },
+      },
       shimmer: {
         '100%': {
           transform: 'translateX(100%)',

@@ -143,7 +143,7 @@ export function SignatoriesScreen() {
             type="file"
             accept="image/png,image/jpeg"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-500"
+            className="block w-full text-sm text-gray-700"
           />
           <p className="mt-1 text-xs text-gray-500">
             Replacing this later changes what future letters carry. Letters

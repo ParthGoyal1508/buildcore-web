@@ -121,7 +121,7 @@ export default function AttendanceImportPanel() {
             setValidation(null);
             setCommitted(null);
           }}
-          className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-gray-50"
+          className="block w-full text-sm text-gray-700"
         />
         {fileName && (
           <p className="mt-2 text-sm text-gray-600">

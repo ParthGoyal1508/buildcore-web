@@ -152,7 +152,7 @@ export default function AssetDocumentModal({
             accept="application/pdf,image/png,image/jpeg"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             required
-            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium"
+            className="block w-full text-sm text-gray-700"
           />
           <p className="mt-1 text-xs text-gray-500">
             PDF or image, up to 10MB.

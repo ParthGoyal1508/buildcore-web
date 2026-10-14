@@ -3,13 +3,15 @@ import { inter } from '@/app/ui/fonts';
 import type { Metadata } from 'next';
 import Providers from '@/app/providers';
 import InstallPrompt from '@/app/install-prompt';
+import NativePickers from '@/app/ui/native-pickers';
 
 export const metadata: Metadata = {
   title: {
     template: '%s | BuildCore',
     default: 'BuildCore',
   },
-  description: 'BuildCore ERP — construction workforce, assets, and project management.',
+  description:
+    'BuildCore ERP — construction workforce, assets, and project management.',
   manifest: '/manifest.webmanifest',
   applicationName: 'BuildCore',
   appleWebApp: {
@@ -53,10 +55,14 @@ export default function RootLayout({
           hydrates — a false-positive mismatch, not a real one. Scoped to
           this one element only; doesn't suppress genuine hydration bugs
           anywhere else in the tree. */}
-      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
+      <body
+        className={`${inter.className} antialiased`}
+        suppressHydrationWarning
+      >
         <Providers>
           {children}
           <InstallPrompt />
+          <NativePickers />
         </Providers>
       </body>
     </html>
