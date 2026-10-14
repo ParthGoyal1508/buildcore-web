@@ -55,6 +55,16 @@ const ACTION_LABELS: Record<string, string> = {
 export const actionLabel = (action: string) =>
   ACTION_LABELS[action] ?? enumLabel(action);
 
+/**
+ * What happened, in words: the API's sentence where it has one ("Confirmed their password for
+ * Personal Settings"), otherwise the action and what it was done to ("Updated PRPL-2401 —
+ * Whitefield"). The record's id is never the reader's answer (2026-10-15).
+ */
+export const activityWhat = (e: ActivityLogEntry) =>
+  e.description ?? actionLabel(e.action);
+export const activityTarget = (e: ActivityLogEntry) =>
+  e.targetLabel !== undefined ? e.targetLabel : e.target;
+
 export default function ActivityLogList() {
   const [module, setModule] = useState('');
   const [timeRange, setTimeRange] = useState('');
@@ -92,13 +102,17 @@ export default function ActivityLogList() {
       render: (e) => new Date(e.timestamp).toLocaleString(),
     },
     { key: 'actor', header: 'User', render: (e) => e.actor },
-    { key: 'action', header: 'Action', render: (e) => actionLabel(e.action) },
+    { key: 'action', header: 'Action', render: (e) => activityWhat(e) },
     {
       key: 'module',
       header: 'Module',
       render: (e) => activityModuleLabel(e.module),
     },
-    { key: 'target', header: 'Target', render: (e) => e.target ?? '—' },
+    {
+      key: 'target',
+      header: 'Target',
+      render: (e) => activityTarget(e) ?? '—',
+    },
   ];
 
   const emptyMessage =

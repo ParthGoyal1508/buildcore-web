@@ -6,7 +6,10 @@ import Link from 'next/link';
 import { getActivityLog } from '@/app/lib/api/dashboard';
 import { ROUTES, activityModuleLabel } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
-import { actionLabel } from '@/app/ui/dashboard/activity-log-list';
+import {
+  activityTarget,
+  activityWhat,
+} from '@/app/ui/dashboard/activity-log-list';
 
 /** How many entries the dashboard shows before "View full log". */
 const ON_DASHBOARD = 8;
@@ -77,10 +80,10 @@ export default function RecentActivity() {
               className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1.5"
             >
               <span className="font-medium text-gray-900">{e.actor}</span>
-              <span className="text-gray-700">{actionLabel(e.action)}</span>
-              {e.target && (
+              <span className="text-gray-700">{activityWhat(e)}</span>
+              {activityTarget(e) && (
                 <span className="min-w-0 truncate text-gray-600">
-                  {e.target}
+                  {activityTarget(e)}
                 </span>
               )}
               <span className="ml-auto text-xs text-gray-500">

@@ -111,7 +111,9 @@ export interface ReminderQuery {
 export async function getReminders(
   query: ReminderQuery = {},
 ): Promise<ReminderList> {
-  const raw = await authFetch<unknown>(`/dashboard/reminders${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/dashboard/reminders${qs({ ...query })}`,
+  );
   return reminderListSchema.parse(raw);
 }
 
@@ -233,6 +235,11 @@ const activityLogEntrySchema = z.object({
   action: z.string(),
   module: z.string(),
   target: z.string().nullable(),
+  // 2026-10-15: what the row is about in words — the record's name (or its kind) and, for an
+  // event "Viewed"/"Updated" would misdescribe, a sentence. Optional so an API not yet deployed
+  // with them still parses.
+  targetLabel: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
   timestamp: z.string(),
 });
 
@@ -362,10 +369,13 @@ export async function runReport(
   type: string,
   body: ReportRunBody,
 ): Promise<ReportResult> {
-  const raw = await authFetch<unknown>(`/reports/${encodeURIComponent(type)}/run`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  const raw = await authFetch<unknown>(
+    `/reports/${encodeURIComponent(type)}/run`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
   return reportResultSchema.parse(raw);
 }
 
