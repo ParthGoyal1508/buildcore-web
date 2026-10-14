@@ -12,6 +12,7 @@ import { MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { promptDialog } from '@/app/ui/dialogs';
 
 /**
  * Biometric re-enrolment review (005 US10).
@@ -40,7 +41,8 @@ export default function ReEnrolmentTable() {
       decision: 'approved' | 'rejected';
       reason?: string;
     }) => decideReEnrolment(id, decision, reason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hr', 'reEnrolment'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr', 'reEnrolment'] }),
     onError: (err: Error) => setError(err.message),
   });
 
@@ -51,7 +53,11 @@ export default function ReEnrolmentTable() {
       sticky: true,
       render: (row) => row.employeeName ?? row.employeeCode ?? row.employeeId,
     },
-    { key: 'reason', header: 'Reason given', render: (row) => row.reason ?? '—' },
+    {
+      key: 'reason',
+      header: 'Reason given',
+      render: (row) => row.reason ?? '—',
+    },
     {
       key: 'requested',
       header: 'Requested',
@@ -85,14 +91,23 @@ export default function ReEnrolmentTable() {
             <>
               <RowAction
                 type="button"
-                onClick={() => decide.mutate({ id: row.id, decision: 'approved' })}
+                onClick={() =>
+                  decide.mutate({ id: row.id, decision: 'approved' })
+                }
               >
                 Approve
               </RowAction>
               <RowAction
                 type="button"
-                onClick={() => {
-                  const reason = window.prompt('Why is this request being rejected?');
+                onClick={async () => {
+                  const reason = await promptDialog({
+                    title: 'Reject this request?',
+                    message: 'Why is this request being rejected?',
+                    required: true,
+                    multiline: true,
+                    confirmLabel: 'Reject',
+                    tone: 'danger',
+                  });
                   if (reason?.trim()) {
                     decide.mutate({
                       id: row.id,

@@ -16,3 +16,50 @@ input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/*
+ * Date fields and file pickers, styled once for every screen (2026-10-15). The client: "These
+ * dropdown, button, file upload, date picker etc doesn't look good."
+ *
+ * The calendar a date or month field opens is ours (`NativePickers`), so the browser's indicator is hidden
+ * and a brand calendar icon drawn in its place. The field is still the native one: the day, month
+ * and year can be typed as before.
+ */
+@layer base {
+  input[type='date'],
+  input[type='month'] {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.6' stroke='%230a4976'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5'/%3e%3c/svg%3e");
+    background-position: right 0.6rem center;
+    background-repeat: no-repeat;
+    background-size: 1.1rem 1.1rem;
+    padding-right: 2.25rem;
+    cursor: pointer;
+  }
+
+  @media (pointer: fine) {
+    input[type='date']::-webkit-calendar-picker-indicator,
+    input[type='month']::-webkit-calendar-picker-indicator {
+      display: none;
+    }
+  }
+
+  input[type='file'] {
+    @apply max-w-full cursor-pointer rounded-lg border border-dashed border-gray-300 bg-white p-1 pr-3 text-sm text-gray-500 transition-colors hover:border-brand-300 hover:bg-brand-50/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500;
+  }
+
+  input[type='file']::file-selector-button {
+    @apply mr-3 cursor-pointer rounded-md border-0 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors;
+  }
+
+  input[type='file']:hover::file-selector-button {
+    @apply bg-brand-100;
+  }
+}
+
+/* A row that opens somewhere looks it: the pointer anywhere on it (`RowLinks`, 2026-10-15). */
+@layer base {
+  tbody tr:has(> td:not([data-row-actions]) a[href]):not([data-row-click='off'] tr),
+  [data-row-href] {
+    cursor: pointer;
+  }
+}

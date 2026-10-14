@@ -16,6 +16,8 @@ import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import ComplianceModal from '@/app/ui/partners/compliance-modal';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 function CompliancePageBody() {
   const searchParams = useSearchParams();
@@ -126,7 +128,10 @@ function CompliancePageBody() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+        >
           {error}
         </p>
       )}
@@ -143,11 +148,15 @@ function CompliancePageBody() {
             <button
               type="button"
               disabled={verify.isPending}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    'Verify this filing? Your identity is recorded against it, and the record can no longer be edited.',
-                  )
+                  await confirmDialog({
+                    title: 'Verify this filing?',
+                    message:
+                      'Verify this filing? Your identity is recorded against it, and the record can no longer be edited.',
+                    confirmLabel: 'Verify',
+                    tone: 'default',
+                  })
                 ) {
                   verify.mutate(row.id);
                 }
@@ -179,7 +188,13 @@ function CompliancePageBody() {
 export default function CompliancePage() {
   // `useSearchParams` needs a Suspense boundary in the App Router.
   return (
-    <Suspense fallback={<p className="p-4 text-sm text-gray-500">Loading…</p>}>
+    <Suspense
+      fallback={
+        <p className="p-4 text-sm text-gray-500">
+          <LoadingText />
+        </p>
+      }
+    >
       <CompliancePageBody />
     </Suspense>
   );

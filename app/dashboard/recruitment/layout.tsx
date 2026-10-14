@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import RecruitmentNav from '@/app/ui/recruitment/recruitment-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * Section guard for `/dashboard/recruitment/*`. `ModuleGuard` already refuses the
@@ -34,7 +35,7 @@ export default function RecruitmentLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

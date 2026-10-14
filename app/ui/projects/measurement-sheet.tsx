@@ -1,9 +1,19 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 
 import { getMeasurementSheet } from '@/app/lib/api/bill-packages';
 import { dateLabel } from '@/app/lib/format';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared table look at sheet density (2026-10-15): this reads like the printed measurement
+ * sheet, and px-4 py-3 spreads nineteen bills over a screen. `!` because clsx does not drop
+ * TABLE's own padding. The tables sit inside this card, so they scroll without a second border.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /**
  * One schedule line's measurement sheet, on screen (025 FR-028).
@@ -67,23 +77,23 @@ export default function MeasurementSheet({
       </header>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
+        <table className={TABLE.table}>
           <caption className="sr-only">Claimed across bills</caption>
-          <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+          <thead className={TABLE.thead}>
             <tr>
-              <th className="px-3 py-2">Bill</th>
-              <th className="px-3 py-2">Period</th>
-              <th className="px-3 py-2 text-right">Qty</th>
-              <th className="px-3 py-2">Remarks</th>
+              <th className={DENSE_TH}>Bill</th>
+              <th className={DENSE_TH}>Period</th>
+              <th className={clsx(DENSE_TH, 'text-right')}>Qty</th>
+              <th className={DENSE_TH}>Remarks</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {data.history.map((row) => (
               <tr
                 key={`${row.billLabel}-${row.periodFrom}`}
-                className={row.isThisBill ? 'bg-blue-50' : undefined}
+                className={clsx(TABLE.row, row.isThisBill && 'bg-blue-50')}
               >
-                <td className="px-3 py-2 whitespace-nowrap">
+                <td className={clsx(DENSE_TD, 'whitespace-nowrap')}>
                   {row.billLabel}
                   {row.overClaimed && (
                     <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
@@ -91,32 +101,36 @@ export default function MeasurementSheet({
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-gray-600">
+                <td
+                  className={clsx(DENSE_TD, 'whitespace-nowrap text-gray-600')}
+                >
                   {dateLabel(row.periodFrom)} – {dateLabel(row.periodTo)}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td className={clsx(DENSE_TD, TABLE.numeric)}>
                   {row.quantity}
                 </td>
                 {/* Verbatim. This is the argument for a deduction, written by the engineer who
                     made it, and tidying it would be editing somebody's case. */}
-                <td className="max-w-md px-3 py-2 text-xs text-gray-700">
+                <td
+                  className={clsx(DENSE_TD, 'max-w-md text-xs text-gray-700')}
+                >
                   {row.reason ?? ''}
                 </td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="border-t-2 border-gray-300 text-sm font-medium">
+          <tfoot className={TABLE.tfoot}>
             <tr>
-              <td className="px-3 py-2" colSpan={2}>
+              <td className={DENSE_TD} colSpan={2}>
                 This bill
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">
+              <td className={clsx(DENSE_TD, TABLE.numeric)}>
                 {data.footer.thisBillQty}
               </td>
-              <td />
+              <td className={DENSE_TD} />
             </tr>
             <tr>
-              <td className="px-3 py-2 text-gray-600" colSpan={2}>
+              <td className={clsx(DENSE_TD, 'text-gray-600')} colSpan={2}>
                 Upto previous
                 {data.footer.uptoPreviousFrom && (
                   <span className="ml-1 text-xs font-normal text-gray-500">
@@ -124,19 +138,19 @@ export default function MeasurementSheet({
                   </span>
                 )}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">
+              <td className={clsx(DENSE_TD, TABLE.numeric)}>
                 {data.footer.uptoPreviousQty}
               </td>
-              <td />
+              <td className={DENSE_TD} />
             </tr>
             <tr>
-              <td className="px-3 py-2" colSpan={2}>
+              <td className={DENSE_TD} colSpan={2}>
                 Upto date
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">
+              <td className={clsx(DENSE_TD, TABLE.numeric)}>
                 {data.footer.uptoDateQty}
               </td>
-              <td />
+              <td className={DENSE_TD} />
             </tr>
           </tfoot>
         </table>
@@ -144,45 +158,50 @@ export default function MeasurementSheet({
 
       {data.dailyRecord.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <table className={TABLE.table}>
             <caption className="py-1 text-left text-xs uppercase tracking-wide text-gray-500">
               The daily record
             </caption>
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <thead className={TABLE.thead}>
               <tr>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2 text-right">Start</th>
-                <th className="px-3 py-2 text-right">End</th>
-                <th className="px-3 py-2 text-right">Run</th>
-                <th className="px-3 py-2">Remarks</th>
+                <th className={DENSE_TH}>Date</th>
+                <th className={clsx(DENSE_TH, 'text-right')}>Start</th>
+                <th className={clsx(DENSE_TH, 'text-right')}>End</th>
+                <th className={clsx(DENSE_TH, 'text-right')}>Run</th>
+                <th className={DENSE_TH}>Remarks</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {data.dailyRecord.map((day) => (
-                <tr key={day.date}>
-                  <td className="px-3 py-2 whitespace-nowrap">
+                <tr key={day.date} className={TABLE.row}>
+                  <td className={clsx(DENSE_TD, 'whitespace-nowrap')}>
                     {dateLabel(day.date)}
                   </td>
                   {day.logbookMissing ? (
                     // Not zeroes. A day nobody logged and a day the machine did nothing are
                     // different facts, and only one of them is somebody to go and ask.
-                    <td className="px-3 py-2 text-xs text-gray-500" colSpan={3}>
+                    <td
+                      className={clsx(DENSE_TD, 'text-xs text-gray-500')}
+                      colSpan={3}
+                    >
                       no logbook entry for this day
                     </td>
                   ) : (
                     <>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td className={clsx(DENSE_TD, TABLE.numeric)}>
                         {day.openingReading ?? '—'}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td className={clsx(DENSE_TD, TABLE.numeric)}>
                         {day.closingReading ?? '—'}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td className={clsx(DENSE_TD, TABLE.numeric)}>
                         {day.totalHours ?? '—'}
                       </td>
                     </>
                   )}
-                  <td className="max-w-md px-3 py-2 text-xs text-gray-700">
+                  <td
+                    className={clsx(DENSE_TD, 'max-w-md text-xs text-gray-700')}
+                  >
                     {day.remarks ?? ''}
                   </td>
                 </tr>

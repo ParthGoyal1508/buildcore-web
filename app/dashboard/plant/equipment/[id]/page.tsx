@@ -20,7 +20,7 @@ import {
   plantLabel,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import DocumentModal from '@/app/ui/plant/document-modal';
 import {
   FormError,
@@ -30,6 +30,8 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -39,6 +41,9 @@ export default function EquipmentDetailPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['plant', 'equipment', id],
@@ -60,7 +65,7 @@ export default function EquipmentDetailPage() {
   });
 
   /**
-   * Opens a stored document in a new tab.
+   * Opens a stored document — in the page's viewer when it is a PDF or an image (2026-10-14).
    *
    * Fetched rather than linked: the endpoint needs the bearer token, which lives in
    * memory and never appears in a URL, so a plain `<a href>` would 401. Same
@@ -70,7 +75,7 @@ export default function EquipmentDetailPage() {
     setOpening(documentId);
     setError(null);
     try {
-      openStoredFile(
+      show(
         await getEquipmentDocumentFile(id, documentId),
         `equipment-document-${documentId}`,
       );
@@ -86,7 +91,7 @@ export default function EquipmentDetailPage() {
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -228,6 +233,7 @@ export default function EquipmentDetailPage() {
       </nav>
 
       <FormError message={error} />
+      {viewer}
 
       <section className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Overview</h2>
@@ -271,7 +277,9 @@ export default function EquipmentDetailPage() {
             ))}
           </dl>
         ) : (
-          <p className="mt-2 text-sm text-gray-500">Loading…</p>
+          <p className="mt-2 text-sm text-gray-500">
+            <LoadingText />
+          </p>
         )}
         {cost.data && (
           <p className="mt-3 text-xs text-gray-500">
@@ -296,8 +304,15 @@ export default function EquipmentDetailPage() {
           emptyMessage="No documents are attached to this machine."
           actions={(row) => (
             <RowAction
-              onClick={() => {
-                if (window.confirm(MESSAGES.plantConfirmDeleteEquipmentDoc)) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Remove this document?',
+                    message: MESSAGES.plantConfirmDeleteEquipmentDoc,
+                    confirmLabel: 'Remove',
+                    tone: 'danger',
+                  })
+                ) {
                   removeDocument.mutate(row.id);
                 }
               }}
@@ -350,10 +365,7 @@ export default function EquipmentDetailPage() {
       </section>
 
       {showUpload && (
-        <DocumentModal
-          equipmentId={id}
-          onClose={() => setShowUpload(false)}
-        />
+        <DocumentModal equipmentId={id} onClose={() => setShowUpload(false)} />
       )}
     </div>
   );

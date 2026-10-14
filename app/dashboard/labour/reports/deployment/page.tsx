@@ -1,13 +1,38 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useState } from 'react';
 
-import { getDeploymentReport } from '@/app/lib/api/labour';
+import {
+  getDeploymentReport,
+  type DeploymentReport,
+} from '@/app/lib/api/labour';
 import { getProjects } from '@/app/lib/api/projects';
 import { Button } from '@/app/ui/button';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import { TABLE } from '@/app/ui/table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
+
+type DeploymentGroup = DeploymentReport['groups'][number];
+
+// Keys match the group's own fields, so each column sorts by the raw figure.
+const COLUMNS: Column<DeploymentGroup>[] = [
+  { key: 'key', header: 'Group', render: (g) => g.key },
+  {
+    key: 'headcount',
+    header: 'Headcount',
+    numeric: true,
+    render: (g) => g.headcount,
+  },
+  {
+    key: 'manDays',
+    header: 'Man-days',
+    numeric: true,
+    render: (g) => g.manDays,
+  },
+];
 
 export default function DeploymentReportPage() {
   const [projectId, setProjectId] = useState('');
@@ -79,38 +104,24 @@ export default function DeploymentReportPage() {
         </div>
       </div>
 
+      {/* The shared table: sortable by any column; the total stays below the rows (2026-10-15). */}
       {report.data && (
-        <div className="overflow-x-auto rounded-lg border border-gray-100">
-          {report.data.groups.length === 0 ? (
-            <p className="p-4 text-sm text-gray-500">
-              No approved musters in this period.
-            </p>
-          ) : (
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">Group</th>
-                  <th className="px-3 py-2">Headcount</th>
-                  <th className="px-3 py-2">Man-days</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {report.data.groups.map((g) => (
-                  <tr key={g.key}>
-                    <td className="px-3 py-2">{g.key}</td>
-                    <td className="px-3 py-2">{g.headcount}</td>
-                    <td className="px-3 py-2">{g.manDays}</td>
-                  </tr>
-                ))}
-                <tr className="font-semibold">
-                  <td className="px-3 py-2">Total</td>
-                  <td className="px-3 py-2" />
-                  <td className="px-3 py-2">{report.data.totalManDays}</td>
-                </tr>
-              </tbody>
-            </table>
-          )}
-        </div>
+        <DataTable<DeploymentGroup>
+          caption="Deployment by group"
+          rows={report.data.groups}
+          rowKey={(g) => g.key}
+          columns={COLUMNS}
+          emptyMessage="No approved musters in this period."
+          footer={
+            <tr>
+              <td className={TABLE.td}>Total</td>
+              <td className={TABLE.td} />
+              <td className={clsx(TABLE.td, TABLE.numeric)}>
+                {report.data.totalManDays}
+              </td>
+            </tr>
+          }
+        />
       )}
     </div>
   );

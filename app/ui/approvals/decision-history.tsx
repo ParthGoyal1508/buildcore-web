@@ -7,6 +7,7 @@ import { getApprovalHistory } from '@/app/lib/api/approvals';
 import type { ApprovalState } from '@/app/lib/api/approvals';
 import { MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The full ordered decision history for one record (spec FR-009).
@@ -66,7 +67,11 @@ export default function DecisionHistory({
 
       {open && (
         <div className="mt-2">
-          {isLoading && <p className="text-gray-500">Loading…</p>}
+          {isLoading && (
+            <p className="text-gray-500">
+              <LoadingText />
+            </p>
+          )}
           {isError && (
             <p role="alert" className="text-red-700">
               {MESSAGES.loadFailed}

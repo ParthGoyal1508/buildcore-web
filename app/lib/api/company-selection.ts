@@ -42,6 +42,15 @@ const selectableCompanySchema = z.object({
    * logo from spending a 404 per navigation re-establishing that.
    */
   hasLogo: z.boolean().default(false),
+  /**
+   * A fingerprint of the logo in force (2026-10-14), null when there is none.
+   *
+   * Goes into the logo's URL and its cache key, so the image can be kept for the whole
+   * session — and by the browser for a year — while a new upload still shows at once: a new
+   * upload is a new fingerprint, so it is simply a different image. Optional with a null
+   * default so a client running ahead of the API keeps working, just without the cache.
+   */
+  logoVersion: z.string().nullable().default(null),
 });
 
 export type SelectableCompany = z.infer<typeof selectableCompanySchema>;
@@ -58,9 +67,9 @@ export async function listSelectableCompanies(): Promise<SelectableCompany[]> {
 /**
  * Chooses the company to work in (FR-003).
  *
- * **Sends only the id, and reads nothing back but confirmation.** The response deliberately carries
- * no lists: one that re-sent every affected collection would become a second source of truth for
- * every screen showing one, and the screens already know how to fetch their own data. What the
+ * **Sends only the id, and reads back only the selectable list.** The response deliberately carries
+ * no other lists: one that re-sent every affected collection would become a second source of truth
+ * for every screen showing one, and the screens already know how to fetch their own data. What the
  * caller must do instead is discard its cache — see `switchCompany` below, which is the only way
  * this should be called.
  *
@@ -68,12 +77,26 @@ export async function listSelectableCompanies(): Promise<SelectableCompany[]> {
  * scoped to the previous company and will come back that way, which is the other reason the cache
  * is cleared rather than selectively invalidated.
  */
-export async function setCompanySelection(companyId: string): Promise<void> {
-  await authFetch<unknown>('/my/company-selection', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ companyId }),
-  });
+export async function setCompanySelection(
+  companyId: string,
+): Promise<SelectableCompany[]> {
+  /**
+   * The selectable list comes back with the new `selected` flag (2026-10-14).
+   *
+   * The server always sent it; this used to discard it and refetch the same list, which put a
+   * whole extra round trip — queued behind every other query the switch had just reset —
+   * between choosing a company and the shell knowing which one it was in. That wait was most of
+   * "the company logo takes too long to load when switching companies". Taking the list from
+   * the response is not the second source of truth the note above warns about: it is the very
+   * list the switcher renders from, returned by the call that changed it.
+   */
+  return selectableResponseSchema.parse(
+    await authFetch<unknown>('/my/company-selection', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId }),
+    }),
+  );
 }
 
 /**

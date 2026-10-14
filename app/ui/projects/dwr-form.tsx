@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -25,6 +26,15 @@ import { Button } from '@/app/ui/button';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared table look at the measurement grid's density (2026-10-15): eleven columns of inputs
+ * copied off the client's sheet, where px-4 py-3 pushes the remark and files off the screen. `!`
+ * because clsx does not drop TABLE's own padding.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /**
  * Recording a day's work (024 Story 1, FR-002 to FR-004).
@@ -327,12 +337,14 @@ export default function DwrForm({
     .filter((group) => !group.isEstimate)
     .flatMap((group) =>
       // A non-BOQ item is measured on the bill that adds it; the API refuses it here.
-      group.items.filter((item) => !item.nonBoq).map((item) => ({
-        id: item.id,
-        label: item.boqNo,
-        sublabel: item.taskName,
-        note: item.unit,
-      })),
+      group.items
+        .filter((item) => !item.nonBoq)
+        .map((item) => ({
+          id: item.id,
+          label: item.boqNo,
+          sublabel: item.taskName,
+          note: item.unit,
+        })),
     );
 
   const save = useMutation({
@@ -429,39 +441,43 @@ export default function DwrForm({
     // reaches the measurement it is evidence of rather than the one next to it.
     const entries: { line: DwrLineInput; files: File[] }[] = lines.flatMap(
       (line): { line: DwrLineInput; files: File[] }[] =>
-      line.kind === 'measured'
-        ? line.rows.filter(hasAnything).map((row) => ({
-          files: row.files,
-          line: {
-            paymentMode: 'work_basis' as const,
-            ...(row.id ? { id: row.id } : {}),
-            ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
-            ...numeric('nos1', row.nos1),
-            ...numeric('length', row.length),
-            ...numeric('breadth', row.breadth),
-            ...numeric('depth', row.depth),
-            // Converted here, not validated away: the API's `chainageFrom` is `@IsNumberString`,
-            // so `21+300` would be a 400. `parseChainage` returns null for anything it cannot
-            // read, and a null is simply not sent — the alternative is sending a guess.
-            ...chainage('chainageFrom', row.chainageFrom),
-            ...chainage('chainageTo', row.chainageTo),
-            ...(row.roadSide.trim() ? { roadSide: row.roadSide.trim() } : {}),
-            ...(row.remark ? { remark: row.remark } : {}),
-          },
-        }))
-        : [
-            {
-              files: line.files,
+        line.kind === 'measured'
+          ? line.rows.filter(hasAnything).map((row) => ({
+              files: row.files,
               line: {
-                paymentMode: 'day_basis' as const,
-                ...(line.id ? { id: line.id } : {}),
+                paymentMode: 'work_basis' as const,
+                ...(row.id ? { id: row.id } : {}),
                 ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
-                ...(line.equipmentId ? { equipmentId: line.equipmentId } : {}),
-                servedQty: line.servedQty,
-                ...(line.remark ? { remark: line.remark } : {}),
+                ...numeric('nos1', row.nos1),
+                ...numeric('length', row.length),
+                ...numeric('breadth', row.breadth),
+                ...numeric('depth', row.depth),
+                // Converted here, not validated away: the API's `chainageFrom` is `@IsNumberString`,
+                // so `21+300` would be a 400. `parseChainage` returns null for anything it cannot
+                // read, and a null is simply not sent — the alternative is sending a guess.
+                ...chainage('chainageFrom', row.chainageFrom),
+                ...chainage('chainageTo', row.chainageTo),
+                ...(row.roadSide.trim()
+                  ? { roadSide: row.roadSide.trim() }
+                  : {}),
+                ...(row.remark ? { remark: row.remark } : {}),
               },
-            },
-          ],
+            }))
+          : [
+              {
+                files: line.files,
+                line: {
+                  paymentMode: 'day_basis' as const,
+                  ...(line.id ? { id: line.id } : {}),
+                  ...(line.boqItemId ? { boqItemId: line.boqItemId } : {}),
+                  ...(line.equipmentId
+                    ? { equipmentId: line.equipmentId }
+                    : {}),
+                  servedQty: line.servedQty,
+                  ...(line.remark ? { remark: line.remark } : {}),
+                },
+              },
+            ],
     );
     const payload = entries.map((entry) => entry.line);
 
@@ -484,10 +500,10 @@ export default function DwrForm({
           {editing ? `Correct ${report?.dprNumber}` : 'Record a day'}
         </h2>
         <p className="text-sm text-gray-600">
-          Enter what the site did. Choose a BOQ item once and measure it as
-          many times as the day needs — a row per position, as the sheet is
-          written. <strong>Quantities are computed</strong>: a measurement from
-          its dimensions, a presence-paid line from the day served. There is no
+          Enter what the site did. Choose a BOQ item once and measure it as many
+          times as the day needs — a row per position, as the sheet is written.{' '}
+          <strong>Quantities are computed</strong>: a measurement from its
+          dimensions, a presence-paid line from the day served. There is no
           field to type one into. Files are optional on every line, and they go
           up when the day is saved.
           {editing && (
@@ -500,7 +516,10 @@ export default function DwrForm({
       </header>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -636,9 +655,13 @@ export default function DwrForm({
       </section>
 
       {unattached.length > 0 && (
-        <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+        <div
+          className="rounded-md bg-amber-50 p-3 text-sm text-amber-900"
+          role="alert"
+        >
           <p className="font-medium">
-            The day was saved, and {unattached.length === 1 ? 'one file' : 'these files'} did not
+            The day was saved, and{' '}
+            {unattached.length === 1 ? 'one file' : 'these files'} did not
             attach:
           </p>
           <ul className="mt-1 list-disc pl-5">
@@ -647,22 +670,28 @@ export default function DwrForm({
             ))}
           </ul>
           <p className="mt-1">
-            Nothing else was lost. Open the report and attach {unattached.length === 1 ? 'it' : 'them'}{' '}
-            there.
+            Nothing else was lost. Open the report and attach{' '}
+            {unattached.length === 1 ? 'it' : 'them'} there.
           </p>
         </div>
       )}
 
       {fileWithoutMeasurement && (
-        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="alert">
-          A file is attached to a measurement that has nothing measured on it. A row with every box
-          empty is not saved, so the file would go with it — enter the measurement, or remove the
-          file.
+        <p
+          className="rounded-md bg-amber-50 p-3 text-sm text-amber-900"
+          role="alert"
+        >
+          A file is attached to a measurement that has nothing measured on it. A
+          row with every box empty is not saved, so the file would go with it —
+          enter the measurement, or remove the file.
         </p>
       )}
 
       {shortDayWithoutRemark && (
-        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+        <p
+          className="rounded-md bg-amber-50 p-3 text-sm text-amber-900"
+          role="alert"
+        >
           A presence line below a full day needs a remark saying why. The real
           sheets argue the deduction there — &ldquo;1 operator, 1 helper not
           available at site&rdquo; — and a short day with no reason is a
@@ -726,13 +755,11 @@ function LineEditor({
    */
   const subtotal =
     line.kind === 'measured'
-      ? line.rows
-          .filter(hasAnything)
-          .reduce<number | null>((total, row) => {
-            if (total === null) return null;
-            const value = rowQuantity(row);
-            return value === null ? null : total + Number(value);
-          }, 0)
+      ? line.rows.filter(hasAnything).reduce<number | null>((total, row) => {
+          if (total === null) return null;
+          const value = rowQuantity(row);
+          return value === null ? null : total + Number(value);
+        }, 0)
       : null;
 
   return (
@@ -758,8 +785,8 @@ function LineEditor({
           placeholder="Search by item number, description or unit"
         />
         <span className="text-xs text-gray-500">
-          {boqOptions.length} lines in this schedule. Type any part of the number
-          or the description — “shutter”, “91.05”, “cum”.
+          {boqOptions.length} lines in this schedule. Type any part of the
+          number or the description — “shutter”, “91.05”, “cum”.
         </span>
       </div>
 
@@ -777,24 +804,24 @@ function LineEditor({
             check a column of against their own sheet. It scrolls inside itself, so a long remark
             never widens the page around it.
           */}
-          <div className="overflow-x-auto rounded border border-gray-200">
-            <table className="w-full min-w-[56rem] text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+          <div className={TABLE.wrap}>
+            <table className={clsx(TABLE.table, 'w-full min-w-[56rem]')}>
+              <thead className={TABLE.thead}>
                 <tr>
-                  <th className="px-2 py-2 font-medium">Chainage from</th>
-                  <th className="px-2 py-2 font-medium">To</th>
-                  <th className="px-2 py-2 font-medium">Side</th>
-                  <th className="px-2 py-2 font-medium">Nos.</th>
-                  <th className="px-2 py-2 font-medium">Length</th>
-                  <th className="px-2 py-2 font-medium">Width</th>
-                  <th className="px-2 py-2 font-medium">Height</th>
-                  <th className="px-2 py-2 text-right font-medium">Qty</th>
-                  <th className="px-2 py-2 font-medium">Remark</th>
-                  <th className="px-2 py-2 font-medium">Files</th>
-                  <th className="px-2 py-2" aria-label="Remove" />
+                  <th className={DENSE_TH}>Chainage from</th>
+                  <th className={DENSE_TH}>To</th>
+                  <th className={DENSE_TH}>Side</th>
+                  <th className={DENSE_TH}>Nos.</th>
+                  <th className={DENSE_TH}>Length</th>
+                  <th className={DENSE_TH}>Width</th>
+                  <th className={DENSE_TH}>Height</th>
+                  <th className={clsx(DENSE_TH, 'text-right')}>Qty</th>
+                  <th className={DENSE_TH}>Remark</th>
+                  <th className={DENSE_TH}>Files</th>
+                  <th className={DENSE_TH} aria-label="Remove" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {line.rows.map((row, rowIndex) => {
                   const update = (next: Partial<MeasurementRow>) =>
                     onChange({
@@ -806,8 +833,8 @@ function LineEditor({
                   const quantity = hasAnything(row) ? rowQuantity(row) : null;
 
                   return (
-                    <tr key={rowIndex}>
-                      <td className="px-2 py-1.5">
+                    <tr key={rowIndex} className={TABLE.row}>
+                      <td className={DENSE_TD}>
                         <Cell
                           value={row.chainageFrom}
                           onChange={(chainageFrom) => update({ chainageFrom })}
@@ -816,7 +843,7 @@ function LineEditor({
                           label="Chainage from"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className={DENSE_TD}>
                         <Cell
                           value={row.chainageTo}
                           onChange={(chainageTo) => update({ chainageTo })}
@@ -825,7 +852,7 @@ function LineEditor({
                           label="Chainage to"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className={DENSE_TD}>
                         <Cell
                           value={row.roadSide}
                           onChange={(roadSide) => update({ roadSide })}
@@ -842,7 +869,7 @@ function LineEditor({
                           ['depth', 'Height'],
                         ] as const
                       ).map(([key, label]) => (
-                        <td key={key} className="px-2 py-1.5">
+                        <td key={key} className={DENSE_TD}>
                           <Cell
                             value={row[key]}
                             onChange={(value) => update({ [key]: value })}
@@ -855,12 +882,10 @@ function LineEditor({
                       {/* Per row, and computed. The client's sheet carries this column and it is
                           the one a reviewer checks against their own — so it is shown as the row
                           is typed rather than after a save. */}
-                      <td className="px-2 py-1.5 text-right tabular-nums">
-                        {quantity ?? (
-                          <span className="text-gray-400">—</span>
-                        )}
+                      <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                        {quantity ?? <span className="text-gray-400">—</span>}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className={DENSE_TD}>
                         <Cell
                           value={row.remark}
                           onChange={(remark) => update({ remark })}
@@ -872,14 +897,14 @@ function LineEditor({
                       {/* Optional, on every measurement. The photograph of a pour is evidence for
                           **this** chainage; filed under the report it joins a pile of twenty that
                           argues for nothing in particular. */}
-                      <td className="px-2 py-1.5 align-top">
+                      <td className={clsx(DENSE_TD, '!align-top')}>
                         <LineFiles
                           files={row.files}
                           attached={attachedTo(row.id)}
                           onChange={(files) => update({ files })}
                         />
                       </td>
-                      <td className="px-2 py-1.5 text-right">
+                      <td className={clsx(DENSE_TD, 'text-right')}>
                         {/* Never the last row: removing it would leave an item measured nowhere,
                             and the way to drop an item is to remove the item. */}
                         {line.rows.length > 1 && (
@@ -904,17 +929,29 @@ function LineEditor({
                   );
                 })}
               </tbody>
-              <tfoot className="border-t border-gray-200 bg-gray-50">
+              <tfoot className={TABLE.tfoot}>
                 <tr>
-                  <td className="px-2 py-2 text-xs text-gray-600" colSpan={7}>
+                  <td
+                    className={clsx(
+                      DENSE_TD,
+                      'text-xs font-normal text-gray-600',
+                    )}
+                    colSpan={7}
+                  >
                     Chainage as the sheet writes it — <strong>21+300</strong> is
                     21 km and 300 m. A plain <strong>21.300</strong> is accepted
                     too. An empty box counts as one.
                   </td>
-                  <td className="px-2 py-2 text-right font-semibold tabular-nums">
+                  <td className={clsx(DENSE_TD, TABLE.numeric)}>
                     {subtotal === null ? '—' : subtotal.toFixed(3)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-gray-600" colSpan={3}>
+                  <td
+                    className={clsx(
+                      DENSE_TD,
+                      'text-xs font-normal text-gray-600',
+                    )}
+                    colSpan={3}
+                  >
                     Total for this item
                   </td>
                 </tr>
@@ -1204,4 +1241,3 @@ function chainage(key: string, value: string): Record<string, string> {
   const parsed = parseChainage(value);
   return parsed === null ? {} : { [key]: parsed };
 }
-

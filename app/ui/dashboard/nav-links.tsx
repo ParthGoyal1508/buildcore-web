@@ -1,67 +1,16 @@
 'use client';
 
-import type { ComponentType, SVGProps } from 'react';
-import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import {
-  HomeIcon,
-  UsersIcon,
-  BriefcaseIcon,
-  TruckIcon,
-  ArchiveBoxIcon,
-  UserGroupIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-  ClockIcon,
-  WrenchScrewdriverIcon,
-  UserPlusIcon,
-  CubeIcon,
-} from '@heroicons/react/24/outline';
+import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, type NavModuleId } from '@/app/lib/constants';
+import { MESSAGES } from '@/app/lib/constants';
 import { visibleModules } from '@/app/lib/permissions';
-
-/**
- * Icons for the modules defined in `NAV_MODULES`.
- *
- * Kept here rather than in `constants.ts` so that file — imported by server components
- * across the app — does not pull nine icon components into every bundle that reads a
- * route or a message. Typing it as a `Record` over `NavModuleId` makes it exhaustive:
- * adding a module to `NAV_MODULES` without an icon fails to compile rather than
- * rendering a blank space.
- */
-const ICONS: Record<NavModuleId, ComponentType<SVGProps<SVGSVGElement>>> = {
-  dashboard: HomeIcon,
-  hr: UsersIcon,
-  projects: BriefcaseIcon,
-  plant: TruckIcon,
-  inventory: ArchiveBoxIcon,
-  // A cube rather than another box: Inventory already owns the archive box, and the
-  // two modules sitting next to each other with the same glyph is the confusion
-  // 012's own spec asks the sidebar to avoid.
-  assets: CubeIcon,
-  partners: UserGroupIcon,
-  labour: WrenchScrewdriverIcon,
-  recruitment: UserPlusIcon,
-  reports: ChartBarIcon,
-  'my-workspace': ClockIcon,
-  settings: Cog6ToothIcon,
-};
-
-/**
- * One nav target. `flex-1 basis-[20%]` on a wrapping row means the modules fill each
- * row evenly whatever their number — three modules become three wide buttons rather
- * than three narrow ones stranded in a five-column track — while ten still wrap into
- * two tidy rows inside a 320px viewport. `h-[48px]` holds the 44px minimum touch target
- * that Principle VI requires of this surface. Desktop reverts to the stacked column via
- * `md:flex-none md:basis-auto`.
- */
-const ITEM =
-  'flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-blue-50 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:flex-none md:basis-auto md:justify-start md:p-2 md:px-3';
+import SideNavItem from '@/app/ui/dashboard/sidenav-item';
+import { areaForPath } from '@/app/ui/module-theme';
 
 /** A full-width row inside the wrapping nav, for the states that are a message. */
-const NOTICE = 'basis-full rounded-md bg-gray-50 px-3 py-2 text-xs';
+const NOTICE = 'basis-full rounded-lg bg-white px-3 py-2 text-xs';
 
 /**
  * The sidebar's module links, filtered to what the signed-in user's role permits
@@ -78,6 +27,7 @@ const NOTICE = 'basis-full rounded-md bg-gray-50 px-3 py-2 text-xs';
  * placeholder and the failed state shows nothing.
  */
 export default function NavLinks() {
+  const pathname = usePathname();
   const {
     data: user,
     isPending,
@@ -92,7 +42,7 @@ export default function NavLinks() {
           <div
             key={slot}
             aria-hidden="true"
-            className="h-[48px] flex-1 basis-[20%] animate-pulse rounded-md bg-gray-100 md:flex-none md:basis-auto"
+            className="h-[48px] flex-1 basis-[20%] animate-pulse rounded-lg bg-white/70 md:h-9 md:flex-none md:basis-auto"
           />
         ))}
         <p className="sr-only" role="status">
@@ -123,17 +73,22 @@ export default function NavLinks() {
     );
   }
 
+  // The module that owns this page, by the same longest-prefix rule the route guard uses —
+  // so a detail page three levels down still lights its module (2026-10-14: the sidebar had
+  // no active state at all until now).
+  const current = areaForPath(pathname);
+
   return (
     <>
-      {modules.map((navModule) => {
-        const LinkIcon = ICONS[navModule.id];
-        return (
-          <Link key={navModule.id} href={navModule.href} className={ITEM}>
-            <LinkIcon className="w-6" />
-            <p className="hidden md:block">{navModule.name}</p>
-          </Link>
-        );
-      })}
+      {modules.map((navModule) => (
+        <SideNavItem
+          key={navModule.id}
+          href={navModule.href}
+          area={navModule.id}
+          label={navModule.name}
+          active={current === navModule.id}
+        />
+      ))}
     </>
   );
 }

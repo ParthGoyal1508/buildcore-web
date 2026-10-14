@@ -13,6 +13,7 @@ import PageHeader from '@/app/ui/page-header';
 import ClientModal from '@/app/ui/projects/client-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import { Fact, DetailCard, OpenLink } from '@/app/ui/projects/detail-card';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One client — what is on file about them, and what they have given us (2026-10-09).
@@ -52,18 +53,24 @@ export default function ClientDetailPage() {
   if (client.isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
   if (client.isError || !client.data) {
     return (
       <main>
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p
+          role="alert"
+          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {MESSAGES.loadFailed}
         </p>
         <p className="mt-3 text-sm">
-          <Link href={ROUTES.projectsClients} className="text-blue-700 underline">
+          <Link
+            href={ROUTES.projectsClients}
+            className="text-blue-700 underline"
+          >
             Back to clients
           </Link>
         </p>
@@ -84,7 +91,10 @@ export default function ClientDetailPage() {
           </span>
         }
         description={
-          <Link href={ROUTES.projectsClients} className="text-blue-700 underline">
+          <Link
+            href={ROUTES.projectsClients}
+            className="text-blue-700 underline"
+          >
             Clients
           </Link>
         }
@@ -118,12 +128,12 @@ export default function ClientDetailPage() {
       <DetailCard heading={`Projects (${rows.length})`}>
         {projects.isLoading ? (
           <p className="text-sm text-gray-500" role="status">
-            Loading…
+            <LoadingText />
           </p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-gray-600">
-            No projects for this client yet. A client with none can be deleted; one with
-            any cannot.
+            No projects for this client yet. A client with none can be deleted;
+            one with any cannot.
           </p>
         ) : (
           <ul className="divide-y divide-gray-100">

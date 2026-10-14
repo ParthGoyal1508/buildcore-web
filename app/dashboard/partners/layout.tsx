@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import PartnersNav from '@/app/ui/partners/partners-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The one place `/dashboard/partners/*` adds a permission check beyond the module
@@ -49,7 +50,7 @@ export default function PartnersLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

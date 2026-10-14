@@ -18,10 +18,11 @@ import {
   activityModuleLabel,
   enumLabel,
 } from '@/app/lib/constants';
-import ResponsiveList, {
-  type Column,
-} from '@/app/ui/settings/responsive-list';
-import { inlineSelectClass } from '@/app/ui/settings/form-fields';
+import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import {
+  inlineSelectClass,
+  SecondaryButton,
+} from '@/app/ui/settings/form-fields';
 
 /**
  * What each audited action is called, for the person reading the log.
@@ -51,8 +52,18 @@ const ACTION_LABELS: Record<string, string> = {
   ADMIN_PASSWORD_RESET: 'Password reset by an administrator',
 };
 
-const actionLabel = (action: string) =>
+export const actionLabel = (action: string) =>
   ACTION_LABELS[action] ?? enumLabel(action);
+
+/**
+ * What happened, in words: the API's sentence where it has one ("Confirmed their password for
+ * Personal Settings"), otherwise the action and what it was done to ("Updated PRPL-2401 —
+ * Whitefield"). The record's id is never the reader's answer (2026-10-15).
+ */
+export const activityWhat = (e: ActivityLogEntry) =>
+  e.description ?? actionLabel(e.action);
+export const activityTarget = (e: ActivityLogEntry) =>
+  e.targetLabel !== undefined ? e.targetLabel : e.target;
 
 export default function ActivityLogList() {
   const [module, setModule] = useState('');
@@ -91,13 +102,17 @@ export default function ActivityLogList() {
       render: (e) => new Date(e.timestamp).toLocaleString(),
     },
     { key: 'actor', header: 'User', render: (e) => e.actor },
-    { key: 'action', header: 'Action', render: (e) => actionLabel(e.action) },
+    { key: 'action', header: 'Action', render: (e) => activityWhat(e) },
     {
       key: 'module',
       header: 'Module',
       render: (e) => activityModuleLabel(e.module),
     },
-    { key: 'target', header: 'Target', render: (e) => e.target ?? '—' },
+    {
+      key: 'target',
+      header: 'Target',
+      render: (e) => activityTarget(e) ?? '—',
+    },
   ];
 
   const emptyMessage =
@@ -146,13 +161,13 @@ export default function ActivityLogList() {
           </select>
         </label>
 
-        <button
+        <SecondaryButton
           onClick={() => download.mutate()}
           disabled={download.isPending}
-          className="ml-auto rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="ml-auto"
         >
           {download.isPending ? 'Exporting…' : 'Export CSV'}
-        </button>
+        </SecondaryButton>
       </div>
 
       {error && (

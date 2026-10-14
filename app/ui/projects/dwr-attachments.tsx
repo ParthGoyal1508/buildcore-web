@@ -8,7 +8,7 @@ import {
   addDwrAttachment,
   downloadDwrAttachment,
 } from '@/app/lib/api/dwr';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
 import { RowAction } from '@/app/ui/settings/form-fields';
 
@@ -51,6 +51,9 @@ export default function DwrAttachments({
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
 
   const upload = useMutation({
     mutationFn: (file: File) => addDwrAttachment(dwrId, file),
@@ -67,7 +70,7 @@ export default function DwrAttachments({
     try {
       // The server's own name for the file, with its extension. The fallback is reached only if
       // the response carried no readable Content-Disposition — see `openStoredFile`.
-      openStoredFile(
+      show(
         await downloadDwrAttachment(attachment.id),
         attachment.fileName,
       );
@@ -104,6 +107,7 @@ export default function DwrAttachments({
         )}
       </div>
 
+      {viewer}
       {error && (
         <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
           {error}
@@ -170,6 +174,9 @@ export function DwrLinePhotos({
 }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
 
   const upload = useMutation({
     mutationFn: (file: File) => addDwrAttachment(dwrId, file, taskId),
@@ -181,7 +188,7 @@ export function DwrLinePhotos({
 
   const open = async (attachment: DwrAttachment) => {
     try {
-      openStoredFile(
+      show(
         await downloadDwrAttachment(attachment.id),
         attachment.fileName,
       );
@@ -193,6 +200,7 @@ export function DwrLinePhotos({
 
   return (
     <div className="flex flex-col items-start gap-1">
+      {viewer}
       {attachments.map((attachment) => (
         <RowAction
           key={attachment.id}

@@ -6,6 +6,7 @@ import { getEmployee } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES } from '@/app/lib/constants';
 import EmployeeForm from '@/app/ui/hr/employee-form';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * Loads the record the edit form starts from.
@@ -22,7 +23,7 @@ export default function EmployeeEditor({ employeeId }: { employeeId: string }) {
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

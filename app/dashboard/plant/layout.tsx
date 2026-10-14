@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, PLANT_PERMISSIONS, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import PlantNav from '@/app/ui/plant/plant-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The per-section permission check `/dashboard/plant/*` needs beyond the module tier.
@@ -68,7 +69,7 @@ export default function PlantLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

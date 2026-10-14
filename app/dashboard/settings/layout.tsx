@@ -7,6 +7,7 @@ import { SETTINGS_PERMISSIONS, MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import SettingsNav from '@/app/ui/settings/settings-nav';
 import { maySettingsAdministerUsers } from '@/app/ui/settings/sections';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The single permission chokepoint for every `/dashboard/settings/*` page.
@@ -37,13 +38,12 @@ export default function SettingsLayout({
 
   // '/dashboard/settings/companies/anything' -> 'companies'
   const section = pathname.split('/')[3] as
-    | keyof typeof SETTINGS_PERMISSIONS
-    | undefined;
+    keyof typeof SETTINGS_PERMISSIONS | undefined;
 
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

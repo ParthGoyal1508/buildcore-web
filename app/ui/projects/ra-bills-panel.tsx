@@ -33,6 +33,7 @@ import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import RaBillView from '@/app/ui/projects/ra-bill-view';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
 import WorkOrderApproval from '@/app/ui/projects/work-order-approval';
+import WorkOrderDocuments from '@/app/ui/projects/work-order-documents';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
@@ -44,6 +45,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
 const TABS = ['award', 'bills', 'retention', 'settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -119,8 +121,8 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
     onError: (err) =>
       setError(
         err instanceof ApiError
-          ? (err.details as { message?: string } | undefined)?.message ??
-              err.message
+          ? ((err.details as { message?: string } | undefined)?.message ??
+              err.message)
           : WORK_ORDER_COPY.submitFailed,
       ),
   });
@@ -148,8 +150,8 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
     onError: (err) =>
       setError(
         err instanceof ApiError
-          ? (err.details as { message?: string } | undefined)?.message ??
-              err.message
+          ? ((err.details as { message?: string } | undefined)?.message ??
+              err.message)
           : WORK_ORDER_COPY.reopenFailed,
       ),
   });
@@ -354,10 +356,15 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                     <SecondaryButton
                       type="button"
                       disabled={reopenAward.isPending}
-                      onClick={() => {
-                        const reason = window.prompt(
-                          WORK_ORDER_COPY.reopenPrompt,
-                        );
+                      onClick={async () => {
+                        const reason = await promptDialog({
+                          title: 'Reopen these rates?',
+                          message: WORK_ORDER_COPY.reopenPrompt,
+                          required: true,
+                          multiline: true,
+                          confirmLabel: 'Reopen',
+                          tone: 'danger',
+                        });
                         if (!reason) return;
                         setError(null);
                         setNotice(null);
@@ -375,7 +382,21 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                 )}
               </header>
 
-              <div role="tablist" className="flex flex-wrap gap-1 border-b border-gray-200">
+              {/* Rates → LOI → work order (2026-10-15): where the record stands in that order, and
+                  the two letters issued from its approved rates. Above the tabs, because it is the
+                  next thing to do on the record whichever tab is open. */}
+              <WorkOrderDocuments
+                key={`documents-${chosen.id}`}
+                order={chosen}
+                vendorName={
+                  (chosen.partnerId && vendors.byId.get(chosen.partnerId)) || ''
+                }
+              />
+
+              <div
+                role="tablist"
+                className="flex flex-wrap gap-1 border-b border-gray-200"
+              >
                 {TABS.map((name) => (
                   <button
                     key={name}
@@ -786,8 +807,8 @@ function BillsTab({
     onError: (err) =>
       onError(
         err instanceof ApiError
-          ? (err.details as { message?: string } | undefined)?.message ??
-              err.message
+          ? ((err.details as { message?: string } | undefined)?.message ??
+              err.message)
           : BILLING_COPY.discardFailed,
       ),
   });
@@ -816,16 +837,18 @@ function BillsTab({
         <div className="space-y-1 rounded border border-gray-200 p-3">
           <Link
             href={`${ROUTES.projectsBillPackages(projectId)}?direction=to_subcontractor&workOrderId=${encodeURIComponent(order.id)}${
-              order.partnerId ? `&partnerId=${encodeURIComponent(order.partnerId)}` : ''
+              order.partnerId
+                ? `&partnerId=${encodeURIComponent(order.partnerId)}`
+                : ''
             }`}
             className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
             Generate the next bill on this work order
           </Link>
           <p className="text-xs text-gray-500">
-            Quantities are proposed from approved daily work against this
-            award. Add recoveries and deductions, send it for approval, then
-            issue, certify and pay it — with a payment advice for each payment.
+            Quantities are proposed from approved daily work against this award.
+            Add recoveries and deductions, send it for approval, then issue,
+            certify and pay it — with a payment advice for each payment.
           </p>
         </div>
       )}
@@ -850,80 +873,92 @@ function BillsTab({
                   // "Submit" here started a separate decision on the same bill.
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Link
-                      href={ROUTES.projectsBillPackage(projectId, bill.package.id)}
+                      href={ROUTES.projectsBillPackage(
+                        projectId,
+                        bill.package.id,
+                      )}
                       className="inline-flex min-h-11 items-center rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 sm:min-h-0"
                     >
                       {nextStepLabel(bill.package.status)}
                     </Link>
                   </div>
                 ) : (
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <SecondaryButton
-                    type="button"
-                    aria-expanded={opened.has(bill.id)}
-                    onClick={() =>
-                      setOpened((current) => {
-                        const next = new Set(current);
-                        if (!next.delete(bill.id)) next.add(bill.id);
-                        return next;
-                      })
-                    }
-                  >
-                    {opened.has(bill.id)
-                      ? BILLING_COPY.hideBill
-                      : BILLING_COPY.viewBill}
-                  </SecondaryButton>
-                  {bill.status === 'draft' && (
-                    <RowAction
-                      type="button"
-                      className="min-h-11 justify-center sm:min-h-0"
-                      onClick={() => {
-                        onError(null);
-                        submit.mutate(bill.id);
-                      }}
-                    >
-                      {BILLING_COPY.submit}
-                    </RowAction>
-                  )}
-                  {/* The way out of a bill raised twice for the same date (2026-10-08). Draft
-                      only, and the server refuses anything else — a submitted bill is a claim
-                      somebody is reading. Confirmed because it cannot be undone. */}
-                  {bill.status === 'draft' && (
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                     <SecondaryButton
                       type="button"
-                      disabled={discard.isPending}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            BILLING_COPY.discardConfirm(bill.billNumber),
-                          )
-                        ) {
-                          return;
-                        }
-                        onError(null);
-                        discard.mutate(bill.id);
-                      }}
+                      aria-expanded={opened.has(bill.id)}
+                      onClick={() =>
+                        setOpened((current) => {
+                          const next = new Set(current);
+                          if (!next.delete(bill.id)) next.add(bill.id);
+                          return next;
+                        })
+                      }
                     >
-                      {discard.isPending
-                        ? BILLING_COPY.discarding
-                        : BILLING_COPY.discard}
+                      {opened.has(bill.id)
+                        ? BILLING_COPY.hideBill
+                        : BILLING_COPY.viewBill}
                     </SecondaryButton>
-                  )}
-                  {/* A draft is edited; a bill somebody has acted on is revised. Saying "revise"
+                    {bill.status === 'draft' && (
+                      <RowAction
+                        type="button"
+                        className="min-h-11 justify-center sm:min-h-0"
+                        onClick={() => {
+                          onError(null);
+                          submit.mutate(bill.id);
+                        }}
+                      >
+                        {BILLING_COPY.submit}
+                      </RowAction>
+                    )}
+                    {/* The way out of a bill raised twice for the same date (2026-10-08). Draft
+                      only, and the server refuses anything else — a submitted bill is a claim
+                      somebody is reading. Confirmed because it cannot be undone. */}
+                    {bill.status === 'draft' && (
+                      <SecondaryButton
+                        type="button"
+                        disabled={discard.isPending}
+                        onClick={async () => {
+                          if (
+                            !(await confirmDialog({
+                              title: 'Discard this bill?',
+                              message: BILLING_COPY.discardConfirm(
+                                bill.billNumber,
+                              ),
+                              confirmLabel: 'Discard',
+                              tone: 'danger',
+                            }))
+                          ) {
+                            return;
+                          }
+                          onError(null);
+                          discard.mutate(bill.id);
+                        }}
+                      >
+                        {discard.isPending
+                          ? BILLING_COPY.discarding
+                          : BILLING_COPY.discard}
+                      </SecondaryButton>
+                    )}
+                    {/* A draft is edited; a bill somebody has acted on is revised. Saying "revise"
                       over a draft promised a formality that does not apply to it. */}
-                  <SecondaryButton type="button" onClick={() => onRevise(bill)}>
-                    {bill.status === 'draft'
-                      ? BILLING_COPY.editHeading
-                      : BILLING_COPY.reviseHeading}
-                  </SecondaryButton>
-                </div>
+                    <SecondaryButton
+                      type="button"
+                      onClick={() => onRevise(bill)}
+                    >
+                      {bill.status === 'draft'
+                        ? BILLING_COPY.editHeading
+                        : BILLING_COPY.reviseHeading}
+                    </SecondaryButton>
+                  </div>
                 )}
                 {!bill.package && opened.has(bill.id) && (
                   <>
                     <RaBillView bill={bill} />
-                    {/* 028 FR-020, FR-021. Beside the bill rather than inside `RaBillView`, which
-                        fetches nothing by design: payments and signed copies are different data
-                        and change without the bill changing. */}
+                    {/* 028 FR-021. Beside the bill rather than inside `RaBillView`, which fetches
+                        nothing by design: payments are different data and change without the bill
+                        changing. A bill raised before packages, so certified by its own `ra_bill`
+                        chain — the settlement shows nothing payable until that chain approves it. */}
                     <RaBillSettlement bill={bill} />
                   </>
                 )}
@@ -966,7 +1001,7 @@ function BillSummary({ bill }: { bill: RaBill }) {
               from issue until certification, which reads as an approval nobody can act on. */}
           {bill.package
             ? BILL_STATUS_LABELS[bill.package.status]
-            : BILLING_COPY.statusLabels[bill.status] ?? bill.status}
+            : (BILLING_COPY.statusLabels[bill.status] ?? bill.status)}
         </span>
       </span>
       <span className="tabular-nums text-gray-900">

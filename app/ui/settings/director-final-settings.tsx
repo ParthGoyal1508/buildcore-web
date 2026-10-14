@@ -18,6 +18,7 @@ import {
 import { dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The action type whose gate cannot be moved.
@@ -110,13 +111,14 @@ export default function DirectorFinalSettings() {
 
   const entries = data?.entries ?? [];
   const changed = entries.filter(
-    (entry) => entry.actionType in edits && edits[entry.actionType] !== entry.isFinal,
+    (entry) =>
+      entry.actionType in edits && edits[entry.actionType] !== entry.isFinal,
   );
 
   if (isLoading) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -166,7 +168,9 @@ export default function DirectorFinalSettings() {
                 {DIRECTOR_FINAL_MESSAGES.pendingChange(
                   approvalActionTypeLabel(actionType),
                   DIRECTOR_FINAL_MESSAGES.stateLabels[
-                    pending.before?.[actionType] ? 'final' : 'not_final_by_decision'
+                    pending.before?.[actionType]
+                      ? 'final'
+                      : 'not_final_by_decision'
                   ],
                   DIRECTOR_FINAL_MESSAGES.stateLabels[
                     to ? 'final' : 'not_final_by_decision'
@@ -199,7 +203,10 @@ export default function DirectorFinalSettings() {
             edited={edits[entry.actionType]}
             mayChange={mayChange && !pending}
             onChange={(isFinal) =>
-              setEdits((current) => ({ ...current, [entry.actionType]: isFinal }))
+              setEdits((current) => ({
+                ...current,
+                [entry.actionType]: isFinal,
+              }))
             }
           />
         ))}

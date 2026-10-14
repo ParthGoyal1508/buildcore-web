@@ -17,6 +17,7 @@ import SectionTabs from '@/app/ui/section-tabs';
  */
 const TABS = [
   { name: 'Stock', href: ROUTES.inventoryStock },
+  { name: 'Purchase orders', href: ROUTES.inventoryPurchaseOrders },
   { name: 'Purchases', href: ROUTES.inventoryPurchases },
   // 028 FR-030: the label only. `ROUTES.inventoryIssues` is unchanged, because renaming a URL
   // breaks every link already sent for no gain anybody can see.

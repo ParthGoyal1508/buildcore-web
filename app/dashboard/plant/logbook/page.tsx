@@ -26,6 +26,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function LogbookPage() {
   const queryClient = useQueryClient();
@@ -95,7 +96,8 @@ export default function LogbookPage() {
     {
       key: 'fuel',
       header: 'Fuel',
-      render: (row) => (row.fuelConsumed === null ? '—' : `${row.fuelConsumed} L`),
+      render: (row) =>
+        row.fuelConsumed === null ? '—' : `${row.fuelConsumed} L`,
     },
     {
       key: 'operator',
@@ -171,8 +173,15 @@ export default function LogbookPage() {
         emptyMessage={MESSAGES.plantLogbookEmpty}
         actions={(row) => (
           <RowAction
-            onClick={() => {
-              if (window.confirm(MESSAGES.plantConfirmDeleteLogbook)) {
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this logbook entry?',
+                  message: MESSAGES.plantConfirmDeleteLogbook,
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                })
+              ) {
                 remove.mutate(row.id);
               }
             }}

@@ -24,6 +24,7 @@ import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import VendorModal from '@/app/ui/partners/vendor-modal';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 const PAGE_SIZE = 25;
 
@@ -124,7 +125,9 @@ export default function VendorsPage() {
           <div>
             <p>{row.primaryContact.name}</p>
             {row.primaryContact.phone && (
-              <p className="text-xs text-gray-500">{row.primaryContact.phone}</p>
+              <p className="text-xs text-gray-500">
+                {row.primaryContact.phone}
+              </p>
             )}
           </div>
         ) : (
@@ -139,7 +142,9 @@ export default function VendorsPage() {
     {
       key: 'active',
       header: 'Status',
-      render: (row) => <StatusBadge status={row.active ? 'active' : 'closed'} />,
+      render: (row) => (
+        <StatusBadge status={row.active ? 'active' : 'closed'} />
+      ),
     },
   ];
 
@@ -217,7 +222,10 @@ export default function VendorsPage() {
       </div>
 
       {actionError && (
-        <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+        >
           {actionError}
         </p>
       )}
@@ -241,7 +249,7 @@ export default function VendorsPage() {
             <button
               type="button"
               disabled={toggleActive.isPending}
-              onClick={() => {
+              onClick={async () => {
                 // Deactivating removes the vendor from every picker and drops its
                 // contractor off the compliance screens, so it is confirmed rather
                 // than being a one-click toggle in a dense table (FR-010).
@@ -249,7 +257,16 @@ export default function VendorsPage() {
                 const message = next
                   ? `Reactivate ${row.name}?`
                   : `Deactivate ${row.name}? They will stop appearing in pickers, and any contractor profile drops off the compliance lists.`;
-                if (window.confirm(message)) {
+                if (
+                  await confirmDialog({
+                    title: next
+                      ? 'Reactivate this vendor?'
+                      : 'Deactivate this vendor?',
+                    message,
+                    confirmLabel: next ? 'Reactivate' : 'Deactivate',
+                    tone: next ? 'default' : 'danger',
+                  })
+                ) {
                   toggleActive.mutate({ id: row.id, active: next });
                 }
               }}

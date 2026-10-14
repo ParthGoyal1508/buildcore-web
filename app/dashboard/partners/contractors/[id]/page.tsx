@@ -23,6 +23,8 @@ import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** Reads a File as base64 without the `data:` prefix — the shape the API expects. */
 function toBase64(file: File): Promise<string> {
@@ -104,7 +106,9 @@ export default function ContractorDetailPage() {
           <p className="font-medium text-gray-900">
             {partnersLabel(row.documentType)}
           </p>
-          {row.fileName && <p className="text-xs text-gray-500">{row.fileName}</p>}
+          {row.fileName && (
+            <p className="text-xs text-gray-500">{row.fileName}</p>
+          )}
         </div>
       ),
     },
@@ -117,7 +121,11 @@ export default function ContractorDetailPage() {
       key: 'expires',
       header: 'Expires',
       render: (row) =>
-        row.expiresAt ? dateLabel(row.expiresAt) : <span className="text-gray-400">No expiry</span>,
+        row.expiresAt ? (
+          dateLabel(row.expiresAt)
+        ) : (
+          <span className="text-gray-400">No expiry</span>
+        ),
     },
     {
       key: 'warning',
@@ -137,7 +145,7 @@ export default function ContractorDetailPage() {
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -188,7 +196,10 @@ export default function ContractorDetailPage() {
       <section className="mb-6">
         <h2 className="mb-3 font-medium text-gray-900">Documents</h2>
         {error && (
-          <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <p
+            role="alert"
+            className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+          >
             {error}
           </p>
         )}
@@ -201,11 +212,14 @@ export default function ContractorDetailPage() {
             <button
               type="button"
               disabled={removeDocument.isPending}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    `Delete this ${partnersLabel(row.documentType).toLowerCase()}? The stored file is removed too.`,
-                  )
+                  await confirmDialog({
+                    title: 'Delete this document?',
+                    message: `Delete this ${partnersLabel(row.documentType).toLowerCase()}? The stored file is removed too.`,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
                 ) {
                   removeDocument.mutate(row.id);
                 }

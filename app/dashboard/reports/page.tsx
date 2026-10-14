@@ -19,7 +19,11 @@ import FilterField from '@/app/ui/dashboard/filter-field';
 import ReportResultTable from '@/app/ui/dashboard/report-result-table';
 import ReportTypeList from '@/app/ui/dashboard/report-type-list';
 import PageHeader from '@/app/ui/page-header';
-import { inlineSelectClass } from '@/app/ui/settings/form-fields';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
+import {
+  inlineSelectClass,
+  SecondaryButton,
+} from '@/app/ui/settings/form-fields';
 
 function buildBody(values: Record<string, string>) {
   const { fromDate, toDate, ...rest } = values;
@@ -43,8 +47,18 @@ export default function ReportsPage() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Whether the export in flight is to be read in the page rather than saved (2026-10-14). Held in
+   * state, not only passed to the mutation, because a large export finishes later, in the effect
+   * that polls for it.
+   */
+  const [viewing, setViewing] = useState(false);
+  const { show, viewer } = useFileViewer();
 
-  const types = useQuery({ queryKey: ['report-types'], queryFn: getReportTypes });
+  const types = useQuery({
+    queryKey: ['report-types'],
+    queryFn: getReportTypes,
+  });
 
   function pick(type: ReportType) {
     setSelected(type);
@@ -66,11 +80,18 @@ export default function ReportsPage() {
   });
 
   const exportMut = useMutation({
-    mutationFn: () =>
-      exportReport(selected!.id, { ...buildBody(values), format }),
-    onSuccess: (outcome) => {
+    mutationFn: (view: boolean) => {
+      setViewing(view);
+      return exportReport(selected!.id, { ...buildBody(values), format });
+    },
+    onSuccess: (outcome, view) => {
       setError(null);
       if (outcome.mode === 'sync') {
+        if (view) {
+          show({ blob: outcome.blob }, `${selected!.id}.pdf`, selected!.name);
+          setMessage(null);
+          return;
+        }
         triggerDownload(outcome.blob, `${selected!.id}.${extFor(format)}`);
         setMessage('Download started.');
       } else if (outcome.mode === 'async') {
@@ -105,8 +126,20 @@ export default function ReportsPage() {
         try {
           const blob = await downloadExport(jobId);
           if (cancelled) return;
-          triggerDownload(blob, `${selected?.id ?? 'report'}.${extFor(format)}`);
-          setMessage('Export ready — download started.');
+          if (viewing) {
+            show(
+              { blob },
+              `${selected?.id ?? 'report'}.pdf`,
+              selected?.name ?? 'Report',
+            );
+            setMessage(null);
+          } else {
+            triggerDownload(
+              blob,
+              `${selected?.id ?? 'report'}.${extFor(format)}`,
+            );
+            setMessage('Export ready — download started.');
+          }
         } catch {
           if (!cancelled) setError('Could not download the finished export.');
         }
@@ -118,7 +151,7 @@ export default function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [jobId, jobStatus.data, selected, format]);
+  }, [jobId, jobStatus.data, selected, format, viewing, show]);
 
   const isUnavailableResult =
     result !== null && 'unavailable' in result ? result : null;
@@ -199,19 +232,28 @@ export default function ReportsPage() {
                   </select>
                 </label>
 
-                <button
-                  onClick={() => exportMut.mutate()}
+                {format === 'pdf' && (
+                  <SecondaryButton
+                    onClick={() => exportMut.mutate(true)}
+                    disabled={exportMut.isPending || jobId !== null}
+                  >
+                    View PDF
+                  </SecondaryButton>
+                )}
+
+                <SecondaryButton
+                  onClick={() => exportMut.mutate(false)}
                   disabled={exportMut.isPending || jobId !== null}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   {jobId !== null
                     ? 'Processing…'
                     : exportMut.isPending
                       ? 'Exporting…'
-                      : 'Export'}
-                </button>
+                      : `Export ${format === 'pdf' ? 'PDF' : 'Excel'}`}
+                </SecondaryButton>
               </div>
 
+              {viewer}
               {message && (
                 <p className="text-sm text-gray-600" role="status">
                   {message}

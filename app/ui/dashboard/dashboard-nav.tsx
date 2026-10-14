@@ -30,15 +30,23 @@ import SectionTabs from '@/app/ui/section-tabs';
  */
 const SECTIONS = [
   { name: 'Overview', href: ROUTES.dashboard, permission: 'DASHBOARD' },
-  { name: 'Site Dashboard', href: ROUTES.siteDashboard, permission: 'DASHBOARD' },
+  // Overview, Group, Site — the client's order (2026-10-15): the company, then every company,
+  // then one site.
   {
     name: 'Group Dashboard',
     href: ROUTES.groupDashboard,
     permission: 'DASHBOARD',
   },
-  { name: 'Activity Log', href: ROUTES.activityLog, permission: 'DASHBOARD' },
+  {
+    name: 'Site Dashboard',
+    href: ROUTES.siteDashboard,
+    permission: 'DASHBOARD',
+  },
   { name: 'Reminders', href: ROUTES.reminders, permission: 'DASHBOARD' },
   { name: 'Reports', href: ROUTES.reports, permission: 'REPORTS' },
+  // Last since 2026-10-15, matching the overview, where the log now sits at the foot of
+  // the page: the client asked for the Activity Log to come after everything else.
+  { name: 'Activity Log', href: ROUTES.activityLog, permission: 'DASHBOARD' },
 ] as const;
 
 export default function DashboardNav({ className }: { className?: string }) {

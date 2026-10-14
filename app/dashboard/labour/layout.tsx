@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import LabourNav from '@/app/ui/labour/labour-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The one place `/dashboard/labour/*` adds a permission check beyond the module
@@ -36,7 +37,7 @@ export default function LabourLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

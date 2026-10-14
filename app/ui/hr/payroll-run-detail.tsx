@@ -22,6 +22,8 @@ import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
 import SlipDelivery from '@/app/ui/hr/slip-delivery';
 import TransactionReconciliation from '@/app/ui/hr/transaction-reconciliation';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 const TABS = [
   { id: 'lines', label: 'Line items' },
@@ -55,7 +57,11 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   const [tab, setTab] = useState<TabId>('lines');
   const [error, setError] = useState<string | null>(null);
 
-  const { data: run, isLoading, isError } = useQuery({
+  const {
+    data: run,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['hr', 'payrollRun', runId],
     queryFn: () => getPayrollRun(runId),
   });
@@ -99,7 +105,8 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   });
 
   const setStatus = useMutation({
-    mutationFn: (status: 'processed' | 'paid') => setPayrollRunStatus(runId, status),
+    mutationFn: (status: 'processed' | 'paid') =>
+      setPayrollRunStatus(runId, status),
     onSuccess: () => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRun', runId] });
@@ -113,7 +120,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -142,18 +149,63 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
       sticky: true,
       render: (line) => line.name ?? line.employeeCode ?? line.employeeId,
     },
-    { key: 'days', header: 'Days paid', numeric: true, render: (l) => money(l.payableDays) },
-    { key: 'lop', header: 'LOP', numeric: true, render: (l) => money(l.lopDays) },
-    { key: 'basic', header: 'Basic', numeric: true, render: (l) => money(l.basic) },
+    {
+      key: 'days',
+      header: 'Days paid',
+      numeric: true,
+      render: (l) => money(l.payableDays),
+    },
+    {
+      key: 'lop',
+      header: 'LOP',
+      numeric: true,
+      render: (l) => money(l.lopDays),
+    },
+    {
+      key: 'basic',
+      header: 'Basic',
+      numeric: true,
+      render: (l) => money(l.basic),
+    },
     { key: 'hra', header: 'HRA', numeric: true, render: (l) => money(l.hra) },
     { key: 'ot', header: 'OT', numeric: true, render: (l) => money(l.otWages) },
-    { key: 'gross', header: 'Gross', numeric: true, render: (l) => money(gross(l)) },
-    { key: 'pf', header: 'PF', numeric: true, render: (l) => money(l.employeePf) },
-    { key: 'esic', header: 'ESIC', numeric: true, render: (l) => money(l.employeeEsic) },
-    { key: 'pt', header: 'PT', numeric: true, render: (l) => money(l.professionalTax) },
+    {
+      key: 'gross',
+      header: 'Gross',
+      numeric: true,
+      render: (l) => money(gross(l)),
+    },
+    {
+      key: 'pf',
+      header: 'PF',
+      numeric: true,
+      render: (l) => money(l.employeePf),
+    },
+    {
+      key: 'esic',
+      header: 'ESIC',
+      numeric: true,
+      render: (l) => money(l.employeeEsic),
+    },
+    {
+      key: 'pt',
+      header: 'PT',
+      numeric: true,
+      render: (l) => money(l.professionalTax),
+    },
     { key: 'tds', header: 'TDS', numeric: true, render: (l) => money(l.tds) },
-    { key: 'emi', header: 'Loan EMI', numeric: true, render: (l) => money(l.loanEmiDeduction) },
-    { key: 'net', header: 'Net pay', numeric: true, render: (l) => money(l.netPay) },
+    {
+      key: 'emi',
+      header: 'Loan EMI',
+      numeric: true,
+      render: (l) => money(l.loanEmiDeduction),
+    },
+    {
+      key: 'net',
+      header: 'Net pay',
+      numeric: true,
+      render: (l) => money(l.netPay),
+    },
   ];
 
   return (
@@ -180,8 +232,15 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
           {run.status === 'draft' && (
             <Button
               type="button"
-              onClick={() => {
-                if (window.confirm(HR_MESSAGES.confirmProcessRun)) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Process payroll run?',
+                    message: HR_MESSAGES.confirmProcessRun,
+                    confirmLabel: 'Process',
+                    tone: 'default',
+                  })
+                ) {
                   setStatus.mutate('processed');
                 }
               }}
@@ -193,8 +252,15 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
           {run.status === 'processed' && (
             <Button
               type="button"
-              onClick={() => {
-                if (window.confirm(HR_MESSAGES.confirmMarkPaid)) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Mark run as paid?',
+                    message: HR_MESSAGES.confirmMarkPaid,
+                    confirmLabel: 'Mark as paid',
+                    tone: 'default',
+                  })
+                ) {
                   setStatus.mutate('paid');
                 }
               }}
@@ -245,7 +311,9 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
           emptyMessage="This run has no line items."
           footer={
             <tr>
-              <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5">Total</td>
+              <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5">
+                Total
+              </td>
               <td colSpan={5} />
               <td className="px-3 py-2.5 text-right tabular-nums">
                 {money(runTotals.gross)}
@@ -314,24 +382,109 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
             <DataTable
               caption="Salary register"
               columns={[
-                { key: 'code', header: 'Code', sticky: true, render: (r) => r.employeeCode },
+                {
+                  key: 'code',
+                  header: 'Code',
+                  sticky: true,
+                  render: (r) => r.employeeCode,
+                },
                 { key: 'name', header: 'Name', render: (r) => r.name },
-                { key: 'days', header: 'Days', numeric: true, render: (r) => money(r.daysPaid) },
-                { key: 'lop', header: 'LOP', numeric: true, render: (r) => money(r.lopDays) },
-                { key: 'basic', header: 'Basic', numeric: true, render: (r) => money(r.basic) },
-                { key: 'hra', header: 'HRA', numeric: true, render: (r) => money(r.hra) },
-                { key: 'conv', header: 'Conveyance', numeric: true, render: (r) => money(r.conveyance) },
-                { key: 'site', header: 'Site allw.', numeric: true, render: (r) => money(r.siteAllowance) },
-                { key: 'special', header: 'Special allw.', numeric: true, render: (r) => money(r.specialAllowance) },
-                { key: 'ot', header: 'OT', numeric: true, render: (r) => money(r.otWages) },
-                { key: 'gross', header: 'Gross', numeric: true, render: (r) => money(r.gross) },
-                { key: 'pf', header: 'PF', numeric: true, render: (r) => money(r.employeePf) },
-                { key: 'esic', header: 'ESIC', numeric: true, render: (r) => money(r.employeeEsic) },
-                { key: 'pt', header: 'PT', numeric: true, render: (r) => money(r.professionalTax) },
-                { key: 'tds', header: 'TDS', numeric: true, render: (r) => money(r.tds) },
-                { key: 'emi', header: 'Loan EMI', numeric: true, render: (r) => money(r.loanEmi) },
-                { key: 'ded', header: 'Deductions', numeric: true, render: (r) => money(r.totalDeductions) },
-                { key: 'net', header: 'Net pay', numeric: true, render: (r) => money(r.netPay) },
+                {
+                  key: 'days',
+                  header: 'Days',
+                  numeric: true,
+                  render: (r) => money(r.daysPaid),
+                },
+                {
+                  key: 'lop',
+                  header: 'LOP',
+                  numeric: true,
+                  render: (r) => money(r.lopDays),
+                },
+                {
+                  key: 'basic',
+                  header: 'Basic',
+                  numeric: true,
+                  render: (r) => money(r.basic),
+                },
+                {
+                  key: 'hra',
+                  header: 'HRA',
+                  numeric: true,
+                  render: (r) => money(r.hra),
+                },
+                {
+                  key: 'conv',
+                  header: 'Conveyance',
+                  numeric: true,
+                  render: (r) => money(r.conveyance),
+                },
+                {
+                  key: 'site',
+                  header: 'Site allw.',
+                  numeric: true,
+                  render: (r) => money(r.siteAllowance),
+                },
+                {
+                  key: 'special',
+                  header: 'Special allw.',
+                  numeric: true,
+                  render: (r) => money(r.specialAllowance),
+                },
+                {
+                  key: 'ot',
+                  header: 'OT',
+                  numeric: true,
+                  render: (r) => money(r.otWages),
+                },
+                {
+                  key: 'gross',
+                  header: 'Gross',
+                  numeric: true,
+                  render: (r) => money(r.gross),
+                },
+                {
+                  key: 'pf',
+                  header: 'PF',
+                  numeric: true,
+                  render: (r) => money(r.employeePf),
+                },
+                {
+                  key: 'esic',
+                  header: 'ESIC',
+                  numeric: true,
+                  render: (r) => money(r.employeeEsic),
+                },
+                {
+                  key: 'pt',
+                  header: 'PT',
+                  numeric: true,
+                  render: (r) => money(r.professionalTax),
+                },
+                {
+                  key: 'tds',
+                  header: 'TDS',
+                  numeric: true,
+                  render: (r) => money(r.tds),
+                },
+                {
+                  key: 'emi',
+                  header: 'Loan EMI',
+                  numeric: true,
+                  render: (r) => money(r.loanEmi),
+                },
+                {
+                  key: 'ded',
+                  header: 'Deductions',
+                  numeric: true,
+                  render: (r) => money(r.totalDeductions),
+                },
+                {
+                  key: 'net',
+                  header: 'Net pay',
+                  numeric: true,
+                  render: (r) => money(r.netPay),
+                },
               ]}
               rows={register?.rows ?? []}
               rowKey={(r) => r.employeeCode}
@@ -339,7 +492,9 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
               footer={
                 register && (
                   <tr>
-                    <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5">Total</td>
+                    <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5">
+                      Total
+                    </td>
                     <td colSpan={9} />
                     <td className="px-3 py-2.5 text-right tabular-nums">
                       {money(register.totals.gross)}
@@ -369,7 +524,12 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
             <DataTable
               caption="Deduction report"
               columns={[
-                { key: 'head', header: 'Head', sticky: true, render: (h) => h.head },
+                {
+                  key: 'head',
+                  header: 'Head',
+                  sticky: true,
+                  render: (h) => h.head,
+                },
                 {
                   key: 'statutory',
                   header: 'Statutory',
@@ -381,7 +541,12 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
                   numeric: true,
                   render: (h) => h.employeeCount,
                 },
-                { key: 'total', header: 'Total', numeric: true, render: (h) => money(h.total) },
+                {
+                  key: 'total',
+                  header: 'Total',
+                  numeric: true,
+                  render: (h) => money(h.total),
+                },
               ]}
               rows={deductionReport?.heads ?? []}
               rowKey={(h) => h.head}
@@ -390,9 +555,9 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
             {deductionReport && (
               <p className="mt-3 text-sm text-gray-600">
                 Statutory {rupees(deductionReport.totals.statutory)} ·
-                Non-statutory {rupees(deductionReport.totals.nonStatutory)}. These
-                are the same figures the challans derive from — both read the run&apos;s
-                line items.
+                Non-statutory {rupees(deductionReport.totals.nonStatutory)}.
+                These are the same figures the challans derive from — both read
+                the run&apos;s line items.
               </p>
             )}
           </>

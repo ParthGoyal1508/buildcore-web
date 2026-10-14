@@ -22,6 +22,7 @@ import {
   RowAction,
   inlineSelectClass,
 } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** One row as the editor holds it, before it is written back as a set. */
 interface Draft {
@@ -66,7 +67,6 @@ export function ProjectDocumentsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-
   /**
    * No company segment any more (019 FR-005).
    *
@@ -108,8 +108,7 @@ export function ProjectDocumentsScreen() {
 
   /** A kind FR-007 names that this company has no type for (FR-007a). */
   const defineDeclared = useMutation({
-    mutationFn: (code: string) =>
-      defineProjectDocumentKind(code),
+    mutationFn: (code: string) => defineProjectDocumentKind(code),
     onSuccess: async () => {
       setError(null);
       setDraft(null);
@@ -127,8 +126,7 @@ export function ProjectDocumentsScreen() {
    * required from the picker immediately.
    */
   const addKind = useMutation({
-    mutationFn: (input: DocumentKindInput) =>
-      createCompanyDocumentKind(input),
+    mutationFn: (input: DocumentKindInput) => createCompanyDocumentKind(input),
     onSuccess: async () => {
       setError(null);
       setDraft(null);
@@ -151,7 +149,12 @@ export function ProjectDocumentsScreen() {
    */
   const mayConfigure = !!user?.permissions.includes('SETTINGS');
 
-  if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (isPending)
+    return (
+      <p className="text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   if (isError || !data) {
     return <FormError message="The requirements could not be loaded." />;
   }
@@ -215,27 +218,28 @@ export function ProjectDocumentsScreen() {
                   </span>
                 )}
                 {mayConfigure && (
-                <label className="flex items-center gap-2 text-xs text-gray-600">
-                  <span className="sr-only">
-                    {DOCUMENT_COPY.strengthLegend} — {requirement.name}
-                  </span>
-                  <select
-                    className={inlineSelectClass}
-                    value={requirement.isMandatory ? 'mandatory' : 'advisory'}
-                    onChange={(event) =>
-                      edit(
-                        rows.map((r) =>
-                          r.documentTypeId === requirement.documentTypeId
-                            ? {
-                                ...r,
-                                isMandatory: event.target.value === 'mandatory',
-                              }
-                            : r,
-                        ),
-                      )
-                    }
-                  >
-                    {/*
+                  <label className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="sr-only">
+                      {DOCUMENT_COPY.strengthLegend} — {requirement.name}
+                    </span>
+                    <select
+                      className={inlineSelectClass}
+                      value={requirement.isMandatory ? 'mandatory' : 'advisory'}
+                      onChange={(event) =>
+                        edit(
+                          rows.map((r) =>
+                            r.documentTypeId === requirement.documentTypeId
+                              ? {
+                                  ...r,
+                                  isMandatory:
+                                    event.target.value === 'mandatory',
+                                }
+                              : r,
+                          ),
+                        )
+                      }
+                    >
+                      {/*
                       Named by consequence, not by "Required"/"Optional" (FR-022a, T066). Those
                       were the labels until 2026-10-01; "optional" says what a kind is not, and
                       since the 2026-09-16 amendment the two differ in *effect* — one refuses the
@@ -243,14 +247,14 @@ export function ProjectDocumentsScreen() {
                       "Optional" cannot see that, and the person who most needs to is the one
                       deciding whether to make a kind mandatory.
                     */}
-                    <option value="mandatory">
-                      {DOCUMENT_COPY.strengthMandatory}
-                    </option>
-                    <option value="advisory">
-                      {DOCUMENT_COPY.strengthAdvisory}
-                    </option>
-                  </select>
-                </label>
+                      <option value="mandatory">
+                        {DOCUMENT_COPY.strengthMandatory}
+                      </option>
+                      <option value="advisory">
+                        {DOCUMENT_COPY.strengthAdvisory}
+                      </option>
+                    </select>
+                  </label>
                 )}
                 {mayConfigure && (
                   <RowAction
@@ -291,57 +295,57 @@ export function ProjectDocumentsScreen() {
       )}
 
       {mayConfigure && (
-      <section className="rounded-lg border border-gray-200 p-4">
-        <h3 className="mb-2 text-sm font-medium text-gray-900">
-          {DOCUMENT_COPY.requirementsAddHeading}
-        </h3>
-        {addable.length === 0 ? (
-          <p className="text-xs text-gray-500">
-            {DOCUMENT_COPY.requirementsNoneToAdd}
-          </p>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="sr-only" htmlFor="requirement-to-add">
-              {DOCUMENT_COPY.requirementsAddPlaceholder}
-            </label>
-            <select
-              id="requirement-to-add"
-              className={inlineSelectClass}
-              value={toAdd}
-              onChange={(event) => setToAdd(event.target.value)}
-            >
-              <option value="">
+        <section className="rounded-lg border border-gray-200 p-4">
+          <h3 className="mb-2 text-sm font-medium text-gray-900">
+            {DOCUMENT_COPY.requirementsAddHeading}
+          </h3>
+          {addable.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              {DOCUMENT_COPY.requirementsNoneToAdd}
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="requirement-to-add">
                 {DOCUMENT_COPY.requirementsAddPlaceholder}
-              </option>
-              {addable.map((type) => (
-                <option key={type.documentTypeId} value={type.documentTypeId}>
-                  {type.name}
+              </label>
+              <select
+                id="requirement-to-add"
+                className={inlineSelectClass}
+                value={toAdd}
+                onChange={(event) => setToAdd(event.target.value)}
+              >
+                <option value="">
+                  {DOCUMENT_COPY.requirementsAddPlaceholder}
                 </option>
-              ))}
-            </select>
-            <Button
-              type="button"
-              disabled={!toAdd}
-              onClick={() => {
-                const type = addable.find((t) => t.documentTypeId === toAdd);
-                if (!type) return;
-                edit([
-                  ...rows,
-                  {
-                    documentTypeId: type.documentTypeId,
-                    code: type.code,
-                    name: type.name,
-                    isMandatory: true,
-                  },
-                ]);
-                setToAdd('');
-              }}
-            >
-              {DOCUMENT_COPY.requirementsAddButton}
-            </Button>
-          </div>
-        )}
-      </section>
+                {addable.map((type) => (
+                  <option key={type.documentTypeId} value={type.documentTypeId}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                disabled={!toAdd}
+                onClick={() => {
+                  const type = addable.find((t) => t.documentTypeId === toAdd);
+                  if (!type) return;
+                  edit([
+                    ...rows,
+                    {
+                      documentTypeId: type.documentTypeId,
+                      code: type.code,
+                      name: type.name,
+                      isMandatory: true,
+                    },
+                  ]);
+                  setToAdd('');
+                }}
+              >
+                {DOCUMENT_COPY.requirementsAddButton}
+              </Button>
+            </div>
+          )}
+        </section>
       )}
 
       {data.undefinedCodes.length > 0 && (

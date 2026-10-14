@@ -109,7 +109,8 @@ export default function DashboardSearch() {
    * end would highlight nothing and make Enter do nothing. Clamping on render handles
    * both without a second state update chasing the first.
    */
-  const activeIndex = flat.length === 0 ? -1 : Math.min(active, flat.length - 1);
+  const activeIndex =
+    flat.length === 0 ? -1 : Math.min(active, flat.length - 1);
   const activeRow = activeIndex >= 0 ? flat[activeIndex] : undefined;
 
   // Close on a click anywhere else. Without this the panel stays open over the page
@@ -170,13 +171,14 @@ export default function DashboardSearch() {
   const panelVisible = open && debounced.length > 0;
 
   const unavailable = (results.data?.unavailableSources ?? [])
-    .map((register) =>
-      SEARCH_COPY.registers[register as SearchRegister] ?? register,
+    .map(
+      (register) =>
+        SEARCH_COPY.registers[register as SearchRegister] ?? register,
     )
     .join(', ');
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div ref={containerRef} className="relative w-full max-w-2xl">
       <label htmlFor="dashboard-search" className="sr-only">
         {SEARCH_COPY.label}
       </label>
@@ -189,7 +191,9 @@ export default function DashboardSearch() {
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={
-            panelVisible && activeRow ? `${listboxId}-${activeRow.id}` : undefined
+            panelVisible && activeRow
+              ? `${listboxId}-${activeRow.id}`
+              : undefined
           }
           autoComplete="off"
           value={term}
@@ -204,9 +208,9 @@ export default function DashboardSearch() {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          className="block w-full rounded-md border border-gray-200 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="peer block h-10 w-full rounded-lg border border-white/15 bg-white/10 py-2 pl-9 pr-3 text-sm text-white transition-colors placeholder:text-white/60 hover:bg-white/15 focus:border-accent-400 focus:bg-white focus:text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent-400/60 focus:placeholder:text-gray-500"
         />
-        <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
+        <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-white/70 peer-focus:text-gray-500" />
       </div>
 
       {panelVisible && (

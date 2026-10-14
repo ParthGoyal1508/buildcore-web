@@ -18,6 +18,7 @@ import {
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function IssuesPage() {
   const queryClient = useQueryClient();
@@ -73,7 +74,8 @@ export default function IssuesPage() {
       hideOnCard: true,
       // The BOQ or activity link is optional by design (009 FR-019), so most rows
       // legitimately have none. A dash, not an alarm.
-      render: (row) => (row.activityId || row.boqItemId ? 'BOQ / activity' : '—'),
+      render: (row) =>
+        row.activityId || row.boqItemId ? 'BOQ / activity' : '—',
     },
     {
       key: 'indent',
@@ -168,8 +170,15 @@ export default function IssuesPage() {
         emptyMessage={MESSAGES.issuesEmpty}
         actions={(row) => (
           <RowAction
-            onClick={() => {
-              if (window.confirm(MESSAGES.confirmDeleteIssue)) {
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this issue?',
+                  message: MESSAGES.confirmDeleteIssue,
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                })
+              ) {
                 remove.mutate(row.id);
               }
             }}

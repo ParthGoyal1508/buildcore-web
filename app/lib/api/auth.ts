@@ -81,6 +81,37 @@ export async function logout(): Promise<void> {
   }
 }
 
+const passwordConfirmationSchema = z.object({
+  confirmationToken: z.string(),
+  expiresAt: z.string(),
+});
+export type PasswordConfirmation = z.infer<typeof passwordConfirmationSchema>;
+
+/** The refusal codes `confirmPassword` and the act it unlocks can answer with. */
+export const PASSWORD_INCORRECT = 'PASSWORD_INCORRECT';
+export const PASSWORD_CONFIRMATION_REQUIRED = 'PASSWORD_CONFIRMATION_REQUIRED';
+
+/**
+ * Re-enters the signed-in user's own password before a sensitive act (2026-10-14).
+ *
+ * Returns a short-lived confirmation (ten minutes) for that one purpose, which the act's own
+ * request then carries. Held in component state only — never stored — so it ends with the
+ * screen. A wrong password is a 403 coded `PASSWORD_INCORRECT`, never a 401: `authFetch` treats
+ * a 401 as an expired session and would sign the user out for a typo.
+ */
+export async function confirmPassword(
+  password: string,
+  purpose: 'cash-visibility',
+): Promise<PasswordConfirmation> {
+  return passwordConfirmationSchema.parse(
+    await authFetch<unknown>('/auth/confirm-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, purpose }),
+    }),
+  );
+}
+
 /**
  * Changes the signed-in user's own password.
  *

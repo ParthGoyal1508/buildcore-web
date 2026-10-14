@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
@@ -32,6 +33,14 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared header at this sheet's density (2026-10-15). The rows are `BillLineRow`'s, at
+ * px-2 py-1.5 so a 231-line schedule stays typeable; the header keeps that inset so each heading
+ * sits over its column. `!` because clsx does not drop TABLE's own padding.
+ */
+const SHEET_TH = clsx(TABLE.th, '!px-2 !py-2');
 
 /**
  * The client bill sheet (018 US1, FR-001 to FR-006 — `bugs.md` item 11).
@@ -235,8 +244,12 @@ export default function BillSheet({ projectId }: { projectId: string }) {
       reasonsRef.current = {};
       setQuantities({});
       setReasons({});
-      void queryClient.invalidateQueries({ queryKey: ['clientBills', projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['billableBoq', projectId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['clientBills', projectId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['billableBoq', projectId],
+      });
     },
     onError: (err) => {
       // 409 is the only status where the remedy is "look at the current state", so it is the only
@@ -396,23 +409,28 @@ export default function BillSheet({ projectId }: { projectId: string }) {
         The header sticks, because a column heading that scrolls away over two hundred rows leaves
         somebody typing quantities into a grid whose columns they can no longer name.
       */}
-      <div className="max-h-[70vh] overflow-auto rounded border border-gray-200">
-        <table className="min-w-[56rem] w-full">
-          <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600 shadow-[0_1px_0_0_rgb(229,231,235)]">
+      <div className={clsx(TABLE.wrap, 'max-h-[70vh] overflow-auto')}>
+        <table className={clsx(TABLE.table, 'w-full min-w-[56rem]')}>
+          <thead
+            className={clsx(
+              TABLE.thead,
+              'sticky top-0 z-10 shadow-[0_1px_0_0_rgb(229,231,235)]',
+            )}
+          >
             <tr>
-              <th className="px-2 py-2">{BILLING_COPY.columns.boqNo}</th>
-              <th className="px-2 py-2">{BILLING_COPY.columns.task}</th>
-              <th className="px-2 py-2">{BILLING_COPY.columns.unit}</th>
-              <th className="px-2 py-2 text-right">
+              <th className={SHEET_TH}>{BILLING_COPY.columns.boqNo}</th>
+              <th className={SHEET_TH}>{BILLING_COPY.columns.task}</th>
+              <th className={SHEET_TH}>{BILLING_COPY.columns.unit}</th>
+              <th className={clsx(SHEET_TH, 'text-right')}>
                 {BILLING_COPY.columns.scopeQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(SHEET_TH, 'text-right')}>
                 {BILLING_COPY.columns.billedQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(SHEET_TH, 'text-right')}>
                 {BILLING_COPY.columns.remainingQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(SHEET_TH, 'text-right')}>
                 {quotedPercentage === 0
                   ? BILLING_COPY.columns.rate
                   : BILLING_COPY.columns.boqRate}
@@ -426,14 +444,14 @@ export default function BillSheet({ projectId }: { projectId: string }) {
                 is typing quantities and deciding whether a figure looks right.
               */}
               {quotedPercentage !== 0 && (
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(SHEET_TH, 'text-right')}>
                   {BILLING_COPY.columns.quotedRate}
                 </th>
               )}
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(SHEET_TH, 'text-right')}>
                 {BILLING_COPY.columns.quantity}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(SHEET_TH, 'text-right')}>
                 {BILLING_COPY.columns.amount}
               </th>
             </tr>
@@ -543,10 +561,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
           </p>
           <p className="mt-1 text-amber-900">{BILLING_COPY.conflictHint}</p>
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row">
-            <SecondaryButton
-              type="button"
-              onClick={() => setConflict(false)}
-            >
+            <SecondaryButton type="button" onClick={() => setConflict(false)}>
               {BILLING_COPY.conflictKeep}
             </SecondaryButton>
             <SecondaryButton
@@ -574,9 +589,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button
           type="button"
-          disabled={
-            measured.length === 0 || compose.isPending
-          }
+          disabled={measured.length === 0 || compose.isPending}
           onClick={() => {
             setError(null);
             compose.mutate();
@@ -595,9 +608,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
           {BILLING_COPY.overQuantityReasonMissing}
         </p>
       )}
-      {compose.isError && !error && (
-        <FormError message={MESSAGES.loadFailed} />
-      )}
+      {compose.isError && !error && <FormError message={MESSAGES.loadFailed} />}
     </section>
   );
 }
@@ -698,24 +709,24 @@ function HeadingAndItems({
       </tr>
       {!collapsed &&
         items.map((item) => (
-        <BillLineRow
-          // The draft generation is part of the key so restoring a draft remounts the rows with
-          // their new starting values. See `BillLineRow.initialQuantity`.
-          key={`${item.id}:${draftGeneration}`}
-          id={item.id}
-          boqNo={item.boqNo}
-          taskName={item.taskName}
-          unit={item.unit}
-          scopeQty={item.scopeQty}
-          rate={item.rate}
-          unpriced={item.unpriced}
-          previouslyBilledQty={item.previouslyBilledQty}
-          isVariation={item.isVariation}
-          variationRef={item.variationRef}
-          quotedPercentage={quotedPercentage}
-          initialQuantity={settled[item.id]}
-          onQuantityChange={onQuantityChange}
-          onReasonChange={onReasonChange}
+          <BillLineRow
+            // The draft generation is part of the key so restoring a draft remounts the rows with
+            // their new starting values. See `BillLineRow.initialQuantity`.
+            key={`${item.id}:${draftGeneration}`}
+            id={item.id}
+            boqNo={item.boqNo}
+            taskName={item.taskName}
+            unit={item.unit}
+            scopeQty={item.scopeQty}
+            rate={item.rate}
+            unpriced={item.unpriced}
+            previouslyBilledQty={item.previouslyBilledQty}
+            isVariation={item.isVariation}
+            variationRef={item.variationRef}
+            quotedPercentage={quotedPercentage}
+            initialQuantity={settled[item.id]}
+            onQuantityChange={onQuantityChange}
+            onReasonChange={onReasonChange}
             onEnterNext={onEnterNext}
             registerInput={registerInput}
           />

@@ -10,7 +10,11 @@ import {
   getPurchases,
   type Purchase,
 } from '@/app/lib/api/inventory';
-import { MESSAGES, PURCHASE_BILL_STATUSES, inventoryLabel } from '@/app/lib/constants';
+import {
+  MESSAGES,
+  PURCHASE_BILL_STATUSES,
+  inventoryLabel,
+} from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import { useSites, useVendors } from '@/app/ui/inventory/use-inventory-refs';
@@ -25,6 +29,8 @@ import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function PurchasesPage() {
   const queryClient = useQueryClient();
@@ -40,6 +46,8 @@ export default function PurchasesPage() {
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openingBill, setOpeningBill] = useState<string | null>(null);
+  // The vendor's bill reads in the page's own viewer when it is a PDF or a photo (2026-10-14).
+  const { show, viewer } = useFileViewer();
 
   const filters = {
     page,
@@ -56,21 +64,20 @@ export default function PurchasesPage() {
   });
 
   /**
-   * Opens a stored bill in a new tab.
-   *
-   * Fetched rather than linked: the endpoint needs the bearer token, which lives in
-   * memory and never appears in a URL, so a plain `<a href>` would 401. The object
-   * URL is revoked on a timer rather than immediately — revoking it before the new
-   * tab has read it is a race the tab loses.
+   * Opens a stored bill in the page's viewer (2026-10-14) — before, a new tab, which most browsers
+   * block when it is opened after the fetch. Fetched rather than linked: the endpoint needs the
+   * bearer token, which lives in memory and never appears in a URL, so a plain `<a href>` would 401.
+   * A bill that is neither a PDF nor an image is saved instead.
    */
   async function openBill(id: string) {
     setOpeningBill(id);
     setError(null);
     try {
-      const blob = await getPurchaseBill(id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      show(
+        { blob: await getPurchaseBill(id) },
+        `purchase-bill-${id}`,
+        'Vendor bill',
+      );
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not open this bill.',
@@ -245,6 +252,7 @@ export default function PurchasesPage() {
       </div>
 
       <FormError message={error} />
+      {viewer}
 
       <ResponsiveList
         columns={columns}
@@ -255,8 +263,15 @@ export default function PurchasesPage() {
         emptyMessage={MESSAGES.purchasesEmpty}
         actions={(row) => (
           <RowAction
-            onClick={() => {
-              if (window.confirm(MESSAGES.confirmDeletePurchase)) {
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this purchase?',
+                  message: MESSAGES.confirmDeletePurchase,
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                })
+              ) {
                 remove.mutate(row.id);
               }
             }}

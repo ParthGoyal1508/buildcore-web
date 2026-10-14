@@ -8,6 +8,7 @@ import { MESSAGES } from '@/app/lib/constants';
 import { financialYearOf, rupees } from '@/app/lib/format';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 type SectionRow = Awaited<
   ReturnType<typeof getFormSixteenData>
@@ -38,7 +39,12 @@ export default function FormSixteenView() {
   });
 
   const columns: Column<SectionRow>[] = [
-    { key: 'section', header: 'Section', sticky: true, render: (row) => row.sectionCode },
+    {
+      key: 'section',
+      header: 'Section',
+      sticky: true,
+      render: (row) => row.sectionCode,
+    },
     {
       key: 'declared',
       header: 'Declared',
@@ -50,7 +56,13 @@ export default function FormSixteenView() {
       header: 'Allowed',
       numeric: true,
       render: (row) => (
-        <span className={row.allowedAmount < row.declaredAmount ? 'text-amber-700' : undefined}>
+        <span
+          className={
+            row.allowedAmount < row.declaredAmount
+              ? 'text-amber-700'
+              : undefined
+          }
+        >
           {rupees(row.allowedAmount)}
         </span>
       ),
@@ -80,7 +92,9 @@ export default function FormSixteenView() {
           {employees?.items.map((employee) => (
             <option key={employee.id} value={employee.id}>
               {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName].filter(Boolean).join(' ')}
+              {[employee.firstName, employee.lastName]
+                .filter(Boolean)
+                .join(' ')}
             </option>
           ))}
         </SelectField>
@@ -98,7 +112,7 @@ export default function FormSixteenView() {
         </p>
       ) : isLoading ? (
         <p className="text-sm text-gray-500" role="status">
-          Loading…
+          <LoadingText />
         </p>
       ) : isError || !data ? (
         <p className="text-sm text-red-600" role="alert">
@@ -122,7 +136,11 @@ export default function FormSixteenView() {
             ).map(([label, value]) => (
               <div key={label} className="flex justify-between px-4 py-2.5">
                 <dt className="text-gray-600">{label}</dt>
-                <dd className={value < 0 ? 'tabular-nums text-red-700' : 'tabular-nums'}>
+                <dd
+                  className={
+                    value < 0 ? 'tabular-nums text-red-700' : 'tabular-nums'
+                  }
+                >
                   {rupees(value)}
                 </dd>
               </div>

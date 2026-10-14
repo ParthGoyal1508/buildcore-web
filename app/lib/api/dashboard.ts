@@ -111,7 +111,9 @@ export interface ReminderQuery {
 export async function getReminders(
   query: ReminderQuery = {},
 ): Promise<ReminderList> {
-  const raw = await authFetch<unknown>(`/dashboard/reminders${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/dashboard/reminders${qs({ ...query })}`,
+  );
   return reminderListSchema.parse(raw);
 }
 
@@ -233,6 +235,11 @@ const activityLogEntrySchema = z.object({
   action: z.string(),
   module: z.string(),
   target: z.string().nullable(),
+  // 2026-10-15: what the row is about in words — the record's name (or its kind) and, for an
+  // event "Viewed"/"Updated" would misdescribe, a sentence. Optional so an API not yet deployed
+  // with them still parses.
+  targetLabel: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
   timestamp: z.string(),
 });
 
@@ -288,32 +295,154 @@ export async function getSiteWidgets(siteId: string): Promise<WidgetResult[]> {
 // Group Dashboard (US6)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getGroupCompanies(): Promise<WidgetResult[]> {
-  const raw = await authFetch<unknown>('/group/companies');
-  return widgetListSchema.parse(raw);
-}
-
-export async function getStatutoryCalendar(): Promise<WidgetResult> {
-  const raw = await authFetch<unknown>('/group/statutory-calendar');
-  return widgetResultSchema.parse(raw);
-}
-
-const groupEmployeeSchema = z.object({
-  id: z.string(),
-  employeeCode: z.string(),
-  name: z.string(),
-  companyId: z.string(),
+/*
+ * The card and calendar values (2026-10-15), checked against a live response.
+ *
+ * Every metric beyond headcount is **optional**: the API omits one the caller has no
+ * permission for (payroll, challans, loans, company settings, projects), and an absent
+ * metric must render as nothing rather than fail the parse and blank the page. Payroll
+ * figures are additionally **nullable** — null is "no processed run yet", which the card
+ * says in words rather than showing ₹0.
+ */
+const activeProjectsSchema = z.object({
+  count: z.number(),
+  contractValue: z.number(),
 });
-export type GroupEmployee = z.infer<typeof groupEmployeeSchema>;
+const loansSchema = z.object({ outstanding: z.number(), count: z.number() });
+const documentsSchema = z.object({
+  missing: z.number(),
+  required: z.number(),
+});
 
-export async function searchGroupEmployees(
-  q: string,
-): Promise<GroupEmployee[]> {
-  const raw = await authFetch<unknown>(
-    `/group/employees/search${qs({ q })}`,
-  );
-  return z.array(groupEmployeeSchema).parse(raw);
+const companyCardSchema = z.object({
+  companyId: z.string(),
+  name: z.string(),
+  shortCode: z.string(),
+  headcount: z.number(),
+  activeProjects: activeProjectsSchema.optional(),
+  payroll: z
+    .object({ period: z.string().nullable(), gross: z.number().nullable() })
+    .optional(),
+  pfEsic: z
+    .object({
+      period: z.string().nullable(),
+      pf: z.number().nullable(),
+      esic: z.number().nullable(),
+      total: z.number().nullable(),
+    })
+    .optional(),
+  loans: loansSchema.optional(),
+  documents: documentsSchema.optional(),
+});
+
+export type GroupCompanyCard = z.infer<typeof companyCardSchema>;
+
+/** The Group Total sums each company's **latest** run, so it lists the months summed. */
+const groupTotalSchema = z.object({
+  companies: z.number(),
+  headcount: z.number(),
+  activeProjects: activeProjectsSchema.optional(),
+  payroll: z
+    .object({ periods: z.array(z.string()), gross: z.number() })
+    .optional(),
+  pfEsic: z
+    .object({
+      periods: z.array(z.string()),
+      pf: z.number(),
+      esic: z.number(),
+      total: z.number(),
+    })
+    .optional(),
+  loans: loansSchema.optional(),
+  documents: documentsSchema.optional(),
+});
+
+export type GroupTotal = z.infer<typeof groupTotalSchema>;
+
+export interface GroupCompanies {
+  companies: GroupCompanyCard[];
+  total: GroupTotal | null;
 }
+
+/**
+ * The company cards and the Group Total, split apart.
+ *
+ * The API still sends them as widget envelopes (`company-card:<id>` and `group-total`);
+ * an envelope whose value does not parse is dropped rather than failing the page, so one
+ * malformed card cannot take the other companies with it.
+ */
+export async function getGroupCompanies(): Promise<GroupCompanies> {
+  const widgets = widgetListSchema.parse(
+    await authFetch<unknown>('/group/companies'),
+  );
+  const companies: GroupCompanyCard[] = [];
+  let total: GroupTotal | null = null;
+  for (const widget of widgets) {
+    if (widget.id === 'group-total') {
+      const parsed = groupTotalSchema.safeParse(widget.value);
+      if (parsed.success) total = parsed.data;
+    } else if (widget.id.startsWith('company-card:')) {
+      const parsed = companyCardSchema.safeParse(widget.value);
+      if (parsed.success) companies.push(parsed.data);
+    }
+  }
+  return { companies, total };
+}
+
+const statutoryItemSchema = z.object({
+  companyId: z.string(),
+  companyName: z.string(),
+  shortCode: z.string(),
+  /** A plain string, not an enum: a scheme the API adds later should still render. */
+  scheme: z.string(),
+  /** `YYYY-MM`. */
+  period: z.string(),
+  /** `YYYY-MM-DD`. */
+  dueDate: z.string(),
+  /** Negative once the date has passed. */
+  daysRemaining: z.number(),
+  /** Null until that month's payroll run is processed. */
+  amount: z.number().nullable(),
+});
+
+export type StatutoryDueItem = z.infer<typeof statutoryItemSchema>;
+
+const statutoryCalendarSchema = z.object({
+  today: z.string().optional(),
+  horizonDays: z.number().optional(),
+  schemes: z.array(z.string()).optional(),
+  items: z.array(statutoryItemSchema),
+});
+
+export interface StatutoryCalendar {
+  items: StatutoryDueItem[];
+  /** Schemes the caller may see — empty when they hold no payroll permission. */
+  schemes: string[];
+  horizonDays: number;
+  note: string | null;
+}
+
+/**
+ * Upcoming statutory due dates (2026-10-15). Computed from fixed statutory rules —
+ * nothing records a filing, so the calendar never says whether one was made.
+ */
+export async function getStatutoryCalendar(): Promise<StatutoryCalendar> {
+  const widget = widgetResultSchema.parse(
+    await authFetch<unknown>('/group/statutory-calendar'),
+  );
+  const value = statutoryCalendarSchema.parse(widget.value);
+  return {
+    items: value.items,
+    schemes: value.schemes ?? [],
+    horizonDays: value.horizonDays ?? 45,
+    note: widget.note ?? null,
+  };
+}
+
+// `searchGroupEmployees` lived here until 2026-10-15. Its only caller was the Group
+// Dashboard's "Search Employees" box, which the client asked to have removed — finding a
+// person is HR's employee list, not a group-overview job. `GET /group/employees/search`
+// still exists on the API; nothing here calls it.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reports (US7)
@@ -374,10 +503,13 @@ export async function runReport(
   type: string,
   body: ReportRunBody,
 ): Promise<ReportResult> {
-  const raw = await authFetch<unknown>(`/reports/${encodeURIComponent(type)}/run`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  const raw = await authFetch<unknown>(
+    `/reports/${encodeURIComponent(type)}/run`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
   return reportResultSchema.parse(raw);
 }
 

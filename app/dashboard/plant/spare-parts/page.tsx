@@ -30,6 +30,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function SparePartsPage() {
   const queryClient = useQueryClient();
@@ -177,8 +178,8 @@ export default function SparePartsPage() {
             Parts also stocked as inventory items
           </h2>
           <p className="mt-1 text-sm text-gray-600">
-            These two stocks are kept separately on purpose. A difference is not an
-            error to fix here — it is what this view exists to show.
+            These two stocks are kept separately on purpose. A difference is not
+            an error to fix here — it is what this view exists to show.
           </p>
           <ResponsiveList
             columns={[
@@ -292,8 +293,15 @@ export default function SparePartsPage() {
               Edit
             </RowAction>
             <RowAction
-              onClick={() => {
-                if (window.confirm(`Delete ${row.partNumber}?`)) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this spare part?',
+                    message: `Delete ${row.partNumber}?`,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                ) {
                   remove.mutate(row.id);
                 }
               }}
@@ -322,10 +330,7 @@ export default function SparePartsPage() {
         />
       )}
       {receiving && (
-        <ReceivePartModal
-          part={receiving}
-          onClose={() => setReceiving(null)}
-        />
+        <ReceivePartModal part={receiving} onClose={() => setReceiving(null)} />
       )}
     </div>
   );

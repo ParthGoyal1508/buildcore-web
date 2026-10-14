@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -23,6 +24,8 @@ import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import SectionGuard from '@/app/ui/projects/section-guard';
 import StatusBadge from '@/app/ui/status-badge';
+import { TABLE } from '@/app/ui/table';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * One daily work report, read-only (024 Story 2).
@@ -139,7 +142,16 @@ export default function DwrReportPage() {
                 <Button
                   type="button"
                   disabled={remove.isPending}
-                  onClick={() => {
+                  onClick={async () => {
+                    if (
+                      !(await confirmDialog({
+                        title: 'Delete this daily work report?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      }))
+                    )
+                      return;
                     setError(null);
                     remove.mutate();
                   }}
@@ -152,7 +164,10 @@ export default function DwrReportPage() {
         </header>
 
         {error && (
-          <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+          <p
+            className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -218,26 +233,26 @@ export default function DwrReportPage() {
               happened.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <div className={TABLE.wrap}>
+              <table className={TABLE.table}>
+                <thead className={TABLE.thead}>
                   <tr>
-                    <th className="px-3 py-2">BOQ</th>
+                    <th className={TABLE.th}>BOQ</th>
                     {/* Where on the road. Collected since 2026-10-07 and shown here because a
                         measurement without its position cannot be checked against the site. */}
-                    <th className="px-3 py-2">Chainage</th>
-                    <th className="px-3 py-2">Side</th>
-                    <th className="px-3 py-2">Basis</th>
-                    <th className="px-3 py-2">How it was measured</th>
-                    <th className="px-3 py-2 text-right">Qty</th>
-                    <th className="px-3 py-2">Remark</th>
+                    <th className={TABLE.th}>Chainage</th>
+                    <th className={TABLE.th}>Side</th>
+                    <th className={TABLE.th}>Basis</th>
+                    <th className={TABLE.th}>How it was measured</th>
+                    <th className={clsx(TABLE.th, 'text-right')}>Qty</th>
+                    <th className={TABLE.th}>Remark</th>
                     {/* Evidence for this line, not for the day (2026-10-11). */}
-                    <th className="px-3 py-2">Photos</th>
+                    <th className={TABLE.th}>Photos</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {lines.map((line) => (
-                    <tr key={line.id}>
+                    <tr key={line.id} className={TABLE.row}>
                       {/*
                         The number never wraps; **the description does**. `whitespace-nowrap` sat
                         on the cell, so a BOQ line whose name runs to forty words — which the
@@ -246,7 +261,7 @@ export default function DwrReportPage() {
                         "How it was measured" into a vertical stack, and left every other column
                         off the right-hand edge.
                       */}
-                      <td className="px-3 py-2 align-top">
+                      <td className={clsx(TABLE.td, '!align-top')}>
                         <span className="whitespace-nowrap">
                           {line.boqNo ?? '—'}
                         </span>
@@ -256,18 +271,28 @@ export default function DwrReportPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 align-top whitespace-nowrap">
+                      <td
+                        className={clsx(
+                          TABLE.td,
+                          'whitespace-nowrap !align-top',
+                        )}
+                      >
                         {chainageRange(line.chainageFrom, line.chainageTo)}
                       </td>
-                      <td className="px-3 py-2">{line.roadSide ?? '—'}</td>
-                      <td className="px-3 py-2">
+                      <td className={TABLE.td}>{line.roadSide ?? '—'}</td>
+                      <td className={TABLE.td}>
                         {line.paymentMode === 'work_basis'
                           ? 'measured'
                           : 'presence'}
                       </td>
                       {/* `min-w` so the arithmetic reads across rather than one word per line,
                           which is what it did while the description column took the width. */}
-                      <td className="min-w-[11rem] px-3 py-2 align-top text-xs text-gray-600">
+                      <td
+                        className={clsx(
+                          TABLE.td,
+                          'min-w-[11rem] text-xs text-gray-600 !align-top',
+                        )}
+                      >
                         {line.paymentMode === 'work_basis' ? (
                           <>
                             {/* All six, in the order the server multiplies them. Four were
@@ -277,7 +302,8 @@ export default function DwrReportPage() {
                                 against the factors beside it. */}
                             {factorsOf(line)
                               .map(([label, value]) => `${label} ${value}`)
-                              .join(' × ') || 'nothing entered — counted as one'}
+                              .join(' × ') ||
+                              'nothing entered — counted as one'}
                             <span className="block text-gray-400">
                               a blank factor counts as one
                             </span>
@@ -289,16 +315,23 @@ export default function DwrReportPage() {
                       {/* One helper decides how a quantity reads, so the two line kinds cannot be
                           shown differently on two screens. A dash where neither column holds a
                           figure: a zero would claim a measurement that does not exist. */}
-                      <td className="px-3 py-2 text-right font-medium">
+                      <td
+                        className={clsx(TABLE.td, TABLE.numeric, 'font-medium')}
+                      >
                         {quantityOf(line) ?? '—'}{' '}
                         <span className="text-xs font-normal text-gray-500">
                           {line.unit ?? ''}
                         </span>
                       </td>
-                      <td className="max-w-sm px-3 py-2 text-xs text-gray-700">
+                      <td
+                        className={clsx(
+                          TABLE.td,
+                          'max-w-sm text-xs text-gray-700',
+                        )}
+                      >
                         {line.remark ?? ''}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={TABLE.td}>
                         <DwrLinePhotos
                           dwrId={params.dwrId}
                           taskId={line.id}

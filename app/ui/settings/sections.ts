@@ -6,6 +6,7 @@ import {
   DocumentTextIcon,
   IdentificationIcon,
   PencilSquareIcon,
+  UserCircleIcon,
   UsersIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
@@ -117,8 +118,23 @@ export const SETTINGS_SECTIONS: {
     key: 'employee-setup',
     href: ROUTES.settingsEmployeeSetup,
     title: 'Employee Setup',
-    description: 'Departments, designations, document types, shifts, code series.',
+    description:
+      'Departments, designations, document types, shifts, code series.',
     icon: WrenchScrewdriverIcon,
+  },
+  {
+    // 2026-10-14. Listed only for a Super Admin — `visibleSettingsSections` filters on
+    // `SETTINGS_PERMISSIONS['personal-settings']`, which is `CROSS_COMPANY_ACCESS` — so nobody
+    // else learns the setting exists. Even a Super Admin sees only a password prompt inside.
+    // Named for what it is rather than its one setting since 2026-10-15 — the client: "we do not
+    // want to show 'Cash Visibility', instead rename it to 'Personal Settings'". Last in the list,
+    // and neither its description nor its icon says what is behind the password.
+    key: 'personal-settings',
+    href: ROUTES.settingsPersonal,
+    title: 'Personal Settings',
+    description:
+      'Sensitive settings. Super Admin only — your password reveals them.',
+    icon: UserCircleIcon,
   },
 ];
 
@@ -131,11 +147,14 @@ export const SETTINGS_SECTIONS: {
  * and the layout guard, and the tab strip would have been a third copy.
  */
 export function visibleSettingsSections(
-  user: { permissions: readonly string[]; roleNames: readonly string[] } | undefined,
+  user:
+    | { permissions: readonly string[]; roleNames: readonly string[] }
+    | undefined,
 ): typeof SETTINGS_SECTIONS {
   if (!user) return [];
   return SETTINGS_SECTIONS.filter((section) => {
-    if (!user.permissions.includes(SETTINGS_PERMISSIONS[section.key])) return false;
+    if (!user.permissions.includes(SETTINGS_PERMISSIONS[section.key]))
+      return false;
     if (section.key === 'users') return maySettingsAdministerUsers(user);
     return true;
   });

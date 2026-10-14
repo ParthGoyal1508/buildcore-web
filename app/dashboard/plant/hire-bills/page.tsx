@@ -11,11 +11,7 @@ import {
   verifyHireBill,
   type HireBill,
 } from '@/app/lib/api/plant';
-import {
-  HIRE_BILL_STATUSES,
-  MESSAGES,
-  plantLabel,
-} from '@/app/lib/constants';
+import { HIRE_BILL_STATUSES, MESSAGES, plantLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import Pager from '@/app/ui/inventory/pager';
 import HireBillModal from '@/app/ui/plant/hire-bill-modal';
@@ -33,6 +29,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
 export default function HireBillsPage() {
   const queryClient = useQueryClient();
@@ -98,7 +95,9 @@ export default function HireBillsPage() {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not record that payment.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not record that payment.',
       ),
   });
 
@@ -128,7 +127,9 @@ export default function HireBillsPage() {
           {row.variance !== 0 && (
             <span
               className={
-                row.variance > 0 ? 'text-xs text-orange-700' : 'text-xs text-gray-500'
+                row.variance > 0
+                  ? 'text-xs text-orange-700'
+                  : 'text-xs text-gray-500'
               }
             >
               {row.variance > 0 ? '+' : ''}
@@ -258,16 +259,19 @@ export default function HireBillsPage() {
             {row.status === 'pending_verification' && (
               <RowAction
                 disabled={verify.isPending}
-                onClick={() => {
+                onClick={async () => {
                   // The variance is surfaced in the confirmation rather than
                   // blocking: verification is an admin decision, not a gate.
                   const confirmed =
                     row.variance === 0 ||
-                    window.confirm(
-                      MESSAGES.plantConfirmVerifyHireBill(
+                    (await confirmDialog({
+                      title: 'Verify this hire bill?',
+                      message: MESSAGES.plantConfirmVerifyHireBill(
                         `${row.variance > 0 ? '+' : ''}${row.variance}`,
                       ),
-                    );
+                      confirmLabel: 'Verify',
+                      tone: 'default',
+                    }));
                   if (confirmed) verify.mutate(row.id);
                 }}
               >
@@ -282,8 +286,14 @@ export default function HireBillsPage() {
                     ? MESSAGES.plantUnverifiedPay
                     : undefined
                 }
-                onClick={() => {
-                  const reference = window.prompt('Payment reference:');
+                onClick={async () => {
+                  const reference = await promptDialog({
+                    title: 'Mark this hire bill paid',
+                    message: 'Payment reference:',
+                    required: true,
+                    confirmLabel: 'Mark paid',
+                    tone: 'default',
+                  });
                   if (reference && reference.trim()) {
                     pay.mutate({
                       id: row.id,

@@ -25,6 +25,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * The item and category masters, as a two-tab dialog opened from the Stock screen.
@@ -57,7 +58,9 @@ function CategoryTab() {
   });
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['inventory', 'categories'] });
+    void queryClient.invalidateQueries({
+      queryKey: ['inventory', 'categories'],
+    });
     void queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] });
   };
 
@@ -68,8 +71,7 @@ function CategoryTab() {
       setError(null);
       invalidate();
     },
-    onError: (err) =>
-      setError(messageFor(err, 'Could not add this category.')),
+    onError: (err) => setError(messageFor(err, 'Could not add this category.')),
   });
 
   const remove = useMutation({
@@ -125,7 +127,17 @@ function CategoryTab() {
         emptyMessage={MESSAGES.categoriesEmpty}
         actions={(row) => (
           <RowAction
-            onClick={() => remove.mutate(row.id)}
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this category?',
+                  message: 'This cannot be undone.',
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                })
+              )
+                remove.mutate(row.id);
+            }}
             // Offered only when nothing is in the way. The backend refuses a
             // category with items anyway; hiding the control means the refusal is
             // not the first the user hears of it.
@@ -302,7 +314,11 @@ function ItemTab() {
         />
         <div className="flex items-end gap-2">
           <SecondaryButton type="submit" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Add item'}
+            {save.isPending
+              ? 'Saving…'
+              : editingId
+                ? 'Save changes'
+                : 'Add item'}
           </SecondaryButton>
           {editingId && (
             <SecondaryButton type="button" onClick={reset}>
@@ -350,7 +366,17 @@ function ItemTab() {
               {row.active ? 'Retire' : 'Restore'}
             </RowAction>
             <RowAction
-              onClick={() => remove.mutate(row.id)}
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this item?',
+                    message: 'This cannot be undone.',
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                )
+                  remove.mutate(row.id);
+              }}
               disabled={remove.isPending}
               title={MESSAGES.itemInUse}
             >

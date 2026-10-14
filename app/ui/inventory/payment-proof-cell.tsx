@@ -11,7 +11,7 @@ import {
 import { fileToBase64 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 
 /**
  * One payment's transfer proof — the RTGS advice or confirmation (017 FR-020, bugs.md item 23).
@@ -36,6 +36,9 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
 
   const attach = async (file: File | undefined) => {
     if (!file) return;
@@ -59,7 +62,7 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
   const open = async () => {
     setError(null);
     try {
-      openStoredFile(
+      show(
         await downloadPaymentProof(payment.id),
         `payment-proof-${payment.id}`,
       );
@@ -70,6 +73,7 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
 
   return (
     <div className="flex flex-col gap-1">
+      {viewer}
       {payment.hasProof ? (
         <>
           <button

@@ -22,6 +22,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import { FileIcon } from '@/app/ui/file-icons';
 
 /**
  * Generating a payment advice for a certified subcontractor bill (2026-10-13).
@@ -55,7 +56,9 @@ export default function PaymentAdviceDialog({
     queryFn: () => getPayee(raBillId),
   });
 
-  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paidOn, setPaidOn] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [amount, setAmount] = useState(
     outstanding && outstanding > 0 ? outstanding.toFixed(2) : '',
   );
@@ -154,7 +157,10 @@ export default function PaymentAdviceDialog({
             onChange={(e) => setAmount(e.target.value)}
           />
           <div className="flex flex-col gap-1">
-            <label htmlFor="advice-mode" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="advice-mode"
+              className="text-sm font-medium text-gray-700"
+            >
               Bank transaction mode
             </label>
             <select
@@ -172,7 +178,9 @@ export default function PaymentAdviceDialog({
           </div>
           <TextField
             id="advice-reference"
-            label={mode === 'Cheque' ? 'Cheque number' : 'Bank reference no. (UTR)'}
+            label={
+              mode === 'Cheque' ? 'Cheque number' : 'Bank reference no. (UTR)'
+            }
             hint="As the bank's confirmation shows it."
             maxLength={120}
             value={reference}
@@ -198,13 +206,14 @@ export default function PaymentAdviceDialog({
             <legend className="sr-only">Download as</legend>
             <span className="font-medium text-gray-700">Download as</span>
             {(['pdf', 'docx'] as const).map((option) => (
-              <label key={option} className="flex items-center gap-1">
+              <label key={option} className="flex items-center gap-1.5">
                 <input
                   type="radio"
                   name="advice-format"
                   checked={format === option}
                   onChange={() => setFormat(option)}
                 />
+                <FileIcon kind={option === 'pdf' ? 'pdf' : 'word'} />
                 {option === 'pdf' ? 'PDF' : 'Word'}
               </label>
             ))}
@@ -248,7 +257,9 @@ function PayeePanel({
   const [error, setError] = useState<string | null>(null);
 
   if (loading) {
-    return <p className="text-sm text-gray-500">Reading the vendor’s details…</p>;
+    return (
+      <p className="text-sm text-gray-500">Reading the vendor’s details…</p>
+    );
   }
   if (!payee) return null;
   if (!payee.vendorId) {
@@ -268,7 +279,9 @@ function PayeePanel({
         <h3 className="text-sm font-semibold text-gray-900">
           Paid to {payee.name}
           {payee.code ? (
-            <span className="ml-2 font-normal text-gray-500">Vendor code {payee.code}</span>
+            <span className="ml-2 font-normal text-gray-500">
+              Vendor code {payee.code}
+            </span>
           ) : null}
         </h3>
         {!open && (
@@ -330,7 +343,10 @@ function PayeePanel({
             />
           ))}
           <div className="flex gap-2 sm:col-span-2">
-            <Button type="submit" disabled={saving || Object.keys(draft).length === 0}>
+            <Button
+              type="submit"
+              disabled={saving || Object.keys(draft).length === 0}
+            >
               {saving ? 'Saving…' : 'Save bank details'}
             </Button>
             {editing && payee.missing.length === 0 && (
@@ -349,7 +365,10 @@ function PayeePanel({
 }
 
 function describe(err: unknown): string {
-  const anyErr = err as { message?: string; details?: { message?: string | string[] } };
+  const anyErr = err as {
+    message?: string;
+    details?: { message?: string | string[] };
+  };
   const detail = anyErr?.details?.message;
   return (
     (Array.isArray(detail) ? detail.join('; ') : detail) ??

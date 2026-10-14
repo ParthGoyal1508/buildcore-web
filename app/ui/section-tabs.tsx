@@ -54,10 +54,13 @@ export default function SectionTabs({
                 href={tab.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={clsx(
-                  '-mb-px block whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                  // 2026-10-14 colour pass: the active tab keeps its underline and gains a
+                  // tinted face, in the accent rather than the near-black navy, so the
+                  // current section is findable at a glance on a busy screen.
+                  '-mb-px block whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
                   isActive
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900',
+                    ? 'border-accent-600 bg-accent-50 text-brand-700'
+                    : 'border-transparent text-gray-600 hover:border-gray-300 hover:bg-white hover:text-gray-900',
                 )}
               >
                 {tab.name}

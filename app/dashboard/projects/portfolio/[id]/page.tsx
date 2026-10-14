@@ -9,6 +9,7 @@ import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
 import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import { TABLE } from '@/app/ui/table';
 
 /** One labelled fact. A definition list, because that is what this is. */
 function Fact({
@@ -63,7 +64,7 @@ function Amount({
   strong?: boolean;
 }) {
   return (
-    <td className="py-2 text-right">
+    <td className={clsx(TABLE.td, TABLE.numeric)}>
       <span
         className={clsx('tabular-nums', strong && 'font-medium text-gray-900')}
       >
@@ -347,26 +348,34 @@ export default function ProjectOverviewPage() {
         but not agreed, agreed but not paid — are the whole of what somebody chases.
       */}
       <Card heading={PROJECT_SHELL_COPY.billingHeading}>
-        <div className="overflow-x-auto">
-          {/* Capped rather than stretched across a full-width card: two money columns a page apart
-              are two columns nobody compares, which is the only reason to put them side by side. */}
-          <table className="w-full max-w-2xl text-sm">
-            <thead>
-              <tr className="text-xs uppercase tracking-wide text-gray-500">
-                <th scope="col" className="py-1 text-left font-medium">
+        {/* Capped rather than stretched across a full-width card: two money columns a page apart
+            are two columns nobody compares, which is the only reason to put them side by side.
+            The shared look but no sorting (2026-10-15): the rows are the stages of a bill, in
+            the order a bill passes through them. */}
+        <div className={clsx(TABLE.wrap, 'max-w-2xl')}>
+          <table className={clsx(TABLE.table, 'w-full')}>
+            <thead className={TABLE.thead}>
+              <tr>
+                <th scope="col" className={TABLE.th}>
                   <span className="sr-only">Stage</span>
                 </th>
-                <th scope="col" className="py-1 text-right font-medium">
+                <th scope="col" className={clsx(TABLE.th, 'text-right')}>
                   {PROJECT_SHELL_COPY.clientBillsLabel}
                 </th>
-                <th scope="col" className="py-1 text-right font-medium">
+                <th scope="col" className={clsx(TABLE.th, 'text-right')}>
                   {PROJECT_SHELL_COPY.subcontractorBillsLabel}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              <tr>
-                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+            <tbody>
+              <tr className={TABLE.row}>
+                <th
+                  scope="row"
+                  className={clsx(
+                    TABLE.td,
+                    'text-left font-normal text-gray-700',
+                  )}
+                >
                   {PROJECT_SHELL_COPY.billingRaised}
                 </th>
                 <Amount
@@ -382,8 +391,14 @@ export default function ProjectOverviewPage() {
                   )}
                 />
               </tr>
-              <tr>
-                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+              <tr className={TABLE.row}>
+                <th
+                  scope="row"
+                  className={clsx(
+                    TABLE.td,
+                    'text-left font-normal text-gray-700',
+                  )}
+                >
                   {PROJECT_SHELL_COPY.billingCertified}
                 </th>
                 <Amount
@@ -399,22 +414,38 @@ export default function ProjectOverviewPage() {
                   )}
                 />
               </tr>
-              <tr>
-                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+              <tr className={TABLE.row}>
+                <th
+                  scope="row"
+                  className={clsx(
+                    TABLE.td,
+                    'text-left font-normal text-gray-700',
+                  )}
+                >
                   {PROJECT_SHELL_COPY.billingSettled}
                 </th>
                 {/* Not a zero. Nothing records a receipt against a client bill, and ₹0 would read
                     as "they have paid nothing" — a claim this system cannot make. */}
-                <td className="py-2 text-right text-xs text-gray-500">
+                <td
+                  className={clsx(TABLE.td, 'text-right text-xs text-gray-500')}
+                >
                   {PROJECT_SHELL_COPY.billingClientReceiptsUnrecorded}
                 </td>
                 <Amount amount={tabs.billSummary.paidAmount} />
               </tr>
-              <tr>
-                <th scope="row" className="py-2 text-left font-normal text-gray-700">
+              <tr className={TABLE.row}>
+                <th
+                  scope="row"
+                  className={clsx(
+                    TABLE.td,
+                    'text-left font-normal text-gray-700',
+                  )}
+                >
                   {PROJECT_SHELL_COPY.billingOutstanding}
                 </th>
-                <td className="py-2 text-right text-gray-400">—</td>
+                <td className={clsx(TABLE.td, 'text-right text-gray-400')}>
+                  —
+                </td>
                 <Amount amount={tabs.billSummary.outstandingAmount} strong />
               </tr>
             </tbody>

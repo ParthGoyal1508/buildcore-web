@@ -1,10 +1,12 @@
 'use client';
 
+import clsx from 'clsx';
 import { useState } from 'react';
 
 import { type RaBill } from '@/app/lib/api/billing';
 import { BILLING_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
+import { TABLE } from '@/app/ui/table';
 
 /**
  * One subcontractor bill, read-only (027).
@@ -63,41 +65,49 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
         </p>
       ) : (
         /* Scrolls inside itself, so a long description never widens the page around it. */
-        <div className="overflow-x-auto rounded border border-gray-200">
-          <table className="w-full min-w-[36rem] text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+        <div className={TABLE.wrap}>
+          <table className={clsx(TABLE.table, 'w-full min-w-[36rem]')}>
+            <thead className={TABLE.thead}>
               <tr>
-                <th className="px-2 py-2">
+                <th className={TABLE.th}>
                   {BILLING_COPY.viewColumns.description}
                 </th>
-                <th className="px-2 py-2">{BILLING_COPY.viewColumns.unit}</th>
-                <th className="px-2 py-2 text-right">
+                <th className={TABLE.th}>{BILLING_COPY.viewColumns.unit}</th>
+                <th className={clsx(TABLE.th, 'text-right')}>
                   {BILLING_COPY.viewColumns.quantity}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(TABLE.th, 'text-right')}>
                   {BILLING_COPY.viewColumns.rate}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(TABLE.th, 'text-right')}>
                   {BILLING_COPY.viewColumns.amount}
                 </th>
               </tr>
             </thead>
             <tbody>
               {lines.map((line) => (
-                <tr key={line.id} className="border-t border-gray-100">
-                  <td className="px-2 py-1.5 text-gray-900">
+                <tr key={line.id} className={TABLE.row}>
+                  <td className={clsx(TABLE.td, 'text-gray-900')}>
                     {line.description}
                   </td>
-                  <td className="px-2 py-1.5 text-gray-600">{line.unit}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
+                  <td className={clsx(TABLE.td, 'text-gray-600')}>
+                    {line.unit}
+                  </td>
+                  <td
+                    className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}
+                  >
                     {/* What this bill measured — not the to-date figure, which belongs to the
                         sheet where somebody is deciding what to add to it. */}
                     {line.thisPeriodQty}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
+                  <td
+                    className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}
+                  >
                     {rupees(line.rate)}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
+                  <td
+                    className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}
+                  >
                     {rupees(line.amount)}
                   </td>
                 </tr>

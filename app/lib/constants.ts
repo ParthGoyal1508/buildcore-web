@@ -38,6 +38,11 @@ export const ROUTES = {
   settingsTerms: '/dashboard/settings/terms',
   /** The four statutory rates a running-account bill is computed at (025 US4). */
   settingsBillingRates: '/dashboard/settings/billing-rates',
+  /**
+   * Personal Settings — the cash visibility switch and whatever joins it; Super Admin only, behind
+   * their own password (2026-10-14; renamed from "Cash visibility" on 2026-10-15).
+   */
+  settingsPersonal: '/dashboard/settings/personal-settings',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -132,8 +137,7 @@ export const ROUTES = {
   // permission, and the backend guards every one of these routes with it.
   /** Every daily work report on a project, and the form that records the next one. */
   projectsDwr: (id: string) => `/dashboard/projects/portfolio/${id}/dwr`,
-  projectsDwrNew: (id: string) =>
-    `/dashboard/projects/portfolio/${id}/dwr/new`,
+  projectsDwrNew: (id: string) => `/dashboard/projects/portfolio/${id}/dwr/new`,
   /** One report, its lines, and the submit / approve / reverse actions. */
   projectsDwrReport: (projectId: string, dwrId: string) =>
     `/dashboard/projects/portfolio/${projectId}/dwr/${dwrId}`,
@@ -205,6 +209,8 @@ export const ROUTES = {
   // --- Inventory (feature 009) ---
   inventoryStock: '/dashboard/inventory/stock',
   inventoryPurchases: '/dashboard/inventory/purchases',
+  /** Purchase orders, which belong to no project (2026-10-15) — addressed to a vendor. */
+  inventoryPurchaseOrders: '/dashboard/inventory/purchase-orders',
   inventoryIssues: '/dashboard/inventory/issues',
   inventoryTransfers: '/dashboard/inventory/transfers',
   inventoryPayments: '/dashboard/inventory/payments',
@@ -368,8 +374,7 @@ export const CLEARANCE_COPY = {
   /** The pending state on the row (T050). */
   waiverPending: (name: string, at: string) =>
     `Waiver requested by ${name} on ${at} — awaiting the Director's approval.`,
-  waiverPendingStill:
-    'Still outstanding. Nothing has been written off yet.',
+  waiverPendingStill: 'Still outstanding. Nothing has been written off yet.',
   /** The rejected state (T051). Silence after a rejection reads as success. */
   waiverRejected: (name: string, at: string) =>
     `A waiver requested by ${name} on ${at} was not approved.`,
@@ -384,8 +389,10 @@ export const CLEARANCE_COPY = {
    * register that owns the truth.
    */
   waivedBy: (name: string, at: string) => `Waived by ${name} on ${at}`,
-  waivedNotReturned: 'Waived — not returned. The obligation stands on the record.',
-  settleBlocked: 'Final settlement is unavailable while anything above is outstanding.',
+  waivedNotReturned:
+    'Waived — not returned. The obligation stands on the record.',
+  settleBlocked:
+    'Final settlement is unavailable while anything above is outstanding.',
   /**
    * Said when the only thing in the way is a waiver nobody has decided yet (T053).
    *
@@ -786,10 +793,14 @@ export const STANDARD_WORDING_KIND_KEYS: readonly string[] = [
  * offer letter — because recruitment happened to ship letters first. Settings shows them all,
  * grouped by the module that issues them; Recruitment shows its own two.
  */
-export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonly string[] }[] = [
+export const LETTER_TEMPLATE_GROUPS: readonly {
+  title: string;
+  kindKeys: readonly string[];
+}[] = [
   {
     title: 'HR & Payroll',
     kindKeys: [
+      'appointment',
       'confirmation',
       'increment',
       'transfer',
@@ -801,7 +812,8 @@ export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonl
       'salary_slip',
     ],
   },
-  { title: 'Recruitment', kindKeys: ['offer', 'appointment'] },
+  // The offer letter only (2026-10-15): the appointment letter is issued from HR & Payroll.
+  { title: 'Recruitment', kindKeys: ['offer'] },
   {
     title: 'Projects',
     kindKeys: ['letter_loi', 'letter_work_order', 'letter_purchase_order'],
@@ -818,8 +830,11 @@ export const LETTER_TEMPLATE_GROUPS: readonly { title: string; kindKeys: readonl
   },
 ];
 
-/** Recruitment's own letters — what its Templates tab lists. */
-export const RECRUITMENT_TEMPLATE_KIND_KEYS = ['offer', 'appointment'] as const;
+/**
+ * Recruitment's own letters — what its Templates tab lists. The offer letter alone since
+ * 2026-10-15; the appointment letter moved to HR & Payroll with every other employee letter.
+ */
+export const RECRUITMENT_TEMPLATE_KIND_KEYS = ['offer'] as const;
 
 export const TEMPLATE_COPY = {
   title: 'Letter Templates',
@@ -927,7 +942,8 @@ export const LETTER_FIELD_COPY = {
   manualSource: 'typed at issue time',
   addHeading: 'Add a field',
   tokenLabel: 'Variable name',
-  tokenHint: 'Used in the template as {{name}}. Letters, digits and underscores only.',
+  tokenHint:
+    'Used in the template as {{name}}. Letters, digits and underscores only.',
   labelLabel: 'Label',
   labelHint: 'What the template editor calls it — “Site name”, not siteName.',
   sourceLabel: 'Value comes from',
@@ -940,7 +956,8 @@ export const LETTER_FIELD_COPY = {
     manual: 'Typed when the letter is issued',
   } as Record<string, string>,
   pathLabel: 'Field in that record',
-  pathHint: 'A dotted path — designation.name, basic, dateOfJoining. Aadhaar, PAN and bank details are refused: a letter kind grants no way past that.',
+  pathHint:
+    'A dotted path — designation.name, basic, dateOfJoining. Aadhaar, PAN and bank details are refused: a letter kind grants no way past that.',
   requiredLabel: 'Refuse to issue a letter if this has no value',
   requiredHint:
     'An optional field with no value renders empty, which is often right. A required one stops the letter — use it where a blank would change what the letter says.',
@@ -1027,7 +1044,8 @@ export const BILLING_COPY = {
   // --- Deductions, each in its own right ---
   gross: 'Gross',
   retention: 'Retention',
-  retentionBasis: (percent: string) => `${percent} of gross, withheld by the client`,
+  retentionBasis: (percent: string) =>
+    `${percent} of gross, withheld by the client`,
   advanceRecovery: 'Advance recovery',
   /**
    * Said on the sheet where the two inputs used to be (028 FR-004).
@@ -1200,7 +1218,8 @@ export const BILLING_COPY = {
     'The client has not certified this bill yet. Record what they certify when it comes back — the gap between billed and certified is the figure worth chasing.',
   billedLabel: 'Billed',
   certifiedMatched: 'Certified in full.',
-  draftNotSent: 'This bill is still a draft. It has not been sent to the client.',
+  draftNotSent:
+    'This bill is still a draft. It has not been sent to the client.',
   historicalRatesNote:
     'Shown at the rates it was billed at. A rate revised afterwards does not restate a bill that was already sent.',
   certified: 'Certified',
@@ -1345,13 +1364,22 @@ export const BILLING_COPY = {
  * it, and keeping them in their own block is what makes that a move rather than an extraction.
  */
 export const WORK_ORDER_COPY = {
-  heading: 'Work orders',
+  /**
+   * Rates first, then the LOI, then the work order (2026-10-15).
+   *
+   * The client finalises a subcontractor's rates before any document goes out, issues the LOI with
+   * those rates as its BOQ annexure, and generates the work order later. One record carries all
+   * three: its draft is the rates being finalised, its approval approves the rates, and the two
+   * letters are issued from it afterwards. The copy below reads in that order — "award" was the
+   * word for the rates when the work order was the first thing issued.
+   */
+  heading: 'Rates & work orders',
   loading: 'Loading work orders…',
   loadFailed: 'Could not load this project’s work orders.',
   empty:
-    'No work order has been raised on this project yet. A subcontractor bill is measured against a work order’s award, so one has to exist first.',
+    'Nothing yet. Start by finalising a subcontractor’s rates: once they are approved, the LOI and then the work order are issued from the same record, and bills are measured against those rates.',
   summary: (retentionPercent: string, awardLines: number, bills: number) =>
-    `Retention ${retentionPercent} · ${awardLines} award line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
+    `Retention ${retentionPercent} · ${awardLines} rate line${awardLines === 1 ? '' : 's'} · ${bills} bill${bills === 1 ? '' : 's'}`,
   /**
    * A heading above the row, and a label on the field — not one string doing both.
    *
@@ -1359,16 +1387,16 @@ export const WORK_ORDER_COPY = {
    * two lines in its column and pushed that field's input a line below its neighbours'. A label
    * that wraps is a row that does not line up.
    */
-  newHeading: 'New work order',
+  newHeading: 'Finalise a subcontractor’s rates',
   detailLabel: 'What the subcontractor is doing',
   retentionLabel: 'Retention (%)',
   retentionHint:
     'Cannot be changed once a bill has been raised: the retention on an issued bill is already withheld at the old rate, and moving the basis would make the subcontractor’s copy disagree with ours about money already held.',
-  raise: 'Raise work order',
+  raise: 'Continue to the rates',
   raising: 'Raising…',
-  raiseFailed: 'That work order could not be raised.',
+  raiseFailed: 'That record could not be created.',
   // --- Award capture ---
-  awardHeading: 'Capture the award',
+  awardHeading: 'Finalise the rates',
   awardHint:
     'One line per awarded item: description, unit, quantity, rate — separated by a tab or a pipe. Paste it from the order; nothing is saved until you choose to.',
   awardPlaceholder: 'RCC M25 in foundations | Cum | 100 | 4500',
@@ -1379,7 +1407,7 @@ export const WORK_ORDER_COPY = {
   awardUnparseable:
     'No usable lines were found. Each line needs a description, a unit, a quantity and a rate, separated by a tab or a pipe.',
   awardMissing:
-    'This work order has no award captured yet, so there is nothing to measure against.',
+    'No rates have been finalised on this record yet, so there is nothing to measure against.',
   /**
    * Saving an award replaces it — the server deletes the old lines and writes the new ones. Said
    * before the save, because a person pasting a corrected line expects it to be *added*.
@@ -1387,7 +1415,7 @@ export const WORK_ORDER_COPY = {
   awardReplaceWarning:
     'Saving replaces the award entirely. Paste every line, not just the ones you are correcting.',
   awardCaptured: (lines: number) =>
-    `${lines} line${lines === 1 ? '' : 's'} captured. Bills are measured against these.`,
+    `${lines} rate line${lines === 1 ? '' : 's'}. The LOI and work order print these, and bills are measured against them.`,
   /** Refused by the server, so said here rather than discovered on the save. */
   awardLockedByBills:
     'Bills have been raised against this award, so it can no longer be replaced — the remaining quantity on a bill already issued would move, and the subcontractor’s copy would then disagree with ours. Raise a variation instead.',
@@ -1400,15 +1428,15 @@ export const WORK_ORDER_COPY = {
    * it, while the first bill raised under it needed an approval. The commitment is made when the
    * award is given; a bill only measures against it.
    */
-  submitForApproval: 'Send the award for approval',
+  submitForApproval: 'Send rates for approval',
   submitting: 'Sending…',
   submitHint:
-    'A bill cannot be measured against this award until it has been approved. Capture the award lines first — there is nothing to approve in a work order that awards nothing.',
+    'Once the rates are approved, the LOI and the work order can be issued from them, and bills measured against them. Enter the rates first — there is nothing to approve without them.',
   pendingHint:
-    'Waiting for approval. A bill against it is refused until the approval completes — which is a different thing from it never having been sent.',
+    'The rates are waiting for approval. No LOI, work order or bill can be issued from them until it completes — which is a different thing from them never having been sent.',
   activeHint:
-    'Approved. Bills may be measured against this award — and the award is now fixed. Reopen it to change a rate.',
-  submitFailed: 'That award could not be sent for approval.',
+    'Rates approved and fixed. Issue the LOI and, later, the work order below; bills may be measured against these rates. Reopen them to change a rate.',
+  submitFailed: 'The rates could not be sent for approval.',
 
   /**
    * Reopening an approved award (2026-10-08).
@@ -1421,10 +1449,10 @@ export const WORK_ORDER_COPY = {
    * than a side effect of saving: an edit that quietly cancelled an approval would remove one
    * without the person noticing they had.
    */
-  reopen: 'Reopen the award',
+  reopen: 'Reopen the rates',
   reopening: 'Reopening…',
   reopenPrompt:
-    'Reopening sends this award back to draft and cancels its approval — it will have to be approved again. Why is it being reopened?',
+    'Reopening sends these rates back to draft and cancels their approval — they will have to be approved again, and an LOI or work order already issued keeps the old rates. Why are they being reopened?',
   reopenHint:
     'The rates are fixed while the award is approved. Reopen it to correct one; the approval is given again afterwards.',
   reopenedNotice:
@@ -1433,7 +1461,7 @@ export const WORK_ORDER_COPY = {
   awardLockedPending:
     'Somebody is reviewing these figures, so they cannot be changed. Changing them under the approver would put a decision against a schedule they never saw.',
   awardLockedApproved:
-    'This award was approved at the rates it holds, so it cannot be edited. Reopen it to make a change — that cancels the approval.',
+    'These rates were approved, so they cannot be edited — the LOI and work order are issued from them. Reopen them to make a change; that cancels the approval.',
 
   // --- 027: the number, the vendor, and the master–detail frame ---
   /** Shown where a code would be, for the work orders raised before 027 numbered them. */
@@ -1450,21 +1478,26 @@ export const WORK_ORDER_COPY = {
   vendorLoading: 'Loading vendors…',
 
   /** The list is the master; one of these fills the panel beside it. */
-  pickPrompt: 'Pick a work order to see its award, its bills and its retention.',
-  raiseNew: 'Raise a work order',
+  pickPrompt:
+    'Pick a record to see its rates, its documents, its bills and its retention.',
+  raiseNew: 'Finalise rates',
   raiseCancel: 'Cancel',
   tabs: {
-    award: 'Award',
+    award: 'Rates',
     bills: 'Bills',
     retention: 'Retention',
     settings: 'Settings',
   },
   /** Each tab says in one line what it is for, so the four names are not guessed at. */
   tabHints: {
-    award: 'What this subcontractor was given: the item, the quantity and their rate. Bills are measured against it.',
-    bills: 'Running account bills measured against the award — what was done this period, and what is payable after deductions.',
-    retention: 'Money withheld from each bill as security, and every release of it back to the subcontractor.',
-    settings: 'Correcting the detail, the subcontractor and the retention basis on this work order.',
+    award:
+      'The rates agreed with this subcontractor: the item, the quantity and their rate. Approved, they are what the LOI and work order print, and what bills are measured against.',
+    bills:
+      'Running account bills measured against the approved rates — what was done this period, and what is payable after deductions.',
+    retention:
+      'Money withheld from each bill as security, and every release of it back to the subcontractor.',
+    settings:
+      'Correcting the detail, the subcontractor and the retention basis on this work order.',
   },
   settingsHeading: 'Correct this work order',
   settingsSave: 'Save the correction',
@@ -1485,6 +1518,29 @@ export const WORK_ORDER_COPY = {
     'The project BOQ could not be loaded, so lines cannot be picked from it. Typing and pasting still work.',
   awardNoBoq:
     'This project has no BOQ yet, so there is nothing to pick from. Type the lines or paste them.',
+  // --- 2026-10-15: the documents issued from approved rates ---
+  documentsHeading: 'Documents',
+  stageRates: 'Rates finalised',
+  stageLoi: 'LOI issued',
+  stageWorkOrder: 'Work order issued',
+  stageRatesDraft: 'Being entered — send them for approval',
+  stageRatesApproved: 'Approved',
+  stageAwaiting: 'Waiting for approval',
+  stageNotYet: 'Not yet',
+  stageIssued: (reference: string | null) =>
+    reference ? `Issued — ${reference}` : 'Issued',
+  issueLoi: 'Issue LOI',
+  issueWorkOrder: 'Issue work order',
+  documentsLocked:
+    'The LOI and the work order are issued from approved rates. Finalise the rates and send them for approval first.',
+  documentsHint:
+    'Each opens filled from this record — the subcontractor, the approved rates and the scope — for the rest to be typed. Both also list on the project’s Letters tab.',
+  documentsHintNoLoi:
+    'Issue the LOI first: the work order quotes its number and date. Each opens filled from this record — the subcontractor, the approved rates and the scope.',
+  documentsNoKinds:
+    'No LOI or work order letter is set up. They are configured in Settings → Letters.',
+  documentsRatesUnreadable:
+    'The approved rates could not be read, so the letters cannot be filled from them. Try again.',
   awardColumns: {
     boq: 'BOQ',
     description: 'Description',
@@ -1523,11 +1579,11 @@ export const WORK_ORDER_COPY = {
   awardRowIncomplete: (row: number) =>
     `Line ${row} needs a description, a unit, a quantity and a rate.`,
   awardNothingToSave: 'Add at least one line before saving.',
-  awardSaveChanges: 'Save award',
+  awardSaveChanges: 'Save rates',
   awardDiscard: 'Discard changes',
   awardRemoveRow: 'Remove this line',
-  awardTotal: 'Award total',
-  awardLoading: 'Loading the award…',
+  awardTotal: 'Total at these rates',
+  awardLoading: 'Loading the rates…',
 
   /** Bills whose work order was never recorded. Listed rather than hidden by the master–detail. */
   orphanBillsHeading: 'Bills not attached to a work order',
@@ -1679,12 +1735,14 @@ export const MESSAGES = {
   accessDeniedTitle: 'You do not have access to this page',
   accessDeniedBody:
     'Your role does not include the permission this page requires. Ask a Super Admin if you think this is wrong.',
-  saveFailed: 'Could not save your changes. Please review the form and try again.',
+  saveFailed:
+    'Could not save your changes. Please review the form and try again.',
   loadFailed: 'Could not load this list. Please try again.',
 
   // --- Project Assets (feature 012) ---
   assetsLoadFailed: 'Could not load the asset register. Please try again.',
-  assetsSaveFailed: 'Could not save this asset. Please review the form and try again.',
+  assetsSaveFailed:
+    'Could not save this asset. Please review the form and try again.',
   assetsEmpty:
     'No assets registered yet. Register one to start tracking where it is and who holds it.',
   assetsEmptyFiltered: 'No assets match these filters.',
@@ -1704,10 +1762,12 @@ export const MESSAGES = {
       : `Delete the "${name}" role? No users currently hold it.`,
   confirmDelete: (what: string, name: string) =>
     `Delete the ${what} "${name}"? This cannot be undone.`,
-  protectedRole: 'The Super Admin role is protected and cannot be edited or deleted.',
+  protectedRole:
+    'The Super Admin role is protected and cannot be edited or deleted.',
 
   // --- Dashboard: Reminders centre (feature 004, US9) ---
-  remindersEmpty: 'Nothing is due. Reminders appear here as due dates approach.',
+  remindersEmpty:
+    'Nothing is due. Reminders appear here as due dates approach.',
   remindersEmptyFiltered:
     'No reminders match these filters. Clear them to see everything that is due.',
   /** Spec FR-026: an unavailable source is reported, never allowed to fail the screen. */
@@ -1722,8 +1782,10 @@ export const MESSAGES = {
   remindersTruncated: (shown: number) =>
     `Showing the ${shown} most urgent. More are due — narrow by module or severity to see the rest.`,
   reminderSnoozed: (until: string) => `Snoozed until ${until}.`,
-  snoozeReasonRequired: 'Give a reason, so the next person to see this knows why.',
-  snoozeDatePast: 'Pick a date in the future, or the reminder returns immediately.',
+  snoozeReasonRequired:
+    'Give a reason, so the next person to see this knows why.',
+  snoozeDatePast:
+    'Pick a date in the future, or the reminder returns immediately.',
   /** Spec FR-028, for a reminder whose module has no screen to open yet. */
   reminderNoDestination:
     'This reminder has no screen to open yet — its module is still being built.',
@@ -1755,10 +1817,12 @@ export const MESSAGES = {
    * last out, so a punch-in made after the last punch-out does not appear in them
    * at all — this is the only thing on screen that accounts for the button. */
   punchOpenSince: (capturedAt: string) =>
-    `You are currently punched in, since ${new Date(capturedAt).toLocaleTimeString(
-      undefined,
-      { hour: '2-digit', minute: '2-digit' },
-    )}. Punch out to close this shift.`,
+    `You are currently punched in, since ${new Date(
+      capturedAt,
+    ).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}. Punch out to close this shift.`,
   /** Shown in place of the punch control once the day's pair is recorded. */
   punchDayComplete:
     'You have punched in and out for today. Attendance for today is complete.',
@@ -1800,7 +1864,8 @@ export const MESSAGES = {
     'If you work a day and cannot punch at all, tell your supervisor: they can raise a correction for that day, which is reviewed and then shows in your attendance.',
   punchQueuedCount: (count: number) =>
     `${count} punch${count === 1 ? '' : 'es'} queued on this device from before — syncing now.`,
-  punchSyncFailed: (reason: string) => `A queued punch could not be synced: ${reason}`,
+  punchSyncFailed: (reason: string) =>
+    `A queued punch could not be synced: ${reason}`,
   /**
    * The end of the legacy queue, said once.
    *
@@ -1861,8 +1926,7 @@ export const MESSAGES = {
    * biometric against a named employee is worse than the record it replaces — so the screen must
    * not offer to show one, and must not read as though the photo were merely unavailable.
    */
-  punchRefusedNoPhoto:
-    'The photo from a refused attempt is not kept.',
+  punchRefusedNoPhoto: 'The photo from a refused attempt is not kept.',
   notEnrolled: 'Enrol your face before punching in.',
   enrolmentConsent:
     'I consent to my facial data being captured and stored for attendance verification.',
@@ -1901,7 +1965,8 @@ export const MESSAGES = {
    * introduces is the place to prevent that (FR-013). */
   nonNavPermissionsHint:
     'These grant access to areas inside a module. They do not add or remove anything from the sidebar.',
-  permissionControlsModule: (module: string) => `Shows "${module}" in the sidebar`,
+  permissionControlsModule: (module: string) =>
+    `Shows "${module}" in the sidebar`,
 
   // --- Projects (feature 008) ---
   /** The 409 from `DELETE /projects/clients/:id`. The API's own message names the
@@ -1949,8 +2014,7 @@ export const MESSAGES = {
     'Under Maintenance is set by opening a maintenance job, not on this form.',
   plantClosedJobParts:
     'This job is closed. Parts cannot be added to work whose cost has already been reported.',
-  plantUnverifiedPay:
-    'Verify this bill before recording a payment against it.',
+  plantUnverifiedPay: 'Verify this bill before recording a payment against it.',
   plantIncompatiblePart:
     'This part is not listed as compatible with this machine’s category. You can still fit it — the consumption will be flagged for review.',
   plantReversalReason: 'Say why this consumption is being reversed.',
@@ -2057,6 +2121,12 @@ export const PERMISSIONS = [
   'RECRUITMENT',
   'RECRUITMENT_APPROVE',
   /**
+   * Issuing the HR & Payroll letters (2026-10-15) — appointment, experience, relieving,
+   * increment, termination, transfer, F&F. HR's alone: held by HO User and Super Admin, and
+   * grantable here to any other role.
+   */
+  'HR_LETTERS',
+  /**
    * Added by 012. `ASSETS` opens the module; `ASSETS_APPROVE` gates the approvals
    * the backend reserves — request approval, transfer cancellation and
    * condemnation. Both are assignable, so both need a checkbox here.
@@ -2067,8 +2137,14 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
+const PERMISSION_LABELS: Record<string, string> = {
+  HR_LETTERS: 'HR Letters',
+};
+
 /** Human-readable label for a permission value, for checkbox lists and summaries. */
 export function permissionLabel(permission: string): string {
+  // Spelled out where the generated form would mangle an acronym ("Hr Letters").
+  if (permission in PERMISSION_LABELS) return PERMISSION_LABELS[permission];
   return permission
     .toLowerCase()
     .split('_')
@@ -2108,6 +2184,10 @@ export const SETTINGS_PERMISSIONS = {
   // subcontractor signs, which makes editing them a settings act rather than a
   // project one.
   terms: 'SETTINGS',
+  // 2026-10-14. Super Admin only — which is `CROSS_COMPANY_ACCESS` here, as on the backend,
+  // never the role's display name. The API refuses everybody else on both routes, and the
+  // change itself also needs a password confirmation (`app/ui/settings/cash-visibility.tsx`).
+  'personal-settings': 'CROSS_COMPANY_ACCESS',
 } as const;
 
 /** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
@@ -2406,13 +2486,7 @@ export const NAV_MODULES = [
     // logbook the backend would happily serve them. The per-section check is in
     // `app/dashboard/plant/layout.tsx`; this list is only "may this user see the
     // module at all".
-    permissions: [
-      'MACHINERY',
-      'LOGBOOK',
-      'FUEL',
-      'MAINTENANCE',
-      'HIRE_BILLS',
-    ],
+    permissions: ['MACHINERY', 'LOGBOOK', 'FUEL', 'MAINTENANCE', 'HIRE_BILLS'],
   },
   {
     id: 'inventory',
@@ -2526,11 +2600,14 @@ export const NAV_GOVERNING_PERMISSIONS: ReadonlySet<Permission> = new Set(
  * Derived from `NAV_MODULES` rather than written out again, so a module renamed above
  * cannot leave a stale caption here.
  */
-export const NAV_MODULE_BY_PERMISSION: ReadonlyMap<Permission, string> = new Map(
-  NAV_MODULES.flatMap((navModule) =>
-    navModule.permissions.map((permission) => [permission, navModule.name] as const),
-  ),
-);
+export const NAV_MODULE_BY_PERMISSION: ReadonlyMap<Permission, string> =
+  new Map(
+    NAV_MODULES.flatMap((navModule) =>
+      navModule.permissions.map(
+        (permission) => [permission, navModule.name] as const,
+      ),
+    ),
+  );
 
 /** Default page size for the server-paginated employee list (spec FR-001). */
 export const EMPLOYEE_PAGE_SIZE = 25;
@@ -2546,7 +2623,12 @@ export const EMPLOYEE_PAGE_SIZE = 25;
 export const PII_REVEAL_TIMEOUT_MS = 30_000;
 
 /** The four fields the audited reveal endpoint accepts, one per call. */
-export const PII_FIELDS = ['aadhaar', 'pan', 'bankAccountNumber', 'uan'] as const;
+export const PII_FIELDS = [
+  'aadhaar',
+  'pan',
+  'bankAccountNumber',
+  'uan',
+] as const;
 export type PiiField = (typeof PII_FIELDS)[number];
 
 export const PII_FIELD_LABELS: Record<PiiField, string> = {
@@ -2579,8 +2661,17 @@ export const PUNCH_REFUSAL_CODES = [
 export type PunchRefusalCode = (typeof PUNCH_REFUSAL_CODES)[number];
 
 export const GENDERS = ['male', 'female', 'other'] as const;
-export const MARITAL_STATUSES = ['single', 'married', 'divorced', 'widowed'] as const;
-export const EMPLOYMENT_TYPES = ['full_time', 'contract', 'daily_wage'] as const;
+export const MARITAL_STATUSES = [
+  'single',
+  'married',
+  'divorced',
+  'widowed',
+] as const;
+export const EMPLOYMENT_TYPES = [
+  'full_time',
+  'contract',
+  'daily_wage',
+] as const;
 export const CALCULATION_MODES = ['monthly', 'daily'] as const;
 export const ATTENDANCE_STATUS_OVERRIDES = [
   'present',
@@ -2606,7 +2697,11 @@ export const SALARY_ADVANCE_STATUSES = [
   'disbursed',
   'closed',
 ] as const;
-export const EXIT_REASONS = ['resignation', 'termination', 'contract_end'] as const;
+export const EXIT_REASONS = [
+  'resignation',
+  'termination',
+  'contract_end',
+] as const;
 export const TAX_DECLARATION_STATUSES = ['declared', 'verified'] as const;
 /**
  * The statutory challans this screen can produce — the three the API builds.
@@ -2681,7 +2776,7 @@ const ENUM_LABEL_OVERRIDES: Record<string, string> = {
   to_client: 'To the client',
   to_subcontractor: 'To a subcontractor',
   derived_from_gstin: 'derived from the GSTIN',
-  from_project_flag: "set on the project's own record",
+  from_project_flag: 'as chosen on the project',
 };
 
 export function hrLabel(value: string): string {
@@ -2866,7 +2961,8 @@ export const HR_MESSAGES = {
     `${ok} row${ok === 1 ? '' : 's'} ready to import, ${bad} rejected. Only the valid rows will be committed.`,
 
   // Leave
-  rejectNeedsRemarks: 'A rejection needs a reason — the employee sees this remark.',
+  rejectNeedsRemarks:
+    'A rejection needs a reason — the employee sees this remark.',
   leaveDecided: 'Application updated.',
 
   /**
@@ -2930,7 +3026,12 @@ export type ItemUnit = (typeof ITEM_UNITS)[number];
 export const PURCHASE_BILL_STATUSES = ['unpaid', 'part_paid', 'paid'] as const;
 export type PurchaseBillStatus = (typeof PURCHASE_BILL_STATUSES)[number];
 
-export const PAYMENT_MODES = ['upi', 'bank_transfer', 'cash', 'cheque'] as const;
+export const PAYMENT_MODES = [
+  'upi',
+  'bank_transfer',
+  'cash',
+  'cheque',
+] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 
 export const TRANSFER_STATUSES = ['pending', 'in_transit', 'received'] as const;
@@ -2974,6 +3075,8 @@ export const TRANSFER_NEXT_STATUSES: Record<
 export const INVENTORY_PERMISSIONS = {
   stock: 'INVENTORY',
   purchases: 'INVENTORY',
+  // The API maps `letter_purchase_order` to `INVENTORY` since 2026-10-15, so a buyer can raise one.
+  purchaseOrders: 'INVENTORY',
   issues: 'INVENTORY',
   transfers: 'INVENTORY',
   payments: 'INVENTORY',
@@ -3075,9 +3178,7 @@ export const RATE_SOURCE_LABELS: Record<string, string> = {
 /** Indian currency note denominations, descending — the client renders the
  * server-computed breakup against these; the authoritative list is company config on
  * the backend (spec FR-027). */
-export const CASH_DENOMINATIONS = [
-  500, 200, 100, 50, 20, 10, 5, 1,
-] as const;
+export const CASH_DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 1] as const;
 
 /** Label for a labour enum value, via the shared enum labeller, with attendance
  * types given friendly copy. */
@@ -3138,7 +3239,10 @@ export const HIRE_BILL_STATUSES = [
 ] as const;
 export type HireBillStatus = (typeof HIRE_BILL_STATUSES)[number];
 
-export const SERVICE_BILL_STATUSES = ['pending_verification', 'verified'] as const;
+export const SERVICE_BILL_STATUSES = [
+  'pending_verification',
+  'verified',
+] as const;
 export type ServiceBillStatus = (typeof SERVICE_BILL_STATUSES)[number];
 
 export const SERVICE_BILL_PAYMENT_STATUSES = [
@@ -3286,7 +3390,11 @@ export const INTERVIEW_ROUND_TYPES = [
 export const INTERVIEW_MODES = ['in_person', 'phone', 'video'] as const;
 export const INTERVIEW_OUTCOMES = ['recommend', 'hold', 'reject'] as const;
 
-export const REQUISITION_EMPLOYMENT_TYPES = ['permanent', 'contract', 'walk_in'] as const;
+export const REQUISITION_EMPLOYMENT_TYPES = [
+  'permanent',
+  'contract',
+  'walk_in',
+] as const;
 
 export const CANDIDATE_SOURCES = [
   'referral',
@@ -3314,7 +3422,11 @@ export const RESIGNATION_REASON_CATEGORIES = [
   'other',
 ] as const;
 
-export const RESIGNATION_STATUSES = ['submitted', 'accepted', 'withdrawn'] as const;
+export const RESIGNATION_STATUSES = [
+  'submitted',
+  'accepted',
+  'withdrawn',
+] as const;
 
 const RECRUITMENT_STAGE_LABELS: Record<string, string> = {
   applied: 'Applied',
@@ -3385,8 +3497,7 @@ export const ASSET_TRACKING_MODES = ['serialised', 'bulk'] as const;
 export type AssetTrackingMode = (typeof ASSET_TRACKING_MODES)[number];
 
 export const ASSET_ALLOCATION_STATUSES = ['open', 'closed'] as const;
-export type AssetAllocationStatus =
-  (typeof ASSET_ALLOCATION_STATUSES)[number];
+export type AssetAllocationStatus = (typeof ASSET_ALLOCATION_STATUSES)[number];
 
 /**
  * Which permission each Assets section requires beyond the module tier.
@@ -3475,7 +3586,10 @@ export type ApprovalActionKey = (typeof APPROVAL_ACTIONS)[number]['action'];
  * reader who hits this message usually cannot, which is why it says who to ask.
  */
 export const APPROVAL_INERT_MESSAGES = {
-  awaiting_other: (awaitingUserName: string | null, levelLabel: string | null) =>
+  awaiting_other: (
+    awaitingUserName: string | null,
+    levelLabel: string | null,
+  ) =>
     awaitingUserName
       ? `Waiting on ${awaitingUserName}`
       : `Waiting on ${levelLabel ?? 'the next approver'}`,
@@ -3483,10 +3597,8 @@ export const APPROVAL_INERT_MESSAGES = {
     levelLabel
       ? `You already decided this at ${levelLabel}`
       : 'You have already decided this',
-  insufficient_authority: (
-    _user: string | null,
-    levelLabel: string | null,
-  ) => `${levelLabel ?? 'Another level'} decides this`,
+  insufficient_authority: (_user: string | null, levelLabel: string | null) =>
+    `${levelLabel ?? 'Another level'} decides this`,
   slot_unmapped: (_user: string | null, levelLabel: string | null) =>
     `Nobody can approve this yet: no role is mapped to ${
       levelLabel ?? 'this level'
@@ -3581,7 +3693,8 @@ export const ROLE_LEVELS = {
    */
   hint: 'Tick an area to give access, then choose whether this role can only look at it or can also change it. Decide per area — a role can be able to change one thing and only view another.',
   viewOnly: 'View only',
-  viewOnlyHint: 'Can open and read it. Nothing in it can be added, edited or deleted.',
+  viewOnlyHint:
+    'Can open and read it. Nothing in it can be added, edited or deleted.',
   viewAndChange: 'View and change',
   viewAndChangeHint: 'Can read it and can add, edit and delete within it.',
   /** FR-020. Not an error message — the control cannot express the state at all. */
@@ -3632,7 +3745,8 @@ export const FUEL_EXCEPTIONS = {
   attributionHirer: 'The hirer — deduct from their hire bill',
   attributionOperator: 'The operator — recover from their salary',
   attributionBoth: 'Both',
-  attributionNeither: 'Nobody — the variance was genuine and is not being pursued',
+  attributionNeither:
+    'Nobody — the variance was genuine and is not being pursued',
   /**
    * FR-004, said rather than silently hidden.
    *
@@ -3660,7 +3774,8 @@ export const FUEL_EXCEPTIONS = {
 
   recoverHireBill: 'Deduct from hire bill',
   recoverOperator: 'Propose salary recovery',
-  recoveredHireBill: (amount: string) => `Deducted from the hire bill: ${amount}`,
+  recoveredHireBill: (amount: string) =>
+    `Deducted from the hire bill: ${amount}`,
   /**
    * FR-006, T045. **Proposed, not applied** — the single most important sentence here.
    *
@@ -3723,8 +3838,7 @@ export const LOCATION_ASSIGNMENT = {
   bulkHint:
     'Everyone selected gets the same assignment, from the same date. They are recorded one at a time, so if some fail the rest still stand.',
   bulkNobodySelected: 'Select at least one employee.',
-  bulkDone: (ok: number) =>
-    `${ok} employee${ok === 1 ? '' : 's'} assigned.`,
+  bulkDone: (ok: number) => `${ok} employee${ok === 1 ? '' : 's'} assigned.`,
   /**
    * Partial failure, named rather than summarised.
    *
@@ -3832,6 +3946,9 @@ export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
   final_settlement: 'Final settlement',
   attendance_correction: 'Attendance correction',
   director_final_set_change: 'Change to the Director approval set',
+  // An initialism the fallback would print as "Ra bill" (2026-10-15).
+  ra_bill: 'RA bill',
+  dwr: 'Daily work report',
 };
 
 /**
@@ -3972,8 +4089,7 @@ export const DOCUMENT_COPY = {
     'The document kind could not be defined. Please try again.',
   requirementsKindHint:
     'For a document BuildCore does not name — a site handover note, a client NOC. It becomes available to require immediately.',
-  defineFailed:
-    'The document type could not be defined. Please try again.',
+  defineFailed: 'The document type could not be defined. Please try again.',
   expiryRequired: 'This document expires, so an expiry date is required.',
   restrictedNotice:
     'Regulated personal data. It can be downloaded, and every download is recorded — there is no preview.',
@@ -4082,7 +4198,8 @@ export const DOCUMENT_COPY = {
    * reader's question when the controls are not there is "where did they go", and silence answers
    * it with a hunt through ten tabs.
    */
-  editFiledElsewhere: 'Documents for this project are filed on its Documents tab.',
+  editFiledElsewhere:
+    'Documents for this project are filed on its Documents tab.',
   editFiledElsewhereLink: 'Open Documents',
   /**
    * The summary beside the submit control. Names the count, not the kinds — the kinds are named on
@@ -4117,8 +4234,7 @@ export const DOCUMENT_COPY = {
    * Said once above the list when the filter is on, because a list that silently excludes rows
    * is a list somebody will read as the whole set.
    */
-  proofFilterActive:
-    'Showing only payments with no proof attached.',
+  proofFilterActive: 'Showing only payments with no proof attached.',
 } as const;
 
 /** Copy for the letters surfaces. */
@@ -4131,7 +4247,7 @@ export const LETTER_COPY = {
    */
   subjectHeading: 'Letters',
   subjectEmpty: 'No letters have been issued for this yet.',
-  subjectOpen: 'Open',
+  subjectOpen: 'View',
 
   awaitingApproval:
     'This letter is waiting for approval and cannot be issued yet.',
@@ -4148,7 +4264,8 @@ export const LETTER_COPY = {
    */
   kindInUseFallback:
     'This letter kind cannot be deleted while letters still reference it.',
-  signatoryRequired: 'This kind of letter carries a signature — choose a signatory.',
+  signatoryRequired:
+    'This kind of letter carries a signature — choose a signatory.',
 } as const;
 
 /**
@@ -4171,12 +4288,13 @@ export const LETTER_STATUS_LABELS = {
  * offered. What this decides is only *which screen* a kind belongs on: a work order is a letter
  * too, and an employee's Letters tab is not where it is issued.
  *
- * **No appointment letter here** (2026-10-14): it is Recruitment's document, issued from the
- * pipeline when the candidate joins — see `RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS`. **No
- * confirmation or suspension letter** either: the client issues neither, and has no wording for
- * them.
+ * **The appointment letter is here** (2026-10-15). It was Recruitment's, issued from the pipeline
+ * on joining; the client moved it: Recruitment issues the offer letter and nothing else, and every
+ * letter to an employee is issued from HR & Payroll. **No confirmation or suspension letter**: the
+ * client issues neither, and has no wording for them.
  */
 export const EMPLOYEE_LETTER_KIND_KEYS = [
+  'appointment',
   'increment',
   'transfer',
   'experience',
@@ -4184,13 +4302,6 @@ export const EMPLOYEE_LETTER_KIND_KEYS = [
   'termination',
   'fnf_settlement',
 ] as const;
-
-/**
- * Recruitment's document for somebody who has just joined. Addressed to the new employee record,
- * because it prints the employee code, joining date and salary annexure, none of which exist
- * before joining; issued from Recruitment, because joining is the last step of hiring.
- */
-export const RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS = ['appointment'] as const;
 
 /** A candidate is issued an offer, and nothing else, before they join. */
 export const CANDIDATE_LETTER_KIND_KEYS = ['offer'] as const;
@@ -4203,15 +4314,16 @@ export const CANDIDATE_LETTER_KIND_KEYS = ['offer'] as const;
  */
 export const HR_LETTER_KIND_PERMISSIONS: Record<string, string> = {
   offer: 'RECRUITMENT',
-  appointment: 'RECRUITMENT',
-  confirmation: 'EMPLOYEES',
-  relieving: 'EMPLOYEES',
-  experience: 'EMPLOYEES',
-  transfer: 'EMPLOYEES',
-  suspension: 'EMPLOYEES',
-  termination: 'EMPLOYEES',
-  increment: 'PAYROLL',
-  fnf_settlement: 'PAYROLL',
+  // HR's alone since 2026-10-15 — see `HR_LETTERS` in `PERMISSIONS`.
+  appointment: 'HR_LETTERS',
+  confirmation: 'HR_LETTERS',
+  relieving: 'HR_LETTERS',
+  experience: 'HR_LETTERS',
+  transfer: 'HR_LETTERS',
+  suspension: 'HR_LETTERS',
+  termination: 'HR_LETTERS',
+  increment: 'HR_LETTERS',
+  fnf_settlement: 'HR_LETTERS',
 };
 
 /** Copy for the generate-a-document flow (HR documents, 2026-10-13). */
@@ -4222,13 +4334,16 @@ export const GENERATE_LETTER_COPY = {
   noKinds:
     'No HR document kind is available to you here. Kinds are configured in Settings → Letter kinds, and each is issued under its own permission.',
   fromRecords: 'From records',
-  fromRecordsHint: 'Filled in from the records. Edit any of them for this letter only.',
+  fromRecordsHint:
+    'Filled in from the records. Edit any of them for this letter only.',
   toFill: 'To fill in',
   toFillHint: 'Nothing on record holds these.',
-  noFields: 'This kind declares no fields — it is issued exactly as its template reads.',
+  noFields:
+    'This kind declares no fields — it is issued exactly as its template reads.',
   requiredMissing: 'Required — nothing on record holds this.',
   signatory: 'Signatory',
-  noSignatories: 'This document carries a signature, and no active signatory is set up. Add one in Settings → Signatories.',
+  noSignatories:
+    'This document carries a signature, and no active signatory is set up. Add one in Settings → Signatories.',
   signatoriesForbidden:
     'This document carries a signature, and you may not read the signatory list. Ask an administrator to issue it, or to grant access.',
   signatoriesFailed: 'The signatories could not be loaded.',
@@ -4294,7 +4409,7 @@ export const PAYMENT_PROOF_COPY = {
  * answers.
  */
 export const SETTLEMENT_COPY = {
-  heading: 'Payment and acknowledgement',
+  heading: 'Payment',
   /** Only a certified bill has an agreed figure to be outstanding against. */
   notCertified:
     'This bill has not been certified, so there is no agreed figure to pay against and its quantities can still change. Money paid before certification is an advance — record it as an advance recovery on the bill package.',
@@ -4326,20 +4441,8 @@ export const SETTLEMENT_COPY = {
     adjustment: 'Adjustment',
   } as Record<string, string>,
 
-  signedHeading: 'Signed copy',
-  /** The state, which is the point of FR-020 — not merely a file in a list. */
-  acknowledged: (date: string) => `Acknowledged on ${date}`,
-  unacknowledged: 'No signed copy has come back yet.',
-  receivedOnLabel: 'Received on',
-  receivedOnHint:
-    'When the copy came back, not when it was scanned. A copy signed on site on Tuesday and scanned on Friday was acknowledged on Tuesday — and that is the date a payment term runs from.',
-  fileLabel: 'The signed copy',
-  upload: 'File the signed copy',
-  uploading: 'Uploading…',
-  download: 'Download',
-  /** A later scan does not move the acknowledgement date. */
-  replaceHint:
-    'The first copy sets the acknowledgement date. A later replacement scan is filed beside it and does not move the date.',
+  // The signed-copy section's wording went with the section (2026-10-14): the certified copy is
+  // uploaded at Certify on the bill package and downloaded from its lifecycle panel.
   debitNote: 'Download the debit note',
 } as const;
 
@@ -4402,6 +4505,20 @@ export const INVENTORY_ISSUE_LABEL = 'Issue / Consumption material';
 
 /** The same label where a shorter one is needed — a tab strip, a breadcrumb. */
 export const INVENTORY_ISSUE_LABEL_SHORT = 'Issue / Consumption';
+
+/**
+ * The project's GST choice (2026-10-14). It decides the tax on every bill on the project — to the
+ * client and from each subcontractor — rather than the two parties' GSTINs, because the company
+ * holds more than one.
+ */
+export const PROJECT_GST_COPY = {
+  legend: 'GST on bills',
+  options: [
+    { label: 'CGST + SGST', cgstApplicable: true },
+    { label: 'IGST', cgstApplicable: false },
+  ],
+  hint: 'Applies to every client and subcontractor bill on this project. A bill already raised keeps the tax it was raised with.',
+} as const;
 
 export const PROJECT_SHELL_COPY = {
   loading: 'Loading this project…',
@@ -4535,13 +4652,14 @@ export const PROJECT_SHELL_COPY = {
   departmentLabel: 'Department',
   projectTypeLabel: 'Project type',
   siteStartLabel: 'Site start',
-  cgstLabel: 'CGST',
-  cgstApplicable: 'Applicable',
-  cgstNotApplicable: 'Not applicable',
+  cgstLabel: 'GST on bills',
+  cgstApplicable: 'CGST + SGST',
+  cgstNotApplicable: 'IGST',
   retentionLabel: 'Client retention',
   quotedLabel: 'Quoted percentage',
   /** Null is not zero: a bill to the client is refused until a term is recorded. */
-  retentionUnset: 'Not recorded — a bill to the client is refused until it is set',
+  retentionUnset:
+    'Not recorded — a bill to the client is refused until it is set',
   quotedAtPar: 'At par',
   /**
    * The sign carried in words as well as in the figure.
@@ -4619,12 +4737,14 @@ export const BOQ_COPY = {
   unitHint: 'As it appears on your schedule — it is stored exactly as typed.',
   scopeQty: 'Scope quantity',
   rate: 'Rate',
-  rateHint: 'Leave blank and the line stays unpriced; a bill will refuse it rather than bill it free.',
+  rateHint:
+    'Leave blank and the line stays unpriced; a bill will refuse it rather than bill it free.',
   startDate: 'Start date (optional)',
   finishDate: 'Finish date (optional)',
   duration: 'Working days (optional)',
   perDay: 'Per-day target (optional)',
-  programmeHint: 'Dates are optional. A line without them is simply not planned yet.',
+  programmeHint:
+    'Dates are optional. A line without them is simply not planned yet.',
   save: 'Save',
   saving: 'Saving…',
   cancel: 'Cancel',
@@ -4632,7 +4752,8 @@ export const BOQ_COPY = {
   planLine: 'Plan',
   planHint:
     'Dates only. Leave a box empty to clear what is there — scope, rate and description are edited nowhere near a programme.',
-  deleteBlocked: 'This line cannot be deleted because work has been recorded against it.',
+  deleteBlocked:
+    'This line cannot be deleted because work has been recorded against it.',
 
   /**
    * The two schedules, kept apart (027).
@@ -4735,7 +4856,8 @@ export const BOQ_COPY = {
   reportPercentageMissing:
     'Not found in this file. Every bill will be raised at the schedule rate, with no percentage added — on a ₹3 crore tender a missing 2.46% is about ₹7.4 lakh. Set it on the project before billing.',
   reportUnits: 'Units found',
-  reportUnitsHint: 'Shown as your file spells them. Matching ignores case, spacing and full stops.',
+  reportUnitsHint:
+    'Shown as your file spells them. Matching ignores case, spacing and full stops.',
   reportErrors: (count: number) =>
     `${count} row${count === 1 ? '' : 's'} could not be imported`,
   reportWarnings: (count: number) =>
@@ -4755,7 +4877,8 @@ export const BOQ_COPY = {
       'The workbook opened but has no sheets with any content. If it came from a tender portal, open it in Excel and save it again before uploading.',
     BOQ_NO_SCHEDULE_BLOCK:
       'No schedule could be found. The sheet needs a header row naming an item description, a quantity, a unit and a rate.',
-    BOQ_NO_SCHEDULE_ROWS: 'The schedule has a header row but no items beneath it.',
+    BOQ_NO_SCHEDULE_ROWS:
+      'The schedule has a header row but no items beneath it.',
     BOQ_NO_IMPORTABLE_ROWS:
       'Every row in the schedule was rejected, so there is nothing to import. The reasons are listed above.',
     BOQ_TOO_MANY_ROWS:
@@ -4769,11 +4892,13 @@ export const BOQ_COPY = {
       'The database did not finish writing this schedule in time, so nothing was saved and the project is exactly as it was. The import is still held — press Confirm again. If it fails a second time, import the schedule’s sections separately.',
     BOQ_ALREADY_POPULATED:
       'This project already has a BOQ. Importing again would add a second copy rather than replace the first, and the existing lines cannot be removed automatically because bills may already measure against them. Add or revise lines instead.',
-    BOQ_BATCH_NOT_FOUND: 'That import is no longer available. Upload the file again.',
+    BOQ_BATCH_NOT_FOUND:
+      'That import is no longer available. Upload the file again.',
     BOQ_BATCH_EXPIRED:
       'This import was prepared a while ago and has expired. Nothing was saved — upload the file again.',
     /** Not a failure: the schedule is on its way in, which is what the person wanted. */
-    BOQ_BATCH_IN_PROGRESS: 'This schedule is being imported now. Reload the project in a moment.',
+    BOQ_BATCH_IN_PROGRESS:
+      'This schedule is being imported now. Reload the project in a moment.',
     /** Not a failure either: it already worked. */
     BOQ_BATCH_ALREADY_CONFIRMED: 'Already imported. Nothing further is needed.',
     BOQ_BATCH_NOT_YOURS:
@@ -4781,7 +4906,6 @@ export const BOQ_COPY = {
   } as const,
   refusalFallback: 'The workbook could not be imported.',
 } as const;
-
 
 /**
  * The company's standard terms and conditions (2026-10-11).

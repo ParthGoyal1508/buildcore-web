@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { RowActionLink } from '@/app/ui/settings/form-fields';
 import type { ReactNode } from 'react';
 
 /**
@@ -54,11 +54,8 @@ export function OpenLink({
   label?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="shrink-0 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-    >
+    <RowActionLink href={href} className="shrink-0">
       {label}
-    </Link>
+    </RowActionLink>
   );
 }

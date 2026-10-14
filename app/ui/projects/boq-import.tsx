@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useRef, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
@@ -16,6 +17,7 @@ import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
 
 /**
  * The tender import: upload, read the report, then confirm (008 FR-027 – FR-031).
@@ -77,10 +79,16 @@ export default function BoqImport({
       setDone(BOQ_COPY.importDone(result.groups, result.lines));
       setReport(null);
       setRefusal(null);
-      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq'] });
-      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq-alerts'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'boq'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'boq-alerts'],
+      });
       // The project itself carries the quoted percentage this import may have set.
-      void queryClient.invalidateQueries({ queryKey: ['projects', 'portfolio', projectId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', 'portfolio', projectId],
+      });
     },
     onError: (error: Error) => {
       // FR-031: a second confirm lands here, and "already imported" is an outcome rather than a
@@ -104,13 +112,19 @@ export default function BoqImport({
       </div>
 
       {done && (
-        <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-900">
+        <p
+          role="status"
+          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-900"
+        >
           {done}
         </p>
       )}
 
       {refusal && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p
+          role="alert"
+          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800"
+        >
           {refusal}
         </p>
       )}
@@ -123,7 +137,7 @@ export default function BoqImport({
             ref={inputRef}
             type="file"
             accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700"
+            className="block w-full text-sm text-gray-700"
             disabled={read.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -132,7 +146,9 @@ export default function BoqImport({
             }}
           />
           {read.isPending && (
-            <p className="mt-2 text-sm text-gray-500">{BOQ_COPY.importReading}</p>
+            <p className="mt-2 text-sm text-gray-500">
+              {BOQ_COPY.importReading}
+            </p>
           )}
         </div>
       )}
@@ -147,7 +163,9 @@ export default function BoqImport({
               disabled={commit.isPending || blocked}
               onClick={() => commit.mutate(report.batchId)}
             >
-              {commit.isPending ? BOQ_COPY.importConfirming : BOQ_COPY.importConfirm}
+              {commit.isPending
+                ? BOQ_COPY.importConfirming
+                : BOQ_COPY.importConfirm}
             </Button>
             <SecondaryButton
               type="button"
@@ -167,7 +185,11 @@ export default function BoqImport({
 
 /** The sentence for this refusal, by code — never a generic one where a code is known (FR-029). */
 function messageFor(error: Error): string {
-  if (error instanceof ApiError && error.code && error.code in BOQ_COPY.refusals) {
+  if (
+    error instanceof ApiError &&
+    error.code &&
+    error.code in BOQ_COPY.refusals
+  ) {
     return BOQ_COPY.refusals[error.code as keyof typeof BOQ_COPY.refusals];
   }
   return error.message || BOQ_COPY.refusalFallback;
@@ -177,44 +199,59 @@ function Report({ report }: { report: BoqImportReport }) {
   return (
     <div className="space-y-4 rounded-md border border-gray-200 bg-gray-50 p-3">
       <div>
-        <h4 className="text-sm font-semibold text-gray-900">{BOQ_COPY.reportHeading}</h4>
+        <h4 className="text-sm font-semibold text-gray-900">
+          {BOQ_COPY.reportHeading}
+        </h4>
         <p className="text-sm text-gray-700">
           {BOQ_COPY.reportLines(report.lines, report.groups)}
         </p>
-        <p className="text-xs text-gray-500">{BOQ_COPY.reportSheet(report.sheetName)}</p>
+        <p className="text-xs text-gray-500">
+          {BOQ_COPY.reportSheet(report.sheetName)}
+        </p>
         <p className="text-xs text-gray-500">{BOQ_COPY.reportNothingWritten}</p>
       </div>
 
       {/* FR-027. Both derived totals beside the file's own, with the difference — the only thing
           on this screen that can show the import read the file correctly rather than merely
-          read something. */}
-      <table className="w-full text-sm">
-        <caption className="sr-only">{BOQ_COPY.reportHeading}</caption>
-        <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
-          <tr>
-            <th scope="col" className="py-1" />
-            <th scope="col" className="py-1 text-right">{BOQ_COPY.reportHeading}</th>
-            <th scope="col" className="py-1 text-right">{BOQ_COPY.reportStated}</th>
-            <th scope="col" className="py-1 text-right">{BOQ_COPY.reportDifference}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <TotalRow
-            label={BOQ_COPY.reportScheduleTotal}
-            derived={report.totals.scheduleDerived}
-            stated={report.totals.scheduleStated}
-            difference={report.totals.scheduleDifference}
-          />
-          <TotalRow
-            label={BOQ_COPY.reportQuotedTotal}
-            derived={report.totals.quotedDerived}
-            stated={report.totals.quotedStated}
-            difference={report.totals.quotedDifference}
-          />
-        </tbody>
-      </table>
+          read something. The tables take the shared white card (2026-10-15): on this grey report
+          panel a bare table has no surface of its own. */}
+      <div className={TABLE.wrap}>
+        <table className={clsx(TABLE.table, 'w-full')}>
+          <caption className="sr-only">{BOQ_COPY.reportHeading}</caption>
+          <thead className={TABLE.thead}>
+            <tr>
+              <th scope="col" className={TABLE.th} />
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportHeading}
+              </th>
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportStated}
+              </th>
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportDifference}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <TotalRow
+              label={BOQ_COPY.reportScheduleTotal}
+              derived={report.totals.scheduleDerived}
+              stated={report.totals.scheduleStated}
+              difference={report.totals.scheduleDifference}
+            />
+            <TotalRow
+              label={BOQ_COPY.reportQuotedTotal}
+              derived={report.totals.quotedDerived}
+              stated={report.totals.quotedStated}
+              difference={report.totals.quotedDifference}
+            />
+          </tbody>
+        </table>
+      </div>
 
-      <p className={`text-sm ${report.totals.reconciles ? 'text-green-800' : 'text-red-800'}`}>
+      <p
+        className={`text-sm ${report.totals.reconciles ? 'text-green-800' : 'text-red-800'}`}
+      >
         {report.totals.reconciles
           ? `${BOQ_COPY.reportReconciles} (${BOQ_COPY.reportTolerance(rupees(report.totals.tolerance))})`
           : BOQ_COPY.reportDoesNotReconcile}
@@ -223,7 +260,9 @@ function Report({ report }: { report: BoqImportReport }) {
       {/* FR-028. A condition to resolve, with its consequence in rupees — never a zero, and never
           silence, because the cost of a missing percentage is invisible on every other screen. */}
       <div>
-        <p className="text-sm font-medium text-gray-900">{BOQ_COPY.reportPercentage}</p>
+        <p className="text-sm font-medium text-gray-900">
+          {BOQ_COPY.reportPercentage}
+        </p>
         {report.quotedPercentageFound && report.quotedPercentage !== null ? (
           <p className="text-sm text-gray-700">
             <span className="tabular-nums">
@@ -239,7 +278,9 @@ function Report({ report }: { report: BoqImportReport }) {
       </div>
 
       <div>
-        <p className="text-sm font-medium text-gray-900">{BOQ_COPY.reportUnits}</p>
+        <p className="text-sm font-medium text-gray-900">
+          {BOQ_COPY.reportUnits}
+        </p>
         <p className="text-xs text-gray-500">{BOQ_COPY.reportUnitsHint}</p>
         <ul className="mt-1 flex flex-wrap gap-1.5">
           {report.units.map((unit) => (
@@ -250,14 +291,20 @@ function Report({ report }: { report: BoqImportReport }) {
               {/* As typed (FR-030), with the count rather than the normalised form: the client is
                   reading this against their own sheet, not against our matching rule. */}
               {unit.asTyped}
-              <span className="ml-1 text-gray-400 tabular-nums">×{unit.lines}</span>
+              <span className="ml-1 text-gray-400 tabular-nums">
+                ×{unit.lines}
+              </span>
             </li>
           ))}
         </ul>
       </div>
 
       {report.errors.length > 0 && (
-        <Problems title={BOQ_COPY.reportErrors(report.errors.length)} rows={report.errors} tone="red" />
+        <Problems
+          title={BOQ_COPY.reportErrors(report.errors.length)}
+          rows={report.errors}
+          tone="red"
+        />
       )}
       {/* Warnings listed apart from errors: a line grouped under the sheet name was imported, and
           calling it an error would make somebody go looking for a row that is fine. */}
@@ -284,15 +331,20 @@ function TotalRow({
   difference: number | null;
 }) {
   return (
-    <tr className="border-t border-gray-200">
-      <th scope="row" className="py-1 text-left font-medium text-gray-700">
+    <tr className={TABLE.row}>
+      <th
+        scope="row"
+        className={clsx(TABLE.td, 'text-left font-medium text-gray-700')}
+      >
         {label}
       </th>
-      <td className="py-1 text-right tabular-nums">{derived === null ? '—' : rupees(derived)}</td>
-      <td className="py-1 text-right tabular-nums text-gray-600">
+      <td className={clsx(TABLE.td, TABLE.numeric)}>
+        {derived === null ? '—' : rupees(derived)}
+      </td>
+      <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}>
         {stated === null ? '—' : rupees(stated)}
       </td>
-      <td className="py-1 text-right tabular-nums text-gray-600">
+      <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}>
         {difference === null ? '—' : rupees(difference)}
       </td>
     </tr>
@@ -317,21 +369,34 @@ function Problems({
       >
         {title}
       </summary>
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-left uppercase tracking-wide text-gray-500">
+      <div className={clsx(TABLE.wrap, 'mt-2')}>
+        <table className={clsx(TABLE.table, 'w-full')}>
+          <thead className={TABLE.thead}>
             <tr>
-              <th scope="col" className="py-1 pr-3">{BOQ_COPY.reportColumnRow}</th>
-              <th scope="col" className="py-1 pr-3">{BOQ_COPY.reportColumnColumn}</th>
-              <th scope="col" className="py-1">{BOQ_COPY.reportColumnReason}</th>
+              <th scope="col" className={TABLE.th}>
+                {BOQ_COPY.reportColumnRow}
+              </th>
+              <th scope="col" className={TABLE.th}>
+                {BOQ_COPY.reportColumnColumn}
+              </th>
+              <th scope="col" className={TABLE.th}>
+                {BOQ_COPY.reportColumnReason}
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((problem) => (
-              <tr key={`${problem.row}-${problem.column}`} className="border-t border-gray-200">
-                <td className="py-1 pr-3 tabular-nums">{problem.row}</td>
-                <td className="py-1 pr-3">{problem.column}</td>
-                <td className="py-1 text-gray-700">{problem.reason}</td>
+              <tr
+                key={`${problem.row}-${problem.column}`}
+                className={TABLE.row}
+              >
+                <td className={clsx(TABLE.td, 'tabular-nums')}>
+                  {problem.row}
+                </td>
+                <td className={TABLE.td}>{problem.column}</td>
+                <td className={clsx(TABLE.td, 'text-gray-700')}>
+                  {problem.reason}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -1,8 +1,9 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import {
   type DwrSummary,
@@ -18,6 +19,13 @@ import { ROUTES } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import StatusBadge from '@/app/ui/status-badge';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
 /**
  * Every daily work report on a project, and what can be done to each (024 Story 1, Story 2).
@@ -63,21 +71,23 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     queryFn: () => listDwrs(projectId),
   });
 
-  // Defaulted to the order the server already returns, so the first paint does not reshuffle
-  // under the reader: `workDate desc`, with the report number breaking ties.
-  const [sort, setSort] = useState<Sort>({
-    column: 'workDate',
-    direction: 'desc',
-  });
-
-  const rows = useSorted(reports ?? [], sort);
+  // Unsorted until the reader clicks a header, so the first paint is the server's own order:
+  // `workDate desc`, with the report number breaking ties. The shared sort is stable, so two
+  // reports on one day keep that tiebreak when the list is sorted by date (2026-10-15).
+  const {
+    sorted: rows,
+    sort,
+    toggle,
+  } = useSortedRows(reports ?? [], DWR_COLUMNS);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['dwrs', projectId] });
     // Approval moved BOQ executed quantities, so anything reading them is now stale. Named
     // individually rather than clearing everything: a blanket reset re-fetches the whole project.
     void queryClient.invalidateQueries({ queryKey: ['boq', projectId] });
-    void queryClient.invalidateQueries({ queryKey: ['billPackages', projectId] });
+    void queryClient.invalidateQueries({
+      queryKey: ['billPackages', projectId],
+    });
   };
 
   const act = useMutation({
@@ -91,8 +101,7 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
       // approved report rather than letting a day's record be deleted out from under a bill.
       if (job.kind === 'delete') return deleteDwr(job.dwrId);
       if (job.kind === 'approve') return approveDwr(job.dwrId);
-      if (job.kind === 'return')
-        return returnDwr(job.dwrId, job.reason ?? '');
+      if (job.kind === 'return') return returnDwr(job.dwrId, job.reason ?? '');
       return reverseDwr(job.dwrId, job.reason ?? '');
     },
     onSuccess: (_result, job) => {
@@ -102,11 +111,11 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
           ? 'Approved. The executed quantity on each BOQ line has moved.'
           : job.kind === 'delete'
             ? 'Deleted. Nothing had moved, because only a draft can be.'
-          : job.kind === 'reverse'
-            ? 'Reversed. Exactly what the approval added has been taken back.'
-            : job.kind === 'submit'
-              ? 'Submitted for approval. Nothing has moved yet — approval is what does that.'
-              : 'Returned to the author.',
+            : job.kind === 'reverse'
+              ? 'Reversed. Exactly what the approval added has been taken back.'
+              : job.kind === 'submit'
+                ? 'Submitted for approval. Nothing has moved yet — approval is what does that.'
+                : 'Returned to the author.',
       );
       refresh();
     },
@@ -130,7 +139,6 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
       </p>
     );
   }
-
 
   return (
     <section className="flex flex-col gap-4">
@@ -159,7 +167,10 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
         </p>
       )}
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -171,29 +182,24 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
           claim nothing.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+        <div className={TABLE.wrap}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
-                <SortableHeader
-                  label="Report"
-                  column="dprNumber"
-                  sort={sort}
-                  onSort={setSort}
-                />
-                <SortableHeader
-                  label="Work date"
-                  column="workDate"
-                  sort={sort}
-                  onSort={setSort}
-                />
-                <th className="px-3 py-2">State</th>
-                <th className="px-3 py-2 text-right">Lines</th>
-                <th className="px-3 py-2">On site</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+                {DWR_COLUMNS.map((column) => (
+                  <SortHeader
+                    key={column.key}
+                    label={column.label}
+                    columnKey={column.key}
+                    sort={sort}
+                    onSort={toggle}
+                    numeric={column.numeric}
+                  />
+                ))}
+                <th className={clsx(TABLE.th, 'text-right')}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {rows.map((report) => (
                 <ReportRow
                   key={report.id}
@@ -215,88 +221,28 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
   );
 }
 
-/** Which column the list is ordered by, and which way. */
-interface Sort {
-  column: 'dprNumber' | 'workDate';
-  direction: 'asc' | 'desc';
-}
-
-/**
- * The list in the reader's chosen order — **a copy, sorted here rather than refetched**.
- *
- * The server already returns every report on the project in one response, so ordering is a
- * question the page can answer by itself; asking the API to re-sort would be a round trip to
- * rearrange rows the browser is holding. `toSorted` is avoided for the same reason the rest of
- * this codebase avoids it — `reports` is TanStack Query's cached array, and sorting it in place
- * would mutate the cache.
- */
-function useSorted(reports: DwrSummary[], sort: Sort): DwrSummary[] {
-  return useMemo(() => {
-    const sign = sort.direction === 'asc' ? 1 : -1;
-    return [...reports].sort((a, b) => {
-      // Numeric collation, not plain text. The numbers are zero-padded today so the two agree,
-      // and a project that ever reaches DPR-10000 would otherwise sort it between 0001 and 0002.
-      const primary =
-        sort.column === 'dprNumber'
-          ? a.dprNumber.localeCompare(b.dprNumber, undefined, { numeric: true })
-          : a.workDate.localeCompare(b.workDate);
-      // Two reports on one day is ordinary — there are four such pairs on the project this was
-      // reported from. Without a tiebreak those rows would reorder arbitrarily between renders.
-      const tiebreak = a.dprNumber.localeCompare(b.dprNumber, undefined, {
-        numeric: true,
-      });
-      return sign * (primary || tiebreak);
-    });
-  }, [reports, sort]);
-}
-
-/**
- * A column header that sorts, announcing its state to a screen reader through `aria-sort`.
- *
- * Clicking the column already sorted reverses it; clicking another takes that column descending,
- * which is what a reader of a dated list wants first — the most recent day, not the oldest.
- */
-function SortableHeader({
-  label,
-  column,
-  sort,
-  onSort,
-}: {
+// The sortable columns (2026-10-15). `dprNumber` sorts with numeric collation, so DPR-10000
+// lands after DPR-9999 rather than between 0001 and 0002.
+const DWR_COLUMNS: (SortableColumn<DwrSummary> & {
   label: string;
-  column: Sort['column'];
-  sort: Sort;
-  onSort: (next: Sort) => void;
-}) {
-  const active = sort.column === column;
-  return (
-    <th
-      className="px-3 py-2"
-      aria-sort={
-        active
-          ? sort.direction === 'asc'
-            ? 'ascending'
-            : 'descending'
-          : 'none'
-      }
-    >
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 uppercase tracking-wide text-gray-500 hover:text-gray-900"
-        onClick={() =>
-          onSort({
-            column,
-            direction: active && sort.direction === 'desc' ? 'asc' : 'desc',
-          })
-        }
-      >
-        {label}
-        <span aria-hidden className={active ? 'text-gray-900' : 'text-gray-300'}>
-          {active && sort.direction === 'asc' ? '\u2191' : '\u2193'}
-        </span>
-      </button>
-    </th>
-  );
-}
+  numeric?: boolean;
+})[] = [
+  { key: 'dprNumber', label: 'Report', render: (r) => r.dprNumber },
+  { key: 'workDate', label: 'Work date', render: (r) => r.workDate },
+  { key: 'status', label: 'State', render: (r) => r.status },
+  {
+    key: 'lineCount',
+    label: 'Lines',
+    numeric: true,
+    render: (r) => r.lineCount,
+  },
+  {
+    key: 'onSite',
+    label: 'On site',
+    render: (r) => r.workerCount,
+    sortValue: (r) => r.workerCount ?? 0,
+  },
+];
 
 function ReportRow({
   projectId,
@@ -332,8 +278,8 @@ function ReportRow({
   const blockedAsAuthor = isAuthor && !mayApproveOwn;
 
   return (
-    <tr className="align-top">
-      <td className="px-3 py-2">
+    <tr className={clsx(TABLE.row, 'align-top')}>
+      <td className={clsx(TABLE.td, 'align-top')}>
         <Link
           href={ROUTES.projectsDwrReport(projectId, report.id)}
           className="font-medium text-blue-700 hover:underline"
@@ -341,8 +287,10 @@ function ReportRow({
           {report.dprNumber}
         </Link>
       </td>
-      <td className="px-3 py-2">{dateLabel(report.workDate)}</td>
-      <td className="px-3 py-2">
+      <td className={clsx(TABLE.td, 'align-top')}>
+        {dateLabel(report.workDate)}
+      </td>
+      <td className={clsx(TABLE.td, 'align-top')}>
         {/* The report's own status, and a marker beside it where an approval was taken back.
             This read `reversed ? 'returned' : report.status`, which was a stand-in from when the
             server had no `returned` value to send: a reversed report sits in `draft`, and showing
@@ -356,17 +304,19 @@ function ReportRow({
       {/* A count, because the list is a page of summaries: `lineCount` is what the server sends and
           the lines themselves are on the detail read. This column rendered an array the list has
           never carried, so it read "none" for every report whatever the day contained. */}
-      <td className="px-3 py-2 text-right tabular-nums">
+      <td className={clsx(TABLE.td, TABLE.numeric, 'align-top')}>
         {report.lineCount === 0 ? (
           <span className="text-gray-500">none</span>
         ) : (
           report.lineCount
         )}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap text-gray-600">
+      <td
+        className={clsx(TABLE.td, 'whitespace-nowrap align-top text-gray-600')}
+      >
         {report.workerCount ?? 0} people · {report.machineryCount ?? 0} machines
       </td>
-      <td className="px-3 py-2">
+      <td className={clsx(TABLE.td, 'align-top')}>
         <div className="flex flex-wrap justify-end gap-2">
           {report.status === 'draft' || report.status === 'returned' ? (
             <>
@@ -378,11 +328,15 @@ function ReportRow({
               <Button
                 disabled={busy}
                 intent="write"
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    window.confirm(
-                      'Delete this draft? Nothing has moved yet, so nothing is taken back.',
-                    )
+                    await confirmDialog({
+                      title: 'Delete this draft?',
+                      message:
+                        'Delete this draft? Nothing has moved yet, so nothing is taken back.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
                   ) {
                     onAct('delete');
                   }
@@ -411,10 +365,15 @@ function ReportRow({
               <Button
                 disabled={busy}
                 intent="write"
-                onClick={() => {
-                  const reason = window.prompt(
-                    'Why is this going back to the author?',
-                  );
+                onClick={async () => {
+                  const reason = await promptDialog({
+                    title: 'Return to the author?',
+                    message: 'Why is this going back to the author?',
+                    required: true,
+                    multiline: true,
+                    confirmLabel: 'Return',
+                    tone: 'danger',
+                  });
                   if (reason) onAct('return', reason);
                 }}
               >
@@ -426,10 +385,16 @@ function ReportRow({
           {report.status === 'approved' && !reversed && (
             <Button
               disabled={busy}
-              onClick={() => {
-                const reason = window.prompt(
-                  'Why is this approval being reversed? The quantity it added will be taken back.',
-                );
+              onClick={async () => {
+                const reason = await promptDialog({
+                  title: 'Reverse this approval?',
+                  message:
+                    'Why is this approval being reversed? The quantity it added will be taken back.',
+                  required: true,
+                  multiline: true,
+                  confirmLabel: 'Reverse',
+                  tone: 'danger',
+                });
                 if (reason) onAct('reverse', reason);
               }}
             >

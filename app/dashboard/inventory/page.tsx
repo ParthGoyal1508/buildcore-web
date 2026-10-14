@@ -5,6 +5,7 @@ import {
   ArrowUpTrayIcon,
   BanknotesIcon,
   ClipboardDocumentListIcon,
+  DocumentTextIcon,
   ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 
@@ -21,6 +22,13 @@ const SECTIONS: Tile[] = [
     icon: ArchiveBoxIcon,
     description:
       'What is where, at what average rate, and what has fallen below its reorder level.',
+  },
+  {
+    name: 'Purchase orders',
+    href: ROUTES.inventoryPurchaseOrders,
+    icon: DocumentTextIcon,
+    description:
+      'Orders placed on a vendor for items from the item master — approved, then issued as a PDF.',
   },
   {
     name: 'Purchases',

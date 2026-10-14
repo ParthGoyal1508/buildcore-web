@@ -24,6 +24,11 @@ export const companySchema = z.object({
   city: z.string().nullable(),
   state: z.string().nullable(),
   pinCode: z.string().nullable(),
+  // Printed at the head of a work order or purchase order (2026-10-14). Optional in the schema so
+  // a server that predates them still parses.
+  phone: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
   pfEstablishmentCode: z.string().nullable(),
   esicCode: z.string().nullable(),
   professionalTaxRegNumber: z.string().nullable(),
@@ -472,13 +477,21 @@ export async function getCashVisibility(
   );
 }
 
+/**
+ * Changes it. Super Admin only, and only with a live password confirmation from
+ * `confirmPassword('cash-visibility')` (2026-10-14) — the API refuses the change without one
+ * with a 403 coded `PASSWORD_CONFIRMATION_REQUIRED`, never a 401, so a lapsed confirmation
+ * asks for the password again instead of signing anybody out.
+ */
 export async function setCashVisibility(
   hideCashTransactions: boolean,
+  confirmationToken: string,
   companyId?: string,
 ): Promise<CashVisibility> {
   return cashVisibilitySchema.parse(
     await authFetch(withCompany('/settings/cash-visibility', companyId), {
       method: 'PATCH',
+      headers: { 'X-Confirmation-Token': confirmationToken },
       body: JSON.stringify({ hideCashTransactions }),
     }),
   );

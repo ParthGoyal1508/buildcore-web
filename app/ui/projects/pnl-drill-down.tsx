@@ -1,14 +1,22 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
   getDrillDown,
   type DrillableFigure,
+  type DrillRecord,
 } from '@/app/lib/api/project-pnl';
 import { PNL_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 /**
  * What a figure on the project summary is made of (018 FR-011, FR-012).
@@ -101,54 +109,7 @@ export default function PnlDrillDown({
       <h3 className="text-sm font-semibold text-gray-900">
         {PNL_COPY.drillHeading(label)}
       </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[32rem] text-sm">
-          <thead className="text-left text-xs font-medium uppercase tracking-wide text-gray-600">
-            <tr>
-              <th className="py-1 pr-3">{PNL_COPY.drillColumns.reference}</th>
-              <th className="py-1 pr-3">{PNL_COPY.drillColumns.date}</th>
-              <th className="py-1 pr-3 text-right">
-                {PNL_COPY.drillColumns.amount}
-              </th>
-              <th className="py-1 pr-3">{PNL_COPY.drillColumns.status}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.records.map((record) => (
-              <tr key={record.id} className="border-t border-gray-100">
-                <td className="py-1 pr-3 text-gray-900">
-                  {record.reference}
-                  {record.description && (
-                    <span className="block text-xs text-gray-500">
-                      {record.description}
-                    </span>
-                  )}
-                </td>
-                <td className="py-1 pr-3 text-gray-600">
-                  {dateLabel(record.date)}
-                </td>
-                <td className="py-1 pr-3 text-right tabular-nums text-gray-900">
-                  {rupees(record.amount)}
-                </td>
-                <td className="py-1 pr-3 text-gray-600">
-                  {record.status ?? '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-gray-300">
-              <td className="py-1 pr-3 font-medium text-gray-900" colSpan={2}>
-                {PNL_COPY.drillTotal}
-              </td>
-              <td className="py-1 pr-3 text-right font-semibold tabular-nums text-gray-900">
-                {rupees(total)}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <RecordsTable records={view.records} total={total} />
       {difference === 0 ? (
         <p className="text-xs text-gray-500">{PNL_COPY.drillReconciles}</p>
       ) : (
@@ -162,6 +123,95 @@ export default function PnlDrillDown({
           register below.
         </p>
       )}
+    </div>
+  );
+}
+
+// Keys match the record's own fields: the date sorts as a date, the amount as a number (2026-10-15).
+const RECORD_COLUMNS: (SortableColumn<DrillRecord> & {
+  label: string;
+  numeric?: boolean;
+})[] = [
+  {
+    key: 'reference',
+    label: PNL_COPY.drillColumns.reference,
+    render: (r) => r.reference,
+  },
+  { key: 'date', label: PNL_COPY.drillColumns.date, render: (r) => r.date },
+  {
+    key: 'amount',
+    label: PNL_COPY.drillColumns.amount,
+    numeric: true,
+    render: (r) => r.amount,
+  },
+  {
+    key: 'status',
+    label: PNL_COPY.drillColumns.status,
+    render: (r) => r.status,
+  },
+];
+
+/** The records behind a figure, sortable by any column; the total stays in the footer. */
+function RecordsTable({
+  records,
+  total,
+}: {
+  records: DrillRecord[];
+  total: number;
+}) {
+  const { sorted, sort, toggle } = useSortedRows(records, RECORD_COLUMNS);
+  return (
+    <div className={TABLE.wrap}>
+      <table className={clsx(TABLE.table, 'w-full min-w-[32rem]')}>
+        <thead className={TABLE.thead}>
+          <tr>
+            {RECORD_COLUMNS.map((column) => (
+              <SortHeader
+                key={column.key}
+                label={column.label}
+                columnKey={column.key}
+                sort={sort}
+                onSort={toggle}
+                numeric={column.numeric}
+              />
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((record) => (
+            <tr key={record.id} className={TABLE.row}>
+              <td className={clsx(TABLE.td, 'text-gray-900')}>
+                {record.reference}
+                {record.description && (
+                  <span className="block text-xs text-gray-500">
+                    {record.description}
+                  </span>
+                )}
+              </td>
+              <td className={clsx(TABLE.td, 'text-gray-600')}>
+                {dateLabel(record.date)}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+                {rupees(record.amount)}
+              </td>
+              <td className={clsx(TABLE.td, 'text-gray-600')}>
+                {record.status ?? '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className={TABLE.tfoot}>
+          <tr>
+            <td className={clsx(TABLE.td, 'text-gray-900')} colSpan={2}>
+              {PNL_COPY.drillTotal}
+            </td>
+            <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+              {rupees(total)}
+            </td>
+            <td />
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

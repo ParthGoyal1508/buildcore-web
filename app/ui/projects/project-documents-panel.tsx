@@ -12,10 +12,14 @@ import {
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
-import { DocumentUpload, type UploadKind } from '@/app/ui/documents/document-upload';
+import {
+  DocumentUpload,
+  type UploadKind,
+} from '@/app/ui/documents/document-upload';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * What a project actually holds, and what it still owes (017 FR-024, web T077, T078).
@@ -50,7 +54,9 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
  */
 function hasLapsed(document: { expiresAt?: string | null }): boolean {
   if (!document.expiresAt) return false;
-  return document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
+  return (
+    document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10)
+  );
 }
 
 export default function ProjectDocumentsPanel({
@@ -59,6 +65,9 @@ export default function ProjectDocumentsPanel({
   projectId: string;
 }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
   /**
    * Which kind the upload form is open for, or `null` when it is closed.
    *
@@ -110,7 +119,9 @@ export default function ProjectDocumentsPanel({
       // The portfolio row carries this project's readiness, and it has just moved. Invalidated
       // by its root key because the list is cached per filter and page — a readiness figure that
       // disagrees with the project's own screen is the inconsistency 017 FR-008 exists to avoid.
-      void queryClient.invalidateQueries({ queryKey: ['projects', 'portfolio'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', 'portfolio'],
+      });
     },
   });
 
@@ -119,7 +130,7 @@ export default function ProjectDocumentsPanel({
     try {
       // The server's own name for the file, with its extension — see `openStoredFile`. The
       // fallback is only reached if the response carried no readable `Content-Disposition`.
-      openStoredFile(
+      show(
         await downloadProjectDocument(projectId, document.id),
         `${document.documentType}-${document.id}`,
       );
@@ -169,7 +180,7 @@ export default function ProjectDocumentsPanel({
   if (documents.isLoading) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -195,6 +206,7 @@ export default function ProjectDocumentsPanel({
       </div>
 
       <FormError message={downloadError} />
+      {viewer}
 
       {rows.length === 0 ? (
         <p className="text-sm text-gray-500">

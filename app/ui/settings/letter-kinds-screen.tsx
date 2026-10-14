@@ -17,6 +17,8 @@ import {
   RowAction,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 const QUERY_KEY = ['letter-kinds'];
 
@@ -91,7 +93,12 @@ export function LetterKindsScreen() {
     },
   });
 
-  if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (isPending)
+    return (
+      <p className="text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   if (isError || !data) {
     return <FormError message="Letter kinds could not be loaded." />;
   }
@@ -135,7 +142,17 @@ export function LetterKindsScreen() {
               ) : (
                 <RowAction
                   type="button"
-                  onClick={() => remove.mutate(kind.id)}
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this letter kind?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    )
+                      remove.mutate(kind.id);
+                  }}
                   disabled={remove.isPending}
                 >
                   Delete

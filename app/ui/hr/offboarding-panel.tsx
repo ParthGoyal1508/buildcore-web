@@ -16,7 +16,13 @@ import {
   SETTLEMENT_ASSET_COPY,
   hrLabel,
 } from '@/app/lib/constants';
-import { dateLabel, money, periodLabel, rupees, todayIso } from '@/app/lib/format';
+import {
+  dateLabel,
+  money,
+  periodLabel,
+  rupees,
+  todayIso,
+} from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import ExitClearance from '@/app/ui/hr/exit-clearance';
 import Modal from '@/app/ui/settings/modal';
@@ -27,6 +33,8 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * Offboarding and Full & Final settlement (005 US11).
@@ -46,7 +54,8 @@ export default function OffboardingPanel({
 }) {
   const queryClient = useQueryClient();
   const [lastWorkingDay, setLastWorkingDay] = useState(todayIso());
-  const [reason, setReason] = useState<(typeof EXIT_REASONS)[number]>('resignation');
+  const [reason, setReason] =
+    useState<(typeof EXIT_REASONS)[number]>('resignation');
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [processedRun, setProcessedRun] = useState(false);
@@ -118,7 +127,7 @@ export default function OffboardingPanel({
 
         {exitLoading ? (
           <p className="text-sm text-gray-500" role="status">
-            Loading…
+            <LoadingText />
           </p>
         ) : !exit ? (
           <form
@@ -129,8 +138,8 @@ export default function OffboardingPanel({
             className="flex flex-col gap-4"
           >
             <p className="text-sm text-gray-600">
-              No exit has been initiated for this employee. Recording one is what
-              makes a settlement computable.
+              No exit has been initiated for this employee. Recording one is
+              what makes a settlement computable.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
@@ -177,7 +186,9 @@ export default function OffboardingPanel({
                 <dd>{dateLabel(exit.lastWorkingDay)}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-gray-500">Reason</dt>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">
+                  Reason
+                </dt>
                 <dd>{hrLabel(exit.reason)}</dd>
               </div>
               <div>
@@ -235,11 +246,16 @@ export default function OffboardingPanel({
                       ['Advance recovery', -fnf.advanceRecovery],
                     ] as [string, number][]
                   ).map(([label, value]) => (
-                    <div key={label} className="flex justify-between px-4 py-2.5">
+                    <div
+                      key={label}
+                      className="flex justify-between px-4 py-2.5"
+                    >
                       <dt className="text-gray-600">{label}</dt>
                       <dd
                         className={
-                          value < 0 ? 'tabular-nums text-red-700' : 'tabular-nums'
+                          value < 0
+                            ? 'tabular-nums text-red-700'
+                            : 'tabular-nums'
                         }
                       >
                         {money(value)}
@@ -369,8 +385,8 @@ export default function OffboardingPanel({
                 </section>
 
                 <p className="text-xs text-gray-600">
-                  Settled against {periodLabel(fnf.period)}. Processing creates a
-                  draft payroll run flagged Full &amp; Final and closes every
+                  Settled against {periodLabel(fnf.period)}. Processing creates
+                  a draft payroll run flagged Full &amp; Final and closes every
                   outstanding loan and advance.
                 </p>
 
@@ -379,20 +395,29 @@ export default function OffboardingPanel({
                     role="status"
                     className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
                   >
-                    Settlement run created as a draft. Review and process it from
-                    the Payroll screen — deactivating the employee happens there,
-                    not here.
+                    Settlement run created as a draft. Review and process it
+                    from the Payroll screen — deactivating the employee happens
+                    there, not here.
                   </p>
                 ) : (
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm(HR_MESSAGES.confirmProcessFnf)) {
+                      onClick={async () => {
+                        if (
+                          await confirmDialog({
+                            title: 'Process full & final settlement?',
+                            message: HR_MESSAGES.confirmProcessFnf,
+                            confirmLabel: 'Process',
+                            tone: 'default',
+                          })
+                        ) {
                           process.mutate();
                         }
                       }}
-                      disabled={process.isPending || Boolean(exit.fnfPayrollRunId)}
+                      disabled={
+                        process.isPending || Boolean(exit.fnfPayrollRunId)
+                      }
                     >
                       {exit.fnfPayrollRunId
                         ? 'Already settled'

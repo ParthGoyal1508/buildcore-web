@@ -398,6 +398,12 @@ const issuedLetterSchema = z.object({
    * instead of building a second approval display.
    */
   approval: approvalStateSchemaForModules.nullish().default(null),
+  /**
+   * What was typed at compose (2026-10-15) — the values this app sent, not what the records
+   * filled in. A work order's record finds the LOI and work order it issued by the `workOrderId`
+   * it sent here; an empty object from an API that predates the field.
+   */
+  composedVariables: z.record(z.string(), z.string()).default({}),
 });
 export type IssuedLetter = z.infer<typeof issuedLetterSchema>;
 
@@ -481,6 +487,8 @@ export interface LetterQuery {
   subjectId?: string;
   employeeId?: string;
   candidateId?: string;
+  /** One kind across every subject (2026-10-15) — Inventory's purchase-order list. */
+  letterKindKey?: string;
   includeSuperseded?: boolean;
 }
 

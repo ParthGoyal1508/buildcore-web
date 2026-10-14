@@ -8,18 +8,23 @@ import {
   type BillAbstract,
   type BillDocumentFormat,
   type BillPackage,
+  type CertifiedCopyLine,
+  type CertifiedCopyReading,
   abandonBillPackage,
   certifyBillPackage,
   downloadBillDocument,
   issueBillPackage,
   markBillShared,
+  readCertifiedCopy,
   reviseBillPackage,
   submitBillPackage,
   withdrawBillPackage,
 } from '@/app/lib/api/bill-packages';
+import { downloadCertificate, downloadSignedCopy } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
-import { dateLabel } from '@/app/lib/format';
+import { dateLabel, rupees } from '@/app/lib/format';
 import { useCanWrite } from '@/app/lib/write-access';
+import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import ActionReview from '@/app/ui/approvals/action-review';
 import { Button } from '@/app/ui/button';
 import {
@@ -27,6 +32,16 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+
+/**
+ * The shared table look at sheet density for the certification grid (2026-10-15): a line per BOQ
+ * item with an input each, where px-4 py-3 doubles the scroll. `!` because clsx does not drop
+ * TABLE's own padding.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /**
  * Where a bill stands and what can be done to it next (2026-10-13).
@@ -56,9 +71,7 @@ export default function BillLifecycle({
   const [busy, setBusy] = useState<string | null>(null);
   const canWrite = useCanWrite();
   /** Which inline form is open — one at a time. */
-  const [form, setForm] = useState<'share' | 'certify' | 'revise' | null>(
-    null,
-  );
+  const [form, setForm] = useState<'share' | 'certify' | 'revise' | null>(null);
 
   const toClient = pkg.direction === 'to_client';
   const run = async (key: string, fn: () => Promise<unknown>, done: string) => {
@@ -123,8 +136,8 @@ export default function BillLifecycle({
                 action === 'approve'
                   ? 'Approval recorded.'
                   : action === 'reject'
-                  ? 'Rejected — the bill is back with its author as a draft.'
-                  : 'Returned to the author for correction.',
+                    ? 'Rejected — the bill is back with its author as a draft.'
+                    : 'Returned to the author for correction.',
               );
               // The chain's completion moves the bill on the server a moment after the decision.
               onChanged();
@@ -157,13 +170,21 @@ export default function BillLifecycle({
             </Button>
             <SecondaryButton
               hidden={!canWrite}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    'Abandon this draft? The period stays recorded as one somebody opened and chose not to bill.',
-                  )
+                  await confirmDialog({
+                    title: 'Abandon this draft?',
+                    message:
+                      'Abandon this draft? The period stays recorded as one somebody opened and chose not to bill.',
+                    confirmLabel: 'Abandon',
+                    tone: 'danger',
+                  })
                 ) {
-                  void run('abandon', () => abandonBillPackage(pkg.id), 'Abandoned.');
+                  void run(
+                    'abandon',
+                    () => abandonBillPackage(pkg.id),
+                    'Abandoned.',
+                  );
                 }
               }}
               disabled={busy !== null}
@@ -198,10 +219,15 @@ export default function BillLifecycle({
         {(pkg.status === 'pending_approval' || pkg.status === 'approved') && (
           <SecondaryButton
             hidden={!canWrite}
-            onClick={() => {
-              const reason = window.prompt(
-                'Take this bill back to draft to change it? Say why — the approver will see it.',
-              );
+            onClick={async () => {
+              const reason = await promptDialog({
+                title: 'Withdraw to draft?',
+                message:
+                  'Take this bill back to draft to change it? Say why — the approver will see it.',
+                multiline: true,
+                confirmLabel: 'Withdraw',
+                tone: 'danger',
+              });
               if (reason !== null) {
                 void run(
                   'withdraw',
@@ -226,11 +252,15 @@ export default function BillLifecycle({
                 Update shared with
               </SecondaryButton>
             ) : (
-              <Button onClick={() => setForm(form === 'share' ? null : 'share')}>
+              <Button
+                onClick={() => setForm(form === 'share' ? null : 'share')}
+              >
                 Mark as shared
               </Button>
             )}
-            <Button onClick={() => setForm(form === 'certify' ? null : 'certify')}>
+            <Button
+              onClick={() => setForm(form === 'certify' ? null : 'certify')}
+            >
               {pkg.status === 'certified' ? 'Amend certification' : 'Certify'}
             </Button>
             <SecondaryButton
@@ -266,7 +296,7 @@ export default function BillLifecycle({
               'certify',
               () => certifyBillPackage(pkg.id, input),
               toClient
-                ? 'Certified amount recorded beside the billed figure.'
+                ? 'Certified, beside the billed figure. A quantity the client did not pass stays outstanding for the next bill.'
                 : 'Certified. The bill can now be paid, and each payment can produce a payment advice.',
             )
           }
@@ -286,6 +316,7 @@ export default function BillLifecycle({
       )}
 
       <Facts pkg={pkg} />
+      <CertifiedCopy pkg={pkg} onError={(m) => onError(m)} />
       <Downloads pkg={pkg} onError={(m) => onError(m)} />
     </section>
   );
@@ -305,7 +336,13 @@ function Steps({ pkg }: { pkg: BillPackage }) {
     return <p className="text-sm text-gray-600">This draft was abandoned.</p>;
   }
   const reached = new Set<string>(['draft']);
-  const order = ['draft', 'pending_approval', 'approved', 'issued', 'certified'];
+  const order = [
+    'draft',
+    'pending_approval',
+    'approved',
+    'issued',
+    'certified',
+  ];
   const at = order.indexOf(pkg.status);
   order.slice(0, at + 1).forEach((step) => reached.add(step));
   if (pkg.sharedAt) reached.add('shared');
@@ -314,7 +351,10 @@ function Steps({ pkg }: { pkg: BillPackage }) {
     reached.add('approved');
   }
   return (
-    <ol className="flex flex-wrap items-center gap-1 text-xs" aria-label="Bill status">
+    <ol
+      className="flex flex-wrap items-center gap-1 text-xs"
+      aria-label="Bill status"
+    >
       {STEPS.map((step, index) => (
         <li key={step.key} className="flex items-center gap-1">
           <span
@@ -325,9 +365,7 @@ function Steps({ pkg }: { pkg: BillPackage }) {
                 : 'bg-gray-100 text-gray-500',
               step.key === pkg.status && 'ring-2 ring-blue-300 ring-offset-1',
             )}
-            aria-current={
-              step.key === pkg.status ? 'step' : undefined
-            }
+            aria-current={step.key === pkg.status ? 'step' : undefined}
           >
             {step.label}
           </span>
@@ -345,7 +383,10 @@ function Steps({ pkg }: { pkg: BillPackage }) {
 function Facts({ pkg }: { pkg: BillPackage }) {
   const facts: [string, string][] = [];
   if (pkg.counterpartyName) {
-    facts.push([pkg.direction === 'to_client' ? 'Client' : 'Subcontractor', pkg.counterpartyName]);
+    facts.push([
+      pkg.direction === 'to_client' ? 'Client' : 'Subcontractor',
+      pkg.counterpartyName,
+    ]);
   }
   if (pkg.approvedAt) facts.push(['Approved', dateLabel(pkg.approvedAt)]);
   if (pkg.issuedAt) facts.push(['Issued', dateLabel(pkg.issuedAt)]);
@@ -382,6 +423,74 @@ function Facts({ pkg }: { pkg: BillPackage }) {
   );
 }
 
+/**
+ * The certified copy filed at Certify, once the bill is certified (2026-10-14).
+ *
+ * Either direction, one link: the server says which download holds it — the client bill's
+ * certificate, or the signed copy on a subcontractor's RA bill — so this asks no question of its
+ * own about where a direction keeps its paper.
+ */
+function CertifiedCopy({
+  pkg,
+  onError,
+}: {
+  pkg: BillPackage;
+  onError: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  // The certified copy read in the page (2026-10-14) — offered when it is a PDF or a scan; a
+  // client's marked-up workbook is only ever saved.
+  const { view, viewer } = useFileViewer();
+  const copy = pkg.certifiedCopy;
+  if (pkg.status !== 'certified' || !copy) return null;
+  const load = () =>
+    copy.kind === 'client_certificate'
+      ? downloadCertificate(copy.clientBillId)
+      : downloadSignedCopy(copy.signedCopyId, copy.fileName);
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      const { blob, filename } = await load();
+      saveBlob(blob, filename || copy.fileName);
+    } catch (err) {
+      onError(describe(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      {viewer}
+      {isViewableFile(null, copy.fileName) && (
+        <button
+          type="button"
+          className="font-medium text-blue-700 underline hover:text-blue-900"
+          onClick={() =>
+            void view({
+              title: `Certified copy — ${pkg.label}`,
+              fileName: copy.fileName,
+              load,
+            })
+          }
+        >
+          View
+        </button>
+      )}
+      <button
+        type="button"
+        className="font-medium text-blue-700 underline hover:text-blue-900 disabled:opacity-50"
+        onClick={() => void download()}
+        disabled={busy}
+      >
+        {busy ? 'Downloading…' : 'Download certified copy'}
+      </button>
+      <span className="text-gray-500">{copy.fileName}</span>
+    </div>
+  );
+}
+
 function Downloads({
   pkg,
   onError,
@@ -390,6 +499,8 @@ function Downloads({
   onError: (message: string) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  // The PDF of either read in the page rather than saved (2026-10-14).
+  const { view, viewer } = useFileViewer();
   const toClient = pkg.direction === 'to_client';
   const abstractName = toClient ? 'Payment Abstract' : 'Abstract';
   const name = `${pkg.counterpartyName ? `${pkg.counterpartyName} ` : ''}${pkg.label}`;
@@ -398,10 +509,15 @@ function Downloads({
     const key = `${format}-${abstractOnly}`;
     setBusy(key);
     try {
-      const { blob, filename } = await downloadBillDocument(pkg.id, name, format, {
-        abstractOnly,
-        abstractName,
-      });
+      const { blob, filename } = await downloadBillDocument(
+        pkg.id,
+        name,
+        format,
+        {
+          abstractOnly,
+          abstractName,
+        },
+      );
       saveBlob(blob, filename);
     } catch (err) {
       onError(describe(err));
@@ -422,17 +538,33 @@ function Downloads({
           {busy === `${format}-${abstractOnly}`
             ? 'Producing…'
             : format === 'xlsx'
-            ? 'Excel'
-            : format === 'pdf'
-            ? 'PDF'
-            : 'Word'}
+              ? 'Excel'
+              : format === 'pdf'
+                ? 'PDF'
+                : 'Word'}
         </SecondaryButton>
       ))}
+      <SecondaryButton
+        onClick={() =>
+          void view({
+            title: `${name}${abstractOnly ? ` ${abstractName}` : ''}`,
+            fileName: `${name}${abstractOnly ? ` ${abstractName}` : ''}.pdf`,
+            load: () =>
+              downloadBillDocument(pkg.id, name, 'pdf', {
+                abstractOnly,
+                abstractName,
+              }),
+          })
+        }
+      >
+        View PDF
+      </SecondaryButton>
     </div>
   );
 
   return (
     <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
+      {viewer}
       {row('Full bill', false)}
       {row(abstractName, true)}
       {(pkg.status === 'draft' ||
@@ -485,6 +617,23 @@ function ShareForm({
   );
 }
 
+/** One billed line in the line-by-line certification table, with what was typed against it. */
+type CertifyRow = CertifiedCopyLine & { value: string };
+
+/** What a certified copy's quantity column meant, in words. */
+const BASIS_LABEL: Record<
+  CertifiedCopyReading['columnsUsed'][number]['basis'],
+  string
+> = {
+  certified: 'the certified quantity',
+  this_bill: 'this bill’s quantity',
+  upto_date_less_previous: 'up-to-date less previous',
+  quantity: 'the only quantity column',
+};
+
+/** Two decimals, as the server's `money` rounds — the certified figure is priced line by line. */
+const paise = (value: number) => Math.round(value * 100) / 100;
+
 function CertifyForm({
   pkg,
   abstract,
@@ -495,7 +644,8 @@ function CertifyForm({
   abstract: BillAbstract | undefined;
   busy: boolean;
   onSubmit: (input: {
-    certifiedAmount: string;
+    certifiedAmount?: string;
+    lines?: { lineId: string; certifiedQty: number }[];
     remarks?: string;
     certificateData?: string;
     certificateFileName?: string;
@@ -513,13 +663,105 @@ function CertifyForm({
   const [amount, setAmount] = useState(prefill);
   const [remarks, setRemarks] = useState(pkg.certifiedRemarks ?? '');
   const [certificate, setCertificate] = useState<File | null>(null);
+
+  // ── Line by line, on a bill to the client (2026-10-15) ────────────────
+  // The client's engineer passes quantities, not a total: billed 100, passed 95. The quantities
+  // are read out of the certified copy where it is a workbook, and typed in where it is not; either
+  // way every billed line is shown, confirmed and sent, and the server prices them.
+  const [mode, setMode] = useState<'amount' | 'lines'>('amount');
+  const [reading, setReading] = useState<CertifiedCopyReading | null>(null);
+  /** The file the reading came from; null for manual entry. */
+  const [readFrom, setReadFrom] = useState<string | null>(null);
+  const [rows, setRows] = useState<CertifyRow[]>([]);
+  const [readBusy, setReadBusy] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
+
+  const isWorkbook = (file: File | null) =>
+    !!file && /\.xlsx?$/i.test(file.name);
+
+  const loadLines = async (file: File | null) => {
+    setReadBusy(true);
+    setReadError(null);
+    try {
+      const result = await readCertifiedCopy(
+        pkg.id,
+        file ? { data: await toBase64(file), fileName: file.name } : undefined,
+      );
+      // An earlier line-by-line certificate, where this is an amendment — the starting point for
+      // manual entry, before the billed quantity.
+      const earlier = new Map(
+        pkg.claims
+          .filter((claim) => claim.billLineId && claim.certifiedQty != null)
+          .map((claim) => [
+            claim.billLineId as string,
+            String(Number(claim.certifiedQty)),
+          ]),
+      );
+      setReading(result);
+      setReadFrom(file ? file.name : null);
+      setRows(
+        result.lines.map((line) => ({
+          ...line,
+          // Read from the file where it was; otherwise the earlier certificate, otherwise the
+          // billed quantity — a line the file does not mention is highlighted, not left blank.
+          value:
+            line.certifiedQty !== null
+              ? String(line.certifiedQty)
+              : (earlier.get(line.lineId) ?? String(line.billedQty)),
+        })),
+      );
+      setMode('lines');
+    } catch (err) {
+      setReadError(describe(err));
+    } finally {
+      setReadBusy(false);
+    }
+  };
+
+  const quoted = reading?.quotedPercentage ?? 0;
+  const priced = (qty: number, row: CertifyRow) =>
+    paise(qty * row.rate * (1 + (row.nonBoq ? 0 : quoted)));
+  const parsed = rows.map((row) => {
+    const text = row.value.trim();
+    const qty = text === '' ? NaN : Number(text);
+    const valid = Number.isFinite(qty) && qty >= 0 && qty <= row.billedQty;
+    return { row, qty, valid };
+  });
+  const allValid = parsed.length > 0 && parsed.every((entry) => entry.valid);
+  const certifiedValue = paise(
+    parsed.reduce(
+      (sum, entry) => sum + (entry.valid ? priced(entry.qty, entry.row) : 0),
+      0,
+    ),
+  );
+  const billedValue = paise(
+    rows.reduce((sum, row) => sum + priced(row.billedQty, row), 0),
+  );
+  const fromFile = !!reading?.readable;
+  const notFound = fromFile
+    ? rows.filter((row) => row.certifiedQty === null).length
+    : 0;
+  const invalid = parsed.filter((entry) => !entry.valid).length;
+  const short = parsed.filter(
+    (entry) => entry.valid && entry.qty < entry.row.billedQty,
+  ).length;
+
+  const lineMode = toClient && mode === 'lines';
+
   return (
     <form
       className="flex flex-wrap items-start gap-2 rounded-md bg-gray-50 p-3"
       onSubmit={async (e) => {
         e.preventDefault();
         onSubmit({
-          certifiedAmount: amount.trim(),
+          ...(lineMode
+            ? {
+                lines: parsed.map((entry) => ({
+                  lineId: entry.row.lineId,
+                  certifiedQty: entry.qty,
+                })),
+              }
+            : { certifiedAmount: amount.trim() }),
           remarks: remarks.trim() || undefined,
           ...(certificate
             ? {
@@ -530,50 +772,271 @@ function CertifyForm({
         });
       }}
     >
-      <div className="w-48">
-        <TextField
-          id="bill-certified-amount"
-          label={toClient ? 'Value of work certified (₹)' : 'Payable certified (₹)'}
-          inputMode="decimal"
-          required
-          pattern="^-?[0-9]+(\.[0-9]{1,2})?$"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-      </div>
+      {!lineMode && (
+        <div className="w-48">
+          <TextField
+            id="bill-certified-amount"
+            label={
+              toClient ? 'Value of work certified (₹)' : 'Payable certified (₹)'
+            }
+            inputMode="decimal"
+            required
+            pattern="^-?[0-9]+(\.[0-9]{1,2})?$"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </div>
+      )}
       <div className="min-w-[16rem] flex-1">
         <TextField
           id="bill-certified-remarks"
           label="Remarks"
-          hint={toClient ? 'Who certified it, and where — MB page, certificate number' : 'Optional'}
+          hint={
+            toClient
+              ? 'Who certified it, and where — MB page, certificate number'
+              : 'Optional'
+          }
           value={remarks}
           maxLength={1000}
           onChange={(e) => setRemarks(e.target.value)}
         />
       </div>
-      {toClient && (
-        <div className="flex flex-col gap-1">
-          <label htmlFor="bill-certificate" className="text-sm font-medium text-gray-700">
-            Client’s certificate
-          </label>
-          <input
-            id="bill-certificate"
-            type="file"
-            accept="application/pdf,image/*,.xlsx,.xls"
-            className="text-sm"
-            onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
-          />
-        </div>
-      )}
+      {/* Both directions (2026-10-14). On a subcontractor's bill this is the certified copy —
+          filed as the RA bill's signed copy, which also acknowledges the bill. */}
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="bill-certificate"
+          className="text-sm font-medium text-gray-700"
+        >
+          {toClient ? 'Client’s certificate' : 'Certified copy'}
+        </label>
+        <input
+          id="bill-certificate"
+          type="file"
+          accept="application/pdf,image/*,.xlsx,.xls"
+          className="text-sm"
+          onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
+        />
+      </div>
       <div className="shrink-0">
         <FieldLabelSpacer />
-        <Button type="submit" disabled={busy || !amount.trim()}>
+        <Button
+          type="submit"
+          disabled={busy || (lineMode ? !allValid : !amount.trim())}
+        >
           {busy ? 'Saving…' : 'Certify'}
         </Button>
       </div>
+
+      {toClient && (
+        <div className="flex w-full flex-wrap items-center gap-2">
+          {certificate && (
+            <SecondaryButton
+              type="button"
+              onClick={() => void loadLines(certificate)}
+              disabled={readBusy}
+            >
+              {readBusy
+                ? 'Reading…'
+                : isWorkbook(certificate)
+                  ? 'Read quantities from the file'
+                  : 'Enter quantities for this certificate'}
+            </SecondaryButton>
+          )}
+          {!(lineMode && readFrom === null) && (
+            <SecondaryButton
+              type="button"
+              onClick={() => void loadLines(null)}
+              disabled={readBusy}
+            >
+              Enter quantities manually
+            </SecondaryButton>
+          )}
+          {lineMode && (
+            <button
+              type="button"
+              className="text-sm text-blue-600 hover:underline"
+              onClick={() => setMode('amount')}
+            >
+              Certify as a single amount
+            </button>
+          )}
+          {readError && (
+            <p className="w-full text-sm text-red-700">{readError}</p>
+          )}
+        </div>
+      )}
+
+      {lineMode && reading && (
+        <div className="flex w-full flex-col gap-2">
+          {/* What was read, and from where — or why nothing could be. */}
+          {fromFile ? (
+            <p className="text-sm text-gray-700">
+              <strong>
+                {reading.matchedCount} of {rows.length} line
+                {rows.length === 1 ? '' : 's'} read from the file
+              </strong>
+              {notFound + invalid > 0 ? `; ${notFound + invalid} to check` : ''}
+              {short > 0 ? ` · ${short} certified below billed` : ''}.{' '}
+              <span className="text-gray-500">
+                {reading.columnsUsed
+                  .map(
+                    (col) =>
+                      `“${col.sheet}”: ${col.itemColumn} → ${col.quantityColumn} (${BASIS_LABEL[col.basis]})`,
+                  )
+                  .join('; ')}
+              </span>
+            </p>
+          ) : (
+            <p
+              className={clsx(
+                'text-sm',
+                reading.reason ? 'text-amber-800' : 'text-gray-700',
+              )}
+            >
+              {reading.reason ??
+                'Enter the quantity the client certified on each line. Each starts at the billed quantity.'}
+            </p>
+          )}
+          {fromFile && reading.unmatchedRows.length > 0 && (
+            <details className="text-xs text-gray-600">
+              <summary className="cursor-pointer">
+                {reading.unmatchedRows.length} row
+                {reading.unmatchedRows.length === 1 ? '' : 's'} in the file
+                matched no line on this bill
+              </summary>
+              <ul className="mt-1 list-disc pl-5">
+                {reading.unmatchedRows.map((row) => (
+                  <li key={`${row.sheet}-${row.row}`}>
+                    “{row.sheet}” row {row.row}:{' '}
+                    {row.itemNo ?? row.description ?? '—'} — {row.qty}
+                    {row.reason === 'duplicate'
+                      ? ' (that line was already read above)'
+                      : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <div className={TABLE.wrap}>
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
+                <tr>
+                  <th className={DENSE_TH}>BOQ</th>
+                  <th className={DENSE_TH}>Description</th>
+                  <th className={DENSE_TH}>Unit</th>
+                  <th className={clsx(DENSE_TH, 'text-right')}>Billed</th>
+                  <th className={clsx(DENSE_TH, 'text-right')}>Certified</th>
+                  <th className={DENSE_TH}>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.map(({ row, qty, valid }) => {
+                  const missing = fromFile && row.certifiedQty === null;
+                  const below = valid && qty < row.billedQty;
+                  return (
+                    <tr
+                      key={row.lineId}
+                      className={clsx(
+                        TABLE.row,
+                        !valid
+                          ? 'bg-red-50'
+                          : missing
+                            ? 'bg-amber-50'
+                            : undefined,
+                      )}
+                    >
+                      <td className={clsx(DENSE_TD, 'tabular-nums')}>
+                        {row.boqNo}
+                      </td>
+                      <td className={clsx(DENSE_TD, 'max-w-md')}>
+                        <span className="line-clamp-2" title={row.description}>
+                          {row.description}
+                        </span>
+                      </td>
+                      <td className={DENSE_TD}>{row.unit}</td>
+                      <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                        {row.billedQty}
+                      </td>
+                      <td className={clsx(DENSE_TD, 'text-right')}>
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          max={row.billedQty}
+                          inputMode="decimal"
+                          aria-label={`Certified quantity — ${row.boqNo}`}
+                          value={row.value}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setRows((current) =>
+                              current.map((r) =>
+                                r.lineId === row.lineId ? { ...r, value } : r,
+                              ),
+                            );
+                          }}
+                          className={clsx(
+                            'w-28 rounded border px-2 py-1 text-right tabular-nums',
+                            !valid
+                              ? 'border-red-400'
+                              : below
+                                ? 'border-amber-400'
+                                : 'border-gray-300',
+                          )}
+                        />
+                      </td>
+                      <td className={clsx(DENSE_TD, 'text-xs')}>
+                        {!valid ? (
+                          <span className="text-red-700">
+                            {Number.isFinite(qty) && qty > row.billedQty
+                              ? 'More than was billed — raise a further bill instead'
+                              : 'Enter a quantity, zero or more'}
+                          </span>
+                        ) : missing ? (
+                          <span className="text-amber-800">
+                            Not found in the file — check
+                          </span>
+                        ) : below ? (
+                          <span className="text-amber-800">
+                            {paise(row.billedQty - qty).toLocaleString(
+                              'en-IN',
+                              {
+                                maximumFractionDigits: 3,
+                              },
+                            )}{' '}
+                            short — stays outstanding for the next bill
+                          </span>
+                        ) : row.source ? (
+                          <span className="text-gray-500">
+                            “{row.source.sheet}” row {row.source.row}
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-sm text-gray-800">
+            Value of work certified: <strong>{rupees(certifiedValue)}</strong>{' '}
+            <span className="text-gray-500">
+              of {rupees(billedValue)} billed
+              {allValid && billedValue - certifiedValue > 0
+                ? ` — ${rupees(paise(billedValue - certifiedValue))} short`
+                : ''}
+              . Worked out from the quantities; the server prices them the same
+              way.
+            </span>
+          </p>
+        </div>
+      )}
+
       <p className="w-full text-xs text-gray-500">
         Kept beside the billed figure, never instead of it — the difference is
         what gets chased.
+        {toClient &&
+          ' Certified line by line, a quantity the client did not pass stays outstanding and can be claimed on the next bill.'}
         {!toClient &&
           ' Certifying releases the bill for payment; each payment can then produce a payment advice.'}
       </p>
@@ -621,7 +1084,8 @@ function ReviseForm({
 async function toBase64(file: File): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += 1)
+    binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
 

@@ -29,6 +29,7 @@ import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function TransfersPage() {
   const queryClient = useQueryClient();
@@ -66,7 +67,9 @@ export default function TransfersPage() {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not update this transfer.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not update this transfer.',
       ),
   });
 
@@ -78,7 +81,9 @@ export default function TransfersPage() {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not delete this transfer.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not delete this transfer.',
       ),
   });
 
@@ -192,8 +197,15 @@ export default function TransfersPage() {
               </RowAction>
             ))}
             <RowAction
-              onClick={() => {
-                if (window.confirm(MESSAGES.confirmDeleteTransfer)) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this transfer?',
+                    message: MESSAGES.confirmDeleteTransfer,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                ) {
                   remove.mutate(row.id);
                 }
               }}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 
 import {
   type OverClaimReport,
@@ -9,6 +10,7 @@ import {
 } from '@/app/lib/api/bill-packages';
 import { projectsLabel } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
+import { TABLE } from '@/app/ui/table';
 
 /**
  * The two reports feature 023's decisions oblige (025 FR-031).
@@ -151,23 +153,28 @@ function OverClaims({ report }: { report: OverClaimReport }) {
           No bill has claimed more than its approved measurement.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+        // The shared look but no sorting (2026-10-15): each bill's lines are grouped under its
+        // label, written once on the first line, and a sort would scatter them across bills.
+        <div className={TABLE.wrap}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
-                <th className="px-3 py-2">Bill</th>
-                <th className="px-3 py-2">State</th>
-                <th className="px-3 py-2">Item</th>
-                <th className="px-3 py-2 text-right">Measured</th>
-                <th className="px-3 py-2 text-right">Claimed</th>
-                <th className="px-3 py-2">Reason given</th>
+                <th className={TABLE.th}>Bill</th>
+                <th className={TABLE.th}>State</th>
+                <th className={TABLE.th}>Item</th>
+                <th className={clsx(TABLE.th, 'text-right')}>Measured</th>
+                <th className={clsx(TABLE.th, 'text-right')}>Claimed</th>
+                <th className={TABLE.th}>Reason given</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {flagged.flatMap((row) =>
                 row.lines.map((line, index) => (
-                  <tr key={`${row.packageId}-${line.boqNo}-${index}`}>
-                    <td className="px-3 py-2 align-top">
+                  <tr
+                    key={`${row.packageId}-${line.boqNo}-${index}`}
+                    className={TABLE.row}
+                  >
+                    <td className={clsx(TABLE.td, 'align-top')}>
                       {index === 0 ? (
                         <>
                           {row.label}
@@ -177,17 +184,19 @@ function OverClaims({ report }: { report: OverClaimReport }) {
                         </>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 align-top text-gray-600">
+                    <td className={clsx(TABLE.td, 'align-top text-gray-600')}>
                       {index === 0 ? projectsLabel(row.status) : null}
                     </td>
-                    <td className="px-3 py-2">{line.boqNo || '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
+                    <td className={TABLE.td}>{line.boqNo || '—'}</td>
+                    <td className={clsx(TABLE.td, TABLE.numeric)}>
                       {line.proposed ?? '—'}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                    <td
+                      className={clsx(TABLE.td, TABLE.numeric, 'font-medium')}
+                    >
                       {line.claimed}
                     </td>
-                    <td className="px-3 py-2 text-gray-700">
+                    <td className={clsx(TABLE.td, 'text-gray-700')}>
                       {line.reason ?? '—'}
                     </td>
                   </tr>

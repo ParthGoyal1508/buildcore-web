@@ -1,5 +1,25 @@
 import forms from '@tailwindcss/forms';
 import type { Config } from 'tailwindcss';
+import colors from 'tailwindcss/colors';
+
+/**
+ * The brand navy ramp — see the note on `blue` below for how it was built and measured.
+ * Named once and used twice: as `blue` (what ~250 existing classes already say) and as
+ * `brand` (what new shell code says, so it reads as intent rather than as a hue).
+ */
+const brand = {
+  50: '#eff6fb',
+  100: '#d7e8f4',
+  200: '#b0d1e8',
+  300: '#7db0d4',
+  400: '#3580b6',
+  500: '#0a4976',
+  600: '#002d4e',
+  700: '#00243d',
+  800: '#001b2e',
+  900: '#001524',
+  950: '#000c14',
+};
 
 const config: Config = {
   content: [
@@ -9,6 +29,12 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      animation: {
+        'pop-down': 'pop-down 140ms ease-out',
+        'pop-up': 'pop-up 140ms ease-out',
+        'fade-in': 'fade-in 160ms ease-out',
+        'top-loader': 'top-loader 1.1s ease-in-out infinite',
+      },
       gridTemplateColumns: {
         '13': 'repeat(13, minmax(0, 1fr))',
       },
@@ -33,22 +59,57 @@ const config: Config = {
          * ring on white 9.4:1, 800 text on a 100 badge 14.0:1 — all well past WCAG AA,
          * which the old vivid #0070F3 focus ring (3.4:1) barely cleared.
          */
-        blue: {
-          50: '#eff6fb',
-          100: '#d7e8f4',
-          200: '#b0d1e8',
-          300: '#7db0d4',
-          400: '#3580b6',
-          500: '#0a4976',
-          600: '#002d4e',
-          700: '#00243d',
-          800: '#001b2e',
-          900: '#001524',
-          950: '#000c14',
-        },
+        blue: brand,
+        brand,
+        /**
+         * The colour pass (2026-10-14 — "Use a more colourful palette; the current look feels
+         * washed out").
+         *
+         * **`gray` is Tailwind's `slate`.** The app is mostly grey — about 2,000 `gray-*`
+         * classes — and stock grey is a dead neutral that, beside a navy brand, is what read as
+         * washed out. Slate is the same lightness ramp with a cool blue cast, so every border,
+         * label and panel now leans toward the brand instead of away from it, without touching
+         * one of those classes. Contrast is unchanged in practice: slate-500 on white is 4.8:1
+         * against grey-500's 4.8:1 (measured), and slate-600 is 7.6:1.
+         *
+         * **`accent`** is the bright partner to the navy — the azure from the same family — for
+         * the places a navy-on-white shell had nothing lively to offer: the active sidebar icon,
+         * the header's brand rule, highlights. 700 on white is 5.9:1, enough for text; 600 (4.1:1)
+         * is for icons and fills, never body copy.
+         *
+         * **`success` / `warning` / `danger`** name the three states every status already uses,
+         * so new code can say what it means. They alias emerald, amber and rose — the saturated
+         * versions of the green, yellow and red the badges already carry.
+         */
+        gray: colors.slate,
+        accent: colors.sky,
+        success: colors.emerald,
+        warning: colors.amber,
+        danger: colors.rose,
       },
     },
     keyframes: {
+      // The popups' entrance (2026-10-15): a short drop and fade from the edge they open on.
+      'pop-down': {
+        from: { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
+        to: { opacity: '1', transform: 'none' },
+      },
+      'pop-up': {
+        from: { opacity: '0', transform: 'translateY(4px) scale(0.98)' },
+        to: { opacity: '1', transform: 'none' },
+      },
+      'fade-in': {
+        from: { opacity: '0' },
+        to: { opacity: '1' },
+      },
+      // The top loading bar: a third of the width sweeping across, again and again.
+      'top-loader': {
+        from: { transform: 'translateX(-100%)' },
+        to: { transform: 'translateX(300%)' },
+      },
+      spin: {
+        to: { transform: 'rotate(360deg)' },
+      },
       shimmer: {
         '100%': {
           transform: 'translateX(100%)',

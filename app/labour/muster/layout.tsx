@@ -10,6 +10,7 @@ import AccessDenied from '@/app/ui/access-denied';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import LabourNav from '@/app/ui/labour/labour-nav';
 import ShellHeader from '@/app/ui/shell-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The muster capture shell.
@@ -48,7 +49,7 @@ export default function MusterLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -62,38 +63,39 @@ export default function MusterLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 md:h-screen md:flex-row md:overflow-hidden md:bg-transparent">
-      {/* Desktop only, and the same component `/dashboard` mounts, so a supervisor
-          who is also an admin keeps every module they can reach. */}
-      <div className="hidden flex-none md:block md:w-64">
-        <SideNav />
-      </div>
+    <div className="flex min-h-screen flex-col bg-gray-50 md:h-screen md:overflow-hidden md:bg-transparent">
+      <ShellHeader />
+      <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
+        {/* Desktop only, and the same component `/dashboard` mounts, so a supervisor
+            who is also an admin keeps every module they can reach. */}
+        <div className="hidden flex-none md:block md:w-64">
+          <SideNav />
+        </div>
 
-      {/* A column of its own so the shell header can sit above a separately
-          scrolling body, the same shape `/dashboard` uses. */}
-      <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
-        <ShellHeader />
+        {/* A separately scrolling body beneath the full-width bar, the same shape
+            `/dashboard` uses. */}
+        <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
+          <div className="flex-grow p-4 md:overflow-y-auto md:p-12">
+            {/* The sidebar's job on a phone: one way back, rather than a bottom bar of
+                sections this screen does not have. */}
+            <Link
+              href={ROUTES.labour}
+              className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:hidden"
+            >
+              <ArrowLeftIcon className="w-4" aria-hidden="true" />
+              Labour
+            </Link>
 
-        <div className="flex-grow p-4 md:overflow-y-auto md:p-12">
-          {/* The sidebar's job on a phone: one way back, rather than a bottom bar of
-              sections this screen does not have. */}
-          <Link
-            href={ROUTES.labour}
-            className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:hidden"
-          >
-            <ArrowLeftIcon className="w-4" aria-hidden="true" />
-            Labour
-          </Link>
+            <LabourNav
+              canSeeReports={user.permissions.includes('REPORTS')}
+              className="mb-6 hidden md:block"
+            />
 
-          <LabourNav
-            canSeeReports={user.permissions.includes('REPORTS')}
-            className="mb-6 hidden md:block"
-          />
-
-          {/* The wizard stays a narrow column at every width — it is a form, and a
-              three-step form stretched to a 1400px content area is harder to fill,
-              not easier. */}
-          <div className="mx-auto max-w-xl md:mx-0">{children}</div>
+            {/* The wizard stays a narrow column at every width — it is a form, and a
+                three-step form stretched to a 1400px content area is harder to fill,
+                not easier. */}
+            <div className="mx-auto max-w-xl md:mx-0">{children}</div>
+          </div>
         </div>
       </div>
     </div>

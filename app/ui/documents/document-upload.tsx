@@ -185,7 +185,7 @@ export function DocumentUpload({
           id="document-file"
           type="file"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-500"
+          className="block w-full text-sm text-gray-700"
         />
       </div>
 

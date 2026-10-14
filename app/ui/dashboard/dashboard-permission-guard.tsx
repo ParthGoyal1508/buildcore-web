@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The DASHBOARD permission chokepoint for the Dashboard module's sub-pages
@@ -39,7 +40,7 @@ export default function DashboardPermissionGuard({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

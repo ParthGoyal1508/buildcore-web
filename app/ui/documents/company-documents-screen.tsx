@@ -12,7 +12,7 @@ import {
   type CompanyDocument,
 } from '@/app/lib/api/company-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { CompletenessPanel } from '@/app/ui/documents/completeness-panel';
 import {
   DocumentUpload,
@@ -36,6 +36,9 @@ export function CompanyDocumentsScreen() {
   const queryClient = useQueryClient();
   const [uploadFor, setUploadFor] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
   const [defineError, setDefineError] = useState<string | null>(null);
 
   /**
@@ -125,7 +128,7 @@ export function CompanyDocumentsScreen() {
   const open = async (doc: CompanyDocument) => {
     setDownloadError(null);
     try {
-      openStoredFile(await downloadCompanyDocument(doc.id), `${doc.code}-${doc.id}`);
+      show(await downloadCompanyDocument(doc.id), `${doc.code}-${doc.id}`);
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       setDownloadError(
@@ -155,6 +158,7 @@ export function CompanyDocumentsScreen() {
         <RestrictedNotice />
       )}
       <FormError message={downloadError} />
+      {viewer}
       <FormError message={defineError} />
 
       <CompletenessPanel

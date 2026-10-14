@@ -13,8 +13,10 @@ import {
 import { PNL_COPY } from '@/app/lib/constants';
 import { currentPeriod, periodLabel, rupees } from '@/app/lib/format';
 import MonthlyLabour from '@/app/ui/projects/monthly-labour';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import PnlDrillDown from '@/app/ui/projects/pnl-drill-down';
 import { RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
 
 /**
  * One project's position for one month (018 US3, FR-010 to FR-012 — `bugs.md` item 11).
@@ -51,6 +53,9 @@ export default function ProjectSummary({
   const [open, setOpen] = useState<DrillableFigure | null>(null);
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  // The PDF export reads in the page's own viewer (2026-10-14) rather than a new tab opened after
+  // the fetch, which most browsers block; the workbook is saved under a real name.
+  const { show, viewer } = useFileViewer();
 
   const pnl = useQuery({
     // The period is in the key, so changing the month refetches rather than showing last month's
@@ -64,10 +69,11 @@ export default function ProjectSummary({
     setExporting(format);
     try {
       const blob = await exportProjectPosition(projectId, period, format);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      // The document carries its own production time; the object URL is only the delivery.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      show(
+        { blob },
+        `Project position ${period}.${format === 'pdf' ? 'pdf' : 'xlsx'}`,
+        `Project position — ${periodLabel(period)}`,
+      );
     } catch {
       setExportError(PNL_COPY.exportFailed);
     } finally {
@@ -128,6 +134,7 @@ export default function ProjectSummary({
         </div>
       </div>
       <p className="text-xs text-gray-500">{PNL_COPY.exportHint}</p>
+      {viewer}
       {exportError && (
         <p className="text-sm text-red-700" role="alert">
           {exportError}
@@ -153,24 +160,26 @@ export default function ProjectSummary({
             </p>
           )}
 
-          <div className="overflow-x-auto rounded border border-gray-200">
-            <table className="w-full min-w-[40rem] text-sm">
+          {/* The shared look but no sorting (2026-10-15): this is a statement read top to bottom —
+              revenue, each cost, total cost, margin — and an unavailable category spans its row. */}
+          <div className={TABLE.wrap}>
+            <table className={clsx(TABLE.table, 'w-full min-w-[40rem]')}>
               <caption className="sr-only">
                 {`${PNL_COPY.heading} — ${periodLabel(view.period)}`}
               </caption>
-              <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+              <thead className={TABLE.thead}>
                 <tr>
-                  <th className="px-3 py-2">{PNL_COPY.columns.line}</th>
-                  <th className="px-3 py-2 text-right">
+                  <th className={TABLE.th}>{PNL_COPY.columns.line}</th>
+                  <th className={clsx(TABLE.th, 'text-right')}>
                     {PNL_COPY.columns.monthly}
                   </th>
-                  <th className="px-3 py-2 text-right">
+                  <th className={clsx(TABLE.th, 'text-right')}>
                     {PNL_COPY.columns.cumulative}
                   </th>
-                  <th className="px-3 py-2 text-right">
+                  <th className={clsx(TABLE.th, 'text-right')}>
                     {PNL_COPY.columns.budget}
                   </th>
-                  <th className="px-3 py-2 text-right">
+                  <th className={clsx(TABLE.th, 'text-right')}>
                     {PNL_COPY.columns.variance}
                   </th>
                 </tr>
@@ -189,9 +198,7 @@ export default function ProjectSummary({
                   return (
                     <FigureRow
                       key={row.category}
-                      label={
-                        PNL_COPY.categories[row.category] ?? row.category
-                      }
+                      label={PNL_COPY.categories[row.category] ?? row.category}
                       monthly={row.monthly}
                       cumulative={row.cumulative}
                       budget={row.budget}
@@ -210,26 +217,33 @@ export default function ProjectSummary({
                     />
                   );
                 })}
-                <tr className="border-t border-gray-300 bg-gray-50">
-                  <td className="px-3 py-2 font-medium text-gray-900">
+              </tbody>
+              <tfoot className={TABLE.tfoot}>
+                <tr>
+                  <td className={clsx(TABLE.td, 'text-gray-900')}>
                     {PNL_COPY.totalCost}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">
+                  <td
+                    className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}
+                  >
                     {rupees(view.costMonthly)}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">
+                  <td
+                    className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}
+                  >
                     {rupees(view.costCumulative)}
                   </td>
                   <td colSpan={2} />
                 </tr>
-                <tr className="bg-gray-50">
-                  <td className="px-3 py-2 font-medium text-gray-900">
+                <tr>
+                  <td className={clsx(TABLE.td, 'text-gray-900')}>
                     {PNL_COPY.margin}
                   </td>
-                  <td className="px-3 py-2" />
+                  <td className={TABLE.td} />
                   <td
                     className={clsx(
-                      'px-3 py-2 text-right font-semibold tabular-nums',
+                      TABLE.td,
+                      TABLE.numeric,
                       view.marginCumulative < 0
                         ? 'text-red-700'
                         : 'text-gray-900',
@@ -239,7 +253,7 @@ export default function ProjectSummary({
                   </td>
                   <td colSpan={2} />
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
 
@@ -305,8 +319,8 @@ function FigureRow({
   onToggle: (figure: DrillableFigure | null) => void;
 }) {
   return (
-    <tr className="border-t border-gray-100">
-      <td className="px-3 py-2 text-gray-900">
+    <tr className={TABLE.row}>
+      <td className={clsx(TABLE.td, 'text-gray-900')}>
         {figure ? (
           <RowAction
             type="button"
@@ -328,25 +342,26 @@ function FigureRow({
         // separate absences rather than one category nobody could ask about.
         <td
           colSpan={4}
-          className="px-3 py-2 text-right text-sm font-medium text-amber-900"
+          className={clsx(TABLE.td, 'text-right font-medium text-amber-900')}
         >
           {PNL_COPY.unavailable}
         </td>
       ) : (
         <>
-          <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+          <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
             {rupees(monthly)}
           </td>
-          <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+          <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
             {rupees(cumulative)}
           </td>
-          <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+          <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}>
             {/* Null means nobody set a budget — not that the budget is zero. */}
             {budget === null || budget === undefined ? '—' : rupees(budget)}
           </td>
           <td
             className={clsx(
-              'px-3 py-2 text-right tabular-nums',
+              TABLE.td,
+              TABLE.numeric,
               variance !== null && variance !== undefined && variance < 0
                 ? 'font-medium text-red-700'
                 : 'text-gray-600',

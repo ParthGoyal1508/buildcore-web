@@ -9,14 +9,55 @@ import {
   approveMuster,
   getMuster,
   returnMuster,
+  type MusterLine,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { labourLabel } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
-import { FormError, SecondaryButton, TextField } from '@/app/ui/settings/form-fields';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import {
+  FormError,
+  SecondaryButton,
+  TextField,
+} from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
+
+// Keys match the line's own fields, so each column sorts by the raw value rather than its label.
+const LINE_COLUMNS: Column<MusterLine>[] = [
+  { key: 'workerId', header: 'Worker', render: (line) => line.workerId },
+  {
+    key: 'attendanceType',
+    header: 'Attendance',
+    render: (line) => labourLabel(line.attendanceType),
+  },
+  {
+    key: 'overtimeHours',
+    header: 'Overtime',
+    numeric: true,
+    render: (line) => line.overtimeHours ?? '—',
+  },
+  {
+    key: 'applicableRate',
+    header: 'Rate',
+    numeric: true,
+    render: (line) => rupees(line.applicableRate),
+  },
+  {
+    key: 'faceMatchLow',
+    header: 'Face',
+    render: (line) =>
+      line.faceMatchLow ? (
+        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+          needs review
+        </span>
+      ) : (
+        <span className="text-gray-400">ok</span>
+      ),
+  },
+];
 
 export default function MusterDetailPage() {
   const params = useParams<{ id: string }>();
@@ -35,22 +76,30 @@ export default function MusterDetailPage() {
 
   const approve = useMutation({
     mutationFn: () => approveMuster(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['muster', id] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['muster', id] }),
     onError: (e) =>
       setError(e instanceof ApiError ? e.message : 'Could not approve.'),
   });
   const returnToDraft = useMutation({
     mutationFn: () => returnMuster(id, returnReason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['muster', id] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['muster', id] }),
     onError: (e) =>
       setError(e instanceof ApiError ? e.message : 'Could not return.'),
   });
 
   if (muster.isPending) {
-    return <p className="p-4 text-sm text-gray-500">Loading…</p>;
+    return (
+      <p className="p-4 text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   }
   if (muster.isError || !muster.data) {
-    return <p className="p-4 text-sm text-red-600">Could not load this muster.</p>;
+    return (
+      <p className="p-4 text-sm text-red-600">Could not load this muster.</p>
+    );
   }
 
   const m = muster.data;
@@ -80,40 +129,14 @@ export default function MusterDetailPage() {
 
       <FormError message={error} />
 
-      <div className="overflow-x-auto rounded-lg border border-gray-100">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-2">Worker</th>
-              <th className="px-3 py-2">Attendance</th>
-              <th className="px-3 py-2">Overtime</th>
-              <th className="px-3 py-2">Rate</th>
-              <th className="px-3 py-2">Face</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {m.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="px-3 py-2">{line.workerId}</td>
-                <td className="px-3 py-2">
-                  {labourLabel(line.attendanceType)}
-                </td>
-                <td className="px-3 py-2">{line.overtimeHours ?? '—'}</td>
-                <td className="px-3 py-2">{rupees(line.applicableRate)}</td>
-                <td className="px-3 py-2">
-                  {line.faceMatchLow ? (
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                      needs review
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">ok</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* The shared table: sortable by any column (2026-10-15). */}
+      <DataTable<MusterLine>
+        caption="Muster lines"
+        rows={m.lines}
+        rowKey={(line) => line.id}
+        columns={LINE_COLUMNS}
+        emptyMessage="No workers on this muster."
+      />
 
       {!readOnly && canApprove && (
         <div className="flex flex-col gap-3 rounded-lg border border-gray-100 p-4 sm:flex-row sm:items-end">

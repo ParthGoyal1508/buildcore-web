@@ -11,10 +11,7 @@ import {
   requestReEnrolment,
   type FaceEnrolmentStatus,
 } from '@/app/lib/api/my-workspace';
-import {
-  ENROLMENT_PHOTO_RANGE,
-  MESSAGES,
-} from '@/app/lib/constants';
+import { ENROLMENT_PHOTO_RANGE, MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import {
   CheckboxField,
@@ -23,6 +20,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import CameraCapture from '@/app/ui/my/camera-capture';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** A captured shot plus the object URL its thumbnail is rendered from. */
 interface Shot {
@@ -109,7 +107,7 @@ export default function FaceEnrolmentStatusPanel() {
   if (isLoading) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -272,7 +270,9 @@ export default function FaceEnrolmentStatusPanel() {
                 <Button
                   type="button"
                   onClick={() => submitRequest.mutate()}
-                  disabled={reason.trim().length === 0 || submitRequest.isPending}
+                  disabled={
+                    reason.trim().length === 0 || submitRequest.isPending
+                  }
                 >
                   {submitRequest.isPending ? 'Sending…' : 'Send request'}
                 </Button>

@@ -6,9 +6,50 @@ import { useState } from 'react';
 import { getResignationReport } from '@/app/lib/api/recruitment';
 import { recruitmentLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { TextField } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+
+type Separation = Awaited<
+  ReturnType<typeof getResignationReport>
+>['items'][number] & { rowKey: string };
+
+// Keys match the row's own fields, so each column sorts by the raw value — dates as dates.
+const COLUMNS: Column<Separation>[] = [
+  { key: 'employeeId', header: 'Employee', render: (r) => r.employeeId },
+  {
+    key: 'resignationDate',
+    header: 'Resigned',
+    render: (r) => r.resignationDate,
+  },
+  {
+    key: 'lastWorkingDay',
+    header: 'Last working day',
+    render: (r) => r.lastWorkingDay,
+  },
+  {
+    key: 'tenureMonths',
+    header: 'Tenure (m)',
+    numeric: true,
+    render: (r) => r.tenureMonths ?? '—',
+  },
+  {
+    key: 'reasonCategory',
+    header: 'Reason',
+    render: (r) => recruitmentLabel(r.reasonCategory),
+  },
+  {
+    key: 'settlementPending',
+    header: 'F&F',
+    render: (r) =>
+      r.settlementPending ? (
+        <StatusBadge status="overdue" label="Pending" />
+      ) : (
+        <StatusBadge status="active" label="Settled" />
+      ),
+  },
+];
 
 export default function ResignationReportPage() {
   const [from, setFrom] = useState('');
@@ -25,19 +66,42 @@ export default function ResignationReportPage() {
     <div className="space-y-4">
       <PageHeader title="Resignation Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <TextField id="rr-from" label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        <TextField id="rr-to" label="To" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <TextField
+          id="rr-from"
+          label="From"
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+        />
+        <TextField
+          id="rr-to"
+          label="To"
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+        />
         <div className="flex items-end">
-          <Button intent="read" className="w-full justify-center" onClick={() => setSubmitted(true)} disabled={!from || !to}>Run</Button>
+          <Button
+            intent="read"
+            className="w-full justify-center"
+            onClick={() => setSubmitted(true)}
+            disabled={!from || !to}
+          >
+            Run
+          </Button>
         </div>
       </div>
 
       {report.data && (
         <>
           <div className="flex flex-wrap gap-4 text-sm">
-            <span>Total separations: <strong>{report.data.totalSeparations}</strong></span>
+            <span>
+              Total separations: <strong>{report.data.totalSeparations}</strong>
+            </span>
             {report.data.attritionRatePercent !== null && (
-              <span>Attrition: <strong>{report.data.attritionRatePercent}%</strong></span>
+              <span>
+                Attrition: <strong>{report.data.attritionRatePercent}%</strong>
+              </span>
             )}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-gray-600">
@@ -48,42 +112,18 @@ export default function ResignationReportPage() {
             ))}
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-gray-100">
-            {report.data.items.length === 0 ? (
-              <p className="p-4 text-sm text-gray-500">No separations in this period.</p>
-            ) : (
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-3 py-2">Employee</th>
-                    <th className="px-3 py-2">Resigned</th>
-                    <th className="px-3 py-2">Last working day</th>
-                    <th className="px-3 py-2">Tenure (m)</th>
-                    <th className="px-3 py-2">Reason</th>
-                    <th className="px-3 py-2">F&amp;F</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {report.data.items.map((r, i) => (
-                    <tr key={`${r.employeeId}-${i}`}>
-                      <td className="px-3 py-2">{r.employeeId}</td>
-                      <td className="px-3 py-2">{r.resignationDate}</td>
-                      <td className="px-3 py-2">{r.lastWorkingDay}</td>
-                      <td className="px-3 py-2">{r.tenureMonths ?? '—'}</td>
-                      <td className="px-3 py-2">{recruitmentLabel(r.reasonCategory)}</td>
-                      <td className="px-3 py-2">
-                        {r.settlementPending ? (
-                          <StatusBadge status="overdue" label="Pending" />
-                        ) : (
-                          <StatusBadge status="active" label="Settled" />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {/* The shared table: sortable by any column (2026-10-15). */}
+          <DataTable<Separation>
+            caption="Separations"
+            // An employee can resign twice in a long period, so the position keeps keys unique.
+            rows={report.data.items.map((r, i) => ({
+              ...r,
+              rowKey: `${r.employeeId}-${i}`,
+            }))}
+            rowKey={(r) => r.rowKey}
+            columns={COLUMNS}
+            emptyMessage="No separations in this period."
+          />
         </>
       )}
     </div>

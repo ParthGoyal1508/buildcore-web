@@ -26,6 +26,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { usePlantVendors } from './use-plant-refs';
+import { promptDialog } from '@/app/ui/dialogs';
 
 /**
  * Record a third-party service bill against a job.
@@ -81,7 +82,9 @@ function ServiceBillModal({
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   return (
@@ -261,7 +264,9 @@ export default function ServiceBillPanel({ job }: { job: MaintenanceJob }) {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not record that payment.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not record that payment.',
       ),
   });
 
@@ -356,15 +361,26 @@ export default function ServiceBillPanel({ job }: { job: MaintenanceJob }) {
                     ? MESSAGES.plantUnverifiedPay
                     : undefined
                 }
-                onClick={() => {
+                onClick={async () => {
                   const outstanding =
                     Math.round((row.netPayable - row.paidAmount) * 100) / 100;
-                  const amount = window.prompt(
-                    `Amount paid (outstanding ${outstanding}):`,
-                    String(outstanding),
-                  );
+                  const amount = await promptDialog({
+                    title: 'Record payment',
+                    message: `Amount paid (outstanding ${outstanding}):`,
+                    defaultValue: String(outstanding),
+                    inputMode: 'decimal',
+                    required: true,
+                    confirmLabel: 'Next',
+                    tone: 'default',
+                  });
                   if (!amount) return;
-                  const reference = window.prompt('Payment reference:');
+                  const reference = await promptDialog({
+                    title: 'Payment reference',
+                    message: 'Payment reference:',
+                    required: true,
+                    confirmLabel: 'Mark paid',
+                    tone: 'default',
+                  });
                   if (!reference || !reference.trim()) return;
                   pay.mutate({
                     id: row.id,

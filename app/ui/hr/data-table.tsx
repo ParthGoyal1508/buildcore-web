@@ -3,6 +3,13 @@
 import clsx from 'clsx';
 
 import { STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortValue,
+} from '@/app/ui/table';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One column. `numeric` right-aligns and applies tabular figures, which is what
@@ -16,6 +23,10 @@ export interface Column<T> {
   className?: string;
   /** Kept visible while the rest of the table scrolls sideways. */
   sticky?: boolean;
+  /** What the column sorts by when it is not what it shows; see `app/ui/table.tsx`. */
+  sortValue?: (row: T) => SortValue;
+  /** `false` where there is nothing to order by. */
+  sortable?: boolean;
 }
 
 /**
@@ -33,11 +44,15 @@ export interface Column<T> {
  * and the table stays usable down to a tablet width. The first column can be made
  * sticky so the reader never loses track of whose row they are on while scrolled
  * right.
+ *
+ * Since 2026-10-15 it shares its look with every other table (`TABLE` in `app/ui/table.tsx`) and
+ * its headers sort the loaded rows on a click.
  */
 export default function DataTable<T>({
   columns,
   rows,
   rowKey,
+  rowHref,
   actions,
   emptyMessage = 'Nothing here yet.',
   isLoading = false,
@@ -48,6 +63,11 @@ export default function DataTable<T>({
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string;
+  /**
+   * Where a click on the row goes, for a list whose only link is in its actions (2026-10-15):
+   * the whole row opens it (`RowLinks`).
+   */
+  rowHref?: (row: T) => string;
   actions?: (row: T) => React.ReactNode;
   emptyMessage?: string;
   isLoading?: boolean;
@@ -56,26 +76,23 @@ export default function DataTable<T>({
   footer?: React.ReactNode;
   caption?: string;
 }) {
+  const { sorted, sort, toggle } = useSortedRows(rows, columns);
   if (isLoading) {
     return (
-      <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500" role="status">
-        Loading…
+      <p className={TABLE.empty} role="status">
+        <LoadingText />
       </p>
     );
   }
   if (error) {
     return (
-      <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700" role="alert">
+      <p className={TABLE.failed} role="alert">
         {error}
       </p>
     );
   }
   if (rows.length === 0) {
-    return (
-      <p className="rounded-lg bg-gray-50 p-6 text-sm text-gray-500">
-        {emptyMessage}
-      </p>
-    );
+    return <p className={TABLE.empty}>{emptyMessage}</p>;
   }
 
   return (
@@ -84,49 +101,54 @@ export default function DataTable<T>({
     // navigating by keyboard, and the columns off the right edge would simply be
     // unreachable for them.
     <div
-      className="overflow-x-auto rounded-lg border border-gray-200 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      className={clsx(
+        TABLE.wrap,
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
+      )}
       tabIndex={0}
       role="region"
       aria-label={caption ?? 'Data table'}
     >
-      <table className="min-w-full text-sm text-gray-900">
+      <table className={TABLE.table}>
         {caption && <caption className="sr-only">{caption}</caption>}
-        <thead className="border-b border-gray-200 bg-gray-50 text-left">
+        <thead className={TABLE.thead}>
           <tr>
             {columns.map((column) => (
-              <th
+              <SortHeader
                 key={column.key}
-                scope="col"
+                label={column.header}
+                columnKey={column.key}
+                sort={sort}
+                onSort={toggle}
+                sortable={column.sortable !== false}
+                numeric={column.numeric}
                 className={clsx(
-                  'whitespace-nowrap px-3 py-3 font-medium text-gray-700',
-                  column.numeric && 'text-right tabular-nums',
                   column.sticky && 'sticky left-0 z-10 bg-gray-50',
                   column.className,
                 )}
-              >
-                {column.header}
-              </th>
+              />
             ))}
             {actions && (
-              <th scope="col" className="px-3 py-3 text-right font-medium">
+              <th scope="col" className={TABLE.th}>
                 <span className="sr-only">Actions</span>
               </th>
             )}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {sorted.map((row) => (
             <tr
               key={rowKey(row)}
-              className="border-b border-gray-100 last:border-none hover:bg-gray-50"
+              className={TABLE.row}
+              data-row-href={rowHref?.(row)}
             >
               {columns.map((column) => (
                 <td
                   key={column.key}
                   className={clsx(
-                    'px-3 py-2.5 align-middle',
-                    column.numeric && 'text-right tabular-nums',
-                    column.sticky && 'sticky left-0 z-10 bg-white',
+                    TABLE.td,
+                    column.numeric && TABLE.numeric,
+                    column.sticky && TABLE.stickyCell,
                     column.className,
                   )}
                 >
@@ -134,18 +156,14 @@ export default function DataTable<T>({
                 </td>
               ))}
               {actions && (
-                <td className="px-3 py-2.5">
+                <td className={TABLE.td} data-row-actions>
                   <div className="flex justify-end gap-2">{actions(row)}</div>
                 </td>
               )}
             </tr>
           ))}
         </tbody>
-        {footer && (
-          <tfoot className="border-t-2 border-gray-300 bg-gray-50 font-medium">
-            {footer}
-          </tfoot>
-        )}
+        {footer && <tfoot className={TABLE.tfoot}>{footer}</tfoot>}
       </table>
     </div>
   );

@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { ASSETS_PERMISSIONS, MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import AssetsNav from '@/app/ui/assets/assets-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The per-section permission check `/dashboard/assets/*` needs beyond the module
@@ -56,7 +57,7 @@ export default function AssetsLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

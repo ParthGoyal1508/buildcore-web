@@ -199,6 +199,13 @@ export type ApprovalDecisionEntry = z.infer<typeof decisionSchema>;
 const queueEntrySchema = z.object({
   instanceId: z.string(),
   actionType: openString,
+  /**
+   * The module the item belongs to, resolved by the API from its action type
+   * (2026-10-15), so the queue can be grouped without this app keeping a copy of the
+   * mapping. Defaulted so an older API still parses — everything lands under "Other".
+   */
+  module: z.string().default('other'),
+  moduleLabel: z.string().default('Other'),
   entityType: openString,
   entityId: z.string(),
   subject: z.string(),
@@ -278,6 +285,111 @@ export async function getApprovalHistory(
     )}/history`,
   );
   return z.array(decisionSchema).parse(raw);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The approval history listing (2026-10-15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Where one level of the chain stands this round. `not_reached` is a level the item
+ * never got to — rejected earlier, or withdrawn — and is distinct from `upcoming` so a
+ * finished chain never reads as still waiting.
+ */
+export const APPROVAL_STEP_STATUSES = [
+  'approved',
+  'rejected',
+  'returned',
+  'current',
+  'upcoming',
+  'not_reached',
+] as const;
+export type ApprovalStepStatus = (typeof APPROVAL_STEP_STATUSES)[number];
+
+const historyStepSchema = z.object({
+  position: z.number(),
+  label: z.string(),
+  slotKey: z.string(),
+  isFinalAuthority: z.boolean(),
+  status: z.enum(APPROVAL_STEP_STATUSES),
+  actorName: z.string().nullable(),
+  decidedAt: z.string().nullable(),
+  reason: z.string().nullable(),
+});
+
+const historyEntrySchema = z.object({
+  instanceId: z.string(),
+  actionType: openString,
+  module: z.string(),
+  moduleLabel: z.string(),
+  entityType: openString,
+  entityId: z.string(),
+  subject: z.string(),
+  href: z.string().nullable(),
+  state: approvalStateSchema,
+  round: z.number(),
+  returnCount: z.number(),
+  currentPosition: z.number(),
+  totalLevels: z.number(),
+  requestedById: z.string().nullable(),
+  requestedByName: z.string(),
+  requestedAt: z.string(),
+  closedAt: z.string().nullable(),
+  awaitingLabel: z.string().nullable(),
+  delegatedToName: z.string().nullable(),
+  steps: z.array(historyStepSchema),
+  earlierDecisions: z.array(decisionSchema),
+  viewerTookPart: z.boolean(),
+});
+
+const moduleCountSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  count: z.number(),
+});
+
+const historyPageSchema = z.object({
+  items: z.array(historyEntrySchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  modules: z.array(moduleCountSchema),
+});
+
+export type ApprovalHistoryStep = z.infer<typeof historyStepSchema>;
+export type ApprovalHistoryEntry = z.infer<typeof historyEntrySchema>;
+export type ApprovalModuleCount = z.infer<typeof moduleCountSchema>;
+export type ApprovalHistoryPage = z.infer<typeof historyPageSchema>;
+
+/** `open` = pending or returned; `decided` = approved or rejected; `withdrawn` = abandoned. */
+export const APPROVAL_HISTORY_STATUSES = [
+  'open',
+  'decided',
+  'withdrawn',
+  'all',
+] as const;
+export type ApprovalHistoryStatus = (typeof APPROVAL_HISTORY_STATUSES)[number];
+
+export interface ApprovalHistoryQuery {
+  status?: ApprovalHistoryStatus;
+  /** `visible` — everything the caller may read; `mine` — only what they took part in. */
+  scope?: 'visible' | 'mine';
+  module?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Past and in-flight approvals the caller may read, each with its whole chain.
+ *
+ * Distinct from `getApprovalHistory` above, which is one item's decisions: this is the
+ * listing behind the Approvals screen's history, grouped and filtered by module.
+ */
+export async function getApprovalHistoryList(
+  query: ApprovalHistoryQuery = {},
+): Promise<ApprovalHistoryPage> {
+  const raw = await authFetch<unknown>(`/approvals/history${qs({ ...query })}`);
+  return historyPageSchema.parse(raw);
 }
 
 export interface DecideInput {

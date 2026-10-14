@@ -12,6 +12,7 @@ import PageHeader from '@/app/ui/page-header';
 import SiteModal from '@/app/ui/projects/site-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import { DetailCard, Fact, OpenLink } from '@/app/ui/projects/detail-card';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** 0 = Sunday, as `Site.weeklyOffDay` stores it. */
 const DAYS = [
@@ -56,14 +57,17 @@ export default function SiteDetailPage() {
   if (site.isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
   if (site.isError || !site.data) {
     return (
       <main>
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p
+          role="alert"
+          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {MESSAGES.loadFailed}
         </p>
         <p className="mt-3 text-sm">
@@ -119,8 +123,8 @@ export default function SiteDetailPage() {
             </Fact>
           </dl>
           <p className="mt-3 text-xs text-gray-500">
-            A punch inside this circle counts as on site. The address below is where a
-            delivery goes, which is not the same question.
+            A punch inside this circle counts as on site. The address below is
+            where a delivery goes, which is not the same question.
           </p>
         </DetailCard>
 
@@ -131,9 +135,7 @@ export default function SiteDetailPage() {
               {!row.projectId ? (
                 // Nullable by design: a site created by 003 predates projects entirely, and a
                 // site can outlive the project it was opened for.
-                <span className="text-gray-600">
-                  Not attached to a project
-                </span>
+                <span className="text-gray-600">Not attached to a project</span>
               ) : project ? (
                 <span className="flex flex-wrap items-center gap-3">
                   {project.code} — {project.name}

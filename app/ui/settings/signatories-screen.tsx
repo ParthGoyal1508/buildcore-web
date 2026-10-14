@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getSignatories, upsertSignatory } from '@/app/lib/api/letters';
 import { Button } from '@/app/ui/button';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 const QUERY_KEY = ['signatories'];
 
@@ -85,7 +86,12 @@ export function SignatoriesScreen() {
     },
   });
 
-  if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (isPending)
+    return (
+      <p className="text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   if (isError || !data) {
     return <FormError message="Signatories could not be loaded." />;
   }
@@ -143,7 +149,7 @@ export function SignatoriesScreen() {
             type="file"
             accept="image/png,image/jpeg"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-500"
+            className="block w-full text-sm text-gray-700"
           />
           <p className="mt-1 text-xs text-gray-500">
             Replacing this later changes what future letters carry. Letters
