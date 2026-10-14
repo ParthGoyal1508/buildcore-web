@@ -11,6 +11,7 @@ import {
   downloadPaymentAdvice,
 } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { SETTLEMENT_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { useCanWrite } from '@/app/lib/write-access';
@@ -177,6 +178,8 @@ function Payments({
   const [adviceBusy, setAdviceBusy] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const canWrite = useCanWrite();
+  /** A payment advice read in the page rather than saved (2026-10-14). */
+  const { view, viewer } = useFileViewer();
 
   const advice = async (paymentId: string, format: 'pdf' | 'docx') => {
     setAdviceBusy(`${paymentId}-${format}`);
@@ -201,6 +204,7 @@ function Payments({
 
   return (
     <div className="space-y-2">
+      {viewer}
       <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
         {SETTLEMENT_COPY.paymentsHeading}
       </h5>
@@ -235,6 +239,19 @@ function Payments({
               {/* The payment advice for this payment, on the company's own letterhead. */}
               <span className="flex items-center gap-1 text-xs">
                 <span className="text-gray-500">Payment advice:</span>
+                <SecondaryButton
+                  type="button"
+                  className="!h-8 px-2 text-xs"
+                  onClick={() =>
+                    void view({
+                      title: `Payment advice — ${dateLabel(payment.paidOn)}`,
+                      fileName: 'Payment advice.pdf',
+                      load: () => downloadPaymentAdvice(payment.id, 'pdf'),
+                    })
+                  }
+                >
+                  View
+                </SecondaryButton>
                 {(['pdf', 'docx'] as const).map((format) => (
                   <SecondaryButton
                     key={format}

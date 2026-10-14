@@ -13,6 +13,7 @@ import {
 import { PNL_COPY } from '@/app/lib/constants';
 import { currentPeriod, periodLabel, rupees } from '@/app/lib/format';
 import MonthlyLabour from '@/app/ui/projects/monthly-labour';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import PnlDrillDown from '@/app/ui/projects/pnl-drill-down';
 import { RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
 
@@ -51,6 +52,9 @@ export default function ProjectSummary({
   const [open, setOpen] = useState<DrillableFigure | null>(null);
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  // The PDF export reads in the page's own viewer (2026-10-14) rather than a new tab opened after
+  // the fetch, which most browsers block; the workbook is saved under a real name.
+  const { show, viewer } = useFileViewer();
 
   const pnl = useQuery({
     // The period is in the key, so changing the month refetches rather than showing last month's
@@ -64,10 +68,11 @@ export default function ProjectSummary({
     setExporting(format);
     try {
       const blob = await exportProjectPosition(projectId, period, format);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      // The document carries its own production time; the object URL is only the delivery.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      show(
+        { blob },
+        `Project position ${period}.${format === 'pdf' ? 'pdf' : 'xlsx'}`,
+        `Project position — ${periodLabel(period)}`,
+      );
     } catch {
       setExportError(PNL_COPY.exportFailed);
     } finally {
@@ -128,6 +133,7 @@ export default function ProjectSummary({
         </div>
       </div>
       <p className="text-xs text-gray-500">{PNL_COPY.exportHint}</p>
+      {viewer}
       {exportError && (
         <p className="text-sm text-red-700" role="alert">
           {exportError}

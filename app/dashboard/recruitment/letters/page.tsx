@@ -16,6 +16,7 @@ import {
 } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { saveBlob } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
@@ -42,6 +43,8 @@ const HR_KIND_KEYS: readonly string[] = [...CANDIDATE_LETTER_KIND_KEYS];
  */
 export default function LettersPage() {
   const [error, setError] = useState<string | null>(null);
+  // An offer letter read in the page, without saving it (2026-10-14).
+  const { view, viewer } = useFileViewer();
 
   const letters = useQuery({
     queryKey: ['letters', { scope: 'hr' }],
@@ -98,6 +101,7 @@ export default function LettersPage() {
       </div>
 
       <FormError message={error} />
+      {viewer}
 
       <ResponsiveList
         columns={columns}
@@ -108,9 +112,23 @@ export default function LettersPage() {
         emptyMessage="No offer letter has been issued yet."
         actions={(l) =>
           l.status === 'composed' ? null : (
-            <RowAction intent="read" onClick={() => void download(l)}>
-              Download
-            </RowAction>
+            <>
+              <RowAction
+                intent="read"
+                onClick={() =>
+                  void view({
+                    title: l.referenceNo ?? l.letterKindLabel,
+                    fileName: letterFileName(l),
+                    load: () => downloadLetter(l.id),
+                  })
+                }
+              >
+                View
+              </RowAction>
+              <RowAction intent="read" onClick={() => void download(l)}>
+                Download
+              </RowAction>
+            </>
           )
         }
       />

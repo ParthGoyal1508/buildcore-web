@@ -16,6 +16,7 @@ import {
 import { ApiError } from '@/app/lib/api/client';
 import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { openStoredFile } from '@/app/lib/download-file';
+import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import { percentLabel } from '@/app/lib/bill-totals';
 import { dateLabel, rupees, unitRate } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
@@ -124,8 +125,23 @@ export default function ClientBillView({
       ),
   });
 
+  // A PDF or scanned certificate opens in the page's own viewer (2026-10-14) rather than a new tab
+  // — one opened after a fetch is one most browsers block. Anything else is still saved.
+  const { view, viewer } = useFileViewer();
   const openCertificate = async () => {
     setError(null);
+    const certificate = bill.certificate;
+    if (
+      certificate &&
+      isViewableFile(certificate.mimeType, certificate.fileName)
+    ) {
+      void view({
+        title: certificate.fileName,
+        fileName: certificate.fileName,
+        load: () => downloadCertificate(bill.id),
+      });
+      return;
+    }
     try {
       const file = await downloadCertificate(bill.id);
       openStoredFile(file, bill.certificate?.fileName ?? 'certificate');
@@ -391,6 +407,7 @@ export default function ClientBillView({
           </dl>
         )}
 
+        {viewer}
         {bill.certificate && (
           <p className="text-sm">
             <button

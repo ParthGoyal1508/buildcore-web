@@ -12,7 +12,7 @@ import {
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
 import { DocumentUpload, type UploadKind } from '@/app/ui/documents/document-upload';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
@@ -59,6 +59,9 @@ export default function ProjectDocumentsPanel({
   projectId: string;
 }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
   /**
    * Which kind the upload form is open for, or `null` when it is closed.
    *
@@ -119,7 +122,7 @@ export default function ProjectDocumentsPanel({
     try {
       // The server's own name for the file, with its extension — see `openStoredFile`. The
       // fallback is only reached if the response carried no readable `Content-Disposition`.
-      openStoredFile(
+      show(
         await downloadProjectDocument(projectId, document.id),
         `${document.documentType}-${document.id}`,
       );
@@ -195,6 +198,7 @@ export default function ProjectDocumentsPanel({
       </div>
 
       <FormError message={downloadError} />
+      {viewer}
 
       {rows.length === 0 ? (
         <p className="text-sm text-gray-500">

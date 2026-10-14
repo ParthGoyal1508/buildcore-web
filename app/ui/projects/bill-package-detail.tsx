@@ -19,6 +19,7 @@ import {
 import { downloadDebitNote, getRaBill } from '@/app/lib/api/billing';
 import { SETTLEMENT_COPY, projectsLabel } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { dateLabel } from '@/app/lib/format';
 import BillAdjustments from '@/app/ui/projects/bill-adjustments';
 import BillDeductionLines from '@/app/ui/projects/bill-deduction-lines';
@@ -61,6 +62,8 @@ export default function BillPackageDetail({
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** A debit note read in the page rather than saved (2026-10-14). */
+  const { view, viewer } = useFileViewer();
   /** Which line's measurement sheet is open. One at a time: two expanded sheets is a scroll. */
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   /** Opens the unmeasured lines back up on an issued bill — see `acted` below. */
@@ -149,6 +152,7 @@ export default function BillPackageDetail({
 
   return (
     <div className="flex flex-col gap-8">
+      {viewer}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-3 text-lg font-semibold text-gray-900">
@@ -594,6 +598,23 @@ export default function BillPackageDetail({
                             {/* 028 FR-018. The standalone note a subcontractor signs to
                                 acknowledge the recovery — the register already prints inside the
                                 package PDF, and this is the single-debit document. */}
+                            <Button
+                              type="button"
+                              intent="read"
+                              onClick={() =>
+                                void view({
+                                  title: row.noteNumber ?? 'Debit note',
+                                  fileName: `${row.noteNumber ?? 'Debit note'}.pdf`,
+                                  load: () =>
+                                    downloadDebitNote(
+                                      row.id,
+                                      `${row.noteNumber ?? 'Debit note'}.pdf`,
+                                    ),
+                                })
+                              }
+                            >
+                              View
+                            </Button>
                             <Button
                               type="button"
                               onClick={() => {

@@ -20,7 +20,7 @@ import {
   plantLabel,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import DocumentModal from '@/app/ui/plant/document-modal';
 import {
   FormError,
@@ -39,6 +39,9 @@ export default function EquipmentDetailPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['plant', 'equipment', id],
@@ -60,7 +63,7 @@ export default function EquipmentDetailPage() {
   });
 
   /**
-   * Opens a stored document in a new tab.
+   * Opens a stored document — in the page's viewer when it is a PDF or an image (2026-10-14).
    *
    * Fetched rather than linked: the endpoint needs the bearer token, which lives in
    * memory and never appears in a URL, so a plain `<a href>` would 401. Same
@@ -70,7 +73,7 @@ export default function EquipmentDetailPage() {
     setOpening(documentId);
     setError(null);
     try {
-      openStoredFile(
+      show(
         await getEquipmentDocumentFile(id, documentId),
         `equipment-document-${documentId}`,
       );
@@ -228,6 +231,7 @@ export default function EquipmentDetailPage() {
       </nav>
 
       <FormError message={error} />
+      {viewer}
 
       <section className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Overview</h2>

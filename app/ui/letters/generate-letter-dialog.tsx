@@ -23,6 +23,7 @@ import {
   HR_LETTER_KIND_PERMISSIONS,
 } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -549,6 +550,8 @@ function IssuedSummary({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The letter just issued, read in the page before (or instead of) saving it (2026-10-14).
+  const { view, viewer } = useFileViewer();
 
   const download = async () => {
     setError(null);
@@ -584,10 +587,25 @@ function IssuedSummary({
         </div>
       )}
       <FormError message={error} />
+      {viewer}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <SecondaryButton type="button" onClick={onClose}>
           Done
         </SecondaryButton>
+        {!awaiting && (
+          <SecondaryButton
+            type="button"
+            onClick={() =>
+              void view({
+                title: letter.referenceNo ?? letter.letterKindLabel,
+                fileName: letterFileName(letter),
+                load: () => downloadLetter(letter.id),
+              })
+            }
+          >
+            View
+          </SecondaryButton>
+        )}
         {!awaiting && (
           <Button intent="read" type="button" disabled={busy} onClick={() => void download()}>
             {busy ? 'Downloading…' : COPY.download}

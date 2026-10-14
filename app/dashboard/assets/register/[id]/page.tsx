@@ -21,7 +21,7 @@ import {
   formatAssetQuantity,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { openStoredFile } from '@/app/lib/download-file';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import AllocateModal from '@/app/ui/assets/allocate-modal';
 import AssetModal from '@/app/ui/assets/asset-modal';
 import AssetDocumentModal from '@/app/ui/assets/document-modal';
@@ -56,6 +56,9 @@ export default function AssetDetailPage() {
   const [showAllocate, setShowAllocate] = useState(false);
   const [returning, setReturning] = useState<Allocation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
+  // browsers block when it is opened after a fetch; any other file is still saved.
+  const { show, viewer } = useFileViewer();
 
   const asset = useQuery({
     queryKey: ['assets', 'register', 'detail', assetId],
@@ -89,7 +92,7 @@ export default function AssetDetailPage() {
   async function openDocument(documentId: string) {
     setError(null);
     try {
-      openStoredFile(
+      show(
         await getAssetDocumentFile(assetId, documentId),
         `asset-document-${documentId}`,
       );
@@ -299,6 +302,7 @@ export default function AssetDetailPage() {
       </div>
 
       <FormError message={error} />
+      {viewer}
 
       <dl className="grid gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         {[

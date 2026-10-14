@@ -10,7 +10,12 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { FormError, SelectField } from '@/app/ui/settings/form-fields';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
+import {
+  FormError,
+  SecondaryButton,
+  SelectField,
+} from '@/app/ui/settings/form-fields';
 
 const money = (value: number) =>
   value.toLocaleString('en-IN', {
@@ -59,6 +64,8 @@ export default function SalarySlipPanel() {
   const [chosenPeriod, setChosenPeriod] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  // The payslip read in the page, without saving it (2026-10-14).
+  const { view, viewer } = useFileViewer();
 
   const {
     data: periods,
@@ -154,9 +161,26 @@ export default function SalarySlipPanel() {
 
       {slip && <SlipBody slip={slip} />}
 
-      <Button type="button" onClick={download} disabled={isDownloading || !slip}>
-        {isDownloading ? 'Preparing…' : 'Download PDF'}
-      </Button>
+      {viewer}
+      <div className="flex flex-wrap gap-2">
+        <SecondaryButton
+          type="button"
+          disabled={!slip || !period}
+          onClick={() =>
+            period &&
+            void view({
+              title: `Payslip — ${periodLabel(period)}`,
+              fileName: `payslip-${period}.pdf`,
+              load: () => downloadSalarySlipPdf(period),
+            })
+          }
+        >
+          View PDF
+        </SecondaryButton>
+        <Button type="button" onClick={download} disabled={isDownloading || !slip}>
+          {isDownloading ? 'Preparing…' : 'Download PDF'}
+        </Button>
+      </div>
     </div>
   );
 }

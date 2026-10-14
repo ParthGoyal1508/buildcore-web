@@ -21,6 +21,7 @@ import GenerateLetterDialog, {
   type LetterRecipient,
 } from '@/app/ui/letters/generate-letter-dialog';
 import { LetterList } from '@/app/ui/letters/letter-list';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { FormError, RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
 
 /**
@@ -90,12 +91,15 @@ export default function SubjectLetters({
     },
   });
 
-  const open = async (letterId: string) => {
-    const blob = await downloadLetter(letterId);
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  };
+  // Read in the page rather than a new tab (2026-10-14): a tab opened after the fetch is one most
+  // browsers block as a pop-up, and the shared viewer is what every other PDF here opens in.
+  const { view, viewer } = useFileViewer();
+  const open = (letter: IssuedLetter) =>
+    view({
+      title: letter.referenceNo ?? letter.letterKindLabel,
+      fileName: letterFileName(letter),
+      load: () => downloadLetter(letter.id),
+    });
 
   const save = async (letter: IssuedLetter) => {
     setDownloadError(null);
@@ -132,6 +136,7 @@ export default function SubjectLetters({
         )}
       </div>
       <FormError message={downloadError} />
+      {viewer}
       <LetterList
         letters={data ?? []}
         emptyMessage={emptyMessage}
@@ -140,7 +145,7 @@ export default function SubjectLetters({
           // approval gate the composer already renders — putting either here would be a second
           // path to an action whose preconditions this panel does not check.
           <>
-            <RowAction intent="read" type="button" onClick={() => void open(letter.id)}>
+            <RowAction intent="read" type="button" onClick={() => void open(letter)}>
               {LETTER_COPY.subjectOpen}
             </RowAction>
             {letter.status !== 'composed' && (

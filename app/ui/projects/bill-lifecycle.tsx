@@ -24,6 +24,7 @@ import { downloadCertificate, downloadSignedCopy } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { useCanWrite } from '@/app/lib/write-access';
+import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import ActionReview from '@/app/ui/approvals/action-review';
 import { Button } from '@/app/ui/button';
 import {
@@ -402,16 +403,20 @@ function CertifiedCopy({
   onError: (message: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  // The certified copy read in the page (2026-10-14) — offered when it is a PDF or a scan; a
+  // client's marked-up workbook is only ever saved.
+  const { view, viewer } = useFileViewer();
   const copy = pkg.certifiedCopy;
   if (pkg.status !== 'certified' || !copy) return null;
+  const load = () =>
+    copy.kind === 'client_certificate'
+      ? downloadCertificate(copy.clientBillId)
+      : downloadSignedCopy(copy.signedCopyId, copy.fileName);
 
   const download = async () => {
     setBusy(true);
     try {
-      const { blob, filename } =
-        copy.kind === 'client_certificate'
-          ? await downloadCertificate(copy.clientBillId)
-          : await downloadSignedCopy(copy.signedCopyId, copy.fileName);
+      const { blob, filename } = await load();
       saveBlob(blob, filename || copy.fileName);
     } catch (err) {
       onError(describe(err));
@@ -422,6 +427,22 @@ function CertifiedCopy({
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
+      {viewer}
+      {isViewableFile(null, copy.fileName) && (
+        <button
+          type="button"
+          className="font-medium text-blue-700 underline hover:text-blue-900"
+          onClick={() =>
+            void view({
+              title: `Certified copy — ${pkg.label}`,
+              fileName: copy.fileName,
+              load,
+            })
+          }
+        >
+          View
+        </button>
+      )}
       <button
         type="button"
         className="font-medium text-blue-700 underline hover:text-blue-900 disabled:opacity-50"
@@ -443,6 +464,8 @@ function Downloads({
   onError: (message: string) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  // The PDF of either read in the page rather than saved (2026-10-14).
+  const { view, viewer } = useFileViewer();
   const toClient = pkg.direction === 'to_client';
   const abstractName = toClient ? 'Payment Abstract' : 'Abstract';
   const name = `${pkg.counterpartyName ? `${pkg.counterpartyName} ` : ''}${pkg.label}`;
@@ -481,11 +504,27 @@ function Downloads({
             : 'Word'}
         </SecondaryButton>
       ))}
+      <SecondaryButton
+        onClick={() =>
+          void view({
+            title: `${name}${abstractOnly ? ` ${abstractName}` : ''}`,
+            fileName: `${name}${abstractOnly ? ` ${abstractName}` : ''}.pdf`,
+            load: () =>
+              downloadBillDocument(pkg.id, name, 'pdf', {
+                abstractOnly,
+                abstractName,
+              }),
+          })
+        }
+      >
+        View PDF
+      </SecondaryButton>
     </div>
   );
 
   return (
     <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
+      {viewer}
       {row('Full bill', false)}
       {row(abstractName, true)}
       {(pkg.status === 'draft' ||

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type * as React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { decideApproval } from '@/app/lib/api/approvals';
 import {
@@ -26,7 +26,12 @@ import ActionReview from '@/app/ui/approvals/action-review';
 import LineItemsEditor, {
   type LineItemsSource,
 } from '@/app/ui/letters/line-items-editor';
+import { PdfPreview, useFileViewer } from '@/app/ui/pdf-viewer';
 import StatusBadge from '@/app/ui/status-badge';
+
+// The inline draft preview now lives with the shared viewer (2026-10-14); re-exported so a screen
+// that took it from here keeps working.
+export { PdfPreview };
 
 /**
  * The commercial letters — LOI, work order, purchase order — composed, approved, issued and
@@ -268,6 +273,8 @@ export function LetterTable({
 }) {
   const refresh = useRefreshLetters();
   const [error, setError] = useState<string | null>(null);
+  /** An issued letter read in the page, without saving it (2026-10-14). */
+  const { view, viewer } = useFileViewer();
   /** A composed letter's draft, open for reading before it is approved or issued. */
   const [previewing, setPreviewing] = useState<{
     title: string;
@@ -330,6 +337,7 @@ export function LetterTable({
           {error}
         </p>
       )}
+      {viewer}
       {previewing && (
         <PdfPreview
           title={previewing.title}
@@ -424,9 +432,24 @@ export function LetterTable({
                           )}
                         </div>
                       ) : (
-                        <Button onClick={() => void download(letter)}>
-                          Download
-                        </Button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            intent="read"
+                            onClick={() =>
+                              void view({
+                                title:
+                                  letter.referenceNo ?? letter.letterKindLabel,
+                                fileName: `${letter.referenceNo ?? letter.letterKindLabel}.pdf`,
+                                load: () => downloadLetter(letter.id),
+                              })
+                            }
+                          >
+                            View
+                          </Button>
+                          <Button onClick={() => void download(letter)}>
+                            Download
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -751,46 +774,5 @@ export function LetterComposer({
         />
       )}
     </form>
-  );
-}
-
-/**
- * A PDF shown in the page (2026-10-14) — a preview is read beside the form it came from, and a new
- * tab opened after a request is one most browsers block. The object URL is released on close.
- */
-export function PdfPreview({
-  title,
-  blob,
-  onClose,
-}: {
-  title: string;
-  blob: Blob;
-  onClose: () => void;
-}) {
-  const url = useMemo(() => URL.createObjectURL(blob), [blob]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
-
-  return (
-    <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm font-medium text-blue-700 underline"
-        >
-          Close preview
-        </button>
-      </div>
-      <p className="text-xs text-gray-500">
-        A draft: no reference number, and the signature is applied only when the
-        letter is issued.
-      </p>
-      <iframe
-        title={title}
-        src={url}
-        className="h-[75vh] w-full rounded border border-gray-200"
-      />
-    </div>
   );
 }
