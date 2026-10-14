@@ -32,6 +32,7 @@ import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
 import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import RaBillView from '@/app/ui/projects/ra-bill-view';
 import RetentionLedger from '@/app/ui/projects/retention-ledger';
+import WorkOrderApproval from '@/app/ui/projects/work-order-approval';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
@@ -319,9 +320,25 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   </div>
                 )}
                 {chosen.status === 'pending_approval' && (
-                  <p className="text-xs text-amber-800">
-                    {WORK_ORDER_COPY.pendingHint}
-                  </p>
+                  <>
+                    <p className="text-xs text-amber-800">
+                      {WORK_ORDER_COPY.pendingHint}
+                    </p>
+                    <WorkOrderApproval
+                      key={chosen.id}
+                      workOrderId={chosen.id}
+                      label={chosen.code ?? chosen.workDetail}
+                      onChanged={() =>
+                        void queryClient.invalidateQueries({
+                          queryKey: ['workOrders', projectId],
+                        })
+                      }
+                      onNotice={(message) => {
+                        setError(null);
+                        setNotice(message);
+                      }}
+                    />
+                  </>
                 )}
                 {chosen.status === 'active' && (
                   <p className="text-xs text-gray-500">
