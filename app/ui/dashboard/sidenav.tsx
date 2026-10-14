@@ -1,13 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import NavLinks from '@/app/ui/dashboard/nav-links';
-import CompanyLogo from '@/app/ui/company-logo';
 import ApprovalBadge from '@/app/ui/dashboard/approval-badge';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
 
 /**
- * The sidebar: the company's mark, then every place you can go (2026-10-14 rework).
+ * The sidebar: every place you can go (2026-10-14 rework).
  *
  * ## Full height, nothing pinned below the list
  *
@@ -23,33 +21,12 @@ import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
  *
  * ## The brand panel
  *
- * The whole column sits on the brand's palest tint, and the logo sits on it **without a box**
- * (the client: "make the background transparent, make it larger, and match the website's colour
- * scheme"). The logo is whatever each company uploaded — Parth Realcon's is navy on an opaque
- * white JPEG — so transparency cannot come from the file. `mix-blend-multiply` supplies it: white
- * multiplied by the tint *is* the tint, so a white backing disappears into the panel, while the
- * mark's own colours (anything darker than the tint) come through unchanged. It works for any
- * logo on a white or transparent background, which is what a company uploads in practice, and it
- * never alters the stored file.
+ * The whole column sits on the brand's palest tint. The company's mark is no longer here: since
+ * 2026-10-15 the top bar runs the full width above this column and carries it, white on the navy.
  */
 export default function SideNav() {
   return (
     <div className="flex h-full flex-col border-gray-200 bg-brand-50 px-3 py-3 md:border-r md:px-3 md:py-4">
-      <Link
-        className="hidden h-16 shrink-0 items-center rounded-lg px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 md:flex"
-        href="/dashboard"
-      >
-        {/* A fixed box the logo fills, now that the logo arrives trimmed and transparent
-            (`cleanLogo`): every company's mark takes the same height, or the same width when
-            it is a long one, rather than its file's own margins deciding (2026-10-15). */}
-        <CompanyLogo
-          priority
-          className="h-full w-full object-contain object-left"
-        />
-      </Link>
-      {/* A rule between the logo and the modules, so the mark reads as a header and not as the
-          first item of the list (2026-10-15). Desktop only, where the logo is shown. */}
-      <hr className="mx-1 mb-3 mt-3 hidden border-0 border-t border-brand-200/80 md:block" />
       {/* Mobile: a wrapping row whose items are `flex-1 basis-[20%]`, so the targets fill each
           row evenly at any count. Desktop: one scrolling column. `min-h-0` is what lets a flex
           child shrink below its content so `overflow-y-auto` has something to do. */}

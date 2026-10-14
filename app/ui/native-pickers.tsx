@@ -50,7 +50,11 @@ export default function NativePickers() {
     };
     const eligibleDate = (target: EventTarget | null) => {
       if (!fine.matches || !(target instanceof HTMLInputElement)) return null;
-      if (target.type !== 'date' || target.disabled || target.readOnly) {
+      if (
+        (target.type !== 'date' && target.type !== 'month') ||
+        target.disabled ||
+        target.readOnly
+      ) {
         return null;
       }
       if (target.hasAttribute('data-native')) return null;
@@ -423,12 +427,18 @@ const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 /** `YYYY-MM-DD`, the only form a date input's value takes. Built by hand: no time zone in it. */
 const iso = (y: number, m: number, d: number) =>
   `${String(y).padStart(4, '0')}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+/** A date's `YYYY-MM-DD` or a month field's `YYYY-MM`; the day is 1 for a month. */
 const parseIso = (value: string) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(value);
   return match
-    ? { y: Number(match[1]), m: Number(match[2]) - 1, d: Number(match[3]) }
+    ? {
+        y: Number(match[1]),
+        m: Number(match[2]) - 1,
+        d: Number(match[3] ?? 1),
+      }
     : null;
 };
+const isoMonth = (y: number, m: number) => iso(y, m, 1).slice(0, 7);
 const todayIso = () => {
   const now = new Date();
   return iso(now.getFullYear(), now.getMonth(), now.getDate());
@@ -443,10 +453,15 @@ function Calendar({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const { style, above } = usePlacement(el, panel, onClose);
+  // A month field (`type="month"`, 2026-10-15) gets the same panel opened on its month grid, and
+  // a month chosen there is the answer rather than a step towards a day.
+  const monthOnly = el.type === 'month';
   const [value, setValue] = useState(el.value);
   const start = parseIso(value) ?? parseIso(todayIso())!;
   const [view, setView] = useState({ y: start.y, m: start.m });
-  const [mode, setMode] = useState<'days' | 'months' | 'years'>('days');
+  const [mode, setMode] = useState<'days' | 'months' | 'years'>(
+    monthOnly ? 'months' : 'days',
+  );
   const min = el.min || '';
   const max = el.max || '';
   const outOfRange = (day: string) =>
@@ -494,7 +509,7 @@ function Calendar({
     ...Array.from({ length: days }, (_, i) => i + 1),
   ];
   while (cells.length % 7) cells.push(null);
-  const today = todayIso();
+  const today = monthOnly ? todayIso().slice(0, 7) : todayIso();
   const decade = Math.floor(view.y / 12) * 12;
 
   const nav =
@@ -525,7 +540,11 @@ function Calendar({
         </button>
         <button
           type="button"
-          onClick={() => setMode(mode === 'days' ? 'months' : 'years')}
+          onClick={() =>
+            setMode(
+              mode === 'days' ? 'months' : mode === 'months' ? 'years' : mode,
+            )
+          }
           className="rounded-lg px-2 py-1 font-semibold text-gray-900 transition-colors hover:bg-brand-50 hover:text-brand-700"
         >
           {mode === 'days'
@@ -592,15 +611,22 @@ function Calendar({
             <button
               key={name}
               type="button"
+              disabled={monthOnly && outOfRange(isoMonth(view.y, m))}
               onClick={() => {
+                if (monthOnly) {
+                  pick(isoMonth(view.y, m));
+                  return;
+                }
                 setView({ y: view.y, m });
                 setMode('days');
               }}
               className={clsx(
-                'rounded-lg py-2.5 transition-colors',
-                m === view.m
+                'rounded-lg py-2.5 transition-colors disabled:cursor-not-allowed disabled:opacity-30',
+                (monthOnly ? value === isoMonth(view.y, m) : m === view.m)
                   ? 'bg-brand-600 font-semibold text-white'
-                  : 'text-gray-800 hover:bg-brand-50 hover:text-brand-700',
+                  : monthOnly && today === isoMonth(view.y, m)
+                    ? 'font-semibold text-accent-700 ring-1 ring-inset ring-accent-300 hover:bg-accent-50'
+                    : 'text-gray-800 hover:bg-brand-50 hover:text-brand-700',
               )}
             >
               {name.slice(0, 3)}
@@ -655,7 +681,7 @@ function Calendar({
           onClick={() => pick(today)}
           className="rounded-md px-2 py-1 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 disabled:opacity-40"
         >
-          Today
+          {monthOnly ? 'This month' : 'Today'}
         </button>
       </div>
     </div>,

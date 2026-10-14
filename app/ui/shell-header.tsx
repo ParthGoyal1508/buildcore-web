@@ -26,9 +26,8 @@ import UserMenu from '@/app/ui/user-menu';
  * shell's content column is `md:overflow-hidden` with a separately-scrolling body, so
  * this is already fixed above it and `sticky` is a no-op.
  *
- * The wordmark is `md:hidden` — on a desktop the sidebar two inches to the left
- * already carries it, and the sidebar's own copy is now desktop-only, so a phone shows
- * the mark once, here, rather than twice.
+ * The wordmark is shown at every width: the bar runs the full width of the screen above the
+ * sidebar, which no longer carries a copy of its own (2026-10-15).
  *
  * It links to `landingRoute()`, not to `/dashboard`. Hardcoding `/dashboard` makes it
  * a dead link for exactly the users most likely to tap it: a site employee holding
@@ -59,15 +58,24 @@ export default function ShellHeader({
   // that a guard screen is a better outcome than a heading that shifts under a thumb.
   const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
 
-  const wordmark = <CompanyLogo knockout className="h-8 max-w-[8rem]" />;
+  const wordmark = (
+    <CompanyLogo
+      knockout
+      className="h-8 max-w-[8rem] md:h-10 md:max-w-[13rem]"
+    />
+  );
 
   return (
     // The 2026-10-14 colour pass: a thin brand rule along the top edge — navy into the azure
     // accent — is the one splash of the brand on a bar that is otherwise white and has to stay
     // calm behind search and the company selector. `before:` so it costs no extra element and
     // cannot be pushed around by the flex row.
-    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-4 py-2 text-white shadow-md after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-gradient-to-r after:from-accent-400 after:via-accent-500 after:to-emerald-400 md:flex-nowrap md:py-0 md:pl-6 md:pr-3">
-      <div className="md:hidden">
+    <header className="sticky top-0 z-30 flex min-h-14 flex-none flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-4 py-2 text-white shadow-md after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-gradient-to-r after:from-accent-400 after:via-accent-500 after:to-emerald-400 md:h-16 md:flex-nowrap md:py-0 md:pl-5 md:pr-3">
+      {/* The logo heads the bar at every width since the bar went full width on 2026-10-15 — the
+          client: "a full width nav bar with logo and other items, and then side nav bar below
+          that." On a desktop its box is the sidebar's width (less the bar's own padding), so the
+          search starts where the page content does. White on the navy, as on a phone. */}
+      <div className="flex-none md:flex md:w-[calc(16rem-1.25rem)] md:items-center">
         {home ? (
           <Link
             href={home}
