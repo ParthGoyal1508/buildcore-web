@@ -10,6 +10,7 @@ import {
 } from '@/app/lib/api/dashboard';
 import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
 import SiteSelector from '@/app/ui/dashboard/site-selector';
+import { widgetHref } from '@/app/ui/dashboard/widget-links';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import PageHeader from '@/app/ui/page-header';
 
@@ -70,12 +71,12 @@ export default function SiteDashboardPage() {
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {kpis.map((w) => (
-              <WidgetRenderer key={w.id} widget={w} />
+              <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
             ))}
           </div>
           <div className="space-y-6">
             {tables.map((w) => (
-              <WidgetRenderer key={w.id} widget={w} />
+              <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
             ))}
           </div>
         </div>

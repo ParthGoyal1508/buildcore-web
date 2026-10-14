@@ -298,22 +298,10 @@ export async function getStatutoryCalendar(): Promise<WidgetResult> {
   return widgetResultSchema.parse(raw);
 }
 
-const groupEmployeeSchema = z.object({
-  id: z.string(),
-  employeeCode: z.string(),
-  name: z.string(),
-  companyId: z.string(),
-});
-export type GroupEmployee = z.infer<typeof groupEmployeeSchema>;
-
-export async function searchGroupEmployees(
-  q: string,
-): Promise<GroupEmployee[]> {
-  const raw = await authFetch<unknown>(
-    `/group/employees/search${qs({ q })}`,
-  );
-  return z.array(groupEmployeeSchema).parse(raw);
-}
+// `searchGroupEmployees` lived here until 2026-10-15. Its only caller was the Group
+// Dashboard's "Search Employees" box, which the client asked to have removed — finding a
+// person is HR's employee list, not a group-overview job. `GET /group/employees/search`
+// still exists on the API; nothing here calls it.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reports (US7)

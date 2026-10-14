@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getWidgets, type WidgetResult } from '@/app/lib/api/dashboard';
 import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
 import DashboardNav from '@/app/ui/dashboard/dashboard-nav';
+import RecentActivity from '@/app/ui/dashboard/recent-activity';
+import { widgetHref } from '@/app/ui/dashboard/widget-links';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import WelcomeBanner from '@/app/ui/dashboard/welcome-banner';
 import PageHeader from '@/app/ui/page-header';
@@ -54,27 +56,34 @@ export default function DashboardPage() {
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {section(widgets.data, 'kpi').map((w) => (
-              <WidgetRenderer key={w.id} widget={w} />
+              <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
             ))}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               {section(widgets.data, 'table').map((w) => (
-                <WidgetRenderer key={w.id} widget={w} />
+                <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
             </div>
             <div className="space-y-4">
               {section(widgets.data, 'sidebar').map((w) => (
-                <WidgetRenderer key={w.id} widget={w} />
+                <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
               {section(widgets.data, 'alerts').map((w) => (
-                <WidgetRenderer key={w.id} widget={w} />
+                <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
             </div>
           </div>
         </div>
       )}
+
+      {/* Last on the page, at the client's request (2026-10-15): figures and what needs
+          attention first, the record of what already happened at the foot. Outside the
+          widgets block so a failed widgets call still leaves the log readable. */}
+      <div className="mt-6">
+        <RecentActivity />
+      </div>
     </main>
   );
 }

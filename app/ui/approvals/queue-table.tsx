@@ -92,6 +92,8 @@ export default function ApprovalQueue() {
       // moment a decision advanced an item to a level this caller also holds.
       void queryClient.invalidateQueries({ queryKey: ['approvalQueue'] });
       void queryClient.invalidateQueries({ queryKey: ['approvalCount'] });
+      // The decision is now part of the history listed under the queue (2026-10-15).
+      void queryClient.invalidateQueries({ queryKey: ['approvalHistoryList'] });
     },
   });
 
@@ -187,19 +189,59 @@ export default function ApprovalQueue() {
     />
   );
 
+  /**
+   * The loaded rows, grouped by module in the order they first appear (2026-10-15).
+   *
+   * The client asked for approvals grouped by module. The API resolves each row's module
+   * from its action type, so grouping here is only a partition — no mapping of action
+   * types is kept on this side. Order of first appearance keeps the oldest-first promise:
+   * the group holding the most neglected item comes first.
+   */
+  const groups: { key: string; label: string; rows: ApprovalQueueEntry[] }[] =
+    [];
+  for (const row of items) {
+    let group = groups.find((g) => g.key === row.module);
+    if (!group) {
+      group = { key: row.module, label: row.moduleLabel, rows: [] };
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+
   return (
     <div className="space-y-3">
-      <ResponsiveList
-        columns={columns}
-        rows={items}
-        rowKey={(row) => row.instanceId}
-        actions={decision}
-        isLoading={pages.isLoading}
-        error={pages.isError ? MESSAGES.loadFailed : null}
-        // Said plainly rather than left as a blank screen (FR-006). "Nothing is waiting on
-        // you" is a result; an empty table is indistinguishable from one that failed.
-        emptyMessage="Nothing is waiting on you."
-      />
+      {groups.length === 0 ? (
+        <ResponsiveList
+          columns={columns}
+          rows={items}
+          rowKey={(row) => row.instanceId}
+          actions={decision}
+          isLoading={pages.isLoading}
+          error={pages.isError ? MESSAGES.loadFailed : null}
+          // Said plainly rather than left as a blank screen (FR-006). "Nothing is waiting
+          // on you" is a result; an empty table is indistinguishable from one that failed.
+          // The history below still shows everything already decided.
+          emptyMessage="Nothing is waiting on you."
+        />
+      ) : (
+        groups.map((group) => (
+          <section key={group.key} aria-label={group.label} className="space-y-2">
+            <h3 className="text-sm font-semibold text-gray-800">
+              {group.label}{' '}
+              <span className="font-normal text-gray-500">
+                ({group.rows.length})
+              </span>
+            </h3>
+            <ResponsiveList
+              columns={columns}
+              rows={group.rows}
+              rowKey={(row) => row.instanceId}
+              actions={decision}
+              emptyMessage="Nothing is waiting on you."
+            />
+          </section>
+        ))
+      )}
       {nextCursor && (
         <RowAction
           type="button"

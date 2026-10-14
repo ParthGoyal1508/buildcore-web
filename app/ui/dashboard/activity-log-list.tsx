@@ -51,7 +51,7 @@ const ACTION_LABELS: Record<string, string> = {
   ADMIN_PASSWORD_RESET: 'Password reset by an administrator',
 };
 
-const actionLabel = (action: string) =>
+export const actionLabel = (action: string) =>
   ACTION_LABELS[action] ?? enumLabel(action);
 
 export default function ActivityLogList() {

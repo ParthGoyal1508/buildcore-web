@@ -6,7 +6,6 @@ import {
   getGroupCompanies,
   getStatutoryCalendar,
 } from '@/app/lib/api/dashboard';
-import EmployeeSearch from '@/app/ui/dashboard/employee-search';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import PageHeader from '@/app/ui/page-header';
 
@@ -28,9 +27,9 @@ export default function GroupDashboardPage() {
         className="mb-4"
       />
 
-      <div className="mb-6">
-        <EmployeeSearch />
-      </div>
+      {/* The "Search Employees" box sat here until 2026-10-15. The client asked for it
+          to go: this page is the group at a glance, and looking somebody up is what HR
+          → Employees is for. */}
 
       {companies.isPending && (
         <p className="text-sm text-gray-500" role="status">

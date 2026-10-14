@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { rupees } from '@/app/lib/format';
 import ResponsiveList, {
   type Column,
@@ -11,7 +13,18 @@ import type { WidgetResult } from '@/app/lib/api/dashboard';
  * FR-002). Nothing here knows an individual widget's id — a new widget renders with
  * zero code change, which is the whole point of the registry (spec SC-002).
  */
-export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
+export default function WidgetRenderer({
+  widget,
+  href,
+}: {
+  widget: WidgetResult;
+  /**
+   * The module screen this card leads to (2026-10-15). Supplied by the page from
+   * `widget-links.ts` rather than looked up here, which keeps this switch free of widget
+   * ids. Omitted, the card renders exactly as before — unlinked.
+   */
+  href?: string;
+}) {
   if (widget.unavailable) {
     return (
       <ComingSoonCard
@@ -29,20 +42,24 @@ export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
           value={widget.value}
           unit={widget.valueUnit}
           note={widget.note}
+          href={href}
         />
       );
     case 'stat':
-      return <StatCard title={widget.title} value={widget.value} />;
+      return <StatCard title={widget.title} value={widget.value} href={href} />;
     case 'table':
       return (
         <WidgetTable
           title={widget.title}
           value={widget.value}
           note={widget.note}
+          href={href}
         />
       );
     case 'list':
-      return <WidgetList title={widget.title} value={widget.value} />;
+      return (
+        <WidgetList title={widget.title} value={widget.value} href={href} />
+      );
     default:
       return (
         <UnsupportedWidgetCard
@@ -56,6 +73,68 @@ export default function WidgetRenderer({ widget }: { widget: WidgetResult }) {
 const cardClass =
   'rounded-lg border border-gray-200 bg-white p-4 shadow-sm';
 
+/** The focus ring every link on the dashboard carries — keyboard users must see where they are. */
+const focusRing =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+
+/**
+ * A headline card that is itself the link (2026-10-15).
+ *
+ * The whole card rather than a "view" link inside it: the card is the target a person
+ * reaches for, and a small link in a corner is a target they miss. Without an `href` it is
+ * the plain card it always was.
+ */
+function CardShell({
+  href,
+  label,
+  children,
+}: {
+  href?: string;
+  /** Read by assistive technology as the link's name, so it says where it goes. */
+  label: string;
+  children: React.ReactNode;
+}) {
+  if (!href) return <div className={cardClass}>{children}</div>;
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className={`group block ${cardClass} transition hover:border-blue-300 hover:shadow ${focusRing}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** A card heading that links to the module when there is one, with a "View all" cue. */
+function CardHeading({
+  title,
+  href,
+  className,
+}: {
+  title: string;
+  href?: string;
+  className: string;
+}) {
+  if (!href) return <p className={className}>{title}</p>;
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <p className={className}>
+        <Link href={href} className={`rounded hover:underline ${focusRing}`}>
+          {title}
+        </Link>
+      </p>
+      <Link
+        href={href}
+        className={`shrink-0 rounded text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline ${focusRing}`}
+        aria-label={`View all — ${title}`}
+      >
+        View all →
+      </Link>
+    </div>
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -67,9 +146,12 @@ export function KpiCard({
   value,
   unit,
   note,
+  href,
 }: {
   title: string;
   value: unknown;
+  /** The module screen the card opens. */
+  href?: string;
   /** Declared by the widget itself — see `valueUnit` on the wire type. */
   unit?: 'currency';
   /**
@@ -99,17 +181,25 @@ export function KpiCard({
     if (pending > 0) subtitle = `${pending} more metrics coming soon`;
   }
   return (
-    <div className={cardClass}>
-      <p className="text-sm text-gray-500">{title}</p>
+    <CardShell href={href} label={`${title}: ${display}`}>
+      <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
       {subtitle && <p className="mt-1 text-xs text-gray-400">{subtitle}</p>}
       {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
-    </div>
+    </CardShell>
   );
 }
 
 /** A "present / total" style pair. */
-export function StatCard({ title, value }: { title: string; value: unknown }) {
+export function StatCard({
+  title,
+  value,
+  href,
+}: {
+  title: string;
+  value: unknown;
+  href?: string;
+}) {
   let display = '—';
   if (isRecord(value) && 'present' in value && 'total' in value) {
     display = `${value.present} / ${value.total}`;
@@ -117,10 +207,10 @@ export function StatCard({ title, value }: { title: string; value: unknown }) {
     display = String(value);
   }
   return (
-    <div className={cardClass}>
-      <p className="text-sm text-gray-500">{title}</p>
+    <CardShell href={href} label={`${title}: ${display}`}>
+      <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
-    </div>
+    </CardShell>
   );
 }
 
@@ -142,11 +232,14 @@ export function WidgetTable({
   title,
   value,
   note,
+  href,
 }: {
   title: string;
   value: unknown;
   /** See the same prop on `KpiCard`. */
   note?: string;
+  /** The module screen behind the table — linked from the heading. */
+  href?: string;
 }) {
   if (!isTableValue(value)) {
     return <UnsupportedWidgetCard title={title} displayType="table" />;
@@ -165,7 +258,13 @@ export function WidgetTable({
   );
   return (
     <div className={cardClass}>
-      <p className="mb-3 text-sm font-medium text-gray-700">{title}</p>
+      <div className="mb-3">
+        <CardHeading
+          title={title}
+          href={href}
+          className="text-sm font-medium text-gray-700"
+        />
+      </div>
       <ResponsiveList
         columns={columns}
         rows={value.rows}
@@ -195,11 +294,26 @@ const SEVERITY_CLASS: Record<string, string> = {
  * widget to emit anything structured would have printed raw JSON onto the dashboard.
  * Nothing had, which is the only reason nobody saw it; Alerts & Reminders emits objects.
  */
-export function WidgetList({ title, value }: { title: string; value: unknown }) {
+export function WidgetList({
+  title,
+  value,
+  href,
+}: {
+  title: string;
+  value: unknown;
+  /** The screen listing every item, linked from the heading. */
+  href?: string;
+}) {
   const items = Array.isArray(value) ? value : [];
   return (
     <div className={cardClass}>
-      <p className="mb-2 text-sm font-medium text-gray-700">{title}</p>
+      <div className="mb-2">
+        <CardHeading
+          title={title}
+          href={href}
+          className="text-sm font-medium text-gray-700"
+        />
+      </div>
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">Nothing to show.</p>
       ) : (
@@ -226,8 +340,20 @@ export function WidgetList({ title, value }: { title: string; value: unknown }) 
             );
             return (
               <li key={i} className="py-1.5">
-                {typeof item.href === 'string' ? (
-                  <a className="hover:underline" href={item.href}>
+                {/* An in-app path goes through `Link` (client navigation, prefetch);
+                    anything else stays a plain anchor. */}
+                {typeof item.href === 'string' && item.href.startsWith('/') ? (
+                  <Link
+                    className={`rounded hover:underline ${focusRing}`}
+                    href={item.href}
+                  >
+                    {body}
+                  </Link>
+                ) : typeof item.href === 'string' ? (
+                  <a
+                    className={`rounded hover:underline ${focusRing}`}
+                    href={item.href}
+                  >
                     {body}
                   </a>
                 ) : (
