@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type * as React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { decideApproval } from "@/app/lib/api/approvals";
+import { decideApproval } from '@/app/lib/api/approvals';
 import {
   type IssuedLetter,
   type LetterKind,
@@ -18,12 +18,13 @@ import {
   issueLetter,
   previewComposedLetter,
   previewLetter,
-} from "@/app/lib/api/letters";
-import { GENERATE_LETTER_COPY, LETTER_COPY } from "@/app/lib/constants";
-import { dateLabel } from "@/app/lib/format";
-import { Button } from "@/app/ui/button";
-import ActionReview from "@/app/ui/approvals/action-review";
-import StatusBadge from "@/app/ui/status-badge";
+} from '@/app/lib/api/letters';
+import { GENERATE_LETTER_COPY, LETTER_COPY } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
+import { Button } from '@/app/ui/button';
+import ActionReview from '@/app/ui/approvals/action-review';
+import LineItemsEditor from '@/app/ui/letters/line-items-editor';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * The letters a project issues (025 FR-033).
@@ -50,9 +51,9 @@ import StatusBadge from "@/app/ui/status-badge";
  * rather than from a list typed here, and a kind whose fields change needs no change to this file.
  */
 const PROJECT_KINDS = [
-  "letter_work_order",
-  "letter_loi",
-  "letter_purchase_order",
+  'letter_work_order',
+  'letter_loi',
+  'letter_purchase_order',
 ];
 
 /**
@@ -62,68 +63,67 @@ const PROJECT_KINDS = [
  * LOI, work order and purchase order: each shows the ones it declares, in this order.
  */
 const FIELD_ORDER = [
-  "vendorName",
-  "vendorAddress",
-  "vendorCode",
-  "vendorAttention",
-  "vendorMobile",
-  "vendorEmail",
-  "vendorPan",
-  "vendorGstin",
-  "subcontractorAttention",
-  "vendorPfNo",
-  "vendorEsicNo",
-  "loiReference",
-  "revisedDate",
-  "buyerName",
-  "buyerMobile",
-  "buyerEmail",
-  "scope",
-  "proposalDate",
-  "scopeDetail",
-  "scopeBrief",
-  "workLocation",
-  "deliveryAddress",
-  "lineItems",
-  "gstRate",
-  "gstInclusion",
-  "startDate",
-  "commencementDate",
-  "completionDate",
-  "completionPeriod",
-  "billingInterval",
-  "materialResponsibility",
-  "paymentTerms",
-  "deliveryTerms",
-  "retention",
-  "defectsLiability",
-  "liquidatedDamages",
-  "performanceGuarantee",
-  "escalation",
-  "subcontractorScope",
-  "companyScope",
-  "confidentialityPeriod",
-  "poProject",
-  "documentsAndTools",
-  "training",
-  "siteSupport",
-  "inventorySupport",
-  "warrantyFromDispatch",
-  "warrantyFromCommissioning",
-  "companyAddress",
-  "companyGstin",
-  "companyEmail",
+  'vendorName',
+  'vendorAddress',
+  'vendorCode',
+  'vendorAttention',
+  'vendorMobile',
+  'vendorEmail',
+  'vendorPan',
+  'vendorGstin',
+  'subcontractorAttention',
+  'vendorPfNo',
+  'vendorEsicNo',
+  'loiReference',
+  'revisedDate',
+  'buyerName',
+  'buyerMobile',
+  'buyerEmail',
+  'scope',
+  'proposalDate',
+  'scopeDetail',
+  'scopeBrief',
+  'workLocation',
+  'deliveryAddress',
+  'lineItems',
+  'gstRate',
+  'gstInclusion',
+  'startDate',
+  'commencementDate',
+  'completionDate',
+  'completionPeriod',
+  'billingInterval',
+  'materialResponsibility',
+  'paymentTerms',
+  'deliveryTerms',
+  'retention',
+  'defectsLiability',
+  'liquidatedDamages',
+  'performanceGuarantee',
+  'escalation',
+  'subcontractorScope',
+  'companyScope',
+  'confidentialityPeriod',
+  'poProject',
+  'documentsAndTools',
+  'training',
+  'siteSupport',
+  'inventorySupport',
+  'warrantyFromDispatch',
+  'warrantyFromCommissioning',
+  'companyAddress',
+  'companyGstin',
+  'companyEmail',
 ];
 
 /** Free text that runs to several lines — an address, a scope, the item lines. */
 const MULTI_LINE = new Set([
-  "vendorAddress",
-  "deliveryAddress",
-  "scopeDetail",
-  "lineItems",
-  "subcontractorScope",
-  "companyScope",
-  "paymentTerms",
+  'vendorAddress',
+  'deliveryAddress',
+  'scopeDetail',
+  'subcontractorScope',
+  'companyScope',
+  'paymentTerms',
 ]);
 
 /**
@@ -132,9 +132,9 @@ const MULTI_LINE = new Set([
  * and which, where Settings has none, must be typed for the order to issue.
  */
 const EDITABLE_FROM_RECORD = new Set([
-  "companyAddress",
-  "companyGstin",
-  "companyEmail",
+  'companyAddress',
+  'companyGstin',
+  'companyEmail',
 ]);
 
 /**
@@ -143,22 +143,17 @@ const EDITABLE_FROM_RECORD = new Set([
  * shown: a value displayed but not sent would print blank.
  */
 const FIELD_DEFAULTS: Record<string, string> = {
-  gstRate: "18",
-  gstInclusion: "exclusive",
-  billingInterval: "monthly intervals",
-  materialResponsibility: "As agreed",
-  retention: "Not Applicable",
-  defectsLiability: "Not Applicable",
-  liquidatedDamages: "Not Applicable",
-  performanceGuarantee: "Not Applicable",
-  escalation: "Not applicable",
-  confidentialityPeriod: "3 years",
+  gstRate: '18',
+  gstInclusion: 'exclusive',
+  billingInterval: 'monthly intervals',
+  materialResponsibility: 'As agreed',
+  retention: 'Not Applicable',
+  defectsLiability: 'Not Applicable',
+  liquidatedDamages: 'Not Applicable',
+  performanceGuarantee: 'Not Applicable',
+  escalation: 'Not applicable',
+  confidentialityPeriod: '3 years',
 };
-
-/** How the item box wants its lines, shown under it. */
-const LINE_ITEMS_HINT =
-  "One item per line: Description | Unit | Quantity | Rate (a work order may add | HSN code). " +
-  "Rows copied from a spreadsheet paste in as they are. Amounts, GST and the total are worked out.";
 
 export default function ProjectLetters({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
@@ -171,13 +166,13 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
   } | null>(null);
 
   const kinds = useQuery({
-    queryKey: ["letter-kinds"],
+    queryKey: ['letter-kinds'],
     queryFn: () => getLetterKinds(),
   });
 
   const letters = useQuery({
-    queryKey: ["letters", "project", projectId],
-    queryFn: () => getLetters({ subjectType: "project", subjectId: projectId }),
+    queryKey: ['letters', 'project', projectId],
+    queryFn: () => getLetters({ subjectType: 'project', subjectId: projectId }),
   });
 
   const projectKinds = (kinds.data ?? []).filter(
@@ -186,20 +181,20 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
 
   const refresh = () =>
     void queryClient.invalidateQueries({
-      queryKey: ["letters", "project", projectId],
+      queryKey: ['letters', 'project', projectId],
     });
 
   const download = async (letter: IssuedLetter) => {
     try {
       const blob = await downloadLetter(letter.id);
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
+      const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `${letter.referenceNo ?? letter.letterKindLabel}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError("That letter could not be downloaded.");
+      setError('That letter could not be downloaded.');
     }
   };
 
@@ -214,7 +209,7 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
       setError(
         err instanceof Error
           ? err.message
-          : "That letter could not be previewed.",
+          : 'That letter could not be previewed.',
       );
     }
   };
@@ -226,7 +221,7 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
       refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "That letter could not be issued.",
+        err instanceof Error ? err.message : 'That letter could not be issued.',
       );
     }
   };
@@ -311,9 +306,9 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
                 // it — it is issued here. Download is offered only for what has been issued.
                 const approval = letter.approval;
                 const awaiting =
-                  letter.status === "composed" &&
+                  letter.status === 'composed' &&
                   approval !== null &&
-                  approval.state !== "approved";
+                  approval.state !== 'approved';
                 return (
                   <tr key={letter.id} className="align-top">
                     <td className="px-3 py-2">
@@ -346,10 +341,10 @@ export default function ProjectLetters({ projectId }: { projectId: string }) {
                     <td className="px-3 py-2">
                       {letter.issuedAt
                         ? dateLabel(String(letter.issuedAt))
-                        : "—"}
+                        : '—'}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {letter.status === "composed" ? (
+                      {letter.status === 'composed' ? (
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <Button
                             intent="write"
@@ -405,14 +400,14 @@ function ComposeLetter({
   onComposed: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
-  const [signatoryId, setSignatoryId] = useState("");
+  const [signatoryId, setSignatoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Blob | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const fields = useQuery({
-    queryKey: ["letter-kind-fields", kind.id],
+    queryKey: ['letter-kind-fields', kind.id],
     queryFn: () => getLetterKindFields(kind.id),
   });
 
@@ -421,16 +416,16 @@ function ComposeLetter({
   // What the records say for each field — the terms, from Settings — so an editable one opens
   // filled in rather than empty.
   const prefill = useQuery({
-    queryKey: ["letter-prefill", kind.key, "project", projectId],
+    queryKey: ['letter-prefill', kind.key, 'project', projectId],
     queryFn: () =>
       getLetterPrefill({
         letterKindKey: kind.key,
-        subjectType: "project",
+        subjectType: 'project',
         subjectId: projectId,
       }),
   });
   const recordValue = (token: string) =>
-    prefill.data?.fields.find((f) => f.token === token)?.value ?? "";
+    prefill.data?.fields.find((f) => f.token === token)?.value ?? '';
 
   const rank = (token: string) => {
     const at = FIELD_ORDER.indexOf(token);
@@ -439,14 +434,14 @@ function ComposeLetter({
   const manual = (fields.data ?? [])
     .filter(
       (field) =>
-        field.sourceType === "manual" || EDITABLE_FROM_RECORD.has(field.token),
+        field.sourceType === 'manual' || EDITABLE_FROM_RECORD.has(field.token),
     )
     .sort((a, b) => rank(a.token) - rank(b.token));
   const valueOf = (token: string) =>
     values[token] ??
     (EDITABLE_FROM_RECORD.has(token)
       ? recordValue(token)
-      : (FIELD_DEFAULTS[token] ?? ""));
+      : (FIELD_DEFAULTS[token] ?? ''));
   // The defaults this kind declares, sent beneath whatever was typed over them.
   const defaults = Object.fromEntries(
     manual
@@ -458,18 +453,18 @@ function ComposeLetter({
   // so every one of them was refused by the server with "a signatory must be named" — whether or not
   // the company had a signatory set up.
   const signatories = useQuery({
-    queryKey: ["signatories"],
+    queryKey: ['signatories'],
     queryFn: () => getSignatories(),
     enabled: kind.requiresSignature,
   });
   const active = (signatories.data ?? []).filter((s) => s.isActive);
-  const chosenSignatory = signatoryId || active[0]?.id || "";
+  const chosenSignatory = signatoryId || active[0]?.id || '';
   const noSignatory =
     kind.requiresSignature && signatories.isSuccess && active.length === 0;
 
   const input = () => ({
     letterKindKey: kind.key,
-    subjectType: "project",
+    subjectType: 'project',
     subjectId: projectId,
     // Only what was edited is sent. An untouched field is read from its record at issue, so a
     // letter waiting on approval picks up a change made in Settings in the meantime.
@@ -490,7 +485,7 @@ function ComposeLetter({
       setError(
         err instanceof Error
           ? err.message
-          : "The preview could not be produced.",
+          : 'The preview could not be produced.',
       );
     } finally {
       setPreviewBusy(false);
@@ -501,11 +496,11 @@ function ComposeLetter({
     mutationFn: () => composeLetter(input()),
     onSuccess: (letter) => {
       setError(null);
-      if (letter.status === "issued") {
+      if (letter.status === 'issued') {
         onIssued();
       } else {
         setNotice(
-          "Composed, and waiting on an approval. It is not issued yet, and raising it again would make a second one.",
+          'Composed, and waiting on an approval. It is not issued yet, and raising it again would make a second one.',
         );
         onComposed();
       }
@@ -535,7 +530,35 @@ function ComposeLetter({
         <div className="grid gap-3 sm:grid-cols-2">
           {manual.map((field) => {
             const multiLine = MULTI_LINE.has(field.token);
-            const isItems = field.token === "lineItems";
+            if (field.token === 'lineItems') {
+              // Picked from the BOQ and priced row by row (2026-10-14), rather than typed as
+              // pipe-separated lines. A div, not a label: it holds a whole table of inputs.
+              return (
+                <div
+                  key={field.token}
+                  className="flex flex-col gap-1 text-sm sm:col-span-2"
+                >
+                  <span className="font-medium text-gray-700">
+                    {field.label}
+                    {field.isRequired && (
+                      <span className="text-red-600"> *</span>
+                    )}
+                  </span>
+                  <LineItemsEditor
+                    projectId={projectId}
+                    value={valueOf(field.token)}
+                    onChange={(next) =>
+                      setValues((current) => ({
+                        ...current,
+                        [field.token]: next,
+                      }))
+                    }
+                    withHsn={kind.key === 'letter_work_order'}
+                    fromBoq={kind.key !== 'letter_purchase_order'}
+                  />
+                </div>
+              );
+            }
             const common = {
               required: field.isRequired,
               value: valueOf(field.token),
@@ -548,30 +571,21 @@ function ComposeLetter({
                   ...current,
                   [field.token]: event.target.value,
                 })),
-              className: "rounded-md border border-gray-300 px-3 py-2",
+              className: 'rounded-md border border-gray-300 px-3 py-2',
             };
             return (
               <label
                 key={field.token}
                 className={`flex flex-col gap-1 text-sm${
-                  multiLine ? " sm:col-span-2" : ""
+                  multiLine ? ' sm:col-span-2' : ''
                 }`}
               >
                 <span className="font-medium text-gray-700">
                   {field.label}
                   {field.isRequired && <span className="text-red-600"> *</span>}
                 </span>
-                {isItems && (
-                  <span className="text-xs text-gray-500">
-                    {LINE_ITEMS_HINT}
-                  </span>
-                )}
                 {multiLine ? (
-                  <textarea
-                    rows={isItems ? 6 : 3}
-                    {...common}
-                    className={`${common.className}${isItems ? " font-mono text-xs" : ""}`}
-                  />
+                  <textarea rows={3} {...common} />
                 ) : (
                   <input {...common} />
                 )}
@@ -631,10 +645,10 @@ function ComposeLetter({
           disabled={previewBusy || noSignatory}
           onClick={() => void showPreview()}
         >
-          {previewBusy ? "Preparing…" : draft ? "Refresh preview" : "Preview"}
+          {previewBusy ? 'Preparing…' : draft ? 'Refresh preview' : 'Preview'}
         </Button>
         <Button type="submit" disabled={compose.isPending || noSignatory}>
-          {compose.isPending ? "Issuing…" : "Issue"}
+          {compose.isPending ? 'Issuing…' : 'Issue'}
         </Button>
         <Button type="button" intent="write" onClick={onClose}>
           Cancel
