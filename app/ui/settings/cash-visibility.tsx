@@ -62,7 +62,8 @@ export default function CashVisibility() {
     queryFn: getCurrentUser,
   });
   const isSuperAdmin =
-    user?.permissions.includes(SETTINGS_PERMISSIONS['cash-visibility']) ?? false;
+    user?.permissions.includes(SETTINGS_PERMISSIONS['personal-settings']) ??
+    false;
 
   // Drop the confirmation when it expires, so the toggle hides itself on time rather than
   // waiting for the next click to be refused.
@@ -112,7 +113,10 @@ export default function CashVisibility() {
       void queryClient.invalidateQueries();
     },
     onError: (err) => {
-      if (err instanceof ApiError && err.code === PASSWORD_CONFIRMATION_REQUIRED) {
+      if (
+        err instanceof ApiError &&
+        err.code === PASSWORD_CONFIRMATION_REQUIRED
+      ) {
         // Lapsed (or the server restarted with a new key): back to the prompt, saying why.
         setConfirmation(null);
         setError('Your confirmation has expired. Enter your password again.');
@@ -136,8 +140,9 @@ export default function CashVisibility() {
               Confirm it&apos;s you
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Cash visibility is a sensitive setting. Enter your own password to reveal it. The
-              confirmation lasts ten minutes and ends when you leave this screen.
+              These settings are sensitive. Enter your own password to reveal
+              them. The confirmation lasts ten minutes and ends when you leave
+              this screen.
             </p>
           </div>
         </div>
@@ -190,12 +195,13 @@ export default function CashVisibility() {
             Cash transaction visibility
           </h2>
           <p className="mt-1 text-sm text-gray-600">
-            Hides every cash amount across screens, reports and exports. A display setting only —
-            nothing is deleted or changed, and switching it off restores every figure exactly as it
-            was.
+            Hides every cash amount across screens, reports and exports. A
+            display setting only — nothing is deleted or changed, and switching
+            it off restores every figure exactly as it was.
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            Who may <em>record</em> a payment in cash is a separate permission, set per role.
+            Who may <em>record</em> a payment in cash is a separate permission,
+            set per role.
           </p>
         </div>
       </div>
@@ -226,7 +232,11 @@ export default function CashVisibility() {
         <p className="text-xs text-gray-500">
           Currently:{' '}
           <span className="font-medium text-gray-700">
-            {current.isPending ? '…' : hidden ? 'cash amounts are hidden' : 'cash amounts are shown'}
+            {current.isPending
+              ? '…'
+              : hidden
+                ? 'cash amounts are hidden'
+                : 'cash amounts are shown'}
           </span>
           . Confirmed until{' '}
           {new Date(confirmation.expiresAt).toLocaleTimeString([], {

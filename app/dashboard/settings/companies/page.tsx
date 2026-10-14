@@ -11,7 +11,7 @@ export default function CompaniesPage() {
       <CompanyList />
       {/* The cash visibility toggle lived here until 2026-10-14, when it moved to a Settings
           section of its own — Super Admin only, behind their password. See
-          `app/dashboard/settings/cash-visibility/page.tsx`. */}
+          `app/dashboard/settings/personal-settings/page.tsx`. */}
     </main>
   );
 }
