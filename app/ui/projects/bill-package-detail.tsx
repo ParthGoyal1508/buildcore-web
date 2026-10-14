@@ -26,6 +26,10 @@ import BillLifecycle, { describe } from '@/app/ui/projects/bill-lifecycle';
 import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import { Button } from '@/app/ui/button';
 import MeasurementSheet from '@/app/ui/projects/measurement-sheet';
+import {
+  AddNonBoqItem,
+  NonBoqItemEditor,
+} from '@/app/ui/projects/non-boq-items';
 import StatusBadge from '@/app/ui/status-badge';
 
 /**
@@ -316,6 +320,14 @@ export default function BillPackageDetail({
                   claim={claim}
                   editable={editable}
                   packageId={packageId}
+                  canEditItem={
+                    editable && claim.nonBoq && pkg.direction === 'to_client'
+                  }
+                  onItemSaved={() => {
+                    setError(null);
+                    setNotice('Non-BOQ item saved.');
+                    refresh();
+                  }}
                   sheetOpen={sheetFor === claim.scheduleLineId}
                   onToggleSheet={() =>
                     setSheetFor(
@@ -341,6 +353,29 @@ export default function BillPackageDetail({
             </tbody>
           </table>
         </div>
+        )}
+
+        {/* ── Non-BOQ items (2026-10-14) ──────────────────────────────── */}
+        {editable && pkg.direction === 'to_client' && (
+          <div className="mt-4">
+            <AddNonBoqItem
+              packageId={packageId}
+              onSaved={() => {
+                setError(null);
+                setNotice(
+                  'Non-BOQ item added. It is on this bill now, and later bills to this client will list it too.',
+                );
+                refresh();
+              }}
+            />
+          </div>
+        )}
+        {editable && pkg.direction === 'to_subcontractor' && (
+          <p className="mt-3 text-xs text-gray-500">
+            Need a non-BOQ item? A subcontractor’s are part of their award: add
+            it to the work order on Subcontractors, and every bill under it
+            lists it here — enter its quantity on the line.
+          </p>
         )}
       </section>
 
@@ -625,11 +660,16 @@ function ClaimRow({
   claim,
   editable,
   packageId,
+  canEditItem,
+  onItemSaved,
   sheetOpen,
   onToggleSheet,
   onSave,
 }: {
   packageId: string;
+  /** A client's non-BOQ item on a draft: its description, unit and rate can be corrected. */
+  canEditItem: boolean;
+  onItemSaved: () => void;
   sheetOpen: boolean;
   onToggleSheet: () => void;
   claim: BillPackageClaim;
@@ -639,11 +679,14 @@ function ClaimRow({
   const [claimed, setClaimed] = useState(claim.claimedQty);
   const [reason, setReason] = useState(claim.reason ?? '');
   const [saving, setSaving] = useState(false);
+  const [editingItem, setEditingItem] = useState(false);
 
   const changed = claimed !== claim.claimedQty;
-  const differsFromProposal =
-    claim.proposedQty === null || claimed !== claim.proposedQty;
-  const needsReason = differsFromProposal && Number(claimed) !== 0;
+  // A line with no measurement source — a non-BOQ item — is measured here, so there is no proposal
+  // to depart from and no reason to give (2026-10-14). A departure from a measurement needs one.
+  const needsReason =
+    claim.proposedQty !== null &&
+    Number(claimed) !== Number(claim.proposedQty);
 
   return (
     <>
@@ -662,6 +705,20 @@ function ClaimRow({
       </td>
       <td className="max-w-md px-3 py-2">
         <span className="line-clamp-2">{claim.description}</span>
+        {claim.nonBoq && (
+          <span className="ml-1 rounded bg-indigo-100 px-1 text-xs font-medium text-indigo-800">
+            Non-BOQ
+          </span>
+        )}
+        {canEditItem && !editingItem && (
+          <button
+            type="button"
+            onClick={() => setEditingItem(true)}
+            className="ml-2 text-xs font-medium text-blue-700 underline"
+          >
+            Edit item
+          </button>
+        )}
         {claim.overClaimed && (
           <span className="ml-1 rounded bg-amber-200 px-1 text-xs font-medium text-amber-900">
             over-claimed
@@ -732,6 +789,18 @@ function ClaimRow({
         )}
       </td>
     </tr>
+    {editingItem && (
+      <tr className="bg-indigo-50/40">
+        <td colSpan={8} className="px-3 py-3">
+          <NonBoqItemEditor
+            packageId={packageId}
+            claim={claim}
+            onSaved={onItemSaved}
+            onClose={() => setEditingItem(false)}
+          />
+        </td>
+      </tr>
+    )}
     {sheetOpen && (
       <tr className="bg-gray-50">
         <td colSpan={8} className="px-3 py-3">

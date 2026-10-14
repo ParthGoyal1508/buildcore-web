@@ -325,10 +325,16 @@ function GroupRows({
             <td className="px-3 py-2 text-gray-500 tabular-nums">{item.boqNo}</td>
             <td className="px-3 py-2 text-gray-900">
               {item.taskName}
-              {item.isVariation && (
-                <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
-                  {BOQ_COPY.variation}
+              {item.nonBoq ? (
+                <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-800">
+                  Non-BOQ · added on a bill
                 </span>
+              ) : (
+                item.isVariation && (
+                  <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
+                    {BOQ_COPY.variation}
+                  </span>
+                )
               )}
             </td>
             {/* FR-030: exactly as the client spelled it. Tidying `R. mtr` to `R.Mtr.` creates a

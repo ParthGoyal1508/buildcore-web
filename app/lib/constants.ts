@@ -1427,7 +1427,7 @@ export const WORK_ORDER_COPY = {
   // --- 027: the award editor ---
   /** Three ways in, because one award is three different jobs. */
   awardAddFromBoq: 'Add from the BOQ',
-  awardAddBlank: 'Add a blank line',
+  awardAddBlank: '+ Add non-BOQ item',
   awardPasteDisclosure: 'Paste several lines at once',
   awardPasteAdd: 'Add these lines',
   awardBoqPickerLabel: 'BOQ line',
@@ -1473,7 +1473,7 @@ export const WORK_ORDER_COPY = {
   /** Flagged on the row, because a total that is already negative is one found too late. */
   awardRateAboveEarned: 'Above what this line earns',
   awardLinkedHint:
-    'A line picked from the BOQ stays tied to it, so work recorded against that BOQ line counts towards this award. A typed line is not tied to anything, which is correct when the subcontract covers work the BOQ itemises differently.',
+    'A line picked from the BOQ stays tied to it, so work recorded against that BOQ line counts towards this award. A non-BOQ item — description, unit, quantity and rate typed in — is not tied to anything: it is listed on every bill under this work order and its quantity is entered on the bill.',
   awardRowIncomplete: (row: number) =>
     `Line ${row} needs a description, a unit, a quantity and a rate.`,
   awardNothingToSave: 'Add at least one line before saving.',

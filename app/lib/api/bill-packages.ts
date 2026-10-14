@@ -95,6 +95,11 @@ const claimSchema = z
     remainingQty: rendered,
     exceedsScope: z.boolean(),
     unpriced: z.boolean(),
+    /**
+     * Outside the tendered BOQ (2026-10-14): a client's non-BOQ item (NB-1…), or an award line
+     * mapped to no BOQ line. Billed at its own rate, measured on the bill, never by a DWR.
+     */
+    nonBoq: z.boolean().default(false),
   })
   .passthrough();
 
@@ -121,6 +126,10 @@ const packageSchema = z
     rates: ratesSchema,
     claims: z.array(claimSchema),
     unpricedClaimedCount: z.number(),
+    /** The non-BOQ lines this bill claims — shown to the approver before approving. */
+    nonBoqSummary: z
+      .object({ count: z.number(), amount: z.string() })
+      .default({ count: 0, amount: '0.00' }),
     /**
      * The last approved daily report on the project — sent **only** when this package proposed
      * nothing at all, and null otherwise. Null together with an all-zero proposal is the other
@@ -489,6 +498,58 @@ export async function setClaim(
     await authFetch<unknown>(
       `/projects/bill-packages/${packageId}/lines/${claimId}`,
       { method: 'POST', body: JSON.stringify(input) },
+    ),
+  );
+}
+
+/**
+ * A non-BOQ item on a draft bill to the client (2026-10-14).
+ *
+ * Added to the project's BOQ as `NB-n`, so later bills carry it with its quantity up to previous.
+ * Billed at `quantity × rate`, with no tender premium. A subcontractor's go on the work order.
+ */
+export type NonBoqItemInput = {
+  description: string;
+  unit: string;
+  quantity: string;
+  rate: string;
+};
+
+export async function addNonBoqItem(
+  packageId: string,
+  input: NonBoqItemInput,
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-packages/${packageId}/non-boq-items`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
+  );
+}
+
+/** Refused once an issued bill carries the item — that bill stated it at this rate. */
+export async function updateNonBoqItem(
+  packageId: string,
+  itemId: string,
+  input: Partial<Omit<NonBoqItemInput, 'quantity'>>,
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-packages/${packageId}/non-boq-items/${itemId}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+    ),
+  );
+}
+
+/** Refused when another bill carries it — set its quantity to zero here instead. */
+export async function removeNonBoqItem(
+  packageId: string,
+  itemId: string,
+): Promise<BillPackage> {
+  return packageSchema.parse(
+    await authFetch<unknown>(
+      `/projects/bill-packages/${packageId}/non-boq-items/${itemId}`,
+      { method: 'DELETE' },
     ),
   );
 }

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+import {
+  type ApprovalState,
+  approvalStateSchemaForModules,
+} from '@/app/lib/api/approvals';
 import { fileToBase64 } from '@/app/lib/api/project-documents';
 import { authFetch, authFetchFile } from '@/app/lib/session';
 
@@ -612,6 +616,19 @@ export interface WorkOrderInput {
    * `active` comes from the approval chain completing.
    */
   status?: 'completed';
+}
+
+/**
+ * One work order with the caller's place in its award approval (2026-10-14) — `canActNow` puts
+ * Approve / Reject on the work order itself for the person whose turn it is.
+ */
+export async function getWorkOrderApproval(
+  id: string,
+): Promise<ApprovalState | null> {
+  const raw = await authFetch<{ approval?: unknown }>(
+    `/projects/work-orders/${encodeURIComponent(id)}`,
+  );
+  return approvalStateSchemaForModules.nullable().parse(raw.approval ?? null);
 }
 
 export async function getWorkOrders(projectId: string): Promise<WorkOrder[]> {

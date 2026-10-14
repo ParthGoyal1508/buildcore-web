@@ -8,7 +8,6 @@ import {
   type BillAbstract,
   type BillDocumentFormat,
   type BillPackage,
-  BILL_STATUS_LABELS,
   abandonBillPackage,
   certifyBillPackage,
   downloadBillDocument,
@@ -23,7 +22,11 @@ import { dateLabel } from '@/app/lib/format';
 import { useCanWrite } from '@/app/lib/write-access';
 import ActionReview from '@/app/ui/approvals/action-review';
 import { Button } from '@/app/ui/button';
-import { SecondaryButton, TextField } from '@/app/ui/settings/form-fields';
+import {
+  FieldLabelSpacer,
+  SecondaryButton,
+  TextField,
+} from '@/app/ui/settings/form-fields';
 
 /**
  * Where a bill stands and what can be done to it next (2026-10-13).
@@ -94,6 +97,22 @@ export default function BillLifecycle({
               : '.'}{' '}
             The bill is locked while it is with the approver.
           </p>
+          {/* 2026-10-14. Work billed at a rate nobody bid, on a quantity no daily report measured —
+              the one thing on a bill an approver most needs to see before approving it. */}
+          {pkg.nonBoqSummary.count > 0 && (
+            <p className="mb-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-sm text-indigo-900">
+              <strong>
+                Includes {pkg.nonBoqSummary.count} non-BOQ item
+                {pkg.nonBoqSummary.count === 1 ? '' : 's'} · ₹
+                {Number(pkg.nonBoqSummary.amount).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                })}
+              </strong>{' '}
+              — outside the {toClient ? 'tendered BOQ' : 'BOQ'}, billed at the
+              entered rate and quantity. They are marked Non-BOQ in the lines
+              below.
+            </p>
+          )}
           <ActionReview
             state={approval}
             entityLabel={`bill ${pkg.label}`}
@@ -304,6 +323,7 @@ function Steps({ pkg }: { pkg: BillPackage }) {
               reached.has(step.key)
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-500',
+              step.key === pkg.status && 'ring-2 ring-blue-300 ring-offset-1',
             )}
             aria-current={
               step.key === pkg.status ? 'step' : undefined
@@ -312,13 +332,12 @@ function Steps({ pkg }: { pkg: BillPackage }) {
             {step.label}
           </span>
           {index < STEPS.length - 1 && (
-            <span className="text-gray-300" aria-hidden>
+            <span className="text-gray-400" aria-hidden>
               →
             </span>
           )}
         </li>
       ))}
-      <li className="ml-2 text-gray-600">{BILL_STATUS_LABELS[pkg.status]}</li>
     </ol>
   );
 }
@@ -440,7 +459,7 @@ function ShareForm({
   const [sharedTo, setSharedTo] = useState(pkg.sharedTo ?? '');
   return (
     <form
-      className="flex flex-wrap items-end gap-2 rounded-md bg-gray-50 p-3"
+      className="flex flex-wrap items-start gap-2 rounded-md bg-gray-50 p-3"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit(sharedTo);
@@ -456,9 +475,12 @@ function ShareForm({
           onChange={(e) => setSharedTo(e.target.value)}
         />
       </div>
-      <Button type="submit" disabled={busy}>
-        {busy ? 'Saving…' : 'Record as shared'}
-      </Button>
+      <div className="shrink-0">
+        <FieldLabelSpacer />
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Saving…' : 'Record as shared'}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -493,7 +515,7 @@ function CertifyForm({
   const [certificate, setCertificate] = useState<File | null>(null);
   return (
     <form
-      className="flex flex-wrap items-end gap-2 rounded-md bg-gray-50 p-3"
+      className="flex flex-wrap items-start gap-2 rounded-md bg-gray-50 p-3"
       onSubmit={async (e) => {
         e.preventDefault();
         onSubmit({
@@ -543,9 +565,12 @@ function CertifyForm({
           />
         </div>
       )}
-      <Button type="submit" disabled={busy || !amount.trim()}>
-        {busy ? 'Saving…' : 'Certify'}
-      </Button>
+      <div className="shrink-0">
+        <FieldLabelSpacer />
+        <Button type="submit" disabled={busy || !amount.trim()}>
+          {busy ? 'Saving…' : 'Certify'}
+        </Button>
+      </div>
       <p className="w-full text-xs text-gray-500">
         Kept beside the billed figure, never instead of it — the difference is
         what gets chased.
@@ -566,7 +591,7 @@ function ReviseForm({
   const [reason, setReason] = useState('');
   return (
     <form
-      className="flex flex-wrap items-end gap-2 rounded-md bg-gray-50 p-3"
+      className="flex flex-wrap items-start gap-2 rounded-md bg-gray-50 p-3"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit(reason.trim());
@@ -583,9 +608,12 @@ function ReviseForm({
           onChange={(e) => setReason(e.target.value)}
         />
       </div>
-      <Button type="submit" disabled={busy || !reason.trim()}>
-        {busy ? 'Saving…' : 'Record revision'}
-      </Button>
+      <div className="shrink-0">
+        <FieldLabelSpacer />
+        <Button type="submit" disabled={busy || !reason.trim()}>
+          {busy ? 'Saving…' : 'Record revision'}
+        </Button>
+      </div>
     </form>
   );
 }

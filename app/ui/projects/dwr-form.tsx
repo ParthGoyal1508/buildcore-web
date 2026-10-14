@@ -326,7 +326,8 @@ export default function DwrForm({
   const boqOptions: SearchableOption[] = (boqGroups ?? [])
     .filter((group) => !group.isEstimate)
     .flatMap((group) =>
-      group.items.map((item) => ({
+      // A non-BOQ item is measured on the bill that adds it; the API refuses it here.
+      group.items.filter((item) => !item.nonBoq).map((item) => ({
         id: item.id,
         label: item.boqNo,
         sublabel: item.taskName,
