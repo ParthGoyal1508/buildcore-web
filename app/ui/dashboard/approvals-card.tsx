@@ -48,7 +48,7 @@ export default function ApprovalsCard() {
   const total = count.data?.count ?? items.length;
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+    <section className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
           Awaiting your approval
@@ -83,7 +83,7 @@ export default function ApprovalsCard() {
           Nothing is waiting for you.
         </p>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="flex-1 divide-y divide-gray-100">
           {items.map((item) => {
             const body = (
               <>
@@ -131,6 +131,19 @@ export default function ApprovalsCard() {
             );
           })}
         </ul>
+      )}
+      {/* Said when the card holds fewer than are waiting (2026-10-15), so five rows are not
+          read as the whole queue. */}
+      {total > items.length && items.length > 0 && (
+        <p className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
+          Showing {items.length} of {total} — the longest waiting first.{' '}
+          <Link
+            href={ROUTES.approvals}
+            className="font-medium text-brand-700 hover:underline"
+          >
+            See all {total}
+          </Link>
+        </p>
       )}
     </section>
   );

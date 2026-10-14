@@ -73,6 +73,7 @@ export default function WidgetRenderer({
         <WidgetList
           title={widget.title}
           value={widget.value}
+          note={widget.note}
           href={href}
           icon={widgetIcon(widget.id)}
         />
@@ -336,6 +337,7 @@ const SEVERITY_CLASS: Record<string, string> = {
 export function WidgetList({
   title,
   value,
+  note,
   href,
   icon,
 }: {
@@ -343,6 +345,8 @@ export function WidgetList({
   value: unknown;
   /** The screen listing every item, linked from the heading. */
   href?: string;
+  /** "Showing 6 of 9 …" from the API when the card holds fewer than there are. */
+  note?: string;
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }) {
   const items = Array.isArray(value) ? value : [];
@@ -405,6 +409,11 @@ export function WidgetList({
             );
           })}
         </ul>
+      )}
+      {note && (
+        <p className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          {note}
+        </p>
       )}
     </div>
   );
