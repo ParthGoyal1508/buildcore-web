@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 
 import { listSelectableCompanies } from '@/app/lib/api/company-selection';
 import {
@@ -60,7 +61,15 @@ export default function GroupDashboardPage() {
           {companies.data.total && (
             <GroupTotalCard total={companies.data.total} />
           )}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          {/* As many columns as there are companies, up to three (2026-10-15): two companies
+              on a wide screen sat in a three-column grid with the third left empty. */}
+          <div
+            className={clsx(
+              'grid gap-4',
+              companies.data.companies.length >= 2 && 'md:grid-cols-2',
+              companies.data.companies.length >= 3 && '2xl:grid-cols-3',
+            )}
+          >
             {companies.data.companies.map((card) => (
               <CompanyCard
                 key={card.companyId}

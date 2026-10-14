@@ -99,25 +99,35 @@ export default function DashboardPage() {
             metrics={tiles}
           />
 
-          {/* `min-w-0` on both columns: a grid item grows to its widest content by default,
-              and one wide table pushed the whole page sideways on a phone. */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="min-w-0 space-y-6 lg:col-span-2">
-              {section(widgets.data, 'table').map((w) => (
-                <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
-              ))}
-            </div>
-            <div className="min-w-0 space-y-4">
-              {/* First in the column: a decision waiting on the reader is the one thing here
-                  they act on rather than read (2026-10-15). */}
-              <ApprovalsCard />
-              {section(widgets.data, 'alerts').map((w) => (
-                <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
-              ))}
-              {cards.map((w) => (
-                <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
-              ))}
-            </div>
+          {/* The four cards in an even two-by-two (2026-10-15): what happened today beside
+              what needs a decision, then leave beside alerts — the client: "we can fix this
+              layout as we have these 4 items". Each card fills its cell, so a row's two cards
+              end level. `min-w-0` because a grid item grows to its widest table otherwise. */}
+          <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0 [&>*>*]:h-full">
+            {[
+              ...section(widgets.data, 'table')
+                .slice(0, 1)
+                .map((w) => (
+                  <div key={w.id}>
+                    <WidgetRenderer widget={w} href={widgetHref(w.id)} />
+                  </div>
+                )),
+              <div key="approvals">
+                <ApprovalsCard />
+              </div>,
+              ...section(widgets.data, 'table')
+                .slice(1)
+                .map((w) => (
+                  <div key={w.id}>
+                    <WidgetRenderer widget={w} href={widgetHref(w.id)} />
+                  </div>
+                )),
+              ...[...section(widgets.data, 'alerts'), ...cards].map((w) => (
+                <div key={w.id}>
+                  <WidgetRenderer widget={w} href={widgetHref(w.id)} />
+                </div>
+              )),
+            ]}
           </div>
         </div>
       )}

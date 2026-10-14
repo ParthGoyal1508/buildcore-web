@@ -2,7 +2,19 @@
 
 import Link from 'next/link';
 
-import { rupees } from '@/app/lib/format';
+import { dateLabel, rupees } from '@/app/lib/format';
+
+/** "23 Sep" this year, "23 Sep 2025" otherwise — short enough for a half-width card. */
+function shortDate(iso: string): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  const sameYear = date.getUTCFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+    timeZone: 'UTC',
+  });
+}
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import type { WidgetResult } from '@/app/lib/api/dashboard';
 import { widgetIcon } from '@/app/ui/dashboard/widget-metrics';
@@ -268,9 +280,17 @@ export function WidgetTable({
       header: col.label,
       render: (row) => {
         const cell = row[col.key];
-        return cell === null || cell === undefined || cell === ''
-          ? '—'
-          : String(cell);
+        if (cell === null || cell === undefined || cell === '') return '—';
+        // A bare ISO date reads as "23 Sep 2026" and stays on one line: in a half-width card
+        // "2026-09-23" broke at its hyphens into two lines a row (2026-10-15).
+        if (typeof cell === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cell)) {
+          return (
+            <span className="whitespace-nowrap" title={dateLabel(cell)}>
+              {shortDate(cell)}
+            </span>
+          );
+        }
+        return String(cell);
       },
     }),
   );
