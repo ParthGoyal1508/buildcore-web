@@ -20,6 +20,7 @@ import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 import { RowAction } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * The shared table look at the BOQ's density (2026-10-15): eleven columns over a tender of a few
@@ -436,7 +437,19 @@ function GroupRows({
                         {BOQ_COPY.planLine}
                       </RowAction>
                     )}
-                    <RowAction onClick={() => onDelete(item.id)}>
+                    <RowAction
+                      onClick={async () => {
+                        if (
+                          await confirmDialog({
+                            title: 'Delete this BOQ item?',
+                            message: `${item.boqNo} will be removed from the BOQ. This cannot be undone.`,
+                            confirmLabel: 'Delete',
+                            tone: 'danger',
+                          })
+                        )
+                          onDelete(item.id);
+                      }}
+                    >
                       {BOQ_COPY.deleteLine}
                     </RowAction>
                   </div>

@@ -13,6 +13,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import { getNotifications } from '@/app/lib/api/dashboard';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** The panel's own box, in pixels — the `w-72`/`max-h-96` it used to carry as classes.
  *  Needed as numbers because the placement below has to know how much room it wants
@@ -66,7 +67,10 @@ function place(anchor: HTMLElement): Placement {
     top: openUp ? rect.top - GAP - maxHeight : rect.bottom + GAP,
     left: Math.max(
       VIEWPORT_MARGIN,
-      Math.min(preferredLeft, window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN),
+      Math.min(
+        preferredLeft,
+        window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN,
+      ),
     ),
     maxHeight,
   };
@@ -162,7 +166,7 @@ export default function NotificationPanel({
       </div>
       {notifications.isPending && (
         <p className="px-3 py-3 text-sm text-gray-500" role="status">
-          Loading…
+          <LoadingText />
         </p>
       )}
       {notifications.isError && (

@@ -30,6 +30,8 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { LoadingText } from '@/app/ui/spinner';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -89,7 +91,7 @@ export default function EquipmentDetailPage() {
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -275,7 +277,9 @@ export default function EquipmentDetailPage() {
             ))}
           </dl>
         ) : (
-          <p className="mt-2 text-sm text-gray-500">Loading…</p>
+          <p className="mt-2 text-sm text-gray-500">
+            <LoadingText />
+          </p>
         )}
         {cost.data && (
           <p className="mt-3 text-xs text-gray-500">
@@ -300,8 +304,15 @@ export default function EquipmentDetailPage() {
           emptyMessage="No documents are attached to this machine."
           actions={(row) => (
             <RowAction
-              onClick={() => {
-                if (window.confirm(MESSAGES.plantConfirmDeleteEquipmentDoc)) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Remove this document?',
+                    message: MESSAGES.plantConfirmDeleteEquipmentDoc,
+                    confirmLabel: 'Remove',
+                    tone: 'danger',
+                  })
+                ) {
                   removeDocument.mutate(row.id);
                 }
               }}
@@ -354,10 +365,7 @@ export default function EquipmentDetailPage() {
       </section>
 
       {showUpload && (
-        <DocumentModal
-          equipmentId={id}
-          onClose={() => setShowUpload(false)}
-        />
+        <DocumentModal equipmentId={id} onClose={() => setShowUpload(false)} />
       )}
     </div>
   );

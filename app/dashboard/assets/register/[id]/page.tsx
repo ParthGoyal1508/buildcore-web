@@ -34,6 +34,8 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 type Tab = 'documents' | 'allocations' | 'stock';
 
@@ -98,9 +100,7 @@ export default function AssetDetailPage() {
       );
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not open this document.',
+        err instanceof ApiError ? err.message : 'Could not open this document.',
       );
     }
   }
@@ -108,7 +108,7 @@ export default function AssetDetailPage() {
   if (asset.isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -280,15 +280,24 @@ export default function AssetDetailPage() {
               </SecondaryButton>
             </>
           )}
-          <SecondaryButton
-            type="button"
-            onClick={() => setShowDocument(true)}
-          >
+          <SecondaryButton type="button" onClick={() => setShowDocument(true)}>
             Attach a document
           </SecondaryButton>
           <SecondaryButton
             type="button"
-            onClick={() => remove.mutate()}
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this asset?',
+                  message:
+                    'The asset leaves the register, with its history. This cannot be undone.',
+                  confirmLabel: 'Delete asset',
+                  tone: 'danger',
+                  typeToConfirm: 'DELETE',
+                })
+              )
+                remove.mutate();
+            }}
             disabled={remove.isPending}
             title={
               openAllocation
@@ -307,7 +316,8 @@ export default function AssetDetailPage() {
       <dl className="grid gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
-            label: row.trackingMode === 'serialised' ? 'Serial number' : 'Quantity',
+            label:
+              row.trackingMode === 'serialised' ? 'Serial number' : 'Quantity',
             value:
               row.trackingMode === 'serialised'
                 ? (row.serialNumber ?? '—')

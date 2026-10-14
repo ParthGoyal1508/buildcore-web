@@ -21,6 +21,7 @@ import {
   useSortedRows,
   type SortableColumn,
 } from '@/app/ui/table';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** Dot colours. Distinct from `StatusBadge` because a dot has no text to carry the
  * meaning, so each one gets a `title` and an accessible label instead. */
@@ -88,15 +89,13 @@ function RagTable({ data }: { data: RagMatrix }) {
           </thead>
           <tbody>
             {sorted.map((row) => (
-              <tr
-                key={row.contractorProfileId}
-                className={clsx(TABLE.row, 'group/row')}
-              >
+              <tr key={row.contractorProfileId} className={TABLE.row}>
                 <th
                   scope="row"
                   className={clsx(
                     TABLE.td,
-                    'sticky left-0 z-10 bg-white text-left font-medium text-gray-900 group-hover/row:bg-brand-50',
+                    TABLE.stickyCell,
+                    'text-left font-medium text-gray-900',
                   )}
                 >
                   {row.contractorName}
@@ -185,7 +184,7 @@ function RagMatrixBody() {
           className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500"
           role="status"
         >
-          Loading…
+          <LoadingText />
         </p>
       )}
       {isError && (
@@ -229,7 +228,13 @@ function RagMatrixBody() {
 
 export default function RagMatrixPage() {
   return (
-    <Suspense fallback={<p className="p-4 text-sm text-gray-500">Loading…</p>}>
+    <Suspense
+      fallback={
+        <p className="p-4 text-sm text-gray-500">
+          <LoadingText />
+        </p>
+      }
+    >
       <RagMatrixBody />
     </Suspense>
   );

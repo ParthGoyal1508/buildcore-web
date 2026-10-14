@@ -3,7 +3,10 @@ import { inter } from '@/app/ui/fonts';
 import type { Metadata } from 'next';
 import Providers from '@/app/providers';
 import InstallPrompt from '@/app/install-prompt';
+import { DialogHost } from '@/app/ui/dialogs';
 import NativePickers from '@/app/ui/native-pickers';
+import RowLinks from '@/app/ui/row-links';
+import TopLoader from '@/app/ui/top-loader';
 
 export const metadata: Metadata = {
   title: {
@@ -63,6 +66,9 @@ export default function RootLayout({
           {children}
           <InstallPrompt />
           <NativePickers />
+          <DialogHost />
+          <RowLinks />
+          <TopLoader />
         </Providers>
       </body>
     </html>

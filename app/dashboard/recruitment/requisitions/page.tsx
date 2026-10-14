@@ -15,7 +15,10 @@ import {
 } from '@/app/lib/api/recruitment';
 import { listDepartments, listDesignations } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { REQUISITION_EMPLOYMENT_TYPES, recruitmentLabel } from '@/app/lib/constants';
+import {
+  REQUISITION_EMPLOYMENT_TYPES,
+  recruitmentLabel,
+} from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
@@ -29,6 +32,7 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function RequisitionsPage() {
   const queryClient = useQueryClient();
@@ -53,49 +57,77 @@ export default function RequisitionsPage() {
   });
   const requisitions = useQuery({
     queryKey: ['requisitions', status],
-    queryFn: () => getRequisitions({ status: status || undefined, pageSize: 200 }),
+    queryFn: () =>
+      getRequisitions({ status: status || undefined, pageSize: 200 }),
   });
 
-  const canApprove = user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['requisitions'] });
-  const deptName = (id: string) => departments.data?.find((d) => d.id === id)?.name ?? id;
-  const desigName = (id: string) => designations.data?.find((d) => d.id === id)?.name ?? id;
+  const canApprove =
+    user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['requisitions'] });
+  const deptName = (id: string) =>
+    departments.data?.find((d) => d.id === id)?.name ?? id;
+  const desigName = (id: string) =>
+    designations.data?.find((d) => d.id === id)?.name ?? id;
 
   const submit = useMutation({
     mutationFn: (id: string) => submitRequisitionForApproval(id),
     onSuccess: invalidate,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not submit.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not submit.'),
   });
   const approve = useMutation({
     mutationFn: (id: string) => approveRequisition(id),
     onSuccess: invalidate,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not approve.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not approve.'),
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteRequisition(id),
     onSuccess: invalidate,
     onError: (e) =>
       setError(
-        e instanceof ApiError ? e.message : 'Requisition has candidates — cannot delete.',
+        e instanceof ApiError
+          ? e.message
+          : 'Requisition has candidates — cannot delete.',
       ),
   });
 
   const columns: Column<Requisition>[] = [
     { key: 'code', header: 'Code', render: (r) => r.requisitionCode },
-    { key: 'dept', header: 'Department', render: (r) => deptName(r.departmentId) },
-    { key: 'desig', header: 'Designation', render: (r) => desigName(r.designationId) },
+    {
+      key: 'dept',
+      header: 'Department',
+      render: (r) => deptName(r.departmentId),
+    },
+    {
+      key: 'desig',
+      header: 'Designation',
+      render: (r) => desigName(r.designationId),
+    },
     {
       key: 'positions',
       header: 'Positions',
       render: (r) => `${r.filledPositions} / ${r.positionCount}`,
     },
-    { key: 'type', header: 'Type', render: (r) => recruitmentLabel(r.employmentType) },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (r) => recruitmentLabel(r.employmentType),
+    },
     { key: 'target', header: 'Target', render: (r) => r.targetJoiningDate },
-    { key: 'age', header: 'Age', render: (r) => `${r.ageInDays}d`, hideOnCard: true },
+    {
+      key: 'age',
+      header: 'Age',
+      render: (r) => `${r.ageInDays}d`,
+      hideOnCard: true,
+    },
     {
       key: 'status',
       header: 'Status',
-      render: (r) => <StatusBadge status={r.status} label={recruitmentLabel(r.status)} />,
+      render: (r) => (
+        <StatusBadge status={r.status} label={recruitmentLabel(r.status)} />
+      ),
     },
   ];
 
@@ -107,13 +139,20 @@ export default function RequisitionsPage() {
           description="Open positions and their approvals."
         />
         <div className="flex items-end gap-2">
-          <SelectField id="req-status" label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <SelectField
+            id="req-status"
+            label="Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
             <option value="">All</option>
-            {['draft', 'pending_approval', 'open', 'rejected', 'closed'].map((s) => (
-              <option key={s} value={s}>
-                {recruitmentLabel(s)}
-              </option>
-            ))}
+            {['draft', 'pending_approval', 'open', 'rejected', 'closed'].map(
+              (s) => (
+                <option key={s} value={s}>
+                  {recruitmentLabel(s)}
+                </option>
+              ),
+            )}
           </SelectField>
           <Button onClick={() => setShowForm(true)}>New Requisition</Button>
         </div>
@@ -132,13 +171,31 @@ export default function RequisitionsPage() {
           <span className="flex flex-wrap gap-2">
             {r.status === 'draft' && (
               <>
-                <RowAction onClick={() => submit.mutate(r.id)}>Submit</RowAction>
-                <RowAction onClick={() => remove.mutate(r.id)}>Delete</RowAction>
+                <RowAction onClick={() => submit.mutate(r.id)}>
+                  Submit
+                </RowAction>
+                <RowAction
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this requisition?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    )
+                      remove.mutate(r.id);
+                  }}
+                >
+                  Delete
+                </RowAction>
               </>
             )}
             {r.status === 'pending_approval' && canApprove && (
               <>
-                <RowAction onClick={() => approve.mutate(r.id)}>Approve</RowAction>
+                <RowAction onClick={() => approve.mutate(r.id)}>
+                  Approve
+                </RowAction>
                 <RowAction onClick={() => setRejecting(r)}>Reject</RowAction>
               </>
             )}
@@ -199,7 +256,9 @@ function RequisitionForm({
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const ctcInvalid =
-    form.budgetedCtcMin && form.budgetedCtcMax && Number(form.budgetedCtcMin) > Number(form.budgetedCtcMax);
+    form.budgetedCtcMin &&
+    form.budgetedCtcMax &&
+    Number(form.budgetedCtcMin) > Number(form.budgetedCtcMax);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -214,7 +273,8 @@ function RequisitionForm({
         justification: form.justification,
       }),
     onSuccess: onSaved,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not create.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not create.'),
   });
 
   const valid =
@@ -248,27 +308,68 @@ function RequisitionForm({
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormError message={error} />
-        <SelectField id="r-dept" label="Department" value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
+        <SelectField
+          id="r-dept"
+          label="Department"
+          value={form.departmentId}
+          onChange={(e) => set('departmentId', e.target.value)}
+        >
           <option value="">Select…</option>
           {departments.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
           ))}
         </SelectField>
-        <SelectField id="r-desig" label="Designation" value={form.designationId} onChange={(e) => set('designationId', e.target.value)}>
+        <SelectField
+          id="r-desig"
+          label="Designation"
+          value={form.designationId}
+          onChange={(e) => set('designationId', e.target.value)}
+        >
           <option value="">Select…</option>
           {designations.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
           ))}
         </SelectField>
-        <TextField id="r-count" label="Position count" type="number" min="1" value={form.positionCount} onChange={(e) => set('positionCount', e.target.value)} />
-        <SelectField id="r-type" label="Employment type" value={form.employmentType} onChange={(e) => set('employmentType', e.target.value)}>
+        <TextField
+          id="r-count"
+          label="Position count"
+          type="number"
+          min="1"
+          value={form.positionCount}
+          onChange={(e) => set('positionCount', e.target.value)}
+        />
+        <SelectField
+          id="r-type"
+          label="Employment type"
+          value={form.employmentType}
+          onChange={(e) => set('employmentType', e.target.value)}
+        >
           {REQUISITION_EMPLOYMENT_TYPES.map((t) => (
-            <option key={t} value={t}>{recruitmentLabel(t)}</option>
+            <option key={t} value={t}>
+              {recruitmentLabel(t)}
+            </option>
           ))}
         </SelectField>
-        <TextField id="r-target" label="Target joining date" type="date" value={form.targetJoiningDate} onChange={(e) => set('targetJoiningDate', e.target.value)} />
+        <TextField
+          id="r-target"
+          label="Target joining date"
+          type="date"
+          value={form.targetJoiningDate}
+          onChange={(e) => set('targetJoiningDate', e.target.value)}
+        />
         <div />
-        <TextField id="r-min" label="Budgeted CTC min (₹)" type="number" min="0" value={form.budgetedCtcMin} onChange={(e) => set('budgetedCtcMin', e.target.value)} />
+        <TextField
+          id="r-min"
+          label="Budgeted CTC min (₹)"
+          type="number"
+          min="0"
+          value={form.budgetedCtcMin}
+          onChange={(e) => set('budgetedCtcMin', e.target.value)}
+        />
         <TextField
           id="r-max"
           label="Budgeted CTC max (₹)"
@@ -279,11 +380,17 @@ function RequisitionForm({
           error={ctcInvalid ? 'Max must be at least the minimum' : undefined}
         />
         <div className="sm:col-span-2">
-          <TextField id="r-just" label="Justification" value={form.justification} onChange={(e) => set('justification', e.target.value)} />
+          <TextField
+            id="r-just"
+            label="Justification"
+            value={form.justification}
+            onChange={(e) => set('justification', e.target.value)}
+          />
         </div>
         {form.budgetedCtcMin && form.budgetedCtcMax && !ctcInvalid && (
           <p className="text-xs text-gray-500 sm:col-span-2">
-            Budget band: {rupees(Number(form.budgetedCtcMin))} – {rupees(Number(form.budgetedCtcMax))}
+            Budget band: {rupees(Number(form.budgetedCtcMin))} –{' '}
+            {rupees(Number(form.budgetedCtcMax))}
           </p>
         )}
       </div>
@@ -305,7 +412,8 @@ function RejectForm({
   const mutation = useMutation({
     mutationFn: () => rejectRequisition(requisition.id, reason),
     onSuccess: onSaved,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not reject.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not reject.'),
   });
   return (
     <Modal
@@ -314,12 +422,19 @@ function RejectForm({
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <Button onClick={() => mutation.mutate()} disabled={!reason}>Reject</Button>
+          <Button onClick={() => mutation.mutate()} disabled={!reason}>
+            Reject
+          </Button>
         </div>
       }
     >
       <FormError message={error} />
-      <TextField id="rej-reason" label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+      <TextField
+        id="rej-reason"
+        label="Reason"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+      />
     </Modal>
   );
 }

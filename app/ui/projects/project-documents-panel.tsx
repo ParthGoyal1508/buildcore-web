@@ -14,8 +14,12 @@ import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
-import { DocumentUpload, type UploadKind } from '@/app/ui/documents/document-upload';
+import {
+  DocumentUpload,
+  type UploadKind,
+} from '@/app/ui/documents/document-upload';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * What a project actually holds, and what it still owes (017 FR-024, web T077, T078).
@@ -50,7 +54,9 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
  */
 function hasLapsed(document: { expiresAt?: string | null }): boolean {
   if (!document.expiresAt) return false;
-  return document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
+  return (
+    document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10)
+  );
 }
 
 export default function ProjectDocumentsPanel({
@@ -113,7 +119,9 @@ export default function ProjectDocumentsPanel({
       // The portfolio row carries this project's readiness, and it has just moved. Invalidated
       // by its root key because the list is cached per filter and page — a readiness figure that
       // disagrees with the project's own screen is the inconsistency 017 FR-008 exists to avoid.
-      void queryClient.invalidateQueries({ queryKey: ['projects', 'portfolio'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', 'portfolio'],
+      });
     },
   });
 
@@ -172,7 +180,7 @@ export default function ProjectDocumentsPanel({
   if (documents.isLoading) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

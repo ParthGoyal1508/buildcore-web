@@ -15,6 +15,7 @@ import {
 import { COMPANY_SWITCHER } from '@/app/lib/constants';
 import { COMPANY_LOGO_KEY, CompanyMark } from '@/app/ui/company-logo';
 import { hasUnsavedChanges, unsavedScreens } from '@/app/lib/unsaved-changes';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * The key this control's own query lives under.
@@ -146,7 +147,7 @@ export default function CompanySwitcher() {
    */
   const selectedId = companies.find((company) => company.selected)?.id ?? '';
 
-  const handleChange = (companyId: string) => {
+  const handleChange = async (companyId: string) => {
     /**
      * FR-006. A switch discards every cached view, so an unsaved form is lost with them.
      *
@@ -156,7 +157,15 @@ export default function CompanySwitcher() {
      */
     if (hasUnsavedChanges()) {
       const screens = unsavedScreens().join(', ');
-      if (!window.confirm(COMPANY_SWITCHER.confirmDiscard(screens))) return;
+      if (
+        !(await confirmDialog({
+          title: 'Discard unsaved changes?',
+          message: COMPANY_SWITCHER.confirmDiscard(screens),
+          confirmLabel: 'Switch company',
+          tone: 'danger',
+        }))
+      )
+        return;
     }
     setFailed(false);
     setPending(companyId);
@@ -217,7 +226,7 @@ export default function CompanySwitcher() {
                   autoFocus={isSelected}
                   onClick={() => {
                     setOpen(false);
-                    if (!isSelected) handleChange(company.id);
+                    if (!isSelected) void handleChange(company.id);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === 'Escape') setOpen(false);

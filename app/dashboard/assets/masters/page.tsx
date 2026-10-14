@@ -30,6 +30,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 type Tab = 'categories' | 'doc-types' | 'grades';
 
@@ -259,7 +260,17 @@ export default function AssetMastersPage() {
               */}
               {row.assetCount === 0 && (
                 <RowAction
-                  onClick={() => removeCategory.mutate(row.id)}
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this category?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    )
+                      removeCategory.mutate(row.id);
+                  }}
                   disabled={removeCategory.isPending}
                 >
                   Delete
@@ -289,7 +300,17 @@ export default function AssetMastersPage() {
                 Edit
               </RowAction>
               <RowAction
-                onClick={() => removeDocType.mutate(row.id)}
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this document type?',
+                      message: 'This cannot be undone.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  )
+                    removeDocType.mutate(row.id);
+                }}
                 disabled={removeDocType.isPending}
               >
                 Delete
@@ -318,7 +339,17 @@ export default function AssetMastersPage() {
                 Edit
               </RowAction>
               <RowAction
-                onClick={() => removeGrade.mutate(row.id)}
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this grade?',
+                      message: 'This cannot be undone.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  )
+                    removeGrade.mutate(row.id);
+                }}
                 disabled={removeGrade.isPending}
               >
                 Delete

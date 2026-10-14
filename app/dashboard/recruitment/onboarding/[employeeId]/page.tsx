@@ -25,6 +25,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 type Item = Onboarding['items'][number];
 
@@ -41,23 +42,34 @@ export default function OnboardingPage() {
     queryKey: ['onboarding', employeeId],
     queryFn: () => getOnboarding(employeeId),
   });
-  const canApprove = user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['onboarding', employeeId] });
+  const canApprove =
+    user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['onboarding', employeeId] });
 
   const issue = useMutation({
     mutationFn: (id: string) => issueKitItem(id, 1),
     onSuccess: invalidate,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not issue.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not issue.'),
   });
   const induct = useMutation({
     mutationFn: (id: string) => completeInduction(id),
     onSuccess: invalidate,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not complete.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not complete.'),
   });
 
-  if (onboarding.isPending) return <p className="p-4 text-sm text-gray-500">Loading…</p>;
+  if (onboarding.isPending)
+    return (
+      <p className="p-4 text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   if (onboarding.isError || !onboarding.data)
-    return <p className="p-4 text-sm text-red-600">Could not load onboarding.</p>;
+    return (
+      <p className="p-4 text-sm text-red-600">Could not load onboarding.</p>
+    );
 
   const data = onboarding.data;
   const groups: Record<string, Item[]> = {
@@ -65,7 +77,11 @@ export default function OnboardingPage() {
     kit: data.items.filter((i) => i.itemType === 'kit'),
     induction: data.items.filter((i) => i.itemType === 'induction'),
   };
-  const groupTitle: Record<string, string> = { document: 'Documents', kit: 'Kit', induction: 'Induction' };
+  const groupTitle: Record<string, string> = {
+    document: 'Documents',
+    kit: 'Kit',
+    induction: 'Induction',
+  };
 
   return (
     <div className="space-y-4">
@@ -93,21 +109,35 @@ export default function OnboardingPage() {
 
       {(['document', 'kit', 'induction'] as const).map((type) => (
         <section key={type}>
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">{groupTitle[type]}</h2>
+          <h2 className="mb-2 text-sm font-semibold text-gray-700">
+            {groupTitle[type]}
+          </h2>
           <div className="space-y-2">
             {groups[type].map((i) => (
-              <div key={i.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3 text-sm">
+              <div
+                key={i.id}
+                className="flex items-center justify-between rounded-lg border border-gray-100 p-3 text-sm"
+              >
                 <span>{i.label}</span>
                 <span className="flex items-center gap-2">
-                  <StatusBadge status={i.status} label={recruitmentLabel(i.status)} />
+                  <StatusBadge
+                    status={i.status}
+                    label={recruitmentLabel(i.status)}
+                  />
                   {i.status === 'pending' && type === 'document' && (
-                    <RowAction onClick={() => setVerifying(i)}>Verify</RowAction>
+                    <RowAction onClick={() => setVerifying(i)}>
+                      Verify
+                    </RowAction>
                   )}
                   {i.status === 'pending' && type === 'kit' && (
-                    <RowAction onClick={() => issue.mutate(i.id)}>Issue</RowAction>
+                    <RowAction onClick={() => issue.mutate(i.id)}>
+                      Issue
+                    </RowAction>
                   )}
                   {i.status === 'pending' && type === 'induction' && (
-                    <RowAction onClick={() => induct.mutate(i.id)}>Complete</RowAction>
+                    <RowAction onClick={() => induct.mutate(i.id)}>
+                      Complete
+                    </RowAction>
                   )}
                   {i.status === 'pending' && canApprove && (
                     <RowAction onClick={() => setWaiving(i)}>Waive</RowAction>
@@ -115,7 +145,9 @@ export default function OnboardingPage() {
                 </span>
               </div>
             ))}
-            {groups[type].length === 0 && <p className="text-sm text-gray-400">None.</p>}
+            {groups[type].length === 0 && (
+              <p className="text-sm text-gray-400">None.</p>
+            )}
           </div>
         </section>
       ))}
@@ -124,21 +156,35 @@ export default function OnboardingPage() {
         <VerifyModal
           item={verifying}
           onClose={() => setVerifying(null)}
-          onSaved={() => { invalidate(); setVerifying(null); }}
+          onSaved={() => {
+            invalidate();
+            setVerifying(null);
+          }}
         />
       )}
       {waiving && (
         <WaiveModal
           item={waiving}
           onClose={() => setWaiving(null)}
-          onSaved={() => { invalidate(); setWaiving(null); }}
+          onSaved={() => {
+            invalidate();
+            setWaiving(null);
+          }}
         />
       )}
     </div>
   );
 }
 
-function VerifyModal({ item, onClose, onSaved }: { item: Item; onClose: () => void; onSaved: () => void }) {
+function VerifyModal({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: Item;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [documentNumber, setDocumentNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -154,7 +200,10 @@ function VerifyModal({ item, onClose, onSaved }: { item: Item; onClose: () => vo
       });
     },
     onSuccess: onSaved,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not verify the document.'),
+    onError: (e) =>
+      setError(
+        e instanceof ApiError ? e.message : 'Could not verify the document.',
+      ),
   });
 
   return (
@@ -164,30 +213,64 @@ function VerifyModal({ item, onClose, onSaved }: { item: Item; onClose: () => vo
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <Button onClick={() => { setError(null); mutation.mutate(); }} disabled={!file}>Verify</Button>
+          <Button
+            onClick={() => {
+              setError(null);
+              mutation.mutate();
+            }}
+            disabled={!file}
+          >
+            Verify
+          </Button>
         </div>
       }
     >
       <div className="space-y-3">
         <FormError message={error} />
-        <TextField id="v-num" label="Document number" value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
-        <TextField id="v-exp" label="Expiry (optional)" type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+        <TextField
+          id="v-num"
+          label="Document number"
+          value={documentNumber}
+          onChange={(e) => setDocumentNumber(e.target.value)}
+        />
+        <TextField
+          id="v-exp"
+          label="Expiry (optional)"
+          type="date"
+          value={expiryDate}
+          onChange={(e) => setExpiryDate(e.target.value)}
+        />
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">File</label>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            File
+          </label>
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
         </div>
       </div>
     </Modal>
   );
 }
 
-function WaiveModal({ item, onClose, onSaved }: { item: Item; onClose: () => void; onSaved: () => void }) {
+function WaiveModal({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: Item;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const mutation = useMutation({
     mutationFn: () => waiveOnboardingItem(item.id, reason),
     onSuccess: onSaved,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not waive.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not waive.'),
   });
   return (
     <Modal
@@ -196,12 +279,25 @@ function WaiveModal({ item, onClose, onSaved }: { item: Item; onClose: () => voi
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <Button onClick={() => { setError(null); mutation.mutate(); }} disabled={!reason}>Waive</Button>
+          <Button
+            onClick={() => {
+              setError(null);
+              mutation.mutate();
+            }}
+            disabled={!reason}
+          >
+            Waive
+          </Button>
         </div>
       }
     >
       <FormError message={error} />
-      <TextField id="w-reason" label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+      <TextField
+        id="w-reason"
+        label="Reason"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+      />
     </Modal>
   );
 }

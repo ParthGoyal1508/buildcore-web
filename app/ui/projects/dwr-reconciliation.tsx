@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getReconciliation, repairReconciliation } from '@/app/lib/api/dwr';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import { promptDialog } from '@/app/ui/dialogs';
 
 type ReconciliationLine = Awaited<
   ReturnType<typeof getReconciliation>
@@ -154,10 +155,16 @@ export default function DwrReconciliation({
           actions={(line) => (
             <Button
               disabled={repair.isPending}
-              onClick={() => {
-                const reason = window.prompt(
-                  'Say what drifted and why the counter is the wrong figure. A repair overwrites it, and the previous value is recorded.',
-                );
+              onClick={async () => {
+                const reason = await promptDialog({
+                  title: 'Repair this counter?',
+                  message:
+                    'Say what drifted and why the counter is the wrong figure. A repair overwrites it, and the previous value is recorded.',
+                  required: true,
+                  multiline: true,
+                  confirmLabel: 'Repair',
+                  tone: 'danger',
+                });
                 if (reason) {
                   repair.mutate({ ids: [line.boqItemId], reason });
                 }

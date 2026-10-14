@@ -9,7 +9,12 @@ export const TABLE = {
   table: 'min-w-full text-sm text-gray-800',
   thead: 'border-b border-gray-200 bg-gray-50 text-left',
   th: 'px-3 py-3 align-bottom text-xs font-semibold text-gray-600',
-  row: 'border-b border-gray-100 transition-colors last:border-0 hover:bg-brand-50/50',
+  // `group/row` so a sticky cell can follow the row's hover; `stickyCell` gives it the same colour.
+  row: 'group/row border-b border-gray-100 transition-colors last:border-0 hover:bg-brand-50/60',
+  /** A cell pinned while the table scrolls sideways: opaque, so the rest does not show through it,
+   * and the same tint as its row on hover (brand-50 at 60% over white, made opaque). */
+  stickyCell:
+    'sticky left-0 z-10 bg-white transition-colors group-hover/row:bg-[#f5fafd]',
   td: 'px-3 py-3 align-middle',
   tfoot: 'border-t-2 border-gray-200 bg-gray-50 font-semibold',
   /** Loading, empty and failed states, in the table's place. */

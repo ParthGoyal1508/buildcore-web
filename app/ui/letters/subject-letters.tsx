@@ -22,7 +22,12 @@ import GenerateLetterDialog, {
 } from '@/app/ui/letters/generate-letter-dialog';
 import { LetterList } from '@/app/ui/letters/letter-list';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
-import { FormError, RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
+import {
+  FormError,
+  RowAction,
+  SecondaryButton,
+} from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The letters belonging to one subject, wherever that subject's own screen is (017 US6, T029, T030).
@@ -73,7 +78,10 @@ export default function SubjectLetters({
 }) {
   const [generating, setGenerating] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const offerable = useOfferableLetterKinds(generate?.kindKeys ?? [], !!generate);
+  const offerable = useOfferableLetterKinds(
+    generate?.kindKeys ?? [],
+    !!generate,
+  );
 
   const { data, isLoading, isError } = useQuery({
     // The query in the key, so switching subject refetches rather than showing the last one's
@@ -113,7 +121,7 @@ export default function SubjectLetters({
   if (isLoading) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -145,11 +153,19 @@ export default function SubjectLetters({
           // approval gate the composer already renders — putting either here would be a second
           // path to an action whose preconditions this panel does not check.
           <>
-            <RowAction intent="read" type="button" onClick={() => void open(letter)}>
+            <RowAction
+              intent="read"
+              type="button"
+              onClick={() => void open(letter)}
+            >
               {LETTER_COPY.subjectOpen}
             </RowAction>
             {letter.status !== 'composed' && (
-              <RowAction intent="read" type="button" onClick={() => void save(letter)}>
+              <RowAction
+                intent="read"
+                type="button"
+                onClick={() => void save(letter)}
+              >
                 Download
               </RowAction>
             )}

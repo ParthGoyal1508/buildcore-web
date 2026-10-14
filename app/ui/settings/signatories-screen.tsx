@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getSignatories, upsertSignatory } from '@/app/lib/api/letters';
 import { Button } from '@/app/ui/button';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 const QUERY_KEY = ['signatories'];
 
@@ -85,7 +86,12 @@ export function SignatoriesScreen() {
     },
   });
 
-  if (isPending) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (isPending)
+    return (
+      <p className="text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   if (isError || !data) {
     return <FormError message="Signatories could not be loaded." />;
   }

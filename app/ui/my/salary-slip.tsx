@@ -16,6 +16,7 @@ import {
   SecondaryButton,
   SelectField,
 } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 const money = (value: number) =>
   value.toLocaleString('en-IN', {
@@ -115,7 +116,7 @@ export default function SalarySlipPanel() {
   if (periodsLoading) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -177,7 +178,11 @@ export default function SalarySlipPanel() {
         >
           View PDF
         </SecondaryButton>
-        <Button type="button" onClick={download} disabled={isDownloading || !slip}>
+        <Button
+          type="button"
+          onClick={download}
+          disabled={isDownloading || !slip}
+        >
           {isDownloading ? 'Preparing…' : 'Download PDF'}
         </Button>
       </div>
@@ -253,8 +258,8 @@ function SlipBody({ slip }: { slip: Slip }) {
             an employee reading a column of numbers under their payslip will
             otherwise assume they were. */}
         <p className="mb-1 text-xs text-gray-500">
-          Paid by your employer on top of your salary — not deducted from your net
-          pay.
+          Paid by your employer on top of your salary — not deducted from your
+          net pay.
         </p>
         <AmountRows
           totalLabel="Total contributions"

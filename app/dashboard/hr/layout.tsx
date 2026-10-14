@@ -4,9 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { HR_PERMISSIONS, MESSAGES, ROUTES, type HrSection } from '@/app/lib/constants';
+import {
+  HR_PERMISSIONS,
+  MESSAGES,
+  ROUTES,
+  type HrSection,
+} from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import HrNav from '@/app/ui/hr/hr-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The single permission chokepoint for every `/dashboard/hr/*` page.
@@ -34,7 +40,7 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

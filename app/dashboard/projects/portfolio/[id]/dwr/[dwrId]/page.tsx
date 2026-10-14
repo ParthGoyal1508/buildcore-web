@@ -25,6 +25,7 @@ import { Button } from '@/app/ui/button';
 import SectionGuard from '@/app/ui/projects/section-guard';
 import StatusBadge from '@/app/ui/status-badge';
 import { TABLE } from '@/app/ui/table';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * One daily work report, read-only (024 Story 2).
@@ -141,7 +142,16 @@ export default function DwrReportPage() {
                 <Button
                   type="button"
                   disabled={remove.isPending}
-                  onClick={() => {
+                  onClick={async () => {
+                    if (
+                      !(await confirmDialog({
+                        title: 'Delete this daily work report?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      }))
+                    )
+                      return;
                     setError(null);
                     remove.mutate();
                   }}

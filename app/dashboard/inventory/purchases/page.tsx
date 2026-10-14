@@ -10,7 +10,11 @@ import {
   getPurchases,
   type Purchase,
 } from '@/app/lib/api/inventory';
-import { MESSAGES, PURCHASE_BILL_STATUSES, inventoryLabel } from '@/app/lib/constants';
+import {
+  MESSAGES,
+  PURCHASE_BILL_STATUSES,
+  inventoryLabel,
+} from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import { useSites, useVendors } from '@/app/ui/inventory/use-inventory-refs';
@@ -26,6 +30,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function PurchasesPage() {
   const queryClient = useQueryClient();
@@ -68,7 +73,11 @@ export default function PurchasesPage() {
     setOpeningBill(id);
     setError(null);
     try {
-      show({ blob: await getPurchaseBill(id) }, `purchase-bill-${id}`, 'Vendor bill');
+      show(
+        { blob: await getPurchaseBill(id) },
+        `purchase-bill-${id}`,
+        'Vendor bill',
+      );
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not open this bill.',
@@ -254,8 +263,15 @@ export default function PurchasesPage() {
         emptyMessage={MESSAGES.purchasesEmpty}
         actions={(row) => (
           <RowAction
-            onClick={() => {
-              if (window.confirm(MESSAGES.confirmDeletePurchase)) {
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this purchase?',
+                  message: MESSAGES.confirmDeletePurchase,
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                })
+              ) {
                 remove.mutate(row.id);
               }
             }}

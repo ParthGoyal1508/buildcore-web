@@ -55,3 +55,10 @@ input[type='number']::-webkit-outer-spin-button {
     @apply bg-brand-100;
   }
 }
+
+/* A row that opens somewhere looks it: the pointer anywhere on it (`RowLinks`, 2026-10-15). */
+@layer base {
+  tbody tr:has(> td:not([data-row-actions]) a[href]):not([data-row-click='off'] tr) {
+    cursor: pointer;
+  }
+}

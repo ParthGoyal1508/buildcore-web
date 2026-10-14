@@ -9,6 +9,7 @@ import {
   useSortedRows,
   type SortValue,
 } from '@/app/ui/table';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One column definition, rendered twice: as a `<td>` on desktop and as a labelled
@@ -72,7 +73,7 @@ export default function ResponsiveList<T>({
   if (isLoading) {
     return (
       <p className={TABLE.empty} role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -171,7 +172,7 @@ export default function ResponsiveList<T>({
                       </td>
                     ))}
                     {actions && (
-                      <td className={TABLE.td}>
+                      <td className={TABLE.td} data-row-actions>
                         <div className="flex justify-end gap-2">
                           {actions(row)}
                         </div>

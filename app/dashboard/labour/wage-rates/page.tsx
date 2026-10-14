@@ -27,6 +27,7 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function WageRatesPage() {
   const queryClient = useQueryClient();
@@ -62,8 +63,16 @@ export default function WageRatesPage() {
     projects.data?.items.find((p) => p.id === id)?.name ?? id;
 
   const columns: Column<WageRate>[] = [
-    { key: 'project', header: 'Project', render: (r) => projectName(r.projectId) },
-    { key: 'skill', header: 'Skill', render: (r) => skillName(r.skillCategoryId) },
+    {
+      key: 'project',
+      header: 'Project',
+      render: (r) => projectName(r.projectId),
+    },
+    {
+      key: 'skill',
+      header: 'Skill',
+      render: (r) => skillName(r.skillCategoryId),
+    },
     { key: 'rate', header: 'Daily Rate', render: (r) => rupees(r.dailyRate) },
     { key: 'from', header: 'Effective From', render: (r) => r.effectiveFrom },
     {
@@ -286,7 +295,9 @@ function SkillCategoryMasters({
       createSkillCategory({
         name,
         code,
-        defaultDailyRate: defaultDailyRate ? Number(defaultDailyRate) : undefined,
+        defaultDailyRate: defaultDailyRate
+          ? Number(defaultDailyRate)
+          : undefined,
       }),
     onSuccess: () => {
       setName('');
@@ -296,7 +307,9 @@ function SkillCategoryMasters({
       onChanged();
     },
     onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not add the category.'),
+      setError(
+        e instanceof ApiError ? e.message : 'Could not add the category.',
+      ),
   });
 
   const remove = useMutation({
@@ -361,7 +374,21 @@ function SkillCategoryMasters({
                   </span>
                 )}
               </span>
-              <RowAction onClick={() => remove.mutate(s.id)}>Delete</RowAction>
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this wage rate?',
+                      message: 'This cannot be undone.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  )
+                    remove.mutate(s.id);
+                }}
+              >
+                Delete
+              </RowAction>
             </li>
           ))}
           {skills.length === 0 && (

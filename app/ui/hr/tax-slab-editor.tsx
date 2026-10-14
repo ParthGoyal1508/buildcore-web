@@ -3,7 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getTaxSlabs, setTaxSlabs, type TaxSlabBand } from '@/app/lib/api/hr-payroll';
+import {
+  getTaxSlabs,
+  setTaxSlabs,
+  type TaxSlabBand,
+} from '@/app/lib/api/hr-payroll';
 import { financialYearOf, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
@@ -13,6 +17,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 interface BandDraft {
   lowerBound: string;
@@ -109,7 +114,8 @@ export default function TaxSlabEditor() {
         regime,
         bands.map((band) => ({
           lowerBound: Number(band.lowerBound),
-          upperBound: band.upperBound.trim() === '' ? null : Number(band.upperBound),
+          upperBound:
+            band.upperBound.trim() === '' ? null : Number(band.upperBound),
           ratePercent: Number(band.ratePercent),
         })),
       ),
@@ -126,7 +132,9 @@ export default function TaxSlabEditor() {
   function update(index: number, field: keyof BandDraft, value: string) {
     setSaved(false);
     setBands((current) =>
-      current.map((band, i) => (i === index ? { ...band, [field]: value } : band)),
+      current.map((band, i) =>
+        i === index ? { ...band, [field]: value } : band,
+      ),
     );
   }
 
@@ -153,7 +161,7 @@ export default function TaxSlabEditor() {
 
       {isLoading ? (
         <p className="text-sm text-gray-500" role="status">
-          Loading…
+          <LoadingText />
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -167,15 +175,23 @@ export default function TaxSlabEditor() {
                 label="From"
                 type="number"
                 value={band.lowerBound}
-                onChange={(event) => update(index, 'lowerBound', event.target.value)}
+                onChange={(event) =>
+                  update(index, 'lowerBound', event.target.value)
+                }
               />
               <TextField
                 id={`band-upper-${index}`}
                 label="To"
                 type="number"
                 value={band.upperBound}
-                onChange={(event) => update(index, 'upperBound', event.target.value)}
-                hint={index === bands.length - 1 ? 'Leave blank — open-ended' : undefined}
+                onChange={(event) =>
+                  update(index, 'upperBound', event.target.value)
+                }
+                hint={
+                  index === bands.length - 1
+                    ? 'Leave blank — open-ended'
+                    : undefined
+                }
               />
               <TextField
                 id={`band-rate-${index}`}
@@ -183,7 +199,9 @@ export default function TaxSlabEditor() {
                 type="number"
                 step="0.01"
                 value={band.ratePercent}
-                onChange={(event) => update(index, 'ratePercent', event.target.value)}
+                onChange={(event) =>
+                  update(index, 'ratePercent', event.target.value)
+                }
               />
               <div className="flex gap-2">
                 <RowAction
@@ -224,13 +242,19 @@ export default function TaxSlabEditor() {
       )}
 
       {validation && (
-        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p
+          role="alert"
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
           {validation}
         </p>
       )}
       <FormError message={error} />
       {saved && !validation && (
-        <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+        <p
+          role="status"
+          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
+        >
           Slabs saved for {financialYear} ({regime} regime).
         </p>
       )}

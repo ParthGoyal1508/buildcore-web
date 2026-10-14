@@ -30,6 +30,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function ServiceSchedulesPage() {
   const queryClient = useQueryClient();
@@ -71,7 +72,9 @@ export default function ServiceSchedulesPage() {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not delete this schedule.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not delete this schedule.',
       ),
   });
 
@@ -196,8 +199,15 @@ export default function ServiceSchedulesPage() {
               Edit
             </RowAction>
             <RowAction
-              onClick={() => {
-                if (window.confirm('Delete this service schedule?')) {
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this service schedule?',
+                    message: 'Delete this service schedule?',
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                ) {
                   remove.mutate(row.id);
                 }
               }}

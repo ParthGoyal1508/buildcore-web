@@ -28,6 +28,7 @@ import {
   useSortedRows,
   type SortableColumn,
 } from '@/app/ui/table';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The Reminders centre (spec US9, FR-024 to FR-029).
@@ -114,7 +115,7 @@ export default function RemindersList() {
   if (isPending) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

@@ -32,6 +32,7 @@ import {
   fieldClass,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import { LoadingText } from '@/app/ui/spinner';
 
 /** Who the document is to — exactly one of the two. */
 export type LetterRecipient = { employeeId: string } | { candidateId: string };
@@ -49,7 +50,9 @@ export interface LetterSubmission {
  * `POST /recruitment/offers/:id/generate` instead, because issuing an offer also moves the offer
  * and the candidate on, and a letter issued beside it would leave the offer a draft.
  */
-export type LetterSubmit = (submission: LetterSubmission) => Promise<IssuedLetter>;
+export type LetterSubmit = (
+  submission: LetterSubmission,
+) => Promise<IssuedLetter>;
 
 /** A refusal a custom `submit` words itself; shown verbatim, unlike an unexpected error. */
 export class LetterSubmitError extends Error {}
@@ -187,7 +190,9 @@ export default function GenerateLetterDialog({
 
   const [issued, setIssued] = useState<IssuedLetter | null>(null);
 
-  const title = recipientLabel ? `${COPY.title} — ${recipientLabel}` : COPY.title;
+  const title = recipientLabel
+    ? `${COPY.title} — ${recipientLabel}`
+    : COPY.title;
 
   return (
     <Modal title={title} onClose={onClose} wide>
@@ -197,7 +202,7 @@ export default function GenerateLetterDialog({
         <div className="flex flex-col gap-5">
           {kindsPending ? (
             <p className="text-sm text-gray-500" role="status">
-              Loading…
+              <LoadingText />
             </p>
           ) : kinds.length === 0 ? (
             <p className="text-sm text-gray-600">{COPY.noKinds}</p>
@@ -225,8 +230,7 @@ export default function GenerateLetterDialog({
               kind={kind}
               recipient={recipient}
               submit={
-                submit ??
-                ((input) => composeLetter({ ...input, ...recipient }))
+                submit ?? ((input) => composeLetter({ ...input, ...recipient }))
               }
               onCancel={onClose}
               onIssued={(letter) => {
@@ -284,7 +288,7 @@ function LetterForm({
   if (prefill.isPending) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -305,7 +309,8 @@ function LetterForm({
       signatoriesPending={kind.requiresSignature && signatories.isPending}
       signatoriesError={
         kind.requiresSignature && signatories.isError
-          ? signatories.error instanceof ApiError && signatories.error.status === 403
+          ? signatories.error instanceof ApiError &&
+            signatories.error.status === 403
             ? COPY.signatoriesForbidden
             : COPY.signatoriesFailed
           : null
@@ -371,7 +376,10 @@ function LetterFields({
     // A required field nobody can supply: blank now, and blank in the records it came from —
     // the api would refuse it, so say so on the field without the round trip.
     const missing = fields
-      .filter((f) => f.isRequired && !(values[f.token] ?? '').trim() && !f.value.trim())
+      .filter(
+        (f) =>
+          f.isRequired && !(values[f.token] ?? '').trim() && !f.value.trim(),
+      )
       .map((f) => f.token);
     if (missing.length > 0) {
       setFlagged(missing);
@@ -443,12 +451,16 @@ function LetterFields({
     };
     return (
       <div key={f.token} className={long ? 'sm:col-span-2' : undefined}>
-        <label htmlFor={id} className="mb-1 flex items-center gap-2 text-sm font-medium text-gray-700">
+        <label
+          htmlFor={id}
+          className="mb-1 flex items-center gap-2 text-sm font-medium text-gray-700"
+        >
           <span>
             {f.label}
             {f.isRequired && (
               <span className="text-red-600" aria-hidden="true">
-                {' '}*
+                {' '}
+                *
               </span>
             )}
             {f.isRequired && <span className="sr-only"> (required)</span>}
@@ -459,9 +471,17 @@ function LetterFields({
             </span>
           )}
         </label>
-        {long ? <textarea rows={3} {...common} /> : <input type="text" {...common} />}
+        {long ? (
+          <textarea rows={3} {...common} />
+        ) : (
+          <input type="text" {...common} />
+        )}
         {isFlagged && (
-          <p id={`${id}-error`} className="mt-1 text-xs text-red-600" role="alert">
+          <p
+            id={`${id}-error`}
+            className="mt-1 text-xs text-red-600"
+            role="alert"
+          >
             {COPY.requiredMissing}
           </p>
         )}
@@ -471,15 +491,22 @@ function LetterFields({
 
   return (
     <div className="flex flex-col gap-5">
-      {fields.length === 0 && <p className="text-sm text-gray-600">{COPY.noFields}</p>}
+      {fields.length === 0 && (
+        <p className="text-sm text-gray-600">{COPY.noFields}</p>
+      )}
 
       {fromRecords.length > 0 && (
         <section aria-labelledby="letter-from-records">
-          <h3 id="letter-from-records" className="text-sm font-medium text-gray-900">
+          <h3
+            id="letter-from-records"
+            className="text-sm font-medium text-gray-900"
+          >
             {COPY.fromRecords}
           </h3>
           <p className="mb-3 text-xs text-gray-500">{COPY.fromRecordsHint}</p>
-          <div className="grid gap-4 sm:grid-cols-2">{fromRecords.map(renderField)}</div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {fromRecords.map(renderField)}
+          </div>
         </section>
       )}
 
@@ -489,7 +516,9 @@ function LetterFields({
             {COPY.toFill}
           </h3>
           <p className="mb-3 text-xs text-gray-500">{COPY.toFillHint}</p>
-          <div className="grid gap-4 sm:grid-cols-2">{toFill.map(renderField)}</div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {toFill.map(renderField)}
+          </div>
         </section>
       )}
 
@@ -531,10 +560,16 @@ function LetterFields({
         <Button
           intent="read"
           type="button"
-          disabled={busy || (kind.requiresSignature && signatories.length === 0)}
+          disabled={
+            busy || (kind.requiresSignature && signatories.length === 0)
+          }
           onClick={() => void issue()}
         >
-          {busy ? 'Issuing…' : kind.requiresApproval ? COPY.submitForApproval : COPY.issue}
+          {busy
+            ? 'Issuing…'
+            : kind.requiresApproval
+              ? COPY.submitForApproval
+              : COPY.issue}
         </Button>
       </div>
     </div>
@@ -559,7 +594,9 @@ function IssuedSummary({
     try {
       saveBlob(await downloadLetter(letter.id), letterFileName(letter));
     } catch (err) {
-      setError(err instanceof ApiError && err.code ? err.message : COPY.downloadFailed);
+      setError(
+        err instanceof ApiError && err.code ? err.message : COPY.downloadFailed,
+      );
     } finally {
       setBusy(false);
     }
@@ -570,18 +607,26 @@ function IssuedSummary({
   return (
     <div className="flex flex-col gap-4">
       {awaiting ? (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+        <p
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="status"
+        >
           {COPY.awaitingApproval}
         </p>
       ) : (
-        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3" role="status">
+        <div
+          className="rounded-md border border-green-200 bg-green-50 px-4 py-3"
+          role="status"
+        >
           <p className="text-sm text-green-900">
             {letter.letterKindLabel} {COPY.issued.toLowerCase()}.
           </p>
           {letter.referenceNo && (
             <p className="mt-1 text-sm text-green-900">
               Reference no.{' '}
-              <span className="font-mono font-semibold">{letter.referenceNo}</span>
+              <span className="font-mono font-semibold">
+                {letter.referenceNo}
+              </span>
             </p>
           )}
         </div>
@@ -607,7 +652,12 @@ function IssuedSummary({
           </SecondaryButton>
         )}
         {!awaiting && (
-          <Button intent="read" type="button" disabled={busy} onClick={() => void download()}>
+          <Button
+            intent="read"
+            type="button"
+            disabled={busy}
+            onClick={() => void download()}
+          >
             {busy ? 'Downloading…' : COPY.download}
           </Button>
         )}

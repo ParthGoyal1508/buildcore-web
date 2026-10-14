@@ -38,6 +38,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 interface Breakup {
   notes: Record<string, number>;
@@ -151,7 +152,11 @@ export default function PaymentSheetDetailPage() {
   });
 
   if (sheet.isPending) {
-    return <p className="p-4 text-sm text-gray-500">Loading…</p>;
+    return (
+      <p className="p-4 text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   }
   if (sheet.isError || !sheet.data) {
     return (

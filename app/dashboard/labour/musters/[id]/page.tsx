@@ -23,6 +23,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 // Keys match the line's own fields, so each column sorts by the raw value rather than its label.
 const LINE_COLUMNS: Column<MusterLine>[] = [
@@ -89,7 +90,11 @@ export default function MusterDetailPage() {
   });
 
   if (muster.isPending) {
-    return <p className="p-4 text-sm text-gray-500">Loading…</p>;
+    return (
+      <p className="p-4 text-sm text-gray-500">
+        <LoadingText />
+      </p>
+    );
   }
   if (muster.isError || !muster.data) {
     return (

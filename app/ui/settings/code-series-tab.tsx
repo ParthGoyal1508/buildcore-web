@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCodeSeries } from '@/app/lib/api/settings';
 import { MESSAGES } from '@/app/lib/constants';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * Read-only view of a company's employee code series (spec FR-019).
@@ -35,7 +36,7 @@ export default function CodeSeriesTab() {
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

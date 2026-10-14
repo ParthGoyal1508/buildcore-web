@@ -9,6 +9,7 @@ import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { hasModuleAccess, landingRoute } from '@/app/lib/permissions';
 import { canWriteAt, isWriteByNature } from '@/app/lib/write-access';
 import AccessDenied from '@/app/ui/access-denied';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The permission chokepoint for `/dashboard/*` at the **module** tier (feature 014,
@@ -61,7 +62,7 @@ export default function ModuleGuard({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

@@ -38,6 +38,7 @@ import LocationAssignmentPanel from '@/app/ui/hr/location-assignment';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -85,12 +86,20 @@ function Fields({ children }: { children: React.ReactNode }) {
 const orDash = (value: string | null | undefined) =>
   value && value.trim() ? value : '—';
 
-export default function EmployeeDetailTabs({ employeeId }: { employeeId: string }) {
+export default function EmployeeDetailTabs({
+  employeeId,
+}: {
+  employeeId: string;
+}) {
   const [tab, setTab] = useState<TabId>('overview');
   const [transferring, setTransferring] = useState(false);
   const [offboarding, setOffboarding] = useState(false);
 
-  const { data: employee, isLoading, isError } = useQuery({
+  const {
+    data: employee,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['hr', 'employee', employeeId],
     queryFn: () => getEmployee(employeeId),
   });
@@ -130,7 +139,7 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -158,11 +167,24 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
     ['Site allowance', employee.siteAllowance],
     ['Special allowance', employee.specialAllowance],
   ];
-  const grossMonthly = earnings.reduce((sum, [, value]) => sum + (value ?? 0), 0);
+  const grossMonthly = earnings.reduce(
+    (sum, [, value]) => sum + (value ?? 0),
+    0,
+  );
 
   const loanColumns: Column<Loan>[] = [
-    { key: 'amount', header: 'Amount', numeric: true, render: (row) => money(row.amount) },
-    { key: 'emi', header: 'EMI', numeric: true, render: (row) => money(row.emiAmount) },
+    {
+      key: 'amount',
+      header: 'Amount',
+      numeric: true,
+      render: (row) => money(row.amount),
+    },
+    {
+      key: 'emi',
+      header: 'EMI',
+      numeric: true,
+      render: (row) => money(row.emiAmount),
+    },
     {
       key: 'disbursed',
       header: 'Disbursed',
@@ -217,12 +239,18 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
       <TabPanel id="overview" idPrefix="employee-detail" active={tab}>
         <Fields>
           <Field label="Employee code">{employee.employeeCode}</Field>
-          <Field label="Department">{lookup(departments, employee.departmentId)}</Field>
-          <Field label="Designation">{lookup(designations, employee.designationId)}</Field>
+          <Field label="Department">
+            {lookup(departments, employee.departmentId)}
+          </Field>
+          <Field label="Designation">
+            {lookup(designations, employee.designationId)}
+          </Field>
           <Field label="Employment type">
             {employee.employmentType ? hrLabel(employee.employmentType) : '—'}
           </Field>
-          <Field label="Date of joining">{dateLabel(employee.dateOfJoining)}</Field>
+          <Field label="Date of joining">
+            {dateLabel(employee.dateOfJoining)}
+          </Field>
           <Field label="Shift">{lookup(shifts, employee.shiftId)}</Field>
           <Field label="Mobile">{orDash(employee.mobile)}</Field>
           <Field label="Email">{orDash(employee.email)}</Field>
@@ -248,7 +276,9 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
           <Field label="Title">{orDash(employee.title)}</Field>
           <Field label="Father’s name">{orDash(employee.fatherName)}</Field>
           <Field label="Date of birth">{dateLabel(employee.dob)}</Field>
-          <Field label="Gender">{employee.gender ? hrLabel(employee.gender) : '—'}</Field>
+          <Field label="Gender">
+            {employee.gender ? hrLabel(employee.gender) : '—'}
+          </Field>
           <Field label="Marital status">
             {employee.maritalStatus ? hrLabel(employee.maritalStatus) : '—'}
           </Field>
@@ -261,7 +291,11 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
             />
           </Field>
           <Field label="PAN">
-            <MaskedField employeeId={employee.id} field="pan" maskedValue={employee.pan} />
+            <MaskedField
+              employeeId={employee.id}
+              field="pan"
+              maskedValue={employee.pan}
+            />
           </Field>
         </Fields>
 
@@ -307,8 +341,12 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
 
       <TabPanel id="employment" idPrefix="employee-detail" active={tab}>
         <Fields>
-          <Field label="Probation ends">{dateLabel(employee.probationEndDate)}</Field>
-          <Field label="Confirmed on">{dateLabel(employee.confirmationDate)}</Field>
+          <Field label="Probation ends">
+            {dateLabel(employee.probationEndDate)}
+          </Field>
+          <Field label="Confirmed on">
+            {dateLabel(employee.confirmationDate)}
+          </Field>
           <Field label="Calculation mode">
             {employee.calculationMode ? hrLabel(employee.calculationMode) : '—'}
           </Field>
@@ -316,11 +354,15 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
           <Field label="Daily rate">
             {employee.dailyRate === null ? '—' : rupees(employee.dailyRate)}
           </Field>
-          <Field label="Muster category">{orDash(employee.musterCategory)}</Field>
+          <Field label="Muster category">
+            {orDash(employee.musterCategory)}
+          </Field>
           <Field label="Workman ID">{orDash(employee.workmanId)}</Field>
         </Fields>
 
-        <h3 className="mt-6 text-sm font-medium text-gray-900">Letters &amp; onboarding</h3>
+        <h3 className="mt-6 text-sm font-medium text-gray-900">
+          Letters &amp; onboarding
+        </h3>
         <ul className="mt-2 grid gap-1.5 text-sm text-gray-700 sm:grid-cols-2 lg:grid-cols-3">
           {(
             [
@@ -349,7 +391,10 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
         <div className="max-w-md">
           <dl className="divide-y divide-gray-100 rounded-lg border border-gray-200">
             {earnings.map(([label, value]) => (
-              <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
+              <div
+                key={label}
+                className="flex justify-between px-4 py-2.5 text-sm"
+              >
                 <dt className="text-gray-600">{label}</dt>
                 <dd className="tabular-nums">{money(value)}</dd>
               </div>
@@ -363,15 +408,25 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
 
         <SalaryRevisions employee={employee} />
 
-        <h3 className="mt-6 text-sm font-medium text-gray-900">Statutory &amp; bank</h3>
+        <h3 className="mt-6 text-sm font-medium text-gray-900">
+          Statutory &amp; bank
+        </h3>
         <div className="mt-2">
           <Fields>
-            <Field label="PF applicable">{employee.pfApplicable ? 'Yes' : 'No'}</Field>
-            <Field label="ESIC applicable">{employee.esicApplicable ? 'Yes' : 'No'}</Field>
+            <Field label="PF applicable">
+              {employee.pfApplicable ? 'Yes' : 'No'}
+            </Field>
+            <Field label="ESIC applicable">
+              {employee.esicApplicable ? 'Yes' : 'No'}
+            </Field>
             <Field label="PF number">{orDash(employee.pfNumber)}</Field>
             <Field label="ESIC number">{orDash(employee.esicNumber)}</Field>
             <Field label="UAN">
-              <MaskedField employeeId={employee.id} field="uan" maskedValue={employee.uan} />
+              <MaskedField
+                employeeId={employee.id}
+                field="uan"
+                maskedValue={employee.uan}
+              />
             </Field>
             <Field label="Bank">{orDash(employee.bankName)}</Field>
             <Field label="Branch">{orDash(employee.bankBranch)}</Field>
@@ -406,10 +461,29 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
               header: 'Leave type',
               render: (row) => hrLabel(row.leaveType),
             },
-            { key: 'fy', header: 'Financial year', render: (row) => row.financialYear },
-            { key: 'opening', header: 'Opening', numeric: true, render: (row) => money(row.opening) },
-            { key: 'accrued', header: 'Accrued', numeric: true, render: (row) => money(row.accrued) },
-            { key: 'used', header: 'Used', numeric: true, render: (row) => money(row.used) },
+            {
+              key: 'fy',
+              header: 'Financial year',
+              render: (row) => row.financialYear,
+            },
+            {
+              key: 'opening',
+              header: 'Opening',
+              numeric: true,
+              render: (row) => money(row.opening),
+            },
+            {
+              key: 'accrued',
+              header: 'Accrued',
+              numeric: true,
+              render: (row) => money(row.accrued),
+            },
+            {
+              key: 'used',
+              header: 'Used',
+              numeric: true,
+              render: (row) => money(row.used),
+            },
             {
               key: 'balance',
               header: 'Balance',
@@ -455,10 +529,16 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
       </TabPanel>
 
       {transferring && (
-        <TransferModal employee={employee} onClose={() => setTransferring(false)} />
+        <TransferModal
+          employee={employee}
+          onClose={() => setTransferring(false)}
+        />
       )}
       {offboarding && (
-        <OffboardingPanel employee={employee} onClose={() => setOffboarding(false)} />
+        <OffboardingPanel
+          employee={employee}
+          onClose={() => setOffboarding(false)}
+        />
       )}
     </main>
   );

@@ -41,6 +41,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * The shape a project form must satisfy before it is worth sending (spec FR-002).
@@ -177,7 +178,11 @@ export default function ProjectForm({ project }: { project?: Project }) {
   // that refuses anything over 100, so the request was a 400 and the control offered
   // "Not assigned" and nothing else — on creating a project and on editing one.
   const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: EMPLOYEE_PAGE_MAX, isActive: true }],
+    queryKey: [
+      'hr',
+      'employees',
+      { pageSize: EMPLOYEE_PAGE_MAX, isActive: true },
+    ],
     queryFn: () =>
       listEmployees({ pageSize: EMPLOYEE_PAGE_MAX, isActive: true }),
   });
@@ -326,7 +331,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
     },
   });
 
-  function onSubmit(values: ProjectFormValues) {
+  async function onSubmit(values: ProjectFormValues) {
     setServerError(null);
     // Cleared here, not in `onError`: a refusal from a previous attempt must stay on its controls
     // until the user tries again, or the explanation vanishes before it has been read.
@@ -337,13 +342,32 @@ export default function ProjectForm({ project }: { project?: Project }) {
       const message = values.isLocked
         ? MESSAGES.projectLockConfirm
         : MESSAGES.projectUnlockConfirm;
-      if (!window.confirm(message)) return;
+      if (
+        !(await confirmDialog({
+          title: values.isLocked
+            ? 'Lock this project?'
+            : 'Unlock this project?',
+          message,
+          confirmLabel: values.isLocked ? 'Lock' : 'Unlock',
+          tone: values.isLocked ? 'danger' : 'default',
+        }))
+      )
+        return;
     }
     mutation.mutate(values);
   }
 
-  function handleCancel() {
-    if (isDirty && !window.confirm(MESSAGES.discardChanges)) return;
+  async function handleCancel() {
+    if (
+      isDirty &&
+      !(await confirmDialog({
+        title: 'Discard changes?',
+        message: MESSAGES.discardChanges,
+        confirmLabel: 'Discard',
+        tone: 'danger',
+      }))
+    )
+      return;
     router.push(ROUTES.projectsPortfolio);
   }
 
@@ -473,7 +497,9 @@ export default function ProjectForm({ project }: { project?: Project }) {
                 </label>
               ))}
             </div>
-            <p className="mt-1 text-xs text-gray-500">{PROJECT_GST_COPY.hint}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              {PROJECT_GST_COPY.hint}
+            </p>
           </fieldset>
 
           <TextField

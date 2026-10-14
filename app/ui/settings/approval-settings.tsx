@@ -13,6 +13,7 @@ import { listRoles } from '@/app/lib/api/settings';
 import { MESSAGES, approvalActionTypeLabel } from '@/app/lib/constants';
 import { FormError, selectClass } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * Slot-to-role mappings, and the chains that depend on them (feature 016 FR-001a, FR-021b).
@@ -155,7 +156,7 @@ export default function ApprovalSettings() {
               {slots.isLoading && (
                 <tr className={TABLE.row}>
                   <td colSpan={2} className={`${TABLE.td} text-gray-500`}>
-                    Loading…
+                    <LoadingText />
                   </td>
                 </tr>
               )}
@@ -218,7 +219,9 @@ export default function ApprovalSettings() {
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           {chains.isLoading && (
-            <p className="text-sm text-gray-500">Loading…</p>
+            <p className="text-sm text-gray-500">
+              <LoadingText />
+            </p>
           )}
           {(chains.data ?? [])
             // Active first, then superseded ones — those are kept because an item still

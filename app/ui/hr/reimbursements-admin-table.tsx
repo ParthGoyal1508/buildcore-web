@@ -24,6 +24,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { promptDialog } from '@/app/ui/dialogs';
 
 const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
 
@@ -56,7 +57,9 @@ function PayClaimModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [paymentMode, setPaymentMode] = useState<'payroll' | 'direct'>('payroll');
+  const [paymentMode, setPaymentMode] = useState<'payroll' | 'direct'>(
+    'payroll',
+  );
   const [paymentReference, setPaymentReference] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +111,9 @@ function PayClaimModal({
             setPaymentMode(event.target.value as 'payroll' | 'direct')
           }
         >
-          <option value="payroll">Through payroll — added to the next run</option>
+          <option value="payroll">
+            Through payroll — added to the next run
+          </option>
           <option value="direct">Direct — settled outside payroll</option>
         </SelectField>
         {needsReference && (
@@ -172,7 +177,12 @@ export default function ReimbursementsAdminTable() {
       header: 'Category',
       render: (row) => categoryName(row.categoryId),
     },
-    { key: 'amount', header: 'Amount', numeric: true, render: (row) => money(row.amount) },
+    {
+      key: 'amount',
+      header: 'Amount',
+      numeric: true,
+      render: (row) => money(row.amount),
+    },
     {
       key: 'date',
       header: 'Expense date',
@@ -237,8 +247,15 @@ export default function ReimbursementsAdminTable() {
                 </RowAction>
                 <RowAction
                   type="button"
-                  onClick={() => {
-                    const remarks = window.prompt(HR_MESSAGES.rejectNeedsRemarks);
+                  onClick={async () => {
+                    const remarks = await promptDialog({
+                      title: 'Reject this claim?',
+                      message: HR_MESSAGES.rejectNeedsRemarks,
+                      required: true,
+                      multiline: true,
+                      confirmLabel: 'Reject',
+                      tone: 'danger',
+                    });
                     if (remarks?.trim()) {
                       reject.mutate({ id: row.id, remarks: remarks.trim() });
                     }

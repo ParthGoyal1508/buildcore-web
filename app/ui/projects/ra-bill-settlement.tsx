@@ -19,6 +19,7 @@ import { Button } from '@/app/ui/button';
 import PaymentAdviceDialog from '@/app/ui/projects/payment-advice-dialog';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import HiddenAmount from '@/app/ui/hidden-amount';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * What has been paid against one bill (028 FR-021).
@@ -98,7 +99,10 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
       </h4>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -109,9 +113,7 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
             <dt className="text-xs uppercase tracking-wide text-gray-500">
               {SETTLEMENT_COPY.certified}
             </dt>
-            <dd className="tabular-nums">
-              {rupees(position.certifiedAmount)}
-            </dd>
+            <dd className="tabular-nums">{rupees(position.certifiedAmount)}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-gray-500">
@@ -145,7 +147,6 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
         onError={setError}
         onChanged={refresh}
       />
-
     </section>
   );
 }
@@ -263,8 +264,8 @@ function Payments({
                     {adviceBusy === `${payment.id}-${format}`
                       ? '…'
                       : format === 'pdf'
-                      ? 'PDF'
-                      : 'Word'}
+                        ? 'PDF'
+                        : 'Word'}
                   </SecondaryButton>
                 ))}
               </span>
@@ -272,8 +273,15 @@ function Payments({
                 type="button"
                 intent="write"
                 disabled={remove.isPending}
-                onClick={() => {
-                  if (window.confirm(SETTLEMENT_COPY.removeConfirm)) {
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Remove this payment?',
+                      message: SETTLEMENT_COPY.removeConfirm,
+                      confirmLabel: 'Remove',
+                      tone: 'danger',
+                    })
+                  ) {
                     remove.mutate(payment.id);
                   }
                 }}

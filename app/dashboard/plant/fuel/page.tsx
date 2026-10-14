@@ -26,6 +26,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 export default function FuelPage() {
   const equipment = usePlantEquipment();
@@ -173,7 +174,9 @@ export default function FuelPage() {
             />
           </>
         ) : (
-          <p className="mt-2 text-sm text-gray-500">Loading…</p>
+          <p className="mt-2 text-sm text-gray-500">
+            <LoadingText />
+          </p>
         )}
       </section>
 

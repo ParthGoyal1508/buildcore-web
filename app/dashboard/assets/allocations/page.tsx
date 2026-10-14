@@ -23,13 +23,11 @@ import {
   useAssetsCompanyId,
 } from '@/app/ui/assets/use-asset-refs';
 import Pager from '@/app/ui/inventory/pager';
-import {
-  RowAction,
-  SelectField,
-} from '@/app/ui/settings/form-fields';
+import { RowAction, SelectField } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 type View = 'allocations' | 'custody';
 
@@ -87,7 +85,12 @@ export default function AllocationsPage() {
         </Link>
       ),
     },
-    { key: 'name', header: 'Name', hideOnCard: true, render: (row) => row.assetName },
+    {
+      key: 'name',
+      header: 'Name',
+      hideOnCard: true,
+      render: (row) => row.assetName,
+    },
     { key: 'site', header: 'Site', render: (row) => row.siteName },
     {
       key: 'custodian',
@@ -241,7 +244,7 @@ export default function AllocationsPage() {
         <div className="flex flex-col gap-4">
           {custody.isPending && (
             <p className="p-4 text-sm text-gray-500" role="status">
-              Loading…
+              <LoadingText />
             </p>
           )}
           {custody.isError && (

@@ -8,11 +8,18 @@ import { getEmployeeAttendanceMonth } from '@/app/lib/api/hr-payroll';
 import { MESSAGES, STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
 import { timeLabel } from '@/app/lib/format';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** The statuses a day can carry, in the order the legend lists them. */
-const LEGEND = ['present', 'absent', 'on_leave', 'weekly_off', 'holiday'] as const;
+const LEGEND = [
+  'present',
+  'absent',
+  'on_leave',
+  'weekly_off',
+  'holiday',
+] as const;
 
 /**
  * A month of one employee's attendance as a calendar grid.
@@ -21,7 +28,11 @@ const LEGEND = ['present', 'absent', 'on_leave', 'weekly_off', 'holiday'] as con
  * their month look like" — clusters of absence next to weekends, a gap around a
  * leave period. A list of thirty rows makes that shape invisible.
  */
-export default function AttendanceCalendar({ employeeId }: { employeeId: string }) {
+export default function AttendanceCalendar({
+  employeeId,
+}: {
+  employeeId: string;
+}) {
   const now = new Date();
   const [month, setMonth] = useState(now.getUTCMonth() + 1);
   const [year, setYear] = useState(now.getUTCFullYear());
@@ -62,7 +73,7 @@ export default function AttendanceCalendar({ employeeId }: { employeeId: string 
 
       {isLoading && (
         <p className="text-sm text-gray-500" role="status">
-          Loading…
+          <LoadingText />
         </p>
       )}
       {isError && (
@@ -91,7 +102,8 @@ export default function AttendanceCalendar({ employeeId }: { employeeId: string 
                   key={day.date}
                   className={clsx(
                     'rounded-md p-2 text-xs',
-                    STATUS_BADGE_CLASSES[day.status] ?? 'bg-gray-100 text-gray-700',
+                    STATUS_BADGE_CLASSES[day.status] ??
+                      'bg-gray-100 text-gray-700',
                   )}
                 >
                   <div className="font-medium tabular-nums">

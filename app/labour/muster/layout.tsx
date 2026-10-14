@@ -10,6 +10,7 @@ import AccessDenied from '@/app/ui/access-denied';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import LabourNav from '@/app/ui/labour/labour-nav';
 import ShellHeader from '@/app/ui/shell-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The muster capture shell.
@@ -48,7 +49,7 @@ export default function MusterLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

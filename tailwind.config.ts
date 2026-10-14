@@ -33,6 +33,7 @@ const config: Config = {
         'pop-down': 'pop-down 140ms ease-out',
         'pop-up': 'pop-up 140ms ease-out',
         'fade-in': 'fade-in 160ms ease-out',
+        'top-loader': 'top-loader 1.1s ease-in-out infinite',
       },
       gridTemplateColumns: {
         '13': 'repeat(13, minmax(0, 1fr))',
@@ -100,6 +101,14 @@ const config: Config = {
       'fade-in': {
         from: { opacity: '0' },
         to: { opacity: '1' },
+      },
+      // The top loading bar: a third of the width sweeping across, again and again.
+      'top-loader': {
+        from: { transform: 'translateX(-100%)' },
+        to: { transform: 'translateX(300%)' },
+      },
+      spin: {
+        to: { transform: 'rotate(360deg)' },
       },
       shimmer: {
         '100%': {

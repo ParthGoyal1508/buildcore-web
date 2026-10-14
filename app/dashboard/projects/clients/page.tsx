@@ -27,6 +27,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * The client master (spec US1).
@@ -72,9 +73,18 @@ export default function ClientsPage() {
       header: 'Client',
       render: (row) => <span className="font-medium">{row.name}</span>,
     },
-    { key: 'contact', header: 'Contact person', render: (row) => row.contactPerson || '—' },
+    {
+      key: 'contact',
+      header: 'Contact person',
+      render: (row) => row.contactPerson || '—',
+    },
     { key: 'phone', header: 'Phone', render: (row) => row.phone || '—' },
-    { key: 'email', header: 'Email', render: (row) => row.email || '—', hideOnCard: true },
+    {
+      key: 'email',
+      header: 'Email',
+      render: (row) => row.email || '—',
+      hideOnCard: true,
+    },
     { key: 'gstin', header: 'GSTIN', render: (row) => row.gstin || '—' },
     { key: 'projects', header: 'Projects', render: (row) => row.projectCount },
     {
@@ -123,7 +133,10 @@ export default function ClientsPage() {
       </div>
 
       {rowError && (
-        <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {rowError}
         </p>
       )}
@@ -157,8 +170,21 @@ export default function ClientsPage() {
             </RowAction>
             <RowAction
               disabled={row.projectCount > 0 || removal.isPending}
-              title={row.projectCount > 0 ? MESSAGES.clientHasProjects : undefined}
-              onClick={() => removal.mutate(row.id)}
+              title={
+                row.projectCount > 0 ? MESSAGES.clientHasProjects : undefined
+              }
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this client?',
+                    message: `${row.name} will be deleted. This cannot be undone.`,
+                    confirmLabel: 'Delete client',
+                    tone: 'danger',
+                    typeToConfirm: 'DELETE',
+                  })
+                )
+                  removal.mutate(row.id);
+              }}
             >
               Delete
             </RowAction>
@@ -172,7 +198,10 @@ export default function ClientsPage() {
             Page {data.page} of {Math.ceil(data.total / data.pageSize)}
           </span>
           <div className="flex gap-2">
-            <RowAction disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            <RowAction
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
               Previous
             </RowAction>
             <RowAction

@@ -22,6 +22,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { usePlantEquipment, usePlantSpareParts } from './use-plant-refs';
+import { promptDialog } from '@/app/ui/dialogs';
 
 /**
  * The parts consumed on one maintenance job (006 US10).
@@ -86,7 +87,9 @@ export default function JobPartsPanel({ job }: { job: MaintenanceJob }) {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   const reverse = useMutation({
@@ -251,8 +254,15 @@ export default function JobPartsPanel({ job }: { job: MaintenanceJob }) {
           row.type === 'consumption' && !row.reversed ? (
             <RowAction
               disabled={reverse.isPending}
-              onClick={() => {
-                const reason = window.prompt(MESSAGES.plantReversalReason);
+              onClick={async () => {
+                const reason = await promptDialog({
+                  title: 'Reverse this consumption?',
+                  message: MESSAGES.plantReversalReason,
+                  required: true,
+                  multiline: true,
+                  confirmLabel: 'Reverse',
+                  tone: 'danger',
+                });
                 if (reason && reason.trim()) {
                   reverse.mutate({ id: row.id, reason: reason.trim() });
                 }

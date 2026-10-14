@@ -14,6 +14,7 @@ import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import VendorCategoryModal from '@/app/ui/partners/vendor-category-modal';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function VendorCategoriesPage() {
   const [editing, setEditing] = useState<VendorCategory | null>(null);
@@ -30,7 +31,9 @@ export default function VendorCategoriesPage() {
     mutationFn: (id: string) => deleteVendorCategory(id),
     onSuccess: () => {
       setDeleteError(null);
-      queryClient.invalidateQueries({ queryKey: ['partners', 'vendor-categories'] });
+      queryClient.invalidateQueries({
+        queryKey: ['partners', 'vendor-categories'],
+      });
     },
     onError: (error: unknown) => {
       // The backend refuses with a 409 and says how many vendors are in the way.
@@ -54,7 +57,8 @@ export default function VendorCategoriesPage() {
     {
       key: 'description',
       header: 'Description',
-      render: (row) => row.description ?? <span className="text-gray-400">—</span>,
+      render: (row) =>
+        row.description ?? <span className="text-gray-400">—</span>,
     },
     {
       key: 'vendorCount',
@@ -118,11 +122,14 @@ export default function VendorCategoriesPage() {
               type="button"
               className="text-sm font-medium text-red-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400 disabled:no-underline"
               disabled={remove.isPending}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    `Delete the "${row.name}" category? This cannot be undone.`,
-                  )
+                  await confirmDialog({
+                    title: 'Delete this category?',
+                    message: `Delete the "${row.name}" category? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
                 ) {
                   remove.mutate(row.id);
                 }

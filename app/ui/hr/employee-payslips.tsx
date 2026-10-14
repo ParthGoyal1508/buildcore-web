@@ -12,6 +12,7 @@ import { saveBlob } from '@/app/lib/download-file';
 import { periodLabel } from '@/app/lib/format';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * An employee's published payslips, from HR's side (2026-10-14).
@@ -20,7 +21,11 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
  * through `hr/payroll/employees/:id/slips`, which requires `PAYROLL`. The tab that mounts this is
  * shown only to holders of it, so a refusal here means the server disagreed, and it says so.
  */
-export default function EmployeePayslips({ employeeId }: { employeeId: string }) {
+export default function EmployeePayslips({
+  employeeId,
+}: {
+  employeeId: string;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   // A payslip read in the page, without saving it (2026-10-14).
@@ -51,7 +56,7 @@ export default function EmployeePayslips({ employeeId }: { employeeId: string })
   if (periods.isPending) {
     return (
       <p className="text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -79,8 +84,13 @@ export default function EmployeePayslips({ employeeId }: { employeeId: string })
       ) : (
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
           {periods.data.map((period) => (
-            <li key={period} className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="text-sm text-gray-900">{periodLabel(period)}</span>
+            <li
+              key={period}
+              className="flex items-center justify-between gap-2 px-3 py-2"
+            >
+              <span className="text-sm text-gray-900">
+                {periodLabel(period)}
+              </span>
               <span className="flex items-center gap-2">
                 <RowAction
                   intent="read"

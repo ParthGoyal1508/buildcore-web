@@ -6,7 +6,11 @@ import { useState } from 'react';
 import { amountOrHidden } from '@/app/lib/api/cash-hiding';
 import HiddenAmount from '@/app/ui/hidden-amount';
 import { ApiError } from '@/app/lib/api/client';
-import { deletePayment, getPayments, type Payment } from '@/app/lib/api/inventory';
+import {
+  deletePayment,
+  getPayments,
+  type Payment,
+} from '@/app/lib/api/inventory';
 import {
   DOCUMENT_COPY,
   MESSAGES,
@@ -27,6 +31,7 @@ import {
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
@@ -70,7 +75,9 @@ export default function PaymentsPage() {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not delete this payment.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not delete this payment.',
       ),
   });
 
@@ -235,8 +242,15 @@ export default function PaymentsPage() {
         emptyMessage={MESSAGES.paymentsEmpty}
         actions={(row) => (
           <RowAction
-            onClick={() => {
-              if (window.confirm(MESSAGES.confirmDeletePayment)) {
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this payment?',
+                  message: MESSAGES.confirmDeletePayment,
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                })
+              ) {
                 remove.mutate(row.id);
               }
             }}

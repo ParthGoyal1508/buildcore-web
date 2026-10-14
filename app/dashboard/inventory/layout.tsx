@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import InventoryNav from '@/app/ui/inventory/inventory-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The one place `/dashboard/inventory/*` adds a permission check beyond the module
@@ -51,7 +52,7 @@ export default function InventoryLayout({
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

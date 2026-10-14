@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import PageHeader from '@/app/ui/page-header';
 import { visibleProjectSections } from '@/app/ui/projects/sections';
 import TileGrid from '@/app/ui/tile-grid';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The Projects index.
@@ -34,7 +35,7 @@ export default function ProjectsPage() {
       />
       {isLoading ? (
         <p className="text-sm text-gray-500" role="status">
-          Loading…
+          <LoadingText />
         </p>
       ) : (
         <TileGrid

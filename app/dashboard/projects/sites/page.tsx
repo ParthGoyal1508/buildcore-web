@@ -27,6 +27,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /** The site master (spec US2). */
 export default function SitesPage() {
@@ -165,7 +166,10 @@ export default function SitesPage() {
       </div>
 
       {rowError && (
-        <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {rowError}
         </p>
       )}
@@ -188,7 +192,18 @@ export default function SitesPage() {
                 honest answer comes from trying. */}
             <RowAction
               disabled={removal.isPending}
-              onClick={() => removal.mutate(row.id)}
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this site?',
+                    message: `${row.name} will be deleted. This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                    typeToConfirm: 'DELETE',
+                  })
+                )
+                  removal.mutate(row.id);
+              }}
             >
               Delete
             </RowAction>
@@ -202,7 +217,10 @@ export default function SitesPage() {
             Page {data.page} of {Math.ceil(data.total / data.pageSize)}
           </span>
           <div className="flex gap-2">
-            <RowAction disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            <RowAction
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
               Previous
             </RowAction>
             <RowAction

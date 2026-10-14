@@ -1,8 +1,15 @@
 'use client';
 
 import clsx from 'clsx';
+import Link from 'next/link';
 
 import { useCanWrite } from '@/app/lib/write-access';
+import {
+  ActionGlyph,
+  labelText,
+  type Icon as ActionIcon,
+} from '@/app/ui/action-icons';
+import { Spinner } from '@/app/ui/spinner';
 
 /**
  * The box every field shares (2026-10-14 consistency pass).
@@ -68,7 +75,10 @@ export function TextField({
     .join(' ');
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
+      <label
+        htmlFor={id}
+        className="mb-1 block text-sm font-medium text-gray-700"
+      >
         {label}
       </label>
       <input
@@ -84,7 +94,11 @@ export function TextField({
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-red-600" role="alert">
+        <p
+          id={`${id}-error`}
+          className="mt-1 text-xs text-red-600"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -133,7 +147,10 @@ export function SelectField({
     .join(' ');
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
+      <label
+        htmlFor={id}
+        className="mb-1 block text-sm font-medium text-gray-700"
+      >
         {label}
       </label>
       <select
@@ -151,7 +168,11 @@ export function SelectField({
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-red-600" role="alert">
+        <p
+          id={`${id}-error`}
+          className="mt-1 text-xs text-red-600"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -208,6 +229,7 @@ export function SecondaryButton({
         className,
       )}
     >
+      {rest.disabled && labelText(children).trim().endsWith('…') && <Spinner />}
       {children}
     </button>
   );
@@ -231,13 +253,22 @@ export function SecondaryButton({
  *
  * The server refuses either way. This is the affordance; `PermissionsGuard` is the boundary.
  */
+// Row actions carry an icon beside their label since 2026-10-15 (`app/ui/action-icons.tsx`).
+const ROW_ACTION =
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40';
+
+const DESTRUCTIVE = /^(delete|remove|discard)\b/i;
+
 export function RowAction({
   children,
   className,
   intent = 'write',
+  icon,
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   intent?: 'write' | 'read';
+  /** The icon beside the label; chosen from the label's verb when not given, `null` for none. */
+  icon?: ActionIcon | null;
 }) {
   const canWrite = useCanWrite();
   if (intent === 'write' && !canWrite) return null;
@@ -245,12 +276,31 @@ export function RowAction({
     <button
       {...rest}
       className={clsx(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40',
+        ROW_ACTION,
+        // A destructive action warns on hover rather than inviting like the others.
+        DESTRUCTIVE.test(labelText(children).trim()) &&
+          'hover:border-red-300 hover:bg-red-50 hover:text-red-700',
         className,
       )}
     >
+      <ActionGlyph label={children} icon={icon} />
       {children}
     </button>
+  );
+}
+
+/** A row action that navigates — Open, Edit — drawn exactly like `RowAction`. */
+export function RowActionLink({
+  children,
+  className,
+  icon,
+  ...rest
+}: React.ComponentProps<typeof Link> & { icon?: ActionIcon | null }) {
+  return (
+    <Link {...rest} className={clsx(ROW_ACTION, className)}>
+      <ActionGlyph label={children} icon={icon} />
+      {children}
+    </Link>
   );
 }
 

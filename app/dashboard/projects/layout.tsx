@@ -12,6 +12,7 @@ import {
 } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import ProjectsNav from '@/app/ui/projects/projects-nav';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The single permission chokepoint for every `/dashboard/projects/*` page.
@@ -53,7 +54,7 @@ export default function ProjectsLayout({
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One permission, for a screen under `portfolio/:id/` (024 FR-011).
@@ -36,7 +37,7 @@ export default function SectionGuard({
   if (isLoading) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }

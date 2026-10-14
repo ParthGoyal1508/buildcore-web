@@ -17,6 +17,7 @@ import { Button } from '@/app/ui/button';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import ReimbursementForm from '@/app/ui/my/reimbursement-form';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /** Distinct per status (US8 AC4). Rejected is the one in red: it is the only
  * outcome that costs the employee money they have already spent. */
@@ -211,8 +212,15 @@ export default function ReimbursementClaims() {
                   type="button"
                   className="text-red-600"
                   disabled={remove.isPending}
-                  onClick={() => {
-                    if (window.confirm(MESSAGES.confirmDeleteClaim)) {
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this claim?',
+                        message: MESSAGES.confirmDeleteClaim,
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    ) {
                       remove.mutate(row.id);
                     }
                   }}
@@ -228,8 +236,15 @@ export default function ReimbursementClaims() {
                 type="button"
                 className="text-red-600"
                 disabled={withdraw.isPending}
-                onClick={() => {
-                  if (window.confirm(MESSAGES.confirmWithdrawClaim)) {
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Withdraw this claim?',
+                      message: MESSAGES.confirmWithdrawClaim,
+                      confirmLabel: 'Withdraw',
+                      tone: 'danger',
+                    })
+                  ) {
                     withdraw.mutate(row.id);
                   }
                 }}

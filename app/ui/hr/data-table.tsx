@@ -9,6 +9,7 @@ import {
   useSortedRows,
   type SortValue,
 } from '@/app/ui/table';
+import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One column. `numeric` right-aligns and applies tabular figures, which is what
@@ -73,7 +74,7 @@ export default function DataTable<T>({
   if (isLoading) {
     return (
       <p className={TABLE.empty} role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
@@ -130,15 +131,14 @@ export default function DataTable<T>({
         </thead>
         <tbody>
           {sorted.map((row) => (
-            <tr key={rowKey(row)} className={clsx(TABLE.row, 'group/row')}>
+            <tr key={rowKey(row)} className={TABLE.row}>
               {columns.map((column) => (
                 <td
                   key={column.key}
                   className={clsx(
                     TABLE.td,
                     column.numeric && TABLE.numeric,
-                    column.sticky &&
-                      'sticky left-0 z-10 bg-white group-hover/row:bg-brand-50',
+                    column.sticky && TABLE.stickyCell,
                     column.className,
                   )}
                 >
@@ -146,7 +146,7 @@ export default function DataTable<T>({
                 </td>
               ))}
               {actions && (
-                <td className={TABLE.td}>
+                <td className={TABLE.td} data-row-actions>
                   <div className="flex justify-end gap-2">{actions(row)}</div>
                 </td>
               )}

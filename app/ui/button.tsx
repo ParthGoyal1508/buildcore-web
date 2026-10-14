@@ -3,6 +3,8 @@
 import clsx from 'clsx';
 
 import { useCanWrite } from '@/app/lib/write-access';
+import { labelText } from '@/app/ui/action-icons';
+import { Spinner } from '@/app/ui/spinner';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
@@ -57,6 +59,9 @@ export function Button({
         className,
       )}
     >
+      {/* A button that says it is working — "Saving…", "Deleting…" — while disabled turns its
+          spinner on, so every pending save looks the same without each screen adding one. */}
+      {rest.disabled && labelText(children).trim().endsWith('…') && <Spinner />}
       {children}
     </button>
   );

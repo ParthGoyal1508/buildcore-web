@@ -25,6 +25,7 @@ import {
   useSortedRows,
   type SortableColumn,
 } from '@/app/ui/table';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
 /**
  * Every daily work report on a project, and what can be done to each (024 Story 1, Story 2).
@@ -327,11 +328,15 @@ function ReportRow({
               <Button
                 disabled={busy}
                 intent="write"
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    window.confirm(
-                      'Delete this draft? Nothing has moved yet, so nothing is taken back.',
-                    )
+                    await confirmDialog({
+                      title: 'Delete this draft?',
+                      message:
+                        'Delete this draft? Nothing has moved yet, so nothing is taken back.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
                   ) {
                     onAct('delete');
                   }
@@ -360,10 +365,15 @@ function ReportRow({
               <Button
                 disabled={busy}
                 intent="write"
-                onClick={() => {
-                  const reason = window.prompt(
-                    'Why is this going back to the author?',
-                  );
+                onClick={async () => {
+                  const reason = await promptDialog({
+                    title: 'Return to the author?',
+                    message: 'Why is this going back to the author?',
+                    required: true,
+                    multiline: true,
+                    confirmLabel: 'Return',
+                    tone: 'danger',
+                  });
                   if (reason) onAct('return', reason);
                 }}
               >
@@ -375,10 +385,16 @@ function ReportRow({
           {report.status === 'approved' && !reversed && (
             <Button
               disabled={busy}
-              onClick={() => {
-                const reason = window.prompt(
-                  'Why is this approval being reversed? The quantity it added will be taken back.',
-                );
+              onClick={async () => {
+                const reason = await promptDialog({
+                  title: 'Reverse this approval?',
+                  message:
+                    'Why is this approval being reversed? The quantity it added will be taken back.',
+                  required: true,
+                  multiline: true,
+                  confirmLabel: 'Reverse',
+                  tone: 'danger',
+                });
                 if (reason) onAct('reverse', reason);
               }}
             >

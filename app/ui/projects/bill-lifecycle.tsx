@@ -33,6 +33,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
 /**
  * The shared table look at sheet density for the certification grid (2026-10-15): a line per BOQ
@@ -169,11 +170,15 @@ export default function BillLifecycle({
             </Button>
             <SecondaryButton
               hidden={!canWrite}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    'Abandon this draft? The period stays recorded as one somebody opened and chose not to bill.',
-                  )
+                  await confirmDialog({
+                    title: 'Abandon this draft?',
+                    message:
+                      'Abandon this draft? The period stays recorded as one somebody opened and chose not to bill.',
+                    confirmLabel: 'Abandon',
+                    tone: 'danger',
+                  })
                 ) {
                   void run(
                     'abandon',
@@ -214,10 +219,15 @@ export default function BillLifecycle({
         {(pkg.status === 'pending_approval' || pkg.status === 'approved') && (
           <SecondaryButton
             hidden={!canWrite}
-            onClick={() => {
-              const reason = window.prompt(
-                'Take this bill back to draft to change it? Say why — the approver will see it.',
-              );
+            onClick={async () => {
+              const reason = await promptDialog({
+                title: 'Withdraw to draft?',
+                message:
+                  'Take this bill back to draft to change it? Say why — the approver will see it.',
+                multiline: true,
+                confirmLabel: 'Withdraw',
+                tone: 'danger',
+              });
               if (reason !== null) {
                 void run(
                   'withdraw',

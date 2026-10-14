@@ -25,6 +25,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { LoadingText } from '@/app/ui/spinner';
 
 export default function IndentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -70,7 +71,8 @@ export default function IndentDetailPage() {
   });
 
   const flag = useMutation({
-    mutationFn: (lineIds: string[]) => markProcurementNeeded(params.id, lineIds),
+    mutationFn: (lineIds: string[]) =>
+      markProcurementNeeded(params.id, lineIds),
     onSuccess: () => {
       setError(null);
       invalidate();
@@ -84,12 +86,14 @@ export default function IndentDetailPage() {
   if (isPending) {
     return (
       <p className="p-4 text-sm text-gray-500" role="status">
-        Loading…
+        <LoadingText />
       </p>
     );
   }
   if (isError || !data) {
-    return <p className="p-4 text-sm text-red-600">{MESSAGES.inventoryLoadFailed}</p>;
+    return (
+      <p className="p-4 text-sm text-red-600">{MESSAGES.inventoryLoadFailed}</p>
+    );
   }
 
   const anyFulfilled = data.lines.some((line) => line.fulfilledQuantity > 0);

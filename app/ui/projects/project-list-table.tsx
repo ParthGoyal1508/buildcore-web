@@ -7,8 +7,9 @@ import { ProjectListItem } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
 import StatusBadge from '@/app/ui/status-badge';
-import { RowAction } from '@/app/ui/settings/form-fields';
+import { RowAction, RowActionLink } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 /**
  * The portfolio list (spec FR-010, FR-014).
@@ -149,30 +150,31 @@ export default function ProjectListTable({
       actions={(row) => (
         <>
           {/*
-            One way in, not six. Documents, BOQ, Position, Bills and Subcontractors each had a
-            link of their own here, with a comment explaining that they were "reachable from the
-            row rather than from a project detail page that does not exist". It exists now, they
-            are its tabs, and six links per row across a page of projects was a wall of grey
-            buttons in which the one anybody wanted was hard to find.
+            One way in, not six — and since 2026-10-15 not even a button for it: the whole row opens
+            the project (`RowLinks`), as the name always did, so an Open beside Edit and Delete only
+            cost the width that, with icons on the buttons, pushed the list into scrolling.
           */}
-          <Link
-            href={ROUTES.projectsProject(row.id)}
-            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
-            Open
-          </Link>
-          {/* Kept beside Open because editing is the common errand, and it is one click
-              further inside the shell. */}
-          <Link
-            href={ROUTES.projectsEditProject(row.id)}
-            className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          >
+          <RowActionLink href={ROUTES.projectsEditProject(row.id)}>
             Edit
-          </Link>
+          </RowActionLink>
           <RowAction
             disabled={row.isLocked || isDeleting}
             title={row.isLocked ? MESSAGES.projectLocked : undefined}
-            onClick={() => onDelete(row.id)}
+            // It deleted on the click until 2026-10-15, and a project goes with its documents, work
+            // orders and bills.
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: `Delete ${row.name}?`,
+                  message:
+                    'The project goes, with its documents, work orders and bills. This cannot be undone.',
+                  confirmLabel: 'Delete project',
+                  tone: 'danger',
+                  typeToConfirm: 'DELETE',
+                })
+              )
+                onDelete(row.id);
+            }}
           >
             Delete
           </RowAction>

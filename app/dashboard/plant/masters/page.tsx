@@ -29,6 +29,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 type Tab = 'categories' | 'doc-types' | 'rates';
 
@@ -265,8 +266,15 @@ export default function MastersPage() {
                       ? 'Machines are registered under this category. Retire it instead.'
                       : undefined
                   }
-                  onClick={() => {
-                    if (window.confirm(`Delete ${row.name}?`)) {
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this category?',
+                        message: `Delete ${row.name}?`,
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    ) {
                       removeCategory.mutate(row.id);
                     }
                   }}
@@ -342,11 +350,14 @@ export default function MastersPage() {
                     ? 'Only the current rate can be removed — deleting one from the middle of the timeline would leave a gap.'
                     : undefined
                 }
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    window.confirm(
-                      `Remove this rate? The previous one becomes current again.`,
-                    )
+                    await confirmDialog({
+                      title: 'Remove this rate?',
+                      message: `Remove this rate? The previous one becomes current again.`,
+                      confirmLabel: 'Remove',
+                      tone: 'danger',
+                    })
                   ) {
                     removeRate.mutate(row.id);
                   }

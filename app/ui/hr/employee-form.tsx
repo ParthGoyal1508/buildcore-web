@@ -39,6 +39,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { confirmDialog } from '@/app/ui/dialogs';
 
 const TABS = [
   { id: 'identity', label: 'Identity' },
@@ -191,7 +192,10 @@ const employeeFormSchema = z
     // A daily-wage employee is paid per day, so the rate is what makes their
     // payroll line computable at all — an omission here surfaces as a zero net pay
     // several screens later, which is far more expensive to trace back.
-    if (values.employmentType === 'daily_wage' && values.dailyRate === undefined) {
+    if (
+      values.employmentType === 'daily_wage' &&
+      values.dailyRate === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['dailyRate'],
@@ -282,7 +286,9 @@ function defaultsFrom(employee?: Employee): EmployeeFormValues {
     offerLetterIssued: employee.offerLetterIssued,
     offerLetterIssuedDate: dateValue(employee.offerLetterIssuedDate),
     appointmentLetterIssued: employee.appointmentLetterIssued,
-    appointmentLetterIssuedDate: dateValue(employee.appointmentLetterIssuedDate),
+    appointmentLetterIssuedDate: dateValue(
+      employee.appointmentLetterIssuedDate,
+    ),
     ndaSigned: employee.ndaSigned,
     ndaSignedDate: dateValue(employee.ndaSignedDate),
 
@@ -371,8 +377,17 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
     onError: (error: Error) => setServerError(error.message),
   });
 
-  function cancel() {
-    if (isDirty && !window.confirm('Discard unsaved changes?')) return;
+  async function cancel() {
+    if (
+      isDirty &&
+      !(await confirmDialog({
+        title: 'Discard changes?',
+        message: 'Discard unsaved changes?',
+        confirmLabel: 'Discard',
+        tone: 'danger',
+      }))
+    )
+      return;
     router.push(ROUTES.hrEmployees);
   }
 
@@ -414,7 +429,12 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
       className="flex flex-col gap-2"
       noValidate
     >
-      <TabStrip tabs={TABS} active={tab} onChange={setTab} idPrefix="employee" />
+      <TabStrip
+        tabs={TABS}
+        active={tab}
+        onChange={setTab}
+        idPrefix="employee"
+      />
 
       {tabsWithErrors.length > 0 && (
         <p
@@ -459,7 +479,12 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             maxLength={120}
             {...register('fatherName')}
           />
-          <TextField id="dob" label="Date of birth" type="date" {...register('dob')} />
+          <TextField
+            id="dob"
+            label="Date of birth"
+            type="date"
+            {...register('dob')}
+          />
           <SelectField id="gender" label="Gender" {...register('gender')}>
             <option value="">Not stated</option>
             {GENDERS.map((value) => (
@@ -483,8 +508,8 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
         </div>
         {employee && (
           <p className="mt-4 text-sm text-gray-600">
-            Employee code <strong>{employee.employeeCode}</strong> is allocated from
-            the company series and cannot be edited here.
+            Employee code <strong>{employee.employeeCode}</strong> is allocated
+            from the company series and cannot be edited here.
           </p>
         )}
       </TabPanel>
@@ -517,7 +542,11 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
               </option>
             ))}
           </SelectField>
-          <SelectField id="departmentId" label="Department" {...register('departmentId')}>
+          <SelectField
+            id="departmentId"
+            label="Department"
+            {...register('departmentId')}
+          >
             <option value="">Unassigned</option>
             {departments?.map((department) => (
               <option key={department.id} value={department.id}>
@@ -627,9 +656,9 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             <span className="font-medium text-gray-900">
               {employee.isActive ? 'Active' : 'Inactive'}
             </span>{' '}
-            — an employee is made inactive by offboarding them, which records the
-            clearance and the settlement. Use <strong>Offboard</strong> on the
-            employee&rsquo;s own page.
+            — an employee is made inactive by offboarding them, which records
+            the clearance and the settlement. Use <strong>Offboard</strong> on
+            the employee&rsquo;s own page.
           </div>
         )}
       </TabPanel>
@@ -702,13 +731,27 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             {...register('pan')}
           />
         </div>
-        <p className="mt-4 text-sm text-gray-600">{HR_MESSAGES.statutoryNeedsNumbers}</p>
+        <p className="mt-4 text-sm text-gray-600">
+          {HR_MESSAGES.statutoryNeedsNumbers}
+        </p>
       </TabPanel>
 
       <TabPanel id="pay" idPrefix="employee" active={tab}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField id="basic" label="Basic" type="number" step="0.01" {...register('basic')} />
-          <TextField id="hra" label="HRA" type="number" step="0.01" {...register('hra')} />
+          <TextField
+            id="basic"
+            label="Basic"
+            type="number"
+            step="0.01"
+            {...register('basic')}
+          />
+          <TextField
+            id="hra"
+            label="HRA"
+            type="number"
+            step="0.01"
+            {...register('hra')}
+          />
           <TextField
             id="conveyanceAllowance"
             label="Conveyance allowance"
@@ -730,9 +773,17 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             step="0.01"
             {...register('specialAllowance')}
           />
-          <TextField id="paymentMode" label="Payment mode" {...register('paymentMode')} />
+          <TextField
+            id="paymentMode"
+            label="Payment mode"
+            {...register('paymentMode')}
+          />
           <TextField id="bankName" label="Bank" {...register('bankName')} />
-          <TextField id="bankBranch" label="Branch" {...register('bankBranch')} />
+          <TextField
+            id="bankBranch"
+            label="Branch"
+            {...register('bankBranch')}
+          />
           <TextField
             id="bankAccountNumber"
             label="Account number"
@@ -761,9 +812,16 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             label="Alternate mobile"
             {...register('alternateMobile')}
           />
-          <TextField id="email" label="Email" type="email" {...register('email')} />
+          <TextField
+            id="email"
+            label="Email"
+            type="email"
+            {...register('email')}
+          />
         </div>
-        <h3 className="mt-6 text-sm font-medium text-gray-900">Present address</h3>
+        <h3 className="mt-6 text-sm font-medium text-gray-900">
+          Present address
+        </h3>
         <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <TextField
             id="presentAddress"
@@ -771,26 +829,50 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             className="sm:col-span-2"
             {...register('presentAddress')}
           />
-          <TextField id="presentCity" label="City" {...register('presentCity')} />
-          <TextField id="presentState" label="State" {...register('presentState')} />
-          <TextField id="presentPinCode" label="PIN code" {...register('presentPinCode')} />
+          <TextField
+            id="presentCity"
+            label="City"
+            {...register('presentCity')}
+          />
+          <TextField
+            id="presentState"
+            label="State"
+            {...register('presentState')}
+          />
+          <TextField
+            id="presentPinCode"
+            label="PIN code"
+            {...register('presentPinCode')}
+          />
         </div>
-        <h3 className="mt-6 text-sm font-medium text-gray-900">Permanent address</h3>
+        <h3 className="mt-6 text-sm font-medium text-gray-900">
+          Permanent address
+        </h3>
         <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <TextField
             id="permanentAddress"
             label="Address"
             {...register('permanentAddress')}
           />
-          <TextField id="permanentCity" label="City" {...register('permanentCity')} />
-          <TextField id="permanentState" label="State" {...register('permanentState')} />
+          <TextField
+            id="permanentCity"
+            label="City"
+            {...register('permanentCity')}
+          />
+          <TextField
+            id="permanentState"
+            label="State"
+            {...register('permanentState')}
+          />
           <TextField
             id="permanentPinCode"
             label="PIN code"
             {...register('permanentPinCode')}
           />
         </div>
-        <h3 className="mt-6 text-sm font-medium text-gray-900">Emergency contact</h3>
+        <h3 className="mt-6 text-sm font-medium text-gray-900">
+          Emergency contact
+        </h3>
         <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             id="emergencyContactName"
@@ -815,8 +897,8 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           <DocumentsTab employeeId={employee.id} />
         ) : (
           <p className="text-sm text-gray-600">
-            Documents can be uploaded once the employee has been saved — each upload
-            is filed against their record.
+            Documents can be uploaded once the employee has been saved — each
+            upload is filed against their record.
           </p>
         )}
       </TabPanel>
@@ -850,7 +932,11 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <CheckboxField id="ndaSigned" label="NDA signed" {...register('ndaSigned')} />
+            <CheckboxField
+              id="ndaSigned"
+              label="NDA signed"
+              {...register('ndaSigned')}
+            />
             <TextField
               id="ndaSignedDate"
               label="Signed on"
@@ -863,7 +949,11 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
 
       <TabPanel id="onboarding" idPrefix="employee" active={tab}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <CheckboxField id="idCardIssued" label="ID card issued" {...register('idCardIssued')} />
+          <CheckboxField
+            id="idCardIssued"
+            label="ID card issued"
+            {...register('idCardIssued')}
+          />
           <CheckboxField
             id="uniformProvided"
             label="Uniform provided"
@@ -874,7 +964,11 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             label="Safety induction completed"
             {...register('safetyInductionCompleted')}
           />
-          <CheckboxField id="toolsIssued" label="Tools issued" {...register('toolsIssued')} />
+          <CheckboxField
+            id="toolsIssued"
+            label="Tools issued"
+            {...register('toolsIssued')}
+          />
           <CheckboxField
             id="bankVerificationDone"
             label="Bank details verified"
@@ -901,7 +995,11 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           Cancel
         </SecondaryButton>
         <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-          {mutation.isPending ? 'Saving…' : employee ? 'Save changes' : 'Create employee'}
+          {mutation.isPending
+            ? 'Saving…'
+            : employee
+              ? 'Save changes'
+              : 'Create employee'}
         </Button>
       </div>
     </form>

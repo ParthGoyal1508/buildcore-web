@@ -12,8 +12,20 @@ import {
   listLoans,
   type Loan,
 } from '@/app/lib/api/hr-payroll';
-import { HR_MESSAGES, LOAN_STATUSES, MESSAGES, hrLabel } from '@/app/lib/constants';
-import { currentPeriod, dateLabel, money, periodLabel, rupees, todayIso } from '@/app/lib/format';
+import {
+  HR_MESSAGES,
+  LOAN_STATUSES,
+  MESSAGES,
+  hrLabel,
+} from '@/app/lib/constants';
+import {
+  currentPeriod,
+  dateLabel,
+  money,
+  periodLabel,
+  rupees,
+  todayIso,
+} from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
@@ -25,6 +37,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
 function IssueLoanModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -33,7 +46,8 @@ function IssueLoanModal({ onClose }: { onClose: () => void }) {
   const [emiAmount, setEmiAmount] = useState('');
   const [disbursementDate, setDisbursementDate] = useState(todayIso());
   const [reason, setReason] = useState('');
-  const [firstRecoveryPeriod, setFirstRecoveryPeriod] = useState(currentPeriod());
+  const [firstRecoveryPeriod, setFirstRecoveryPeriod] =
+    useState(currentPeriod());
   const [error, setError] = useState<string | null>(null);
 
   const { data: employees } = useQuery({
@@ -109,7 +123,9 @@ function IssueLoanModal({ onClose }: { onClose: () => void }) {
           {employees?.items.map((employee) => (
             <option key={employee.id} value={employee.id}>
               {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName].filter(Boolean).join(' ')}
+              {[employee.firstName, employee.lastName]
+                .filter(Boolean)
+                .join(' ')}
             </option>
           ))}
         </SelectField>
@@ -163,7 +179,13 @@ function IssueLoanModal({ onClose }: { onClose: () => void }) {
 }
 
 /** The generated repayment schedule, shown once a loan is approved. */
-function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => void }) {
+function ScheduleModal({
+  loanId,
+  onClose,
+}: {
+  loanId: string;
+  onClose: () => void;
+}) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'loan', loanId],
     queryFn: () => getLoan(loanId),
@@ -187,8 +209,8 @@ function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => voi
       {data && (
         <p className="mb-3 text-sm text-gray-600">
           {rupees(data.amount)} at {rupees(data.emiAmount)} a month · {paid} of{' '}
-          {data.schedule.length} instalments paid ·{' '}
-          {rupees(outstanding ?? 0)} outstanding
+          {data.schedule.length} instalments paid · {rupees(outstanding ?? 0)}{' '}
+          outstanding
         </p>
       )}
       <DataTable
@@ -200,7 +222,12 @@ function ScheduleModal({ loanId, onClose }: { loanId: string; onClose: () => voi
             sticky: true,
             render: (row) => periodLabel(row.month),
           },
-          { key: 'emi', header: 'EMI', numeric: true, render: (row) => money(row.emiAmount) },
+          {
+            key: 'emi',
+            header: 'EMI',
+            numeric: true,
+            render: (row) => money(row.emiAmount),
+          },
           {
             key: 'status',
             header: 'Status',
@@ -235,19 +262,23 @@ export default function LoansTable() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'loans', status],
     queryFn: () =>
-      listLoans(status ? { status: status as (typeof LOAN_STATUSES)[number] } : {}),
+      listLoans(
+        status ? { status: status as (typeof LOAN_STATUSES)[number] } : {},
+      ),
   });
 
   const approve = useMutation({
     mutationFn: approveLoan,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] }),
     onError: (err: Error) => setError(err.message),
   });
 
   const close = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       closeLoan(id, reason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] }),
     onError: (err: Error) => setError(err.message),
   });
 
@@ -258,8 +289,18 @@ export default function LoansTable() {
       sticky: true,
       render: (row) => employees.label(row.employeeId),
     },
-    { key: 'amount', header: 'Amount', numeric: true, render: (row) => money(row.amount) },
-    { key: 'emi', header: 'EMI', numeric: true, render: (row) => money(row.emiAmount) },
+    {
+      key: 'amount',
+      header: 'Amount',
+      numeric: true,
+      render: (row) => money(row.amount),
+    },
+    {
+      key: 'emi',
+      header: 'EMI',
+      numeric: true,
+      render: (row) => money(row.emiAmount),
+    },
     {
       key: 'outstanding',
       header: 'Outstanding',
@@ -320,8 +361,17 @@ export default function LoansTable() {
             {row.status === 'pending' && (
               <RowAction
                 type="button"
-                onClick={() => {
-                  if (window.confirm(HR_MESSAGES.confirmApproveLoan(rupees(row.amount)))) {
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Approve this loan?',
+                      message: HR_MESSAGES.confirmApproveLoan(
+                        rupees(row.amount),
+                      ),
+                      confirmLabel: 'Approve',
+                      tone: 'default',
+                    })
+                  ) {
                     approve.mutate(row.id);
                   }
                 }}
@@ -332,9 +382,17 @@ export default function LoansTable() {
             {row.status === 'active' && (
               <RowAction
                 type="button"
-                onClick={() => {
-                  const reason = window.prompt('Why is this loan being closed?');
-                  if (reason?.trim()) close.mutate({ id: row.id, reason: reason.trim() });
+                onClick={async () => {
+                  const reason = await promptDialog({
+                    title: 'Close this loan?',
+                    message: 'Why is this loan being closed?',
+                    required: true,
+                    multiline: true,
+                    confirmLabel: 'Close loan',
+                    tone: 'danger',
+                  });
+                  if (reason?.trim())
+                    close.mutate({ id: row.id, reason: reason.trim() });
                 }}
               >
                 Close
@@ -345,7 +403,9 @@ export default function LoansTable() {
       />
 
       {issuing && <IssueLoanModal onClose={() => setIssuing(false)} />}
-      {viewing && <ScheduleModal loanId={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <ScheduleModal loanId={viewing} onClose={() => setViewing(null)} />
+      )}
     </div>
   );
 }
