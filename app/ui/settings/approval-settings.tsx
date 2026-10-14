@@ -12,6 +12,7 @@ import {
 import { listRoles } from '@/app/lib/api/settings';
 import { MESSAGES, approvalActionTypeLabel } from '@/app/lib/constants';
 import { FormError, selectClass } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
 
 /**
  * Slot-to-role mappings, and the chains that depend on them (feature 016 FR-001a, FR-021b).
@@ -63,7 +64,9 @@ export default function ApprovalSettings() {
       setError(null);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['approvalSlotMappings'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['approvalSlotMappings'],
+      });
       // A newly-mapped slot changes what this caller can act on, so the badge and queue
       // are no longer accurate.
       void queryClient.invalidateQueries({ queryKey: ['approvalCount'] });
@@ -92,7 +95,7 @@ export default function ApprovalSettings() {
     (slots.data ?? []).map((slot) => [
       slot.slotKey,
       slot.roleId
-        ? roles.data?.find((r) => r.id === slot.roleId)?.name ?? null
+        ? (roles.data?.find((r) => r.id === slot.roleId)?.name ?? null)
         : null,
     ]),
   );
@@ -125,37 +128,40 @@ export default function ApprovalSettings() {
             Who decides at each level
           </h2>
           <p className="text-sm text-gray-600">
-            Every approval chain in the product resolves its levels through these.
-            Changing one changes who may approve on every chain that uses it.
+            Every approval chain in the product resolves its levels through
+            these. Changing one changes who may approve on every chain that uses
+            it.
           </p>
         </div>
 
         <FormError message={error} />
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-          <table className="w-full text-sm">
-            <caption className="sr-only">Approval level to role mapping</caption>
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+        <div className={TABLE.wrap}>
+          <table className={`${TABLE.table} w-full`}>
+            <caption className="sr-only">
+              Approval level to role mapping
+            </caption>
+            <thead className={TABLE.thead}>
               <tr>
-                <th scope="col" className="px-4 py-2 font-medium">
+                <th scope="col" className={TABLE.th}>
                   Level
                 </th>
-                <th scope="col" className="px-4 py-2 font-medium">
+                <th scope="col" className={TABLE.th}>
                   Decided by
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {slots.isLoading && (
-                <tr>
-                  <td colSpan={2} className="px-4 py-3 text-gray-500">
+                <tr className={TABLE.row}>
+                  <td colSpan={2} className={`${TABLE.td} text-gray-500`}>
                     Loading…
                   </td>
                 </tr>
               )}
               {(slots.data ?? []).map((slot) => (
-                <tr key={slot.slotKey}>
-                  <td className="px-4 py-3">
+                <tr key={slot.slotKey} className={TABLE.row}>
+                  <td className={TABLE.td}>
                     <span className="font-medium text-gray-900">
                       {slot.label}
                     </span>
@@ -165,11 +171,8 @@ export default function ApprovalSettings() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <label
-                      htmlFor={`slot-${slot.slotKey}`}
-                      className="sr-only"
-                    >
+                  <td className={TABLE.td}>
+                    <label htmlFor={`slot-${slot.slotKey}`} className="sr-only">
                       Role that decides at {slot.label}
                     </label>
                     <select
@@ -209,8 +212,8 @@ export default function ApprovalSettings() {
             Chains in this company
           </h2>
           <p className="text-sm text-gray-600">
-            Read-only. Each chain’s levels resolve through the mappings above; a level
-            whose slot is unset is flagged.
+            Read-only. Each chain’s levels resolve through the mappings above; a
+            level whose slot is unset is flagged.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
@@ -273,7 +276,10 @@ function ChainCard({
           .map((level) => {
             const role = roleForSlot.get(level.slotKey) ?? null;
             return (
-              <li key={level.id} className="flex flex-wrap items-baseline gap-x-2">
+              <li
+                key={level.id}
+                className="flex flex-wrap items-baseline gap-x-2"
+              >
                 <span className="w-4 shrink-0 text-xs tabular-nums text-gray-400">
                   {level.position}
                 </span>
@@ -291,7 +297,9 @@ function ChainCard({
                   </span>
                 )}
                 {level.isFinalAuthority && (
-                  <span className="text-xs text-gray-500">· final authority</span>
+                  <span className="text-xs text-gray-500">
+                    · final authority
+                  </span>
                 )}
               </li>
             );

@@ -1,0 +1,21 @@
+/**
+ * The one table look (2026-10-15), as plain class strings. A module of its own, without
+ * `'use client'`, so a server component can use the classes too; `app/ui/table.tsx` re-exports it
+ * beside the sorting.
+ */
+export const TABLE = {
+  /** The scrolling card a table sits in. */
+  wrap: 'overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm',
+  table: 'min-w-full text-sm text-gray-800',
+  thead: 'border-b border-gray-200 bg-gray-50 text-left',
+  th: 'px-3 py-3 align-bottom text-xs font-semibold text-gray-600',
+  row: 'border-b border-gray-100 transition-colors last:border-0 hover:bg-brand-50/50',
+  td: 'px-3 py-3 align-middle',
+  tfoot: 'border-t-2 border-gray-200 bg-gray-50 font-semibold',
+  /** Loading, empty and failed states, in the table's place. */
+  empty:
+    'rounded-xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500',
+  failed: 'rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700',
+  /** A right-aligned figure column, digits lined up. */
+  numeric: 'text-right tabular-nums',
+} as const;

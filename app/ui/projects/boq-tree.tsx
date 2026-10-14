@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import * as React from 'react';
 import { useState } from 'react';
 
@@ -18,6 +19,15 @@ import { rupees } from '@/app/lib/format';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 import { RowAction } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared table look at the BOQ's density (2026-10-15): eleven columns over a tender of a few
+ * hundred lines, where px-4 py-3 pushes the programme columns off the screen. `!` because clsx
+ * does not drop TABLE's own padding.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /**
  * The project's BOQ as the two-level schedule its source actually is (008 FR-025, FR-026).
@@ -85,8 +95,12 @@ export default function BoqTree({
       input: Parameters<typeof planBOQItem>[2];
     }) => planBOQItem(projectId, itemId, input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq'] });
-      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq-alerts'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'boq'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'boq-alerts'],
+      });
       setPlanning(null);
       setError(null);
     },
@@ -98,9 +112,13 @@ export default function BoqTree({
   const remove = useMutation({
     mutationFn: (itemId: string) => deleteBOQItem(projectId, itemId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'boq'],
+      });
       // The alert tabs read the same lines through a different endpoint, so they go stale with it.
-      void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq-alerts'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'boq-alerts'],
+      });
       setError(null);
     },
     onError: (err: Error) =>
@@ -115,11 +133,15 @@ export default function BoqTree({
       return next;
     });
 
-  if (isLoading) return <p className="text-sm text-gray-500">{BOQ_COPY.loading}</p>;
-  if (isError) return <p className="text-sm text-red-700">{BOQ_COPY.loadFailed}</p>;
+  if (isLoading)
+    return <p className="text-sm text-gray-500">{BOQ_COPY.loading}</p>;
+  if (isError)
+    return <p className="text-sm text-red-700">{BOQ_COPY.loadFailed}</p>;
 
   // One read serves both tabs: the query key is the same, so switching tabs costs no request.
-  const groups = (data ?? []).filter((group) => group.isEstimate === isEstimate);
+  const groups = (data ?? []).filter(
+    (group) => group.isEstimate === isEstimate,
+  );
 
   if (groups.length === 0) {
     return (
@@ -153,7 +175,10 @@ export default function BoqTree({
   return (
     <div className="space-y-2">
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p
+          role="alert"
+          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800"
+        >
           {error}
         </p>
       )}
@@ -193,28 +218,50 @@ export default function BoqTree({
         </dl>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-[60rem] w-full text-sm">
+      <div className={TABLE.wrap}>
+        <table className={clsx(TABLE.table, 'w-full min-w-[60rem]')}>
           <caption className="sr-only">{BOQ_COPY.heading}</caption>
-          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <thead className={TABLE.thead}>
             <tr>
-              <th scope="col" className="px-3 py-2">{BOQ_COPY.columnBoqNo}</th>
-              <th scope="col" className="px-3 py-2">{BOQ_COPY.columnTask}</th>
-              <th scope="col" className="px-3 py-2">{BOQ_COPY.columnUnit}</th>
-              <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnScope}</th>
-              <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.rate}</th>
+              <th scope="col" className={DENSE_TH}>
+                {BOQ_COPY.columnBoqNo}
+              </th>
+              <th scope="col" className={DENSE_TH}>
+                {BOQ_COPY.columnTask}
+              </th>
+              <th scope="col" className={DENSE_TH}>
+                {BOQ_COPY.columnUnit}
+              </th>
+              <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                {BOQ_COPY.columnScope}
+              </th>
+              <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                {BOQ_COPY.rate}
+              </th>
               {isEstimate ? (
-                <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnAmount}</th>
+                <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                  {BOQ_COPY.columnAmount}
+                </th>
               ) : (
                 <>
-                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnDone}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnPending}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnPerDay}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{BOQ_COPY.columnAvgPerDay}</th>
-                  <th scope="col" className="px-3 py-2">{BOQ_COPY.columnFinish}</th>
+                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                    {BOQ_COPY.columnDone}
+                  </th>
+                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                    {BOQ_COPY.columnPending}
+                  </th>
+                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                    {BOQ_COPY.columnPerDay}
+                  </th>
+                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                    {BOQ_COPY.columnAvgPerDay}
+                  </th>
+                  <th scope="col" className={DENSE_TH}>
+                    {BOQ_COPY.columnFinish}
+                  </th>
                 </>
               )}
-              {!isLocked && <th scope="col" className="px-3 py-2" />}
+              {!isLocked && <th scope="col" className={DENSE_TH} />}
             </tr>
           </thead>
           <tbody>
@@ -234,19 +281,19 @@ export default function BoqTree({
             ))}
           </tbody>
           {isEstimate && (
-            <tfoot>
-              <tr className="border-t-2 border-gray-300 bg-gray-50">
+            <tfoot className={TABLE.tfoot}>
+              <tr>
                 <th
                   scope="row"
                   colSpan={5}
-                  className="px-3 py-2 text-right font-semibold text-gray-900"
+                  className={clsx(DENSE_TD, 'text-right text-gray-900')}
                 >
                   {BOQ_COPY.estimateTotal}
                 </th>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">
+                <td className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-900')}>
                   {rupees(estimatedTotal)}
                 </td>
-                {!isLocked && <td className="px-3 py-2" />}
+                {!isLocked && <td className={DENSE_TD} />}
               </tr>
             </tfoot>
           )}
@@ -276,7 +323,10 @@ function GroupRows({
   onDelete: ((itemId: string) => void) | null;
   planningId: string | null;
   onPlanOpen: ((itemId: string | null) => void) | null;
-  onPlanSave: (itemId: string, input: Parameters<typeof planBOQItem>[2]) => void;
+  onPlanSave: (
+    itemId: string,
+    input: Parameters<typeof planBOQItem>[2],
+  ) => void;
   planSaving: boolean;
 }) {
   const columns = (isEstimate ? 6 : 10) + (onDelete ? 1 : 0);
@@ -321,78 +371,90 @@ function GroupRows({
       {!collapsed &&
         group.items.map((item) => (
           <React.Fragment key={item.id}>
-          <tr className="border-t border-gray-100">
-            <td className="px-3 py-2 text-gray-500 tabular-nums">{item.boqNo}</td>
-            <td className="px-3 py-2 text-gray-900">
-              {item.taskName}
-              {item.nonBoq ? (
-                <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-800">
-                  Non-BOQ · added on a bill
-                </span>
-              ) : (
-                item.isVariation && (
-                  <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
-                    {BOQ_COPY.variation}
-                  </span>
-                )
-              )}
-            </td>
-            {/* FR-030: exactly as the client spelled it. Tidying `R. mtr` to `R.Mtr.` creates a
-                difference they cannot trace against their own sheet. */}
-            <td className="px-3 py-2 text-gray-700">{item.unit}</td>
-            <td className="px-3 py-2 text-right tabular-nums">{item.scopeQty.toFixed(3)}</td>
-            <td className="px-3 py-2 text-right tabular-nums">{rupees(item.rate)}</td>
-            {isEstimate ? (
-              <td className="px-3 py-2 text-right tabular-nums">
-                {rupees(item.scopeQty * item.rate)}
+            <tr className={TABLE.row}>
+              <td className={clsx(DENSE_TD, 'tabular-nums text-gray-500')}>
+                {item.boqNo}
               </td>
-            ) : (
-              <>
-                <td className="px-3 py-2 text-right tabular-nums">{item.doneQty.toFixed(3)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{item.pendingQty.toFixed(3)}</td>
-                <Programme value={item.perDayQty} />
-                <Programme value={item.avgQtyPerDay} />
-                <td className="px-3 py-2">
-                  {item.finishDate ? (
-                    new Date(item.finishDate).toLocaleDateString()
-                  ) : (
-                    <Unplanned />
-                  )}
+              <td className={clsx(DENSE_TD, 'text-gray-900')}>
+                {item.taskName}
+                {item.nonBoq ? (
+                  <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-800">
+                    Non-BOQ · added on a bill
+                  </span>
+                ) : (
+                  item.isVariation && (
+                    <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
+                      {BOQ_COPY.variation}
+                    </span>
+                  )
+                )}
+              </td>
+              {/* FR-030: exactly as the client spelled it. Tidying `R. mtr` to `R.Mtr.` creates a
+                difference they cannot trace against their own sheet. */}
+              <td className={clsx(DENSE_TD, 'text-gray-700')}>{item.unit}</td>
+              <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                {item.scopeQty.toFixed(3)}
+              </td>
+              <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                {rupees(item.rate)}
+              </td>
+              {isEstimate ? (
+                <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                  {rupees(item.scopeQty * item.rate)}
                 </td>
-              </>
-            )}
-            {onDelete && (
-              <td className="px-3 py-2">
-                <div className="flex justify-end gap-2">
-                  {/* No Plan on a costing line: an estimate carries no programme, which is why
+              ) : (
+                <>
+                  <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                    {item.doneQty.toFixed(3)}
+                  </td>
+                  <td className={clsx(DENSE_TD, TABLE.numeric)}>
+                    {item.pendingQty.toFixed(3)}
+                  </td>
+                  <Programme value={item.perDayQty} />
+                  <Programme value={item.avgQtyPerDay} />
+                  <td className={DENSE_TD}>
+                    {item.finishDate ? (
+                      new Date(item.finishDate).toLocaleDateString()
+                    ) : (
+                      <Unplanned />
+                    )}
+                  </td>
+                </>
+              )}
+              {onDelete && (
+                <td className={DENSE_TD}>
+                  <div className="flex justify-end gap-2">
+                    {/* No Plan on a costing line: an estimate carries no programme, which is why
                       its five programme columns are absent above. Delete stays, because an
                       estimate imported against the wrong project must be removable. */}
-                  {onPlanOpen && !isEstimate && (
-                    <RowAction
-                      onClick={() =>
-                        onPlanOpen(planningId === item.id ? null : item.id)
-                      }
-                    >
-                      {BOQ_COPY.planLine}
+                    {onPlanOpen && !isEstimate && (
+                      <RowAction
+                        onClick={() =>
+                          onPlanOpen(planningId === item.id ? null : item.id)
+                        }
+                      >
+                        {BOQ_COPY.planLine}
+                      </RowAction>
+                    )}
+                    <RowAction onClick={() => onDelete(item.id)}>
+                      {BOQ_COPY.deleteLine}
                     </RowAction>
-                  )}
-                  <RowAction onClick={() => onDelete(item.id)}>{BOQ_COPY.deleteLine}</RowAction>
-                </div>
-              </td>
-            )}
-          </tr>
-          {planningId === item.id && onPlanOpen && (
-            <tr className="bg-gray-50">
-              <td colSpan={columns} className="px-3 py-3">
-                <PlanRow
-                  item={item}
-                  saving={planSaving}
-                  onCancel={() => onPlanOpen(null)}
-                  onSave={(input) => onPlanSave(item.id, input)}
-                />
-              </td>
+                  </div>
+                </td>
+              )}
             </tr>
-          )}
+            {planningId === item.id && onPlanOpen && (
+              <tr className="bg-gray-50">
+                <td colSpan={columns} className="px-3 py-3">
+                  <PlanRow
+                    item={item}
+                    saving={planSaving}
+                    onCancel={() => onPlanOpen(null)}
+                    onSave={(input) => onPlanSave(item.id, input)}
+                  />
+                </td>
+              </tr>
+            )}
           </React.Fragment>
         ))}
     </>
@@ -402,7 +464,7 @@ function GroupRows({
 /** A programme figure, or the word (FR-026). */
 function Programme({ value }: { value: number | null }) {
   return (
-    <td className="px-3 py-2 text-right tabular-nums">
+    <td className={clsx(DENSE_TD, TABLE.numeric)}>
       {value === null ? <Unplanned /> : value.toFixed(3)}
     </td>
   );

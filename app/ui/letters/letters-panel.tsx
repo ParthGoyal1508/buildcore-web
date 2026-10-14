@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import type * as React from 'react';
 import { useState } from 'react';
 
@@ -28,10 +29,28 @@ import LineItemsEditor, {
 } from '@/app/ui/letters/line-items-editor';
 import { PdfPreview, useFileViewer } from '@/app/ui/pdf-viewer';
 import StatusBadge from '@/app/ui/status-badge';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 // The inline draft preview now lives with the shared viewer (2026-10-14); re-exported so a screen
 // that took it from here keeps working.
 export { PdfPreview };
+
+// The sortable columns of the letters list (2026-10-15); the document column has nothing to order.
+const LETTER_COLUMNS: (SortableColumn<IssuedLetter> & { label: string })[] = [
+  { key: 'letterKindLabel', label: 'Kind', render: (l) => l.letterKindLabel },
+  { key: 'status', label: 'State', render: (l) => l.status },
+  {
+    key: 'issuedAt',
+    label: 'Issued',
+    render: () => null,
+    sortValue: (l) => l.issuedAt,
+  },
+];
 
 /**
  * The commercial letters — LOI, work order, purchase order — composed, approved, issued and
@@ -323,6 +342,9 @@ export function LetterTable({
     }
   };
 
+  // Before the loading return, so the hook runs on every render.
+  const { sorted, sort, toggle } = useSortedRows(letters, LETTER_COLUMNS);
+
   if (isLoading) {
     return <p className="text-sm text-gray-500">Loading letters…</p>;
   }
@@ -350,18 +372,24 @@ export function LetterTable({
           {emptyMessage}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+        <div className={TABLE.wrap}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
-                <th className="px-3 py-2">Kind</th>
-                <th className="px-3 py-2">State</th>
-                <th className="px-3 py-2">Issued</th>
-                <th className="px-3 py-2 text-right">Document</th>
+                {LETTER_COLUMNS.map((column) => (
+                  <SortHeader
+                    key={column.key}
+                    label={column.label}
+                    columnKey={column.key}
+                    sort={sort}
+                    onSort={toggle}
+                  />
+                ))}
+                <th className={clsx(TABLE.th, 'text-right')}>Document</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {letters.map((letter) => {
+            <tbody>
+              {sorted.map((letter) => {
                 // A composed letter has no document yet (2026-10-14). While its chain is running it
                 // is decided here, by whoever's turn it is; once approved — or where nothing gates
                 // it — it is issued here. Download is offered only for what has been issued.
@@ -374,8 +402,8 @@ export function LetterTable({
                 // vendor, and a project's letters span its subcontractors.
                 const addressee = letter.composedVariables.vendorName;
                 return (
-                  <tr key={letter.id} className="align-top">
-                    <td className="px-3 py-2">
+                  <tr key={letter.id} className={clsx(TABLE.row, 'align-top')}>
+                    <td className={clsx(TABLE.td, 'align-top')}>
                       {letter.letterKindLabel}
                       {letter.referenceNo && (
                         <span className="block text-xs text-gray-500">
@@ -388,7 +416,7 @@ export function LetterTable({
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className={clsx(TABLE.td, 'align-top')}>
                       <StatusBadge status={letter.status} />
                       {awaiting && approval && (
                         <div className="mt-2 max-w-md">
@@ -407,12 +435,12 @@ export function LetterTable({
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className={clsx(TABLE.td, 'align-top')}>
                       {letter.issuedAt
                         ? dateLabel(String(letter.issuedAt))
                         : '—'}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className={clsx(TABLE.td, 'align-top text-right')}>
                       {letter.status === 'composed' ? (
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <Button
@@ -623,7 +651,10 @@ export function LetterComposer({
           Reading the kind&rsquo;s fields…
         </p>
       ) : prefill.isError ? (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+          role="alert"
+        >
           {prefill.error instanceof Error
             ? prefill.error.message
             : 'This letter’s fields could not be read.'}

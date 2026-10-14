@@ -3,6 +3,13 @@
 import clsx from 'clsx';
 import { Fragment } from 'react';
 
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortValue,
+} from '@/app/ui/table';
+
 /**
  * One column definition, rendered twice: as a `<td>` on desktop and as a labelled
  * row inside a card on mobile.
@@ -14,6 +21,10 @@ export interface Column<T> {
   /** Kept off the mobile card when the value is noise at that size. */
   hideOnCard?: boolean;
   className?: string;
+  /** What the column sorts by when it is not what it shows; see `app/ui/table.tsx`. */
+  sortValue?: (row: T) => SortValue;
+  /** `false` where there is nothing to order by. */
+  sortable?: boolean;
 }
 
 /**
@@ -23,6 +34,10 @@ export interface Column<T> {
  * product's primary users are on phones in the field (Constitution VI), so the same
  * column definitions render as stacked cards there instead — one definition, two
  * presentations, no chance of the two drifting apart.
+ *
+ * Since 2026-10-15 the desktop table shares its look with every other table (`TABLE` in
+ * `app/ui/table.tsx`) and its headers sort the loaded rows on a click; the cards follow the same
+ * order.
  */
 export default function ResponsiveList<T>({
   columns,
@@ -53,30 +68,34 @@ export default function ResponsiveList<T>({
   isLoading?: boolean;
   error?: string | null;
 }) {
+  const { sorted, sort, toggle } = useSortedRows(rows, columns);
   if (isLoading) {
     return (
-      <p className="p-4 text-sm text-gray-500" role="status">
+      <p className={TABLE.empty} role="status">
         Loading…
       </p>
     );
   }
   if (error) {
     return (
-      <p className="p-4 text-sm text-red-600" role="alert">
+      <p className={TABLE.failed} role="alert">
         {error}
       </p>
     );
   }
   if (rows.length === 0) {
-    return <p className="p-4 text-sm text-gray-500">{emptyMessage}</p>;
+    return <p className={TABLE.empty}>{emptyMessage}</p>;
   }
 
   return (
-    <div className="rounded-lg bg-gray-50 p-2 md:p-4">
+    <div>
       {/* Mobile: one card per row. */}
       <div className="space-y-3 md:hidden">
-        {rows.map((row) => (
-          <div key={rowKey(row)} className="rounded-md bg-white p-4 shadow-sm">
+        {sorted.map((row) => (
+          <div
+            key={rowKey(row)}
+            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+          >
             <dl className="space-y-2">
               {columns
                 .filter((column) => !column.hideOnCard)
@@ -85,7 +104,9 @@ export default function ResponsiveList<T>({
                     <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
                       {column.header}
                     </dt>
-                    <dd className="text-sm text-gray-900">{column.render(row)}</dd>
+                    <dd className="text-sm text-gray-900">
+                      {column.render(row)}
+                    </dd>
                   </div>
                 ))}
             </dl>
@@ -104,69 +125,75 @@ export default function ResponsiveList<T>({
       </div>
 
       {/* Desktop: the same columns as a table. */}
-      <table className="hidden min-w-full text-gray-900 md:table">
-        <thead className="text-left text-sm font-normal">
-          <tr>
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                scope="col"
-                className={clsx('px-3 py-4 font-medium', column.className)}
-              >
-                {column.header}
-              </th>
-            ))}
-            {actions && (
-              <th scope="col" className="px-3 py-4 font-medium">
-                <span className="sr-only">Actions</span>
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="bg-white">
-          {rows.map((row) => {
-            const rowDetail = detail?.(row);
-            return (
-              // Fragment keyed rather than the `<tr>`: a row with detail is two sibling rows, and
-              // a table body admits nothing between them to group with.
-              <Fragment key={rowKey(row)}>
-                <tr
-                  className={clsx(
-                    'w-full py-3 text-sm',
-                    // The border moves to the detail row when there is one, so the pair reads as
-                    // one row rather than as a row and an orphan beneath it.
-                    rowDetail ? 'border-none' : 'border-b last-of-type:border-none',
-                  )}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={clsx('px-3 py-3', column.className)}
-                    >
-                      {column.render(row)}
-                    </td>
-                  ))}
-                  {actions && (
-                    <td className="px-3 py-3">
-                      <div className="flex justify-end gap-2">{actions(row)}</div>
-                    </td>
-                  )}
-                </tr>
-                {rowDetail && (
-                  <tr className="border-b text-sm last-of-type:border-none">
-                    <td
-                      colSpan={columns.length + (actions ? 1 : 0)}
-                      className="px-3 pb-3"
-                    >
-                      {rowDetail}
-                    </td>
+      <div className={clsx(TABLE.wrap, 'hidden md:block')}>
+        <table className={TABLE.table}>
+          <thead className={TABLE.thead}>
+            <tr>
+              {columns.map((column) => (
+                <SortHeader
+                  key={column.key}
+                  label={column.header}
+                  columnKey={column.key}
+                  sort={sort}
+                  onSort={toggle}
+                  sortable={column.sortable !== false}
+                  className={column.className}
+                />
+              ))}
+              {actions && (
+                <th scope="col" className={TABLE.th}>
+                  <span className="sr-only">Actions</span>
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => {
+              const rowDetail = detail?.(row);
+              return (
+                // Fragment keyed rather than the `<tr>`: a row with detail is two sibling rows,
+                // and a table body admits nothing between them to group with.
+                <Fragment key={rowKey(row)}>
+                  <tr
+                    className={clsx(
+                      TABLE.row,
+                      // The border moves to the detail row when there is one, so the pair reads
+                      // as one row rather than as a row and an orphan beneath it.
+                      rowDetail && 'border-b-0',
+                    )}
+                  >
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={clsx(TABLE.td, column.className)}
+                      >
+                        {column.render(row)}
+                      </td>
+                    ))}
+                    {actions && (
+                      <td className={TABLE.td}>
+                        <div className="flex justify-end gap-2">
+                          {actions(row)}
+                        </div>
+                      </td>
+                    )}
                   </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                  {rowDetail && (
+                    <tr className="border-b border-gray-100 last:border-0">
+                      <td
+                        colSpan={columns.length + (actions ? 1 : 0)}
+                        className="px-3 pb-3"
+                      >
+                        {rowDetail}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

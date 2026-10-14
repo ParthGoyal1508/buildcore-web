@@ -26,6 +26,7 @@ import {
 } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import CameraCapture from '@/app/ui/my/camera-capture';
 import {
   FormError,
@@ -43,6 +44,72 @@ interface Breakup {
   totalNotes: number;
   residuals: { workerId: string; residual: number }[];
 }
+
+/** A line's deductions, or null when any of them is hidden from this reader. */
+function deductionTotal(l: PaymentSheetLine): number | null {
+  // A nulled deduction is a hidden one, not a zero: summing it as zero would understate the
+  // column by the value of every concealed deduction, which is the exact arithmetic the backend
+  // nulls rather than zeroes to prevent.
+  if (l.deductions.some((d) => d.amount === null)) return null;
+  return l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+}
+
+// Keys match the line's own fields, so each column sorts by the raw figure rather than its text.
+const LINE_COLUMNS: Column<PaymentSheetLine>[] = [
+  { key: 'workerId', header: 'Worker', render: (l) => l.workerId },
+  {
+    key: 'daysWorked',
+    header: 'Days',
+    numeric: true,
+    render: (l) => l.daysWorked,
+  },
+  {
+    key: 'overtimeHours',
+    header: 'OT',
+    numeric: true,
+    render: (l) => l.overtimeHours,
+  },
+  {
+    key: 'resolvedRate',
+    header: 'Rate',
+    numeric: true,
+    render: (l) => (
+      <>
+        {rupees(l.resolvedRate)}
+        <span className="ml-1 text-xs text-gray-400">
+          {RATE_SOURCE_LABELS[l.rateSource] ?? l.rateSource}
+        </span>
+      </>
+    ),
+  },
+  {
+    key: 'grossWage',
+    header: 'Gross',
+    numeric: true,
+    render: (l) => rupees(l.grossWage),
+  },
+  {
+    key: 'deductions',
+    header: 'Deductions',
+    numeric: true,
+    sortValue: deductionTotal,
+    render: (l) => {
+      const total = deductionTotal(l);
+      return total === null ? <HiddenAmount /> : rupees(total);
+    },
+  },
+  {
+    key: 'netPayable',
+    header: 'Net',
+    numeric: true,
+    render: (l) => rupees(l.netPayable),
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (l) => <StatusBadge status={l.status} />,
+  },
+];
 
 export default function PaymentSheetDetailPage() {
   const params = useParams<{ id: string }>();
@@ -87,7 +154,9 @@ export default function PaymentSheetDetailPage() {
     return <p className="p-4 text-sm text-gray-500">Loading…</p>;
   }
   if (sheet.isError || !sheet.data) {
-    return <p className="p-4 text-sm text-red-600">Could not load this sheet.</p>;
+    return (
+      <p className="p-4 text-sm text-red-600">Could not load this sheet.</p>
+    );
   }
 
   const s: PaymentSheet = sheet.data;
@@ -139,69 +208,27 @@ export default function PaymentSheetDetailPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-gray-100">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-2">Worker</th>
-              <th className="px-3 py-2">Days</th>
-              <th className="px-3 py-2">OT</th>
-              <th className="px-3 py-2">Rate</th>
-              <th className="px-3 py-2">Gross</th>
-              <th className="px-3 py-2">Deductions</th>
-              <th className="px-3 py-2">Net</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {s.lines.map((l) => (
-              <tr key={l.id}>
-                <td className="px-3 py-2">{l.workerId}</td>
-                <td className="px-3 py-2">{l.daysWorked}</td>
-                <td className="px-3 py-2">{l.overtimeHours}</td>
-                <td className="px-3 py-2">
-                  {rupees(l.resolvedRate)}
-                  <span className="ml-1 text-xs text-gray-400">
-                    {RATE_SOURCE_LABELS[l.rateSource] ?? l.rateSource}
-                  </span>
-                </td>
-                <td className="px-3 py-2">{rupees(l.grossWage)}</td>
-                <td className="px-3 py-2">
-                  {/* A nulled deduction is a hidden one, not a zero: summing it as zero would
-                      understate the column by the value of every concealed deduction, which is
-                      the exact arithmetic the backend nulls rather than zeroes to prevent. */}
-                  {l.deductions.some((d) => d.amount === null) ? (
-                    <HiddenAmount />
-                  ) : (
-                    rupees(
-                      l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0),
-                    )
-                  )}
-                </td>
-                <td className="px-3 py-2">{rupees(l.netPayable)}</td>
-                <td className="px-3 py-2">
-                  <StatusBadge status={l.status} />
-                </td>
-                <td className="px-3 py-2">
-                  {(s.status === 'approved' ||
-                    s.status === 'partially_disbursed') &&
-                    l.status === 'pending' && (
-                      <RowAction onClick={() => setDisbursing(l)}>
-                        Disburse
-                      </RowAction>
-                    )}
-                  {l.status === 'disbursed' && canApprove && (
-                    <RowAction onClick={() => reverse.mutate(l.id)}>
-                      Reverse
-                    </RowAction>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* The shared table: sortable by any column (2026-10-15). */}
+      <DataTable<PaymentSheetLine>
+        caption="Payment sheet lines"
+        rows={s.lines}
+        rowKey={(l) => l.id}
+        columns={LINE_COLUMNS}
+        emptyMessage="No workers on this sheet."
+        actions={(l) => (
+          <>
+            {(s.status === 'approved' || s.status === 'partially_disbursed') &&
+              l.status === 'pending' && (
+                <RowAction onClick={() => setDisbursing(l)}>Disburse</RowAction>
+              )}
+            {l.status === 'disbursed' && canApprove && (
+              <RowAction onClick={() => reverse.mutate(l.id)}>
+                Reverse
+              </RowAction>
+            )}
+          </>
+        )}
+      />
 
       {s.engagementType === 'direct' && breakup && maySeeCashBreakup && (
         <div className="rounded-lg border border-gray-100 p-4">
@@ -211,10 +238,7 @@ export default function PaymentSheetDetailPage() {
           <div className="flex flex-wrap gap-3 text-sm">
             {CASH_DENOMINATIONS.filter((d) => breakup.notes[String(d)]).map(
               (d) => (
-                <span
-                  key={d}
-                  className="rounded-md bg-gray-50 px-3 py-1.5"
-                >
+                <span key={d} className="rounded-md bg-gray-50 px-3 py-1.5">
                   ₹{d} × {breakup.notes[String(d)]}
                 </span>
               ),

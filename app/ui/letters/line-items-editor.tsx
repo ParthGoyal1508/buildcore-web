@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useState } from 'react';
 
 import { getItems } from '@/app/lib/api/inventory';
@@ -9,6 +10,7 @@ import { money, rupees, unitRate } from '@/app/lib/format';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
+import { TABLE } from '@/app/ui/table';
 
 /**
  * The item table of an LOI, work order or purchase order, entered as rows (2026-10-14).
@@ -216,6 +218,10 @@ export default function LineItemsEditor({
     0,
   );
   const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm';
+  // The shared cell, top-aligned: a description box is taller than the inputs beside it, and the
+  // BOQ-rate hint sits under the rate. `!` because clsx does not drop TABLE.td's align-middle
+  // (2026-10-15).
+  const cell = clsx(TABLE.td, '!align-top');
 
   return (
     <div className="space-y-3">
@@ -267,25 +273,27 @@ export default function LineItemsEditor({
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-2">Description</th>
-                <th className="w-20 py-2 pr-2">Unit</th>
-                <th className="w-28 py-2 pr-2">Quantity</th>
-                <th className="w-32 py-2 pr-2">Rate</th>
-                {withHsn && <th className="w-24 py-2 pr-2">HSN</th>}
-                <th className="w-32 py-2 pr-2 text-right">Amount</th>
-                <th className="w-8" />
+        <div className={TABLE.wrap}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
+              <tr>
+                <th className={TABLE.th}>Description</th>
+                <th className={clsx(TABLE.th, 'w-20')}>Unit</th>
+                <th className={clsx(TABLE.th, 'w-28')}>Quantity</th>
+                <th className={clsx(TABLE.th, 'w-32')}>Rate</th>
+                {withHsn && <th className={clsx(TABLE.th, 'w-24')}>HSN</th>}
+                <th className={clsx(TABLE.th, TABLE.numeric, 'w-32')}>
+                  Amount
+                </th>
+                <th className={clsx(TABLE.th, 'w-8')} />
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const amount = amountOf(row);
                 return (
-                  <tr key={row.key} className="border-b align-top">
-                    <td className="py-2 pr-2">
+                  <tr key={row.key} className={TABLE.row}>
+                    <td className={cell}>
                       {row.boqNo && (
                         <span className="mb-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">
                           BOQ {row.boqNo}
@@ -301,7 +309,7 @@ export default function LineItemsEditor({
                         className={input}
                       />
                     </td>
-                    <td className="py-2 pr-2">
+                    <td className={cell}>
                       <input
                         aria-label="Unit"
                         value={row.unit}
@@ -311,7 +319,7 @@ export default function LineItemsEditor({
                         className={input}
                       />
                     </td>
-                    <td className="py-2 pr-2">
+                    <td className={cell}>
                       <input
                         aria-label="Quantity"
                         inputMode="decimal"
@@ -322,7 +330,7 @@ export default function LineItemsEditor({
                         className={input}
                       />
                     </td>
-                    <td className="py-2 pr-2">
+                    <td className={cell}>
                       <input
                         aria-label="Rate"
                         inputMode="decimal"
@@ -340,7 +348,7 @@ export default function LineItemsEditor({
                       )}
                     </td>
                     {withHsn && (
-                      <td className="py-2 pr-2">
+                      <td className={cell}>
                         <input
                           aria-label="HSN code"
                           value={row.hsn}
@@ -351,10 +359,10 @@ export default function LineItemsEditor({
                         />
                       </td>
                     )}
-                    <td className="py-2 pr-2 text-right tabular-nums">
+                    <td className={clsx(cell, TABLE.numeric)}>
                       {Number.isFinite(amount) ? money(amount) : '—'}
                     </td>
-                    <td className="py-2">
+                    <td className={cell}>
                       <button
                         type="button"
                         aria-label="Remove item"
@@ -370,18 +378,21 @@ export default function LineItemsEditor({
                 );
               })}
             </tbody>
-            <tfoot>
+            <tfoot className={TABLE.tfoot}>
               <tr>
                 <td
                   colSpan={withHsn ? 5 : 4}
-                  className="py-2 pr-2 text-right text-xs text-gray-500"
+                  className={clsx(
+                    TABLE.td,
+                    'text-right text-xs font-normal text-gray-500',
+                  )}
                 >
                   Before GST — GST and the total are added on the letter
                 </td>
-                <td className="py-2 pr-2 text-right font-semibold tabular-nums">
+                <td className={clsx(TABLE.td, TABLE.numeric)}>
                   {rupees(total)}
                 </td>
-                <td />
+                <td className={TABLE.td} />
               </tr>
             </tfoot>
           </table>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
@@ -21,6 +22,12 @@ import { SelectField } from '@/app/ui/settings/form-fields';
 import { RowAction } from '@/app/ui/settings/form-fields';
 import SnoozeModal from '@/app/ui/dashboard/snooze-modal';
 import StatusBadge from '@/app/ui/status-badge';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 /**
  * The Reminders centre (spec US9, FR-024 to FR-029).
@@ -31,9 +38,9 @@ import StatusBadge from '@/app/ui/status-badge';
  * the fallback-tolerant maps in `constants.ts`, so a rule registered by a module
  * built after this component needs no change here.
  *
- * Sorting is the API's, not this component's: the engine already returns overdue
- * first then soonest due (FR-025), and re-sorting client-side would be a second
- * source of truth that silently disagrees the day the rule changes.
+ * The order is the API's: the engine already returns overdue first then soonest due
+ * (FR-025), and that is the order shown. Since 2026-10-15 a reader may click a header
+ * to re-sort the loaded rows for themselves; a third click returns the engine's order.
  */
 export default function RemindersList() {
   const [filters, setFilters] = useState<ReminderQuery>({});
@@ -75,11 +82,16 @@ export default function RemindersList() {
         reminders.map((r) => r.sourceModule),
         filters.module,
       ),
-      types: withSelection(reminders.map((r) => r.type), filters.type),
+      types: withSelection(
+        reminders.map((r) => r.type),
+        filters.type,
+      ),
     };
   }, [unfiltered, filters.module, filters.type]);
 
-  const hasFilters = Boolean(filters.module || filters.type || filters.severity);
+  const hasFilters = Boolean(
+    filters.module || filters.type || filters.severity,
+  );
 
   /**
    * The unavailable sources worth naming **under the current filter** (T049).
@@ -135,7 +147,10 @@ export default function RemindersList() {
           label="Module"
           value={filters.module ?? ''}
           onChange={(event) =>
-            setFilters((f) => ({ ...f, module: event.target.value || undefined }))
+            setFilters((f) => ({
+              ...f,
+              module: event.target.value || undefined,
+            }))
           }
         >
           <option value="">All modules</option>
@@ -198,7 +213,9 @@ export default function RemindersList() {
         >
           {MESSAGES.remindersUnavailable(
             Array.from(
-              new Set(unavailableHere.map((u) => reminderModuleLabel(u.sourceModule))),
+              new Set(
+                unavailableHere.map((u) => reminderModuleLabel(u.sourceModule)),
+              ),
             ).join(', '),
           )}
         </p>
@@ -219,83 +236,118 @@ export default function RemindersList() {
 
       {data.reminders.length === 0 ? (
         <p className="rounded-md border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-          {hasFilters ? MESSAGES.remindersEmptyFiltered : MESSAGES.remindersEmpty}
+          {hasFilters
+            ? MESSAGES.remindersEmptyFiltered
+            : MESSAGES.remindersEmpty}
         </p>
       ) : (
-        // Desktop-first per constitution v2.0.0: a dense grid read at a desk. It
-        // scrolls inside its own container rather than pushing the page sideways.
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[52rem] text-left text-sm">
-            <thead className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th scope="col" className="px-3 py-2 font-medium">Subject</th>
-                <th scope="col" className="px-3 py-2 font-medium">Module</th>
-                <th scope="col" className="px-3 py-2 font-medium">Type</th>
-                <th scope="col" className="px-3 py-2 font-medium">Due</th>
-                <th scope="col" className="px-3 py-2 font-medium">Remaining</th>
-                <th scope="col" className="px-3 py-2 font-medium">Severity</th>
-                <th scope="col" className="px-3 py-2 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {data.reminders.map((reminder) => (
-                <tr key={reminder.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-3">
-                    {/* FR-028: the row opens the underlying record. A link only when
-                        the engine gave one — a module still being built has no screen
-                        to open, and a link to nowhere is worse than plain text. */}
-                    {reminder.actionLink ? (
-                      <Link
-                        href={reminder.actionLink}
-                        className="font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                      >
-                        {reminder.subject}
-                      </Link>
-                    ) : (
-                      <span
-                        className="font-medium text-gray-900"
-                        title={MESSAGES.reminderNoDestination}
-                      >
-                        {reminder.subject}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-gray-600">
-                    {reminderModuleLabel(reminder.sourceModule)}
-                  </td>
-                  <td className="px-3 py-3 text-gray-600">
-                    {reminderTypeLabel(reminder.type)}
-                  </td>
-                  <td className="px-3 py-3 text-gray-600">{reminder.dueDate}</td>
-                  <td className="px-3 py-3 text-gray-600">
-                    {daysRemainingLabel(reminder.daysRemaining)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <StatusBadge
-                      status={reminder.severity}
-                      label={REMINDER_SEVERITY_LABELS[reminder.severity]}
-                    />
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <RowAction onClick={() => setSnoozing(reminder)}>
-                      Snooze
-                    </RowAction>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RemindersTable reminders={data.reminders} onSnooze={setSnoozing} />
       )}
 
       {snoozing && (
-        <SnoozeModal
-          reminder={snoozing}
-          onClose={() => setSnoozing(null)}
-        />
+        <SnoozeModal reminder={snoozing} onClose={() => setSnoozing(null)} />
       )}
+    </div>
+  );
+}
+
+// The raw fields sort: the due date as a date, the days as a number, and severity by its rank
+// rather than its name, so "overdue" leads an ascending sort (2026-10-15).
+const COLUMNS: (SortableColumn<Reminder> & { label: string })[] = [
+  { key: 'subject', label: 'Subject', render: (r) => r.subject },
+  {
+    key: 'sourceModule',
+    label: 'Module',
+    render: (r) => reminderModuleLabel(r.sourceModule),
+  },
+  { key: 'type', label: 'Type', render: (r) => reminderTypeLabel(r.type) },
+  { key: 'dueDate', label: 'Due', render: (r) => r.dueDate },
+  { key: 'daysRemaining', label: 'Remaining', render: (r) => r.daysRemaining },
+  {
+    key: 'severity',
+    label: 'Severity',
+    render: (r) => r.severity,
+    sortValue: (r) => REMINDER_SEVERITIES.indexOf(r.severity),
+  },
+];
+
+/** Desktop-first per constitution v2.0.0: a dense grid read at a desk. It scrolls inside its
+ * own container rather than pushing the page sideways. */
+function RemindersTable({
+  reminders,
+  onSnooze,
+}: {
+  reminders: Reminder[];
+  onSnooze: (reminder: Reminder) => void;
+}) {
+  const { sorted, sort, toggle } = useSortedRows(reminders, COLUMNS);
+  return (
+    <div className={TABLE.wrap}>
+      <table className={clsx(TABLE.table, 'w-full min-w-[52rem] text-left')}>
+        <thead className={TABLE.thead}>
+          <tr>
+            {COLUMNS.map((column) => (
+              <SortHeader
+                key={column.key}
+                label={column.label}
+                columnKey={column.key}
+                sort={sort}
+                onSort={toggle}
+              />
+            ))}
+            <th scope="col" className={TABLE.th}>
+              <span className="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((reminder) => (
+            <tr key={reminder.id} className={TABLE.row}>
+              <td className={TABLE.td}>
+                {/* FR-028: the row opens the underlying record. A link only when
+                    the engine gave one — a module still being built has no screen
+                    to open, and a link to nowhere is worse than plain text. */}
+                {reminder.actionLink ? (
+                  <Link
+                    href={reminder.actionLink}
+                    className="font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  >
+                    {reminder.subject}
+                  </Link>
+                ) : (
+                  <span
+                    className="font-medium text-gray-900"
+                    title={MESSAGES.reminderNoDestination}
+                  >
+                    {reminder.subject}
+                  </span>
+                )}
+              </td>
+              <td className={clsx(TABLE.td, 'text-gray-600')}>
+                {reminderModuleLabel(reminder.sourceModule)}
+              </td>
+              <td className={clsx(TABLE.td, 'text-gray-600')}>
+                {reminderTypeLabel(reminder.type)}
+              </td>
+              <td className={clsx(TABLE.td, 'text-gray-600')}>
+                {reminder.dueDate}
+              </td>
+              <td className={clsx(TABLE.td, 'text-gray-600')}>
+                {daysRemainingLabel(reminder.daysRemaining)}
+              </td>
+              <td className={TABLE.td}>
+                <StatusBadge
+                  status={reminder.severity}
+                  label={REMINDER_SEVERITY_LABELS[reminder.severity]}
+                />
+              </td>
+              <td className={clsx(TABLE.td, 'text-right')}>
+                <RowAction onClick={() => onSnooze(reminder)}>Snooze</RowAction>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

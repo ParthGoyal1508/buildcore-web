@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
@@ -29,8 +30,12 @@ import {
 } from '@/app/ui/projects/work-order-picker';
 import { FieldLabelSpacer } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
-
-
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 /**
  * Every running-account bill package on a project, and the form that opens the next (024 Story 3).
@@ -360,8 +365,8 @@ export default function BillPackagesPanel({
                 ))}
               </select>
               <span className="text-xs text-gray-500">
-                A bill to a subcontractor measures that subcontractor&rsquo;s award
-                lines. Capture the award on{' '}
+                A bill to a subcontractor measures that subcontractor&rsquo;s
+                award lines. Capture the award on{' '}
                 <strong>Subcontractors</strong> before billing against it.
               </span>
               {clearedFor !== null && (
@@ -407,7 +412,10 @@ export default function BillPackagesPanel({
       </form>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -469,6 +477,35 @@ function BillTable({
   rows: BillPackageListItem[];
   counterparty?: (counterpartyKey: string) => string;
 }) {
+  // Sortable by any column (2026-10-15): the period by its first day, the dates as dates, and the
+  // payable by its figure, read out of the server's rendered text.
+  const columns: (SortableColumn<BillPackageListItem> & {
+    label: string;
+    numeric?: boolean;
+  })[] = [
+    { key: 'label', label: 'Bill', render: (pkg) => pkg.label },
+    ...(counterparty
+      ? [
+          {
+            key: 'counterparty',
+            label: BILL_PACKAGE_LIST_COPY.subcontractorColumn,
+            render: (pkg: BillPackageListItem) =>
+              pkg.counterpartyName ?? counterparty(pkg.counterpartyKey),
+          },
+        ]
+      : []),
+    { key: 'periodFrom', label: 'Period', render: (pkg) => pkg.periodFrom },
+    { key: 'status', label: 'State', render: (pkg) => pkg.status },
+    { key: 'issuedAt', label: 'Issued', render: (pkg) => pkg.issuedAt },
+    {
+      key: 'payable',
+      label: 'Payable',
+      numeric: true,
+      render: (pkg) => pkg.payable,
+    },
+  ];
+  const { sorted, sort, toggle } = useSortedRows(rows, columns);
+
   return (
     <section className="flex flex-col gap-2">
       <div>
@@ -485,26 +522,26 @@ function BillTable({
           {empty}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+        <div className={TABLE.wrap}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
-                <th className="px-3 py-2">Bill</th>
-                {counterparty && (
-                  <th className="px-3 py-2">
-                    {BILL_PACKAGE_LIST_COPY.subcontractorColumn}
-                  </th>
-                )}
-                <th className="px-3 py-2">Period</th>
-                <th className="px-3 py-2">State</th>
-                <th className="px-3 py-2">Issued</th>
-                <th className="px-3 py-2 text-right">Payable</th>
+                {columns.map((column) => (
+                  <SortHeader
+                    key={column.key}
+                    label={column.label}
+                    columnKey={column.key}
+                    sort={sort}
+                    onSort={toggle}
+                    numeric={column.numeric}
+                  />
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((pkg) => (
-                <tr key={pkg.id}>
-                  <td className="px-3 py-2">
+            <tbody>
+              {sorted.map((pkg) => (
+                <tr key={pkg.id} className={TABLE.row}>
+                  <td className={TABLE.td}>
                     <Link
                       href={ROUTES.projectsBillPackage(projectId, pkg.id)}
                       className="font-medium text-blue-700 hover:underline"
@@ -519,23 +556,24 @@ function BillTable({
                     )}
                   </td>
                   {counterparty && (
-                    <td className="px-3 py-2">
-                      {pkg.counterpartyName ?? counterparty(pkg.counterpartyKey)}
+                    <td className={TABLE.td}>
+                      {pkg.counterpartyName ??
+                        counterparty(pkg.counterpartyKey)}
                     </td>
                   )}
-                  <td className="px-3 py-2 whitespace-nowrap">
+                  <td className={clsx(TABLE.td, 'whitespace-nowrap')}>
                     {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className={TABLE.td}>
                     <StatusBadge status={pkg.status} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className={TABLE.td}>
                     {pkg.issuedAt ? dateLabel(pkg.issuedAt) : '—'}
                   </td>
                   {/* Shown exactly as the server rendered it (024 FR-009). No formatting here: the
                       API rounds once, to the rupee, and a second pass in the browser is how two
                       screens come to disagree by a rupee on a document a client signs. */}
-                  <td className="px-3 py-2 text-right font-medium">
+                  <td className={clsx(TABLE.td, TABLE.numeric, 'font-medium')}>
                     {pkg.payable}
                   </td>
                 </tr>

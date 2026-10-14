@@ -14,6 +14,7 @@ import {
 import { SLIP_DELIVERY_COPY } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 
 /**
@@ -186,57 +187,57 @@ export default function SlipDelivery({ runId }: { runId: string }) {
       {summary.rows.length === 0 ? (
         <p className="text-sm text-gray-700">{SLIP_DELIVERY_COPY.noneYet}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-100">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">
-                  {SLIP_DELIVERY_COPY.columns.employee}
-                </th>
-                <th className="px-3 py-2">
-                  {SLIP_DELIVERY_COPY.columns.address}
-                </th>
-                <th className="px-3 py-2">
-                  {SLIP_DELIVERY_COPY.columns.status}
-                </th>
-                <th className="px-3 py-2">
-                  {SLIP_DELIVERY_COPY.columns.detail}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {summary.rows.map((row) => (
-                <tr key={row.employeeId}>
-                  <td className="px-3 py-2">
-                    <span className="font-medium text-gray-900">
-                      {row.employeeName || row.employeeCode}
-                    </span>
-                    <span className="ml-1 text-xs text-gray-500">
-                      {row.employeeCode}
-                    </span>
-                  </td>
-                  {/* The address as sent. See the schema's comment: showing the current one would
-                      make an old failure read as though it went to the corrected address. */}
-                  <td className="break-all px-3 py-2 text-gray-700">
-                    {row.address || '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <StatusPill status={row.status} />
-                  </td>
-                  <td className="px-3 py-2 text-xs text-gray-600">
-                    {row.status === 'sent'
-                      ? dateTimeLabel(row.sentAt)
-                      : row.failureReason || '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        // The shared table: sortable by any column (2026-10-15).
+        <DataTable<SlipDeliveryRow>
+          caption="Payslip deliveries"
+          rows={summary.rows}
+          rowKey={(row) => row.employeeId}
+          columns={DELIVERY_COLUMNS}
+        />
       )}
     </section>
   );
 }
+
+const DELIVERY_COLUMNS: Column<SlipDeliveryRow>[] = [
+  {
+    key: 'employee',
+    header: SLIP_DELIVERY_COPY.columns.employee,
+    sortValue: (row) => row.employeeName || row.employeeCode,
+    render: (row) => (
+      <>
+        <span className="font-medium text-gray-900">
+          {row.employeeName || row.employeeCode}
+        </span>
+        <span className="ml-1 text-xs text-gray-500">{row.employeeCode}</span>
+      </>
+    ),
+  },
+  {
+    // The address as sent. See the schema's comment: showing the current one would make an old
+    // failure read as though it went to the corrected address.
+    key: 'address',
+    header: SLIP_DELIVERY_COPY.columns.address,
+    className: 'break-all text-gray-700',
+    render: (row) => row.address || '—',
+  },
+  {
+    key: 'status',
+    header: SLIP_DELIVERY_COPY.columns.status,
+    render: (row) => <StatusPill status={row.status} />,
+  },
+  {
+    key: 'detail',
+    header: SLIP_DELIVERY_COPY.columns.detail,
+    className: 'text-xs text-gray-600',
+    sortValue: (row) =>
+      row.status === 'sent' ? row.sentAt : row.failureReason,
+    render: (row) =>
+      row.status === 'sent'
+        ? dateTimeLabel(row.sentAt)
+        : row.failureReason || '—',
+  },
+];
 
 function Tally({
   label,

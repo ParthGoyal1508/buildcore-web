@@ -5,10 +5,16 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { getPnlGroup } from '@/app/lib/api/project-pnl';
+import { getPnlGroup, type PnlGroup } from '@/app/lib/api/project-pnl';
 import { getProjects } from '@/app/lib/api/projects';
 import { PNL_COPY, ROUTES } from '@/app/lib/constants';
 import { currentPeriod, rupees } from '@/app/lib/format';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 /**
  * Every project's position side by side, with the company total (018 US4, FR-013).
@@ -152,82 +158,7 @@ export default function PnlBoard() {
             </li>
           </ul>
 
-          <div className="hidden overflow-x-auto rounded border border-gray-200 md:block">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
-                <tr>
-                  <th className="px-3 py-2">{PNL_COPY.boardColumns.project}</th>
-                  <th className="px-3 py-2 text-right">
-                    {PNL_COPY.boardColumns.revenue}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {PNL_COPY.boardColumns.cost}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {PNL_COPY.boardColumns.margin}
-                  </th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {board.data.rows.map((row) => (
-                  <tr key={row.projectId} className="border-t border-gray-100">
-                    <td className="px-3 py-2 text-gray-900">
-                      {row.projectName}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-                      {rupees(row.revenueCumulative)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-                      {rupees(row.costCumulative)}
-                    </td>
-                    <td
-                      className={clsx(
-                        'px-3 py-2 text-right font-medium tabular-nums',
-                        row.marginCumulative < 0
-                          ? 'text-red-700'
-                          : 'text-gray-900',
-                      )}
-                    >
-                      {rupees(row.marginCumulative)}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Link
-                        href={ROUTES.projectsSummary(row.projectId)}
-                        className="text-sm text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                      >
-                        {PNL_COPY.boardOpen}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-gray-300 bg-gray-50">
-                  <td className="px-3 py-2 font-semibold text-gray-900">
-                    {PNL_COPY.boardTotal}
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">
-                    {rupees(board.data.totals.revenueCumulative)}
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">
-                    {rupees(board.data.totals.costCumulative)}
-                  </td>
-                  <td
-                    className={clsx(
-                      'px-3 py-2 text-right font-semibold tabular-nums',
-                      board.data.totals.marginCumulative < 0
-                        ? 'text-red-700'
-                        : 'text-gray-900',
-                    )}
-                  >
-                    {rupees(board.data.totals.marginCumulative)}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <PnlTable board={board.data} />
 
           <p className="text-xs text-gray-500">{PNL_COPY.boardTotalNote}</p>
           {board.data.unavailableCategories.length > 0 && (
@@ -241,6 +172,103 @@ export default function PnlBoard() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+type BoardRow = PnlGroup['rows'][number];
+
+// The raw figures sort the money columns; the cells below render them (2026-10-15).
+const BOARD_COLUMNS: SortableColumn<BoardRow>[] = [
+  { key: 'projectName', render: (row) => row.projectName },
+  { key: 'revenueCumulative', render: (row) => row.revenueCumulative },
+  { key: 'costCumulative', render: (row) => row.costCumulative },
+  { key: 'marginCumulative', render: (row) => row.marginCumulative },
+];
+
+/** The desktop table, sortable by any column; the company total stays in the footer. */
+function PnlTable({ board }: { board: PnlGroup }) {
+  const { sorted, sort, toggle } = useSortedRows(board.rows, BOARD_COLUMNS);
+  const header = (key: string, label: string, numeric = false) => (
+    <SortHeader
+      label={label}
+      columnKey={key}
+      sort={sort}
+      onSort={toggle}
+      numeric={numeric}
+    />
+  );
+  return (
+    <div className={clsx(TABLE.wrap, 'hidden md:block')}>
+      <table className={clsx(TABLE.table, 'w-full')}>
+        <thead className={TABLE.thead}>
+          <tr>
+            {header('projectName', PNL_COPY.boardColumns.project)}
+            {header('revenueCumulative', PNL_COPY.boardColumns.revenue, true)}
+            {header('costCumulative', PNL_COPY.boardColumns.cost, true)}
+            {header('marginCumulative', PNL_COPY.boardColumns.margin, true)}
+            <th className={TABLE.th} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row) => (
+            <tr key={row.projectId} className={TABLE.row}>
+              <td className={clsx(TABLE.td, 'text-gray-900')}>
+                {row.projectName}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+                {rupees(row.revenueCumulative)}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+                {rupees(row.costCumulative)}
+              </td>
+              <td
+                className={clsx(
+                  TABLE.td,
+                  TABLE.numeric,
+                  'font-medium',
+                  row.marginCumulative < 0 ? 'text-red-700' : 'text-gray-900',
+                )}
+              >
+                {rupees(row.marginCumulative)}
+              </td>
+              <td className={clsx(TABLE.td, 'text-right')}>
+                <Link
+                  href={ROUTES.projectsSummary(row.projectId)}
+                  className="text-sm text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                >
+                  {PNL_COPY.boardOpen}
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className={TABLE.tfoot}>
+          <tr>
+            <td className={clsx(TABLE.td, 'text-gray-900')}>
+              {PNL_COPY.boardTotal}
+            </td>
+            <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+              {rupees(board.totals.revenueCumulative)}
+            </td>
+            <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+              {rupees(board.totals.costCumulative)}
+            </td>
+            <td
+              className={clsx(
+                TABLE.td,
+                TABLE.numeric,
+                board.totals.marginCumulative < 0
+                  ? 'text-red-700'
+                  : 'text-gray-900',
+              )}
+            >
+              {rupees(board.totals.marginCumulative)}
+            </td>
+            <td />
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

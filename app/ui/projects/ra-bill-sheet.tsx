@@ -20,6 +20,14 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared table look at sheet density (2026-10-15): a line per awarded item with an input
+ * each, where px-4 py-3 doubles the scroll. `!` because clsx does not drop TABLE's own padding.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /**
  * The subcontractor RA bill sheet (018 US2, FR-007 to FR-009 — `bugs.md` item 12).
@@ -104,7 +112,9 @@ export default function RaBillSheet({
   }, []);
 
   const lines = award.data?.lines ?? [];
-  const measured = lines.filter((line) => (quantities[line.workOrderBoqItemId] ?? 0) > 0);
+  const measured = lines.filter(
+    (line) => (quantities[line.workOrderBoqItemId] ?? 0) > 0,
+  );
 
   const perLine = measured.map((line) =>
     lineTotals({
@@ -149,7 +159,9 @@ export default function RaBillSheet({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['raAward', workOrderId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['raAward', workOrderId],
+      });
       // Not "the approval has been invalidated" — see the class comment. The queue is eventual.
       setDone(
         !revising
@@ -226,28 +238,28 @@ export default function RaBillSheet({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded border border-gray-200">
-        <table className="min-w-[48rem] w-full">
-          <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+      <div className={TABLE.wrap}>
+        <table className={clsx(TABLE.table, 'w-full min-w-[48rem]')}>
+          <thead className={TABLE.thead}>
             <tr>
-              <th className="px-2 py-2">{BILLING_COPY.raColumns.description}</th>
-              <th className="px-2 py-2">{BILLING_COPY.raColumns.unit}</th>
-              <th className="px-2 py-2 text-right">
+              <th className={DENSE_TH}>{BILLING_COPY.raColumns.description}</th>
+              <th className={DENSE_TH}>{BILLING_COPY.raColumns.unit}</th>
+              <th className={clsx(DENSE_TH, 'text-right')}>
                 {BILLING_COPY.raColumns.awardedQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(DENSE_TH, 'text-right')}>
                 {BILLING_COPY.raColumns.toDateQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(DENSE_TH, 'text-right')}>
                 {BILLING_COPY.raColumns.remainingQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(DENSE_TH, 'text-right')}>
                 {BILLING_COPY.raColumns.rate}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(DENSE_TH, 'text-right')}>
                 {BILLING_COPY.raColumns.thisPeriodQty}
               </th>
-              <th className="px-2 py-2 text-right">
+              <th className={clsx(DENSE_TH, 'text-right')}>
                 {BILLING_COPY.raColumns.amount}
               </th>
             </tr>
@@ -265,25 +277,30 @@ export default function RaBillSheet({
                 <tr
                   key={line.workOrderBoqItemId}
                   className={clsx(
-                    'border-b border-gray-100',
+                    TABLE.row,
                     totalsForLine.exceedsScope && 'bg-amber-50',
                   )}
                 >
-                  <td className="px-2 py-1.5 text-sm text-gray-900">
+                  <td className={clsx(DENSE_TD, 'text-gray-900')}>
                     {line.description}
                   </td>
-                  <td className="px-2 py-1.5 text-sm text-gray-600">
+                  <td className={clsx(DENSE_TD, 'text-gray-600')}>
                     {line.unit}
                   </td>
-                  <td className="px-2 py-1.5 text-right text-sm tabular-nums text-gray-600">
+                  <td
+                    className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-600')}
+                  >
                     {line.awardedQty}
                   </td>
-                  <td className="px-2 py-1.5 text-right text-sm tabular-nums text-gray-600">
+                  <td
+                    className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-600')}
+                  >
                     {line.toDateQty}
                   </td>
                   <td
                     className={clsx(
-                      'px-2 py-1.5 text-right text-sm tabular-nums',
+                      DENSE_TD,
+                      TABLE.numeric,
                       totalsForLine.remainingQty < 0
                         ? 'font-medium text-amber-900'
                         : 'text-gray-600',
@@ -291,10 +308,12 @@ export default function RaBillSheet({
                   >
                     {totalsForLine.remainingQty}
                   </td>
-                  <td className="px-2 py-1.5 text-right text-sm tabular-nums text-gray-600">
+                  <td
+                    className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-600')}
+                  >
                     {rupees(line.rate)}
                   </td>
-                  <td className="px-2 py-1.5 text-right">
+                  <td className={clsx(DENSE_TD, 'text-right')}>
                     <input
                       type="number"
                       step="0.001"
@@ -311,7 +330,13 @@ export default function RaBillSheet({
                       className="w-24 rounded border border-gray-300 px-2 py-1 text-right text-sm tabular-nums"
                     />
                   </td>
-                  <td className="px-2 py-1.5 text-right text-sm font-medium tabular-nums text-gray-900">
+                  <td
+                    className={clsx(
+                      DENSE_TD,
+                      TABLE.numeric,
+                      'font-medium text-gray-900',
+                    )}
+                  >
                     {entered > 0 ? rupees(totalsForLine.amount) : '—'}
                   </td>
                 </tr>
@@ -394,7 +419,9 @@ export default function RaBillSheet({
         Recoveries and deductions are recorded on the bill package now — one store, and it is the
         one the document reads.
       */}
-      <p className="text-xs text-gray-500">{BILLING_COPY.deductionsMovedNote}</p>
+      <p className="text-xs text-gray-500">
+        {BILLING_COPY.deductionsMovedNote}
+      </p>
 
       {/* The reason is for whoever decides the bill a second time. A draft has no first decision,
           so asking for one makes somebody invent a justification — and an invented reason devalues

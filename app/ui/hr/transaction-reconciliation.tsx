@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useRef, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
@@ -11,7 +12,14 @@ import {
 import { RECONCILIATION_COPY } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { FormError } from '@/app/ui/settings/form-fields';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 /**
  * The bank's returned sheet against the run (021 FR-008 to FR-011) — `bugs.md` item 8.
@@ -130,77 +138,7 @@ export default function TransactionReconciliation({
             {RECONCILIATION_COPY.differenceHint}
           </p>
 
-          <div className="overflow-x-auto rounded-lg border border-gray-100">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">
-                    {RECONCILIATION_COPY.columns.row}
-                  </th>
-                  <th className="px-3 py-2">
-                    {RECONCILIATION_COPY.columns.beneficiary}
-                  </th>
-                  <th className="px-3 py-2">
-                    {RECONCILIATION_COPY.columns.account}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {RECONCILIATION_COPY.columns.sheetAmount}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {RECONCILIATION_COPY.columns.runAmount}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {RECONCILIATION_COPY.columns.difference}
-                  </th>
-                  <th className="px-3 py-2">
-                    {RECONCILIATION_COPY.columns.matched}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {report.lines.map((line) => (
-                  <tr
-                    key={line.rowNumber}
-                    className={
-                      line.unmatchedReason ? 'bg-amber-50/40' : undefined
-                    }
-                  >
-                    <td className="px-3 py-2 tabular-nums text-gray-500">
-                      {line.rowNumber}
-                    </td>
-                    <td className="px-3 py-2">{line.beneficiaryName ?? '—'}</td>
-                    <td className="break-all px-3 py-2 text-xs text-gray-700">
-                      {line.beneficiaryAccount ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {rupees(line.sheetAmount)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {rupees(line.runAmount)}
-                    </td>
-                    {/* Not coloured by sign. A difference is a fact to look at, not a verdict —
-                        see the hint above. */}
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {line.difference === null
-                        ? '—'
-                        : rupees(line.difference)}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {line.matchedEmployeeCode ? (
-                        <span className="text-gray-700">
-                          {line.matchedEmployeeCode}
-                        </span>
-                      ) : (
-                        <span className="text-amber-900">
-                          {line.unmatchedReason}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SheetLinesTable lines={report.lines} />
 
           {report.unmatched > 0 && (
             <p
@@ -221,30 +159,12 @@ export default function TransactionReconciliation({
               >
                 {RECONCILIATION_COPY.missingHint}
               </p>
-              <div className="overflow-x-auto rounded-lg border border-gray-100">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                      <th className="px-3 py-2">
-                        {RECONCILIATION_COPY.columns.employee}
-                      </th>
-                      <th className="px-3 py-2 text-right">
-                        {RECONCILIATION_COPY.columns.runAmount}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {report.missingFromSheet.map((row) => (
-                      <tr key={row.employeeId}>
-                        <td className="px-3 py-2">{row.employeeCode}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {rupees(row.runAmount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<MissingRow>
+                caption={RECONCILIATION_COPY.missingHint}
+                rows={report.missingFromSheet}
+                rowKey={(row) => row.employeeId}
+                columns={MISSING_COLUMNS}
+              />
             </section>
           )}
         </>
@@ -252,6 +172,135 @@ export default function TransactionReconciliation({
     </section>
   );
 }
+
+type SheetLine = Reconciliation['lines'][number];
+type MissingRow = Reconciliation['missingFromSheet'][number];
+
+// Keys match the line's own fields, so the amounts sort as numbers (2026-10-15).
+const LINE_COLUMNS: (SortableColumn<SheetLine> & {
+  label: string;
+  numeric?: boolean;
+})[] = [
+  {
+    key: 'rowNumber',
+    label: RECONCILIATION_COPY.columns.row,
+    render: (line) => line.rowNumber,
+  },
+  {
+    key: 'beneficiaryName',
+    label: RECONCILIATION_COPY.columns.beneficiary,
+    render: (line) => line.beneficiaryName,
+  },
+  {
+    key: 'beneficiaryAccount',
+    label: RECONCILIATION_COPY.columns.account,
+    render: (line) => line.beneficiaryAccount,
+  },
+  {
+    key: 'sheetAmount',
+    label: RECONCILIATION_COPY.columns.sheetAmount,
+    numeric: true,
+    render: (line) => line.sheetAmount,
+  },
+  {
+    key: 'runAmount',
+    label: RECONCILIATION_COPY.columns.runAmount,
+    numeric: true,
+    render: (line) => line.runAmount,
+  },
+  {
+    key: 'difference',
+    label: RECONCILIATION_COPY.columns.difference,
+    numeric: true,
+    render: (line) => line.difference,
+  },
+  {
+    key: 'matched',
+    label: RECONCILIATION_COPY.columns.matched,
+    render: (line) => line.matchedEmployeeCode ?? line.unmatchedReason,
+  },
+];
+
+/**
+ * The sheet's lines, sortable by any column. Written out rather than a `DataTable` because an
+ * unmatched line tints its whole row, which `DataTable` has no hook for.
+ */
+function SheetLinesTable({ lines }: { lines: SheetLine[] }) {
+  const { sorted, sort, toggle } = useSortedRows(lines, LINE_COLUMNS);
+  return (
+    <div className={TABLE.wrap}>
+      <table className={TABLE.table}>
+        <thead className={TABLE.thead}>
+          <tr>
+            {LINE_COLUMNS.map((column) => (
+              <SortHeader
+                key={column.key}
+                label={column.label}
+                columnKey={column.key}
+                sort={sort}
+                onSort={toggle}
+                numeric={column.numeric}
+              />
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((line) => (
+            <tr
+              key={line.rowNumber}
+              className={clsx(
+                TABLE.row,
+                line.unmatchedReason && 'bg-amber-50/40',
+              )}
+            >
+              <td className={clsx(TABLE.td, 'tabular-nums text-gray-500')}>
+                {line.rowNumber}
+              </td>
+              <td className={TABLE.td}>{line.beneficiaryName ?? '—'}</td>
+              <td className={clsx(TABLE.td, 'break-all text-xs text-gray-700')}>
+                {line.beneficiaryAccount ?? '—'}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric)}>
+                {rupees(line.sheetAmount)}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric)}>
+                {rupees(line.runAmount)}
+              </td>
+              {/* Not coloured by sign. A difference is a fact to look at, not a verdict — see
+                  the hint above. */}
+              <td className={clsx(TABLE.td, TABLE.numeric)}>
+                {line.difference === null ? '—' : rupees(line.difference)}
+              </td>
+              <td className={clsx(TABLE.td, 'text-xs')}>
+                {line.matchedEmployeeCode ? (
+                  <span className="text-gray-700">
+                    {line.matchedEmployeeCode}
+                  </span>
+                ) : (
+                  <span className="text-amber-900">{line.unmatchedReason}</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const MISSING_COLUMNS: Column<MissingRow>[] = [
+  {
+    key: 'employeeCode',
+    header: RECONCILIATION_COPY.columns.employee,
+    render: (row) => row.employeeCode,
+  },
+  {
+    key: 'runAmount',
+    header: RECONCILIATION_COPY.columns.runAmount,
+    numeric: true,
+    render: (row) => rupees(row.runAmount),
+  },
+];
 
 function Tally({
   label,

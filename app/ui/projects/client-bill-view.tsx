@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 
 import { BILL_STATUS_LABELS } from '@/app/lib/api/bill-packages';
@@ -26,6 +27,15 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared table look at the bill's density (2026-10-15): the schedule reads like the printed
+ * bill, and px-4 py-3 spreads it over twice the scroll. `!` because clsx does not drop TABLE's
+ * own padding.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /**
  * One client bill, read, with the two acts it still accepts (027).
@@ -81,10 +91,14 @@ export default function ClientBillView({
   const [showAllLines, setShowAllLines] = useState(false);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['clientBills', projectId] });
+    void queryClient.invalidateQueries({
+      queryKey: ['clientBills', projectId],
+    });
     // The BOQ's cumulative column moves when a bill leaves draft, so the sheet has to be told.
     // Invalidating rather than patching: the server decides what is now billed to date.
-    void queryClient.invalidateQueries({ queryKey: ['billableBoq', projectId] });
+    void queryClient.invalidateQueries({
+      queryKey: ['billableBoq', projectId],
+    });
   };
 
   const submit = useMutation({
@@ -217,7 +231,7 @@ export default function ClientBillView({
             label={
               bill.package
                 ? BILL_STATUS_LABELS[bill.package.status]
-                : BILLING_COPY.statusLabels[bill.status] ?? bill.status
+                : (BILLING_COPY.statusLabels[bill.status] ?? bill.status)
             }
           />
         </div>
@@ -241,84 +255,115 @@ export default function ClientBillView({
             {BILLING_COPY.nothingBilledOnThisBill}
           </p>
         ) : (
-        /* Scrolls inside itself, so a forty-word BOQ description never widens the page. */
-        <div className="overflow-x-auto rounded border border-gray-200">
-          <table className="w-full min-w-[44rem] text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
-              <tr>
-                <th className="px-2 py-2">{BILLING_COPY.columns.boqNo}</th>
-                <th className="px-2 py-2">{BILLING_COPY.columns.task}</th>
-                <th className="px-2 py-2">{BILLING_COPY.columns.unit}</th>
-                <th className="px-2 py-2 text-right">
-                  {BILLING_COPY.columns.quantity}
-                </th>
-                <th className="px-2 py-2 text-right">
-                  {quoted
-                    ? BILLING_COPY.columns.boqRate
-                    : BILLING_COPY.columns.rate}
-                </th>
-                {quoted && (
-                  <th className="px-2 py-2 text-right">
-                    {BILLING_COPY.columns.quotedRate}
+          /* Scrolls inside itself, so a forty-word BOQ description never widens the page. */
+          <div className={TABLE.wrap}>
+            <table className={clsx(TABLE.table, 'w-full min-w-[44rem]')}>
+              <thead className={TABLE.thead}>
+                <tr>
+                  <th className={DENSE_TH}>{BILLING_COPY.columns.boqNo}</th>
+                  <th className={DENSE_TH}>{BILLING_COPY.columns.task}</th>
+                  <th className={DENSE_TH}>{BILLING_COPY.columns.unit}</th>
+                  <th className={clsx(DENSE_TH, 'text-right')}>
+                    {BILLING_COPY.columns.quantity}
                   </th>
-                )}
-                <th className="px-2 py-2 text-right">
-                  {BILLING_COPY.columns.amount}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sections.map((section) => (
-                <Fragment key={section.id}>
-                  <tr className="border-t border-gray-200 bg-gray-50">
-                    {/*
+                  <th className={clsx(DENSE_TH, 'text-right')}>
+                    {quoted
+                      ? BILLING_COPY.columns.boqRate
+                      : BILLING_COPY.columns.rate}
+                  </th>
+                  {quoted && (
+                    <th className={clsx(DENSE_TH, 'text-right')}>
+                      {BILLING_COPY.columns.quotedRate}
+                    </th>
+                  )}
+                  <th className={clsx(DENSE_TH, 'text-right')}>
+                    {BILLING_COPY.columns.amount}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sections.map((section) => (
+                  <Fragment key={section.id}>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      {/*
                       Spans the row. A heading with empty cells under Quantity and Rate reads as a
                       line billed at nothing, which is a different claim from a heading.
                     */}
-                    <th
-                      scope="colgroup"
-                      colSpan={quoted ? 7 : 6}
-                      className="px-2 py-1.5 text-left text-sm font-semibold text-gray-900"
-                    >
-                      {section.name}
-                    </th>
-                  </tr>
-                  {section.lines.map((line) => (
-                    <tr key={line.id} className="border-t border-gray-100">
-                      <td className="px-2 py-1.5 tabular-nums text-gray-600">
-                        {line.boqNo}
-                      </td>
-                      <td className="px-2 py-1.5 text-gray-900">
-                        {line.taskName}
-                      </td>
-                      <td className="px-2 py-1.5 text-gray-600">{line.unit}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
-                        {line.quantity}
-                      </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
-                        {/* The schedule's rate, frozen at composition. Never today's BOQ rate. */}
-                        {rupees(line.rate)}
-                      </td>
-                      {quoted && (
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
-                          {/*
+                      <th
+                        scope="colgroup"
+                        colSpan={quoted ? 7 : 6}
+                        className="px-3 py-1.5 text-left text-sm font-semibold text-gray-900"
+                      >
+                        {section.name}
+                      </th>
+                    </tr>
+                    {section.lines.map((line) => (
+                      <tr key={line.id} className={TABLE.row}>
+                        <td
+                          className={clsx(
+                            DENSE_TD,
+                            'tabular-nums text-gray-600',
+                          )}
+                        >
+                          {line.boqNo}
+                        </td>
+                        <td className={clsx(DENSE_TD, 'text-gray-900')}>
+                          {line.taskName}
+                        </td>
+                        <td className={clsx(DENSE_TD, 'text-gray-600')}>
+                          {line.unit}
+                        </td>
+                        <td
+                          className={clsx(
+                            DENSE_TD,
+                            TABLE.numeric,
+                            'text-gray-900',
+                          )}
+                        >
+                          {line.quantity}
+                        </td>
+                        <td
+                          className={clsx(
+                            DENSE_TD,
+                            TABLE.numeric,
+                            'text-gray-600',
+                          )}
+                        >
+                          {/* The schedule's rate, frozen at composition. Never today's BOQ rate. */}
+                          {rupees(line.rate)}
+                        </td>
+                        {quoted && (
+                          <td
+                            className={clsx(
+                              DENSE_TD,
+                              TABLE.numeric,
+                              'text-gray-600',
+                            )}
+                          >
+                            {/*
                             What the quantity was actually priced at, and to four decimals where
                             the quote needs them: at two it stops multiplying out to the amount in
                             the next column, which is the whole reason this one is here.
                           */}
-                          {unitRate(line.quotedRate)}
+                            {unitRate(line.quotedRate)}
+                          </td>
+                        )}
+                        <td
+                          className={clsx(
+                            DENSE_TD,
+                            TABLE.numeric,
+                            'text-gray-900',
+                          )}
+                        >
+                          {rupees(line.amount)}
                         </td>
-                      )}
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
-                        {rupees(line.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {hidden > 0 && (
           <div className="flex flex-wrap items-baseline gap-2">
@@ -437,32 +482,32 @@ export default function ClientBillView({
                 <p className="text-xs text-gray-600">
                   {BILLING_COPY.certifyPerLineHint}
                 </p>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+                <div className={TABLE.wrap}>
+                  <table className={TABLE.table}>
+                    <thead className={TABLE.thead}>
                       <tr>
-                        <th className="py-1 pr-3">BOQ</th>
-                        <th className="py-1 pr-3 text-right">
+                        <th className={DENSE_TH}>BOQ</th>
+                        <th className={clsx(DENSE_TH, 'text-right')}>
                           {BILLING_COPY.certifyBilledQty}
                         </th>
-                        <th className="py-1 text-right">
+                        <th className={clsx(DENSE_TH, 'text-right')}>
                           {BILLING_COPY.certifyCertifiedQty}
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {billed.map((line) => (
-                        <tr key={line.id} className="border-t border-gray-100">
-                          <td className="py-1 pr-3">
+                        <tr key={line.id} className={TABLE.row}>
+                          <td className={DENSE_TD}>
                             {line.boqNo}
                             <span className="block text-xs text-gray-500">
                               {line.taskName}
                             </span>
                           </td>
-                          <td className="py-1 pr-3 text-right tabular-nums">
+                          <td className={clsx(DENSE_TD, TABLE.numeric)}>
                             {line.quantity} {line.unit}
                           </td>
-                          <td className="py-1 text-right">
+                          <td className={clsx(DENSE_TD, 'text-right')}>
                             <input
                               type="number"
                               step="0.001"
@@ -570,38 +615,38 @@ export default function ClientBillView({
           </Link>
         </div>
       ) : (
-      <div className="flex flex-wrap gap-2">
-        {bill.status === 'draft' && (
-          <Button
-            type="button"
-            disabled={submit.isPending}
-            onClick={() => {
-              setError(null);
-              submit.mutate();
-            }}
-          >
-            {submit.isPending ? BILLING_COPY.submitting : BILLING_COPY.submit}
-          </Button>
-        )}
-        {/* Only once it has gone out: certifying a draft would record the client's answer to a
+        <div className="flex flex-wrap gap-2">
+          {bill.status === 'draft' && (
+            <Button
+              type="button"
+              disabled={submit.isPending}
+              onClick={() => {
+                setError(null);
+                submit.mutate();
+              }}
+            >
+              {submit.isPending ? BILLING_COPY.submitting : BILLING_COPY.submit}
+            </Button>
+          )}
+          {/* Only once it has gone out: certifying a draft would record the client's answer to a
             bill they were never sent. */}
-        {/* **Also once it is certified (2026-10-11)**: re-certifying is how a
+          {/* **Also once it is certified (2026-10-11)**: re-certifying is how a
             certification is corrected, which is what was asked for. The server accepts
             an already-certified bill and replaces what it holds. */}
-        {bill.status !== 'draft' && !certifying && (
-          <SecondaryButton
-            type="button"
-            onClick={() => {
-              setCertifying(true);
-              setCertifiedAmount(String(bill.grossAmount));
-            }}
-          >
-            {bill.certifiedAmount === null
-              ? BILLING_COPY.certifyOpen
-              : BILLING_COPY.certifyAmend}
-          </SecondaryButton>
-        )}
-      </div>
+          {bill.status !== 'draft' && !certifying && (
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                setCertifying(true);
+                setCertifiedAmount(String(bill.grossAmount));
+              }}
+            >
+              {bill.certifiedAmount === null
+                ? BILLING_COPY.certifyOpen
+                : BILLING_COPY.certifyAmend}
+            </SecondaryButton>
+          )}
+        </div>
       )}
     </section>
   );
@@ -649,10 +694,7 @@ function Settlement({
       },
       {
         rows: [
-          row(
-            BILLING_COPY.settlementRecoveryDiesel,
-            settlement.recoveryDiesel,
-          ),
+          row(BILLING_COPY.settlementRecoveryDiesel, settlement.recoveryDiesel),
           row(
             BILLING_COPY.settlementDebitAgainstCivil,
             settlement.debitAgainstCivil,

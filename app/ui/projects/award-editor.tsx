@@ -19,6 +19,14 @@ import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { TABLE } from '@/app/ui/table';
+
+/**
+ * The shared table look at sheet density (2026-10-15): a 231-line schedule of inputs at the
+ * standard px-4 py-3 is a page of padding. `!` because clsx does not drop TABLE's own padding.
+ */
+const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
+const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 
 /** One row being edited. Quantities stay strings until save — a half-typed number is not a number. */
 interface AwardRow {
@@ -245,7 +253,10 @@ export default function AwardEditor({
           !Number.isFinite(awardedQty) ||
           !Number.isFinite(rate)
         ) {
-          throw new ApiError(WORK_ORDER_COPY.awardRowIncomplete(index + 1), 400);
+          throw new ApiError(
+            WORK_ORDER_COPY.awardRowIncomplete(index + 1),
+            400,
+          );
         }
         return {
           description: row.description.trim(),
@@ -263,7 +274,9 @@ export default function AwardEditor({
       // The draft is dropped so the table re-derives from what the server actually stored, rather
       // than continuing to show what was sent to it.
       setDraft(null);
-      void queryClient.invalidateQueries({ queryKey: ['raAward', workOrderId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['raAward', workOrderId],
+      });
       onSaved();
     },
     onError: (err) =>
@@ -373,37 +386,39 @@ export default function AwardEditor({
       )}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-gray-600">{WORK_ORDER_COPY.awardEmptyRows}</p>
+        <p className="text-sm text-gray-600">
+          {WORK_ORDER_COPY.awardEmptyRows}
+        </p>
       ) : (
         /* Scrolls inside itself. Six columns of a 231-line schedule will not fit a panel beside a
            list, and a table that widens the page makes every other screen scroll sideways too. */
-        <div className="overflow-x-auto rounded border border-gray-200">
-          <table className="w-full min-w-[52rem] text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
+        <div className={TABLE.wrap}>
+          <table className={clsx(TABLE.table, 'w-full min-w-[52rem]')}>
+            <thead className={TABLE.thead}>
               <tr>
-                <th className="px-2 py-2">{WORK_ORDER_COPY.awardColumns.boq}</th>
-                <th className="px-2 py-2">
+                <th className={DENSE_TH}>{WORK_ORDER_COPY.awardColumns.boq}</th>
+                <th className={DENSE_TH}>
                   {WORK_ORDER_COPY.awardColumns.description}
                 </th>
-                <th className="px-2 py-2">
+                <th className={DENSE_TH}>
                   {WORK_ORDER_COPY.awardColumns.unit}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(DENSE_TH, 'text-right')}>
                   {WORK_ORDER_COPY.awardColumns.quantity}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(DENSE_TH, 'text-right')}>
                   {WORK_ORDER_COPY.awardColumns.boqRate}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(DENSE_TH, 'text-right')}>
                   {WORK_ORDER_COPY.awardColumns.quotedRate}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(DENSE_TH, 'text-right')}>
                   {WORK_ORDER_COPY.awardColumns.rate}
                 </th>
-                <th className="px-2 py-2 text-right">
+                <th className={clsx(DENSE_TH, 'text-right')}>
                   {WORK_ORDER_COPY.awardColumns.amount}
                 </th>
-                {lockedBecause === null && <th className="px-2 py-2" />}
+                {lockedBecause === null && <th className={DENSE_TH} />}
               </tr>
             </thead>
             <tbody>
@@ -412,7 +427,9 @@ export default function AwardEditor({
                   ? boqById.get(row.boqTaskItemId)
                   : undefined;
                 const amount = Number(row.awardedQty) * Number(row.rate);
-                const earned = item ? earnedRate(item.rate, quotedPercentage) : null;
+                const earned = item
+                  ? earnedRate(item.rate, quotedPercentage)
+                  : null;
                 // Only when both are real numbers: a half-typed rate is not yet a rate,
                 // and warning about one is how a field becomes annoying to type in.
                 const overEarned =
@@ -421,8 +438,10 @@ export default function AwardEditor({
                   Number.isFinite(Number(row.rate)) &&
                   Number(row.rate) > earned;
                 return (
-                  <tr key={row.key} className="border-t border-gray-100">
-                    <td className="px-2 py-1.5 tabular-nums text-gray-600">
+                  <tr key={row.key} className={TABLE.row}>
+                    <td
+                      className={clsx(DENSE_TD, 'tabular-nums text-gray-600')}
+                    >
                       {/* The number where there is one. A linked line that the BOQ read could not
                           resolve still shows as linked rather than as a free line. */}
                       {item?.boqNo ??
@@ -434,7 +453,7 @@ export default function AwardEditor({
                           </span>
                         ))}
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td className={DENSE_TD}>
                       <input
                         value={row.description}
                         disabled={lockedBecause !== null}
@@ -445,7 +464,7 @@ export default function AwardEditor({
                         className="w-full min-w-[16rem] rounded border border-gray-300 px-2 py-1 disabled:border-transparent disabled:bg-transparent"
                       />
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td className={DENSE_TD}>
                       <input
                         value={row.unit}
                         disabled={lockedBecause !== null}
@@ -456,7 +475,7 @@ export default function AwardEditor({
                         className="w-20 rounded border border-gray-300 px-2 py-1 disabled:border-transparent disabled:bg-transparent"
                       />
                     </td>
-                    <td className="px-2 py-1.5 text-right">
+                    <td className={clsx(DENSE_TD, 'text-right')}>
                       <input
                         value={row.awardedQty}
                         disabled={lockedBecause !== null}
@@ -468,20 +487,22 @@ export default function AwardEditor({
                         className="w-28 rounded border border-gray-300 px-2 py-1 text-right tabular-nums disabled:border-transparent disabled:bg-transparent"
                       />
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">
+                    <td
+                      className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-500')}
+                    >
                       {/* Reference only. Never copied into the next column — see the rate note. */}
                       {item ? rupees(item.rate) : WORK_ORDER_COPY.awardUnlinked}
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
+                    <td
+                      className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-700')}
+                    >
                       {/*
                         To four decimals, as the bill prints it: the same column under the same
                         name on two screens must not show two different figures.
                       */}
-                      {item
-                        ? unitRate(earned)
-                        : WORK_ORDER_COPY.awardUnlinked}
+                      {item ? unitRate(earned) : WORK_ORDER_COPY.awardUnlinked}
                     </td>
-                    <td className="px-2 py-1.5 text-right">
+                    <td className={clsx(DENSE_TD, 'text-right')}>
                       <input
                         value={row.rate}
                         disabled={lockedBecause !== null}
@@ -503,11 +524,13 @@ export default function AwardEditor({
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
+                    <td
+                      className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-900')}
+                    >
                       {Number.isFinite(amount) ? rupees(amount) : '—'}
                     </td>
                     {lockedBecause === null && (
-                      <td className="px-2 py-1.5 text-right">
+                      <td className={clsx(DENSE_TD, 'text-right')}>
                         <button
                           type="button"
                           aria-label={WORK_ORDER_COPY.awardRemoveRow}
@@ -527,15 +550,15 @@ export default function AwardEditor({
                 );
               })}
             </tbody>
-            <tfoot className="border-t border-gray-300 bg-gray-50">
+            <tfoot className={TABLE.tfoot}>
               <tr>
-                <td colSpan={7} className="px-2 py-2 font-medium text-gray-900">
+                <td colSpan={7} className={clsx(DENSE_TD, 'text-gray-900')}>
                   {WORK_ORDER_COPY.awardTotal}
                 </td>
-                <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">
+                <td className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-900')}>
                   {rupees(total)}
                 </td>
-                {lockedBecause === null && <td />}
+                {lockedBecause === null && <td className={DENSE_TD} />}
               </tr>
             </tfoot>
           </table>

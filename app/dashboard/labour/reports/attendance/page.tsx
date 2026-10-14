@@ -3,11 +3,47 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getAttendanceReport } from '@/app/lib/api/labour';
+import {
+  getAttendanceReport,
+  type AttendanceReport,
+} from '@/app/lib/api/labour';
 import { getSites } from '@/app/lib/api/projects';
 import { Button } from '@/app/ui/button';
+import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
+
+type AttendanceRow = AttendanceReport['workers'][number];
+
+// Keys match the row's own fields, so each column sorts by the raw figure.
+const COLUMNS: Column<AttendanceRow>[] = [
+  { key: 'workerId', header: 'Worker', render: (w) => w.workerId },
+  {
+    key: 'daysPresent',
+    header: 'Present',
+    numeric: true,
+    render: (w) => w.daysPresent,
+  },
+  { key: 'halfDays', header: 'Half', numeric: true, render: (w) => w.halfDays },
+  {
+    key: 'absentDays',
+    header: 'Absent',
+    numeric: true,
+    render: (w) => w.absentDays,
+  },
+  {
+    key: 'overtimeHours',
+    header: 'OT hrs',
+    numeric: true,
+    render: (w) => w.overtimeHours,
+  },
+  {
+    key: 'attendancePercent',
+    header: 'Attendance %',
+    numeric: true,
+    render: (w) => `${w.attendancePercent}%`,
+  },
+];
 
 export default function AttendanceReportPage() {
   const [siteId, setSiteId] = useState('');
@@ -72,39 +108,15 @@ export default function AttendanceReportPage() {
         </div>
       </div>
 
+      {/* The shared table: sortable by any column (2026-10-15). */}
       {report.data && (
-        <div className="overflow-x-auto rounded-lg border border-gray-100">
-          {report.data.workers.length === 0 ? (
-            <p className="p-4 text-sm text-gray-500">
-              No approved musters for this site in the period.
-            </p>
-          ) : (
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">Worker</th>
-                  <th className="px-3 py-2">Present</th>
-                  <th className="px-3 py-2">Half</th>
-                  <th className="px-3 py-2">Absent</th>
-                  <th className="px-3 py-2">OT hrs</th>
-                  <th className="px-3 py-2">Attendance %</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {report.data.workers.map((w) => (
-                  <tr key={w.workerId}>
-                    <td className="px-3 py-2">{w.workerId}</td>
-                    <td className="px-3 py-2">{w.daysPresent}</td>
-                    <td className="px-3 py-2">{w.halfDays}</td>
-                    <td className="px-3 py-2">{w.absentDays}</td>
-                    <td className="px-3 py-2">{w.overtimeHours}</td>
-                    <td className="px-3 py-2">{w.attendancePercent}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <DataTable<AttendanceRow>
+          caption="Attendance by worker"
+          rows={report.data.workers}
+          rowKey={(w) => w.workerId}
+          columns={COLUMNS}
+          emptyMessage="No approved musters for this site in the period."
+        />
       )}
     </div>
   );

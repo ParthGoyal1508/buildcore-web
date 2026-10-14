@@ -1,10 +1,21 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 
-import { getMonthlyWages } from '@/app/lib/api/project-pnl';
+import {
+  getMonthlyWages,
+  type MonthlyWageRollup,
+  type WageWorker,
+} from '@/app/lib/api/project-pnl';
 import { PNL_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
+import {
+  SortHeader,
+  TABLE,
+  useSortedRows,
+  type SortableColumn,
+} from '@/app/ui/table';
 
 /**
  * One project's labour wages for one calendar month, by worker (018 FR-010a, FR-010b).
@@ -95,102 +106,7 @@ export default function MonthlyLabour({
             </p>
           ) : (
             <>
-              {/*
-                Several hundred daily workers have to read as a list rather than as a wall, where
-                the category total was one line. Sticky headers and a bounded scroll container do
-                that without virtualization: these rows are read, not typed into, so rendering all
-                of them costs a scroll and not a keystroke.
-              */}
-              <div className="max-h-[32rem] overflow-auto rounded border border-gray-200">
-                <table className="w-full min-w-[40rem] text-sm">
-                  <thead className="sticky top-0 bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-600">
-                    <tr>
-                      <th className="px-2 py-2">
-                        {PNL_COPY.labourColumns.worker}
-                      </th>
-                      <th className="px-2 py-2">
-                        {PNL_COPY.labourColumns.code}
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        {PNL_COPY.labourColumns.daysWorked}
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        {PNL_COPY.labourColumns.rate}
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        {PNL_COPY.labourColumns.gross}
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        {PNL_COPY.labourColumns.deductions}
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        {PNL_COPY.labourColumns.net}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {view.workers.map((worker) => (
-                      <tr
-                        key={worker.workerId}
-                        className="border-t border-gray-100"
-                      >
-                        <td className="px-2 py-1.5 text-gray-900">
-                          {worker.fullName ?? worker.workerId}
-                          {worker.apportioned && (
-                            <span
-                              className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-900"
-                              title={PNL_COPY.labourApportionedHint}
-                            >
-                              {PNL_COPY.labourApportioned}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 font-mono text-xs text-gray-600">
-                          {worker.labourCode ?? '—'}
-                        </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                          {worker.daysWorked}
-                        </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                          {/* Null where two sheets applied different rates — a mid-month revision. */}
-                          {worker.resolvedRate === null
-                            ? 'Varied'
-                            : rupees(worker.resolvedRate)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
-                          {rupees(worker.grossWage)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                          {rupees(worker.deductions)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-medium tabular-nums text-gray-900">
-                          {rupees(worker.netPayable)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="sticky bottom-0 bg-gray-50">
-                    <tr className="border-t border-gray-300">
-                      <td
-                        className="px-2 py-2 font-medium text-gray-900"
-                        colSpan={4}
-                      >
-                        {view.workers.length} worker
-                        {view.workers.length === 1 ? '' : 's'}
-                      </td>
-                      <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">
-                        {rupees(view.grossTotal)}
-                      </td>
-                      <td className="px-2 py-2 text-right tabular-nums text-gray-700">
-                        {rupees(view.deductionTotal)}
-                      </td>
-                      <td className="px-2 py-2 text-right font-semibold tabular-nums text-gray-900">
-                        {rupees(view.netTotal)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+              <WorkersTable view={view} />
               <p className="text-xs text-gray-500">{view.workersNote}</p>
             </>
           )}
@@ -208,7 +124,8 @@ export default function MonthlyLabour({
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-gray-900">
-                      {dateLabel(sheet.periodFrom)} – {dateLabel(sheet.periodTo)}
+                      {dateLabel(sheet.periodFrom)} –{' '}
+                      {dateLabel(sheet.periodTo)}
                       <span className="ml-2 text-xs text-gray-500">
                         {sheet.engagementType}
                       </span>
@@ -235,5 +152,151 @@ export default function MonthlyLabour({
         </>
       )}
     </section>
+  );
+}
+
+// Keys match the worker's own fields, so the figures sort as numbers (2026-10-15). A varied rate
+// has no single value and sorts last either way.
+const WORKER_COLUMNS: (SortableColumn<WageWorker> & {
+  label: string;
+  numeric?: boolean;
+})[] = [
+  {
+    key: 'fullName',
+    label: PNL_COPY.labourColumns.worker,
+    render: (w) => w.fullName ?? w.workerId,
+    sortValue: (w) => w.fullName ?? w.workerId,
+  },
+  {
+    key: 'labourCode',
+    label: PNL_COPY.labourColumns.code,
+    render: (w) => w.labourCode,
+  },
+  {
+    key: 'daysWorked',
+    label: PNL_COPY.labourColumns.daysWorked,
+    numeric: true,
+    render: (w) => w.daysWorked,
+  },
+  {
+    key: 'resolvedRate',
+    label: PNL_COPY.labourColumns.rate,
+    numeric: true,
+    render: (w) => w.resolvedRate,
+  },
+  {
+    key: 'grossWage',
+    label: PNL_COPY.labourColumns.gross,
+    numeric: true,
+    render: (w) => w.grossWage,
+  },
+  {
+    key: 'deductions',
+    label: PNL_COPY.labourColumns.deductions,
+    numeric: true,
+    render: (w) => w.deductions,
+  },
+  {
+    key: 'netPayable',
+    label: PNL_COPY.labourColumns.net,
+    numeric: true,
+    render: (w) => w.netPayable,
+  },
+];
+
+/**
+ * Several hundred daily workers have to read as a list rather than as a wall, where the category
+ * total was one line. Sticky headers and a bounded scroll container do that without
+ * virtualization: these rows are read, not typed into, so rendering all of them costs a scroll and
+ * not a keystroke.
+ */
+function WorkersTable({ view }: { view: MonthlyWageRollup }) {
+  const { sorted, sort, toggle } = useSortedRows(view.workers, WORKER_COLUMNS);
+  return (
+    <div className={clsx(TABLE.wrap, 'max-h-[32rem] overflow-y-auto')}>
+      <table className={clsx(TABLE.table, 'w-full min-w-[40rem]')}>
+        <thead className={clsx(TABLE.thead, 'sticky top-0 z-10')}>
+          <tr>
+            {WORKER_COLUMNS.map((column) => (
+              <SortHeader
+                key={column.key}
+                label={column.label}
+                columnKey={column.key}
+                sort={sort}
+                onSort={toggle}
+                numeric={column.numeric}
+              />
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((worker) => (
+            <tr key={worker.workerId} className={TABLE.row}>
+              <td className={clsx(TABLE.td, 'text-gray-900')}>
+                {worker.fullName ?? worker.workerId}
+                {worker.apportioned && (
+                  <span
+                    className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-900"
+                    title={PNL_COPY.labourApportionedHint}
+                  >
+                    {PNL_COPY.labourApportioned}
+                  </span>
+                )}
+              </td>
+              <td className={clsx(TABLE.td, 'font-mono text-xs text-gray-600')}>
+                {worker.labourCode ?? '—'}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-700')}>
+                {worker.daysWorked}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-700')}>
+                {/* Null where two sheets applied different rates — a mid-month revision. */}
+                {worker.resolvedRate === null
+                  ? 'Varied'
+                  : rupees(worker.resolvedRate)}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+                {rupees(worker.grossWage)}
+              </td>
+              <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-700')}>
+                {rupees(worker.deductions)}
+              </td>
+              <td
+                className={clsx(
+                  TABLE.td,
+                  TABLE.numeric,
+                  'font-medium text-gray-900',
+                )}
+              >
+                {rupees(worker.netPayable)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className={clsx(TABLE.tfoot, 'sticky bottom-0')}>
+          <tr>
+            <td className={clsx(TABLE.td, 'text-gray-900')} colSpan={4}>
+              {view.workers.length} worker
+              {view.workers.length === 1 ? '' : 's'}
+            </td>
+            <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+              {rupees(view.grossTotal)}
+            </td>
+            <td
+              className={clsx(
+                TABLE.td,
+                TABLE.numeric,
+                'font-normal text-gray-700',
+              )}
+            >
+              {rupees(view.deductionTotal)}
+            </td>
+            <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}>
+              {rupees(view.netTotal)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   );
 }
