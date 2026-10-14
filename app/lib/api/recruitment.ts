@@ -225,6 +225,29 @@ export async function getCandidates(query: CandidateQuery = {}): Promise<Candida
 export async function getCandidate(id: string): Promise<CandidateDetail> {
   return candidateDetailSchema.parse(await authFetch(`/recruitment/candidates/${id}`));
 }
+const candidateTimelineSchema = z.object({
+  addedAt: z.string(),
+  rejectionReason: z.string().nullable(),
+  stages: z.array(
+    z.object({
+      fromStage: candidateStage.nullable(),
+      toStage: candidateStage,
+      occurredAt: z.string(),
+      remarks: z.string().nullable(),
+      actorName: z.string().nullable(),
+    }),
+  ),
+});
+export type CandidateTimeline = z.infer<typeof candidateTimelineSchema>;
+/**
+ * Every stage change with who made it (2026-10-14). No contact details, so — unlike
+ * `getCandidate` — reading it is not an audited reveal, and the candidate panel shows it on open.
+ */
+export async function getCandidateTimeline(id: string): Promise<CandidateTimeline> {
+  return candidateTimelineSchema.parse(
+    await authFetch(`/recruitment/candidates/${id}/timeline`),
+  );
+}
 export interface CandidateInput {
   /**
    * The company the write belongs to.

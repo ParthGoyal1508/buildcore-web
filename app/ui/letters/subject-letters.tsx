@@ -45,12 +45,19 @@ import { FormError, RowAction, SecondaryButton } from '@/app/ui/settings/form-fi
  */
 export default function SubjectLetters({
   query,
+  also,
   heading = LETTER_COPY.subjectHeading,
   emptyMessage = LETTER_COPY.subjectEmpty,
   generate,
 }: {
   /** Exactly one subject's worth — an employee, a candidate, or a subject pair. */
   query: LetterQuery;
+  /**
+   * A second subject whose letters belong in the same list (2026-10-14) — a candidate who has
+   * joined, and the employee record joining created. Two panels listed the appointment letter
+   * twice, because it is addressed to both; one list, de-duplicated by letter, says it once.
+   */
+  also?: LetterQuery;
   heading?: string;
   emptyMessage?: string;
   /**
@@ -70,8 +77,17 @@ export default function SubjectLetters({
   const { data, isLoading, isError } = useQuery({
     // The query in the key, so switching subject refetches rather than showing the last one's
     // letters — the failure mode that looks like it is working.
-    queryKey: ['letters', query],
-    queryFn: () => getLetters(query),
+    queryKey: ['letters', query, also ?? null],
+    queryFn: async () => {
+      const [first, second] = await Promise.all([
+        getLetters(query),
+        also ? getLetters(also) : Promise.resolve([]),
+      ]);
+      const seen = new Set<string>();
+      return [...first, ...second].filter((letter) =>
+        seen.has(letter.id) ? false : (seen.add(letter.id), true),
+      );
+    },
   });
 
   const open = async (letterId: string) => {
