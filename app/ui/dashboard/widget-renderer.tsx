@@ -351,7 +351,7 @@ export function WidgetList({
 }) {
   const items = Array.isArray(value) ? value : [];
   return (
-    <div className={cardClass}>
+    <div className={`${cardClass} flex flex-col`}>
       <div className="mb-2">
         <CardHeading
           title={title}
@@ -363,7 +363,7 @@ export function WidgetList({
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">Nothing to show.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 text-sm">
+        <ul className="mb-3 divide-y divide-gray-100 text-sm">
           {items.map((item, i) => {
             if (!isRecord(item)) {
               return (
@@ -410,9 +410,22 @@ export function WidgetList({
           })}
         </ul>
       )}
+      {/* The footer the approvals card has (2026-10-15): what the card holds, and the way to
+          the rest. The total is read from the API's note ("Showing 5 of 10 — …"). */}
       {note && (
-        <p className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-500">
-          {note}
+        <p className="mt-auto border-t border-gray-100 pt-2 text-xs text-gray-500">
+          {note}.{' '}
+          {href && (
+            <Link
+              href={href}
+              className={`rounded font-medium text-brand-700 hover:underline ${focusRing}`}
+            >
+              See all
+              {/ of (\d+)/.exec(note)?.[1]
+                ? ` ${/ of (\d+)/.exec(note)?.[1]}`
+                : ''}
+            </Link>
+          )}
         </p>
       )}
     </div>
