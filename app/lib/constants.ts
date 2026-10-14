@@ -3946,6 +3946,9 @@ export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
   final_settlement: 'Final settlement',
   attendance_correction: 'Attendance correction',
   director_final_set_change: 'Change to the Director approval set',
+  // An initialism the fallback would print as "Ra bill" (2026-10-15).
+  ra_bill: 'RA bill',
+  dwr: 'Daily work report',
 };
 
 /**

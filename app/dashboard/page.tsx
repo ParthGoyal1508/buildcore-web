@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getWidgets, type WidgetResult } from '@/app/lib/api/dashboard';
 import { DASHBOARD_REFRESH_INTERVAL_MS } from '@/app/lib/constants';
+import ApprovalsCard from '@/app/ui/dashboard/approvals-card';
 import DashboardNav from '@/app/ui/dashboard/dashboard-nav';
 import RecentActivity from '@/app/ui/dashboard/recent-activity';
 import { widgetHref } from '@/app/ui/dashboard/widget-links';
@@ -68,6 +69,9 @@ export default function DashboardPage() {
               ))}
             </div>
             <div className="space-y-4">
+              {/* First in the column: a decision waiting on the reader is the one thing here
+                  they act on rather than read (2026-10-15). */}
+              <ApprovalsCard />
               {section(widgets.data, 'sidebar').map((w) => (
                 <WidgetRenderer key={w.id} widget={w} href={widgetHref(w.id)} />
               ))}
