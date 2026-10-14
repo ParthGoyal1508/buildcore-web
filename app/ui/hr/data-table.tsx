@@ -52,6 +52,7 @@ export default function DataTable<T>({
   columns,
   rows,
   rowKey,
+  rowHref,
   actions,
   emptyMessage = 'Nothing here yet.',
   isLoading = false,
@@ -62,6 +63,11 @@ export default function DataTable<T>({
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string;
+  /**
+   * Where a click on the row goes, for a list whose only link is in its actions (2026-10-15):
+   * the whole row opens it (`RowLinks`).
+   */
+  rowHref?: (row: T) => string;
   actions?: (row: T) => React.ReactNode;
   emptyMessage?: string;
   isLoading?: boolean;
@@ -131,7 +137,11 @@ export default function DataTable<T>({
         </thead>
         <tbody>
           {sorted.map((row) => (
-            <tr key={rowKey(row)} className={TABLE.row}>
+            <tr
+              key={rowKey(row)}
+              className={TABLE.row}
+              data-row-href={rowHref?.(row)}
+            >
               {columns.map((column) => (
                 <td
                   key={column.key}

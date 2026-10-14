@@ -58,7 +58,8 @@ input[type='number']::-webkit-outer-spin-button {
 
 /* A row that opens somewhere looks it: the pointer anywhere on it (`RowLinks`, 2026-10-15). */
 @layer base {
-  tbody tr:has(> td:not([data-row-actions]) a[href]):not([data-row-click='off'] tr) {
+  tbody tr:has(> td:not([data-row-actions]) a[href]):not([data-row-click='off'] tr),
+  [data-row-href] {
     cursor: pointer;
   }
 }

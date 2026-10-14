@@ -44,6 +44,7 @@ export default function ResponsiveList<T>({
   columns,
   rows,
   rowKey,
+  rowHref,
   actions,
   detail,
   emptyMessage = 'Nothing here yet.',
@@ -53,6 +54,11 @@ export default function ResponsiveList<T>({
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string;
+  /**
+   * Where a click on the row goes, for a list whose only link is in its actions (2026-10-15):
+   * the whole row opens it (`RowLinks`).
+   */
+  rowHref?: (row: T) => string;
   actions?: (row: T) => React.ReactNode;
   /**
    * Extra content belonging to one row, given the full width beneath it (016 FR-009a).
@@ -95,6 +101,7 @@ export default function ResponsiveList<T>({
         {sorted.map((row) => (
           <div
             key={rowKey(row)}
+            data-row-href={rowHref?.(row)}
             className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
           >
             <dl className="space-y-2">
@@ -156,6 +163,7 @@ export default function ResponsiveList<T>({
                 // and a table body admits nothing between them to group with.
                 <Fragment key={rowKey(row)}>
                   <tr
+                    data-row-href={rowHref?.(row)}
                     className={clsx(
                       TABLE.row,
                       // The border moves to the detail row when there is one, so the pair reads

@@ -18,7 +18,6 @@ import {
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import ClientModal from '@/app/ui/projects/client-modal';
-import { OpenLink } from '@/app/ui/projects/detail-card';
 import StatusBadge from '@/app/ui/status-badge';
 import {
   RowAction,
@@ -145,6 +144,8 @@ export default function ClientsPage() {
         columns={columns}
         rows={data?.items ?? []}
         rowKey={(row) => row.id}
+        // The whole row opens it, so there is no Open button among the actions (2026-10-15).
+        rowHref={(row) => ROUTES.projectsClient(row.id)}
         isLoading={isLoading}
         error={isError ? MESSAGES.loadFailed : null}
         emptyMessage="No clients yet. Add one to start a project."
@@ -153,7 +154,6 @@ export default function ClientsPage() {
             {/* First, and the same control the portfolio row offers — a master's detail page
                 is where its related records are, and the list's `projectCount` was only ever
                 half of the question somebody was asking. */}
-            <OpenLink href={ROUTES.projectsClient(row.id)} />
             <RowAction
               onClick={() =>
                 setEditing({

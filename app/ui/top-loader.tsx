@@ -40,8 +40,14 @@ export default function TopLoader() {
       if (url.pathname === window.location.pathname) return;
       setNavigatingFrom(window.location.pathname);
     };
+    // A row that navigates by `data-row-href` says so (`RowLinks`).
+    const onNavigate = () => setNavigatingFrom(window.location.pathname);
     document.addEventListener('click', onClick);
-    return () => document.removeEventListener('click', onClick);
+    window.addEventListener('app:navigate', onNavigate);
+    return () => {
+      document.removeEventListener('click', onClick);
+      window.removeEventListener('app:navigate', onNavigate);
+    };
   }, []);
 
   const navigating = navigatingFrom !== null && navigatingFrom === pathname;

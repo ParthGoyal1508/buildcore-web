@@ -17,7 +17,6 @@ import {
   projectsLabel,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { OpenLink } from '@/app/ui/projects/detail-card';
 import SiteModal from '@/app/ui/projects/site-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import {
@@ -178,6 +177,8 @@ export default function SitesPage() {
         columns={columns}
         rows={data?.items ?? []}
         rowKey={(row) => row.id}
+        // The whole row opens it, so there is no Open button among the actions (2026-10-15).
+        rowHref={(row) => ROUTES.projectsSite(row.id)}
         isLoading={isLoading}
         error={isError ? MESSAGES.loadFailed : null}
         emptyMessage="No sites yet. Add one so employees have somewhere to punch in."
@@ -185,7 +186,6 @@ export default function SitesPage() {
           <>
             {/* The list shows coordinates to five places; the detail page shows the geofence
                 somebody actually has to check. Same control as the portfolio's. */}
-            <OpenLink href={ROUTES.projectsSite(row.id)} />
             <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
             {/* Not pre-disabled like the client delete: whether a site is in use
                 depends on employee postings this list has no count of, so the only
