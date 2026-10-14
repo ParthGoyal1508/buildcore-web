@@ -2,6 +2,11 @@
 
 import Link from 'next/link';
 
+import {
+  BILL_STATUS_LABELS,
+  type BillPackageStatus,
+} from '@/app/lib/api/bill-packages';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -822,6 +827,19 @@ function BillsTab({
                 className="rounded border border-gray-200 p-3 text-sm"
               >
                 <BillSummary bill={bill} />
+                {bill.package ? (
+                  // One bill, one approval (2026-10-14). A bill raised through a package is
+                  // approved, issued, certified and paid on its own page; offering a second
+                  // "Submit" here started a separate decision on the same bill.
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Link
+                      href={ROUTES.projectsBillPackage(projectId, bill.package.id)}
+                      className="inline-flex min-h-11 items-center rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 sm:min-h-0"
+                    >
+                      {nextStepLabel(bill.package.status)}
+                    </Link>
+                  </div>
+                ) : (
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                   <SecondaryButton
                     type="button"
@@ -882,7 +900,8 @@ function BillsTab({
                       : BILLING_COPY.reviseHeading}
                   </SecondaryButton>
                 </div>
-                {opened.has(bill.id) && (
+                )}
+                {!bill.package && opened.has(bill.id) && (
                   <>
                     <RaBillView bill={bill} />
                     {/* 028 FR-020, FR-021. Beside the bill rather than inside `RaBillView`, which
@@ -901,6 +920,24 @@ function BillsTab({
 }
 
 /** One bill's identity and its two figures. Shared by the tab and the unattached list. */
+/** What the link to a packaged bill says — the step it is waiting on, in the reader's words. */
+function nextStepLabel(status: BillPackageStatus): string {
+  switch (status) {
+    case 'draft':
+      return 'Open the bill — send it for approval';
+    case 'pending_approval':
+      return 'Open the bill — approve or reject';
+    case 'approved':
+      return 'Open the bill — issue it';
+    case 'issued':
+      return 'Open the bill — certify it';
+    case 'certified':
+      return 'Open the bill — payments and payment advice';
+    default:
+      return 'Open the bill';
+  }
+}
+
 function BillSummary({ bill }: { bill: RaBill }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -908,7 +945,11 @@ function BillSummary({ bill }: { bill: RaBill }) {
         {bill.billNumber}
         <span className="ml-2 text-xs text-gray-500">
           {dateLabel(bill.billingDate)} ·{' '}
-          {BILLING_COPY.statusLabels[bill.status] ?? bill.status}
+          {/* The package's status where there is one: the RA bill row's own says "Submitted"
+              from issue until certification, which reads as an approval nobody can act on. */}
+          {bill.package
+            ? BILL_STATUS_LABELS[bill.package.status]
+            : BILLING_COPY.statusLabels[bill.status] ?? bill.status}
         </span>
       </span>
       <span className="tabular-nums text-gray-900">

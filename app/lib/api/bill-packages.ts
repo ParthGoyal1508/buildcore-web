@@ -660,7 +660,13 @@ export async function reviseBillPackage(
 
 export async function certifyBillPackage(
   packageId: string,
-  input: { certifiedAmount: string; remarks?: string },
+  input: {
+    certifiedAmount: string;
+    remarks?: string;
+    /** A bill to the client: the client's certification document, base64. */
+    certificateData?: string;
+    certificateFileName?: string;
+  },
 ): Promise<BillPackage> {
   return packageSchema.parse(
     await authFetch<unknown>(`/projects/bill-packages/${packageId}/certify`, {

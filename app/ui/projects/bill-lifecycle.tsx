@@ -472,7 +472,12 @@ function CertifyForm({
   pkg: BillPackage;
   abstract: BillAbstract | undefined;
   busy: boolean;
-  onSubmit: (input: { certifiedAmount: string; remarks?: string }) => void;
+  onSubmit: (input: {
+    certifiedAmount: string;
+    remarks?: string;
+    certificateData?: string;
+    certificateFileName?: string;
+  }) => void;
 }) {
   const toClient = pkg.direction === 'to_client';
   // A client certifies the value of work done; the company certifies what it will pay a
@@ -485,12 +490,22 @@ function CertifyForm({
     '';
   const [amount, setAmount] = useState(prefill);
   const [remarks, setRemarks] = useState(pkg.certifiedRemarks ?? '');
+  const [certificate, setCertificate] = useState<File | null>(null);
   return (
     <form
       className="flex flex-wrap items-end gap-2 rounded-md bg-gray-50 p-3"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        onSubmit({ certifiedAmount: amount.trim(), remarks: remarks.trim() || undefined });
+        onSubmit({
+          certifiedAmount: amount.trim(),
+          remarks: remarks.trim() || undefined,
+          ...(certificate
+            ? {
+                certificateData: await toBase64(certificate),
+                certificateFileName: certificate.name,
+              }
+            : {}),
+        });
       }}
     >
       <div className="w-48">
@@ -514,6 +529,20 @@ function CertifyForm({
           onChange={(e) => setRemarks(e.target.value)}
         />
       </div>
+      {toClient && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="bill-certificate" className="text-sm font-medium text-gray-700">
+            Client’s certificate
+          </label>
+          <input
+            id="bill-certificate"
+            type="file"
+            accept="application/pdf,image/*,.xlsx,.xls"
+            className="text-sm"
+            onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
+          />
+        </div>
+      )}
       <Button type="submit" disabled={busy || !amount.trim()}>
         {busy ? 'Saving…' : 'Certify'}
       </Button>
@@ -559,6 +588,13 @@ function ReviseForm({
       </Button>
     </form>
   );
+}
+
+async function toBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
 export function describe(err: unknown): string {

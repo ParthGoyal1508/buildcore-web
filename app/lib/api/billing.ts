@@ -168,8 +168,26 @@ export const clientBillLineSchema = z.object({
 });
 export type ClientBillLine = z.infer<typeof clientBillLineSchema>;
 
+const billPackageRefSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum([
+    'draft',
+    'pending_approval',
+    'approved',
+    'issued',
+    'certified',
+    'abandoned',
+  ]),
+});
+
 export const clientBillSchema = z.object({
   id: z.string(),
+  /**
+   * The bill package this bill is raised through — where it is approved, issued, certified and
+   * paid (2026-10-14). Null for a bill raised on the old sheet.
+   */
+  package: billPackageRefSchema.nullable().optional(),
   projectId: z.string(),
   billNumber: z.string(),
   description: z.string().nullable(),
@@ -371,6 +389,11 @@ export type RaBillLine = z.infer<typeof raBillLineSchema>;
 
 export const raBillSchema = z.object({
   id: z.string(),
+  /**
+   * The bill package this bill is raised through — where it is approved, issued, certified and
+   * paid (2026-10-14). Null for a bill raised on the old sheet.
+   */
+  package: billPackageRefSchema.nullable().optional(),
   projectId: z.string(),
   workOrderId: z.string().nullable(),
   billNumber: z.string(),
