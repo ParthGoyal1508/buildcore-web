@@ -68,6 +68,21 @@ export async function createCompany(input: CompanyInput): Promise<Company> {
   );
 }
 
+/**
+ * Uploads the company's logo (2026-10-13) — shown in the sidebar and printed at the head of every
+ * payment advice the company issues. The server detects the type from the bytes and refuses
+ * anything that is not an image.
+ */
+export async function uploadCompanyLogo(id: string, file: File): Promise<void> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  await authFetch(`/settings/companies/${id}/logo`, {
+    method: 'PUT',
+    body: JSON.stringify({ data: btoa(binary) }),
+  });
+}
+
 export async function updateCompany(
   id: string,
   input: CompanyInput,

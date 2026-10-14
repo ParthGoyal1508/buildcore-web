@@ -8,6 +8,8 @@ import {
   BILL_ADJUSTMENT_TOTALS,
   type BillAbstract,
   type BillAdjustmentKey,
+  type BillDirection,
+  adjustmentsFor,
   setBillAdjustments,
 } from '@/app/lib/api/bill-packages';
 import { Button } from '@/app/ui/button';
@@ -37,11 +39,20 @@ import { Button } from '@/app/ui/button';
  */
 export default function BillAdjustments({
   packageId,
+  direction,
   abstract,
   debitTotal,
   onSaved,
 }: {
   packageId: string;
+  /**
+   * Who the bill is to (2026-10-13).
+   *
+   * The two documents have different enterable figures, and the server refuses the ones the
+   * document has no row for — so a form offering all of them to a client bill would be a form whose
+   * fields fail on save.
+   */
+  direction: BillDirection;
   abstract: BillAbstract;
   /** What the applied debits on this bill come to, for comparison. Null while unknown. */
   debitTotal: string | null;
@@ -87,7 +98,13 @@ export default function BillAdjustments({
     </label>
   );
 
+  const fields = adjustmentsFor(direction);
   const blocks = [
+    {
+      id: '1',
+      title: 'Value of work done',
+      note: 'Taken off the bill of quantities before tax — row 1B. Every percentage on this bill is computed over what is left.',
+    },
     { id: 'A', title: 'Withheld', note: 'Beside the work done, before tax.' },
     {
       id: 'B',
@@ -128,20 +145,29 @@ export default function BillAdjustments({
       )}
 
       <div className="grid gap-6 sm:grid-cols-3">
-        {blocks.map((block) => (
+        {blocks
+          .filter((block) => fields.some((row) => row.block === block.id))
+          .map((block) => (
           <div key={block.id} className="flex flex-col gap-2">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               {block.title}
             </h4>
-            {BILL_ADJUSTMENTS.filter((row) => row.block === block.id).map(
-              (row) => field(row.key, row.label),
-            )}
+            {fields
+              .filter((row) => row.block === block.id)
+              .map((row) => field(row.key, row.label))}
             <p className="mt-1 text-xs text-gray-500">{block.note}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 border-t border-gray-100 pt-4">
+      {/* The two one-time recoveries are a subcontract's, and a client's abstract has neither. */}
+      <div
+        className={
+          direction === 'to_client'
+            ? 'hidden'
+            : 'mt-6 border-t border-gray-100 pt-4'
+        }
+      >
         <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           Contract totals
         </h4>

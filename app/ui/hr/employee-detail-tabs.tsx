@@ -16,7 +16,12 @@ import {
   listDesignations,
   listShifts,
 } from '@/app/lib/api/settings';
-import { HR_MESSAGES, ROUTES, hrLabel } from '@/app/lib/constants';
+import {
+  EMPLOYEE_LETTER_KIND_KEYS,
+  HR_MESSAGES,
+  ROUTES,
+  hrLabel,
+} from '@/app/lib/constants';
 import { dateLabel, money, rupees } from '@/app/lib/format';
 import AttendanceCalendar from '@/app/ui/hr/attendance-calendar';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
@@ -24,6 +29,8 @@ import DocumentsTab from '@/app/ui/hr/documents-tab';
 import SubjectLetters from '@/app/ui/letters/subject-letters';
 import MaskedField from '@/app/ui/hr/masked-field';
 import OffboardingPanel from '@/app/ui/hr/offboarding-panel';
+import SalaryRevisions from '@/app/ui/hr/salary-revisions';
+import EmployeePayslips from '@/app/ui/hr/employee-payslips';
 import TransferModal from '@/app/ui/hr/transfer-modal';
 import { getCurrentUser } from '@/app/lib/api/users';
 import AssetsInCustody from '@/app/ui/assets/assets-in-custody';
@@ -44,6 +51,8 @@ const TABS = [
   // something filed *about* this person, a letter is something this company *issued to* them, and
   // an appointment letter sitting in a list of Aadhaar scans loses that distinction.
   { id: 'letters', label: 'Letters' },
+  // PAYROLL only — filtered out below for anyone without it.
+  { id: 'payslips', label: 'Payslips' },
   { id: 'loans', label: 'Loans' },
 ] as const;
 
@@ -194,7 +203,16 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
         </div>
       </div>
 
-      <TabStrip tabs={TABS} active={tab} onChange={setTab} idPrefix="employee-detail" />
+      <TabStrip
+        tabs={TABS.filter(
+          (entry) =>
+            entry.id !== 'payslips' ||
+            (currentUser?.permissions ?? []).includes('PAYROLL' as never),
+        )}
+        active={tab}
+        onChange={setTab}
+        idPrefix="employee-detail"
+      />
 
       <TabPanel id="overview" idPrefix="employee-detail" active={tab}>
         <Fields>
@@ -228,6 +246,7 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
       <TabPanel id="personal" idPrefix="employee-detail" active={tab}>
         <Fields>
           <Field label="Title">{orDash(employee.title)}</Field>
+          <Field label="Father’s name">{orDash(employee.fatherName)}</Field>
           <Field label="Date of birth">{dateLabel(employee.dob)}</Field>
           <Field label="Gender">{employee.gender ? hrLabel(employee.gender) : '—'}</Field>
           <Field label="Marital status">
@@ -342,6 +361,8 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
           </dl>
         </div>
 
+        <SalaryRevisions employee={employee} />
+
         <h3 className="mt-6 text-sm font-medium text-gray-900">Statutory &amp; bank</h3>
         <div className="mt-2">
           <Fields>
@@ -408,7 +429,19 @@ export default function EmployeeDetailTabs({ employeeId }: { employeeId: string 
       </TabPanel>
 
       <TabPanel id="letters" idPrefix="employee-detail" active={tab}>
-        <SubjectLetters query={{ employeeId: employee.id }} />
+        <SubjectLetters
+          query={{ employeeId: employee.id }}
+          heading="Issued documents"
+          generate={{
+            recipient: { employeeId: employee.id },
+            recipientLabel: name,
+            kindKeys: EMPLOYEE_LETTER_KIND_KEYS,
+          }}
+        />
+      </TabPanel>
+
+      <TabPanel id="payslips" idPrefix="employee-detail" active={tab}>
+        {tab === 'payslips' && <EmployeePayslips employeeId={employee.id} />}
       </TabPanel>
 
       <TabPanel id="loans" idPrefix="employee-detail" active={tab}>

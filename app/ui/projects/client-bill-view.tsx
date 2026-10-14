@@ -1,8 +1,11 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 
+import { BILL_STATUS_LABELS } from '@/app/lib/api/bill-packages';
 import {
   certifyClientBill,
   downloadCertificate,
@@ -11,7 +14,7 @@ import {
   type ClientBillLine,
 } from '@/app/lib/api/billing';
 import { ApiError } from '@/app/lib/api/client';
-import { BILLING_COPY } from '@/app/lib/constants';
+import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { openStoredFile } from '@/app/lib/download-file';
 import { percentLabel } from '@/app/lib/bill-totals';
 import { dateLabel, rupees, unitRate } from '@/app/lib/format';
@@ -192,16 +195,21 @@ export default function ClientBillView({
           <h2 className="text-base font-semibold text-gray-900">
             {bill.billNumber}
           </h2>
+          {/* The package's status where there is one — it is where this bill actually stands. */}
           <StatusBadge
-            status={bill.status}
-            label={BILLING_COPY.statusLabels[bill.status] ?? bill.status}
+            status={bill.package ? bill.package.status : bill.status}
+            label={
+              bill.package
+                ? BILL_STATUS_LABELS[bill.package.status]
+                : BILLING_COPY.statusLabels[bill.status] ?? bill.status
+            }
           />
         </div>
         <p className="text-sm text-gray-600">{dateLabel(bill.billingDate)}</p>
         {bill.description && (
           <p className="text-sm text-gray-900">{bill.description}</p>
         )}
-        {bill.status === 'draft' && (
+        {!bill.package && bill.status === 'draft' && (
           <p className="text-sm text-gray-600">{BILLING_COPY.draftNotSent}</p>
         )}
       </header>
@@ -533,6 +541,18 @@ export default function ClientBillView({
         )}
       </section>
 
+      {bill.package ? (
+        // One bill, one approval (2026-10-14). Approval, issue and certification — with the
+        // client's certificate — happen on the bill's own page.
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={ROUTES.projectsBillPackage(projectId, bill.package.id)}
+            className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 sm:min-h-0"
+          >
+            Open {bill.package.label} — approve, issue and certify
+          </Link>
+        </div>
+      ) : (
       <div className="flex flex-wrap gap-2">
         {bill.status === 'draft' && (
           <Button
@@ -565,6 +585,7 @@ export default function ClientBillView({
           </SecondaryButton>
         )}
       </div>
+      )}
     </section>
   );
 }

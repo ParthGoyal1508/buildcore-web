@@ -21,11 +21,14 @@ export default function JoinModal({
   candidateName,
   onClose,
   onJoined,
+  onGenerateAppointment,
 }: {
   candidateId: string;
   candidateName: string;
   onClose: () => void;
   onJoined: () => void;
+  /** Offered once the employee exists — the appointment letter is issued on joining. */
+  onGenerateAppointment?: (employeeId: string) => void;
 }) {
   const [form, setForm] = useState({
     actualJoiningDate: '',
@@ -67,8 +70,17 @@ export default function JoinModal({
             <p className="text-amber-800">Delayed joining by {result.delayedByDays} days.</p>
           )}
           <div className="flex gap-2">
+            {onGenerateAppointment && (
+              <Button onClick={() => onGenerateAppointment(result.employeeId)}>
+                Generate appointment letter
+              </Button>
+            )}
             <Link href={ROUTES.recruitmentOnboarding(result.employeeId)}>
-              <Button>Open onboarding</Button>
+              {onGenerateAppointment ? (
+                <SecondaryButton>Open onboarding</SecondaryButton>
+              ) : (
+                <Button>Open onboarding</Button>
+              )}
             </Link>
             <SecondaryButton onClick={onClose}>Close</SecondaryButton>
           </div>

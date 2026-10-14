@@ -1,11 +1,27 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
-import { downloadLetter, getLetters, type LetterQuery } from '@/app/lib/api/letters';
-import { LETTER_COPY, MESSAGES } from '@/app/lib/constants';
+import {
+  downloadLetter,
+  getLetters,
+  letterFileName,
+  type IssuedLetter,
+  type LetterQuery,
+} from '@/app/lib/api/letters';
+import {
+  GENERATE_LETTER_COPY,
+  LETTER_COPY,
+  MESSAGES,
+} from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
+import GenerateLetterDialog, {
+  useOfferableLetterKinds,
+  type LetterRecipient,
+} from '@/app/ui/letters/generate-letter-dialog';
 import { LetterList } from '@/app/ui/letters/letter-list';
-import { RowAction } from '@/app/ui/settings/form-fields';
+import { FormError, RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
 
 /**
  * The letters belonging to one subject, wherever that subject's own screen is (017 US6, T029, T030).
@@ -31,12 +47,26 @@ export default function SubjectLetters({
   query,
   heading = LETTER_COPY.subjectHeading,
   emptyMessage = LETTER_COPY.subjectEmpty,
+  generate,
 }: {
   /** Exactly one subject's worth — an employee, a candidate, or a subject pair. */
   query: LetterQuery;
   heading?: string;
   emptyMessage?: string;
+  /**
+   * Offer "Generate document" for these kinds (HR documents, 2026-10-13). Only where this panel
+   * is not itself inside a dialog — the generate flow is one, and dialogs do not stack here.
+   */
+  generate?: {
+    recipient: LetterRecipient;
+    recipientLabel?: string;
+    kindKeys: readonly string[];
+  };
 }) {
+  const [generating, setGenerating] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const offerable = useOfferableLetterKinds(generate?.kindKeys ?? [], !!generate);
+
   const { data, isLoading, isError } = useQuery({
     // The query in the key, so switching subject refetches rather than showing the last one's
     // letters — the failure mode that looks like it is working.
@@ -49,6 +79,15 @@ export default function SubjectLetters({
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  const save = async (letter: IssuedLetter) => {
+    setDownloadError(null);
+    try {
+      saveBlob(await downloadLetter(letter.id), letterFileName(letter));
+    } catch {
+      setDownloadError(GENERATE_LETTER_COPY.downloadFailed);
+    }
   };
 
   if (isLoading) {
@@ -68,7 +107,15 @@ export default function SubjectLetters({
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="text-sm font-medium text-gray-900">{heading}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-gray-900">{heading}</h3>
+        {generate && offerable.kinds.length > 0 && (
+          <SecondaryButton type="button" onClick={() => setGenerating(true)}>
+            {GENERATE_LETTER_COPY.action}
+          </SecondaryButton>
+        )}
+      </div>
+      <FormError message={downloadError} />
       <LetterList
         letters={data ?? []}
         emptyMessage={emptyMessage}
@@ -76,11 +123,26 @@ export default function SubjectLetters({
           // Only the download. Composing belongs on the composer, and issuing belongs behind the
           // approval gate the composer already renders — putting either here would be a second
           // path to an action whose preconditions this panel does not check.
-          <RowAction intent="read" type="button" onClick={() => void open(letter.id)}>
-            {LETTER_COPY.subjectOpen}
-          </RowAction>
+          <>
+            <RowAction intent="read" type="button" onClick={() => void open(letter.id)}>
+              {LETTER_COPY.subjectOpen}
+            </RowAction>
+            {letter.status !== 'composed' && (
+              <RowAction intent="read" type="button" onClick={() => void save(letter)}>
+                Download
+              </RowAction>
+            )}
+          </>
         )}
       />
+      {generate && generating && (
+        <GenerateLetterDialog
+          recipient={generate.recipient}
+          recipientLabel={generate.recipientLabel}
+          kindKeys={generate.kindKeys}
+          onClose={() => setGenerating(false)}
+        />
+      )}
     </section>
   );
 }

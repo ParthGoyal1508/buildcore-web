@@ -188,6 +188,11 @@ export const vendorDetailSchema = z.object({
   city: z.string().nullable(),
   state: z.string().nullable(),
   pinCode: z.string().nullable(),
+  bankName: z.string().nullable().optional(),
+  bankBranch: z.string().nullable().optional(),
+  bankAccountNumber: z.string().nullable().optional(),
+  bankAccountHolderName: z.string().nullable().optional(),
+  ifscCode: z.string().nullable().optional(),
   vendorCurrency: z.string(),
   exchangeRate: decimal,
   contacts: z.array(vendorContactSchema),
@@ -243,6 +248,11 @@ export interface VendorInput {
   city?: string;
   state?: string;
   pinCode?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankAccountNumber?: string;
+  bankAccountHolderName?: string;
+  ifscCode?: string;
   contacts?: Array<{ name: string; phone?: string; email?: string }>;
   categoryIds?: string[];
   hireDetail?: Record<string, unknown>;

@@ -9,6 +9,7 @@ import {
   createCandidate,
   getCandidate,
   getCandidates,
+  getOffers,
   getRequisitions,
   markNoShow,
   rejectCandidate,
@@ -17,12 +18,15 @@ import {
   type CandidateDetail,
 } from '@/app/lib/api/recruitment';
 import {
+  CANDIDATE_LETTER_KIND_KEYS,
+  RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS,
   CANDIDATE_SOURCES,
   PIPELINE_COLUMNS,
   recruitmentLabel,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import JoinModal from '@/app/ui/recruitment/join-modal';
+import { offerLetterSubmit } from '@/app/ui/recruitment/offer-letter-submit';
 import OfferModal from '@/app/ui/recruitment/offer-modal';
 import {
   FormError,
@@ -34,6 +38,9 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import SubjectLetters from '@/app/ui/letters/subject-letters';
+import GenerateLetterDialog, {
+  useOfferableLetterKinds,
+} from '@/app/ui/letters/generate-letter-dialog';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 
@@ -216,6 +223,8 @@ function CandidateForm({ onClose, onSaved }: { onClose: () => void; onSaved: () 
     currentCtc: '',
     expectedCtc: '',
     source: 'portal',
+    fatherName: '',
+    address: '',
   });
   const [error, setError] = useState<string | null>(null);
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -232,6 +241,8 @@ function CandidateForm({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         currentCtc: form.currentCtc ? Number(form.currentCtc) : undefined,
         expectedCtc: form.expectedCtc ? Number(form.expectedCtc) : undefined,
         source: form.source,
+        fatherName: form.fatherName.trim() || undefined,
+        address: form.address.trim() || undefined,
       }),
     onSuccess: onSaved,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not add the candidate.'),
@@ -263,12 +274,16 @@ function CandidateForm({ onClose, onSaved }: { onClose: () => void; onSaved: () 
           {CANDIDATE_SOURCES.map((s) => <option key={s} value={s}>{recruitmentLabel(s)}</option>)}
         </SelectField>
         <TextField id="c-name" label="Full name" value={form.fullName} onChange={(e) => set('fullName', e.target.value)} />
+        <TextField id="c-father" label="Father’s name" maxLength={120} value={form.fatherName} onChange={(e) => set('fatherName', e.target.value)} />
         <TextField id="c-phone" label="Phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
         <TextField id="c-email" label="Email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
         <TextField id="c-exp" label="Experience (years)" type="number" min="0" step="0.1" value={form.totalExperienceYears} onChange={(e) => set('totalExperienceYears', e.target.value)} />
         <TextField id="c-emp" label="Current employer" value={form.currentEmployer} onChange={(e) => set('currentEmployer', e.target.value)} />
         <TextField id="c-cctc" label="Current CTC (₹)" type="number" min="0" value={form.currentCtc} onChange={(e) => set('currentCtc', e.target.value)} />
         <TextField id="c-ectc" label="Expected CTC (₹)" type="number" min="0" value={form.expectedCtc} onChange={(e) => set('expectedCtc', e.target.value)} />
+        <div className="sm:col-span-2">
+          <TextField id="c-address" label="Address" hint="Printed on the offer letter; becomes the permanent address on joining." maxLength={500} value={form.address} onChange={(e) => set('address', e.target.value)} />
+        </div>
       </div>
     </Modal>
   );
@@ -286,7 +301,24 @@ function CandidateDrawer({
   const [revealed, setRevealed] = useState<CandidateDetail | null>(null);
   const [showOffer, setShowOffer] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [showLetter, setShowLetter] = useState(false);
+  // The appointment letter is to the employee joining created — from the join flow's result, or
+  // from the candidate once joined.
+  const [appointmentFor, setAppointmentFor] = useState<string | null>(null);
+  const appointmentLetter = useOfferableLetterKinds(RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS);
   const [error, setError] = useState<string | null>(null);
+  // The offer letter through the pre-filled compose flow — reads the candidate's latest offer.
+  const offerLetter = useOfferableLetterKinds(CANDIDATE_LETTER_KIND_KEYS);
+  const offerStage = candidate.stage === 'selected';
+  // The offer letter is issued *through* the draft offer, which is what moves the offer and the
+  // candidate on — so without one there is nothing to generate it from.
+  const offers = useQuery({
+    queryKey: ['offers', candidate.id],
+    queryFn: () => getOffers(candidate.id),
+    enabled: offerStage,
+  });
+  const draftOffer = offers.data?.find((o) => o.status === 'draft') ?? null;
+  const queryClient = useQueryClient();
 
   const reveal = useMutation({
     mutationFn: () => getCandidate(candidate.id),
@@ -310,7 +342,42 @@ function CandidateDrawer({
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not mark no-show.'),
   });
 
-  if (showOffer) return <OfferModal candidateId={candidate.id} onClose={() => setShowOffer(false)} />;
+  if (showOffer)
+    return (
+      <OfferModal
+        candidateId={candidate.id}
+        candidateName={candidate.fullName}
+        onClose={() => setShowOffer(false)}
+      />
+    );
+  // Replaces the drawer rather than stacking on it, as the offer and join flows do: two modals
+  // would both close on one Escape.
+  if (showLetter && draftOffer)
+    return (
+      <GenerateLetterDialog
+        recipient={{ candidateId: candidate.id }}
+        recipientLabel={candidate.fullName}
+        kindKeys={CANDIDATE_LETTER_KIND_KEYS}
+        initialKindKey="offer"
+        submit={offerLetterSubmit(draftOffer.id, candidate.id)}
+        onIssued={() => {
+          void queryClient.invalidateQueries({ queryKey: ['offers', candidate.id] });
+          onChanged();
+        }}
+        onClose={() => setShowLetter(false)}
+      />
+    );
+  if (appointmentFor)
+    return (
+      <GenerateLetterDialog
+        recipient={{ employeeId: appointmentFor }}
+        recipientLabel={candidate.fullName}
+        kindKeys={RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS}
+        initialKindKey="appointment"
+        onIssued={onChanged}
+        onClose={() => setAppointmentFor(null)}
+      />
+    );
   if (showJoin)
     return (
       <JoinModal
@@ -318,6 +385,14 @@ function CandidateDrawer({
         candidateName={candidate.fullName}
         onClose={() => setShowJoin(false)}
         onJoined={onChanged}
+        onGenerateAppointment={
+          appointmentLetter.kinds.length > 0
+            ? (employeeId) => {
+                setShowJoin(false);
+                setAppointmentFor(employeeId);
+              }
+            : undefined
+        }
       />
     );
 
@@ -347,6 +422,14 @@ function CandidateDrawer({
             {revealed && (
               <>
                 <div className="flex gap-2">
+                  <dt className="w-24 text-gray-500">Father’s name</dt>
+                  <dd>{revealed.fatherName ?? '—'}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="w-24 text-gray-500">Address</dt>
+                  <dd>{revealed.address ?? '—'}</dd>
+                </div>
+                <div className="flex gap-2">
                   <dt className="w-24 text-gray-500">Current CTC</dt>
                   <dd>{revealed.currentCtc ?? '—'}</dd>
                 </div>
@@ -372,6 +455,29 @@ function CandidateDrawer({
               <SecondaryButton onClick={() => noShow.mutate()}>Mark No-show</SecondaryButton>
             </>
           )}
+          {offerStage && offerLetter.kinds.length > 0 && (
+            <div className="flex flex-col">
+              <SecondaryButton
+                onClick={() => setShowLetter(true)}
+                disabled={!draftOffer}
+                aria-describedby={!draftOffer ? 'offer-letter-hint' : undefined}
+              >
+                Generate offer letter
+              </SecondaryButton>
+              {!draftOffer && !offers.isPending && (
+                <p id="offer-letter-hint" className="mt-1 text-xs text-gray-500">
+                  Build the offer first — the letter is issued from it.
+                </p>
+              )}
+            </div>
+          )}
+          {candidate.stage === 'joined' &&
+            candidate.employeeId &&
+            appointmentLetter.kinds.length > 0 && (
+              <Button onClick={() => setAppointmentFor(candidate.employeeId)}>
+                Generate appointment letter
+              </Button>
+            )}
           {candidate.stage !== 'joined' && candidate.stage !== 'rejected' && (
             <SecondaryButton onClick={() => reject.mutate()}>Reject</SecondaryButton>
           )}
@@ -385,6 +491,8 @@ function CandidateDrawer({
           drawer is where a reader already has one candidate in front of them.
         */}
         <SubjectLetters query={{ candidateId: candidate.id }} />
+        {/* Once joined, the appointment letter is to the employee record joining created. */}
+        {candidate.employeeId && <SubjectLetters query={{ employeeId: candidate.employeeId }} />}
       </div>
     </Modal>
   );

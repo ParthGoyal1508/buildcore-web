@@ -28,7 +28,7 @@ import {
   type VendorFormValues,
 } from '@/app/ui/partners/vendor-form-schema';
 
-const TABS = ['Details', 'Address', 'Contacts', 'Work detail'] as const;
+const TABS = ['Details', 'Address', 'Bank', 'Contacts', 'Work detail'] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -78,6 +78,11 @@ export default function VendorModal({
       city: vendor?.city ?? '',
       state: vendor?.state ?? '',
       pinCode: vendor?.pinCode ?? '',
+      bankName: vendor?.bankName ?? '',
+      bankBranch: vendor?.bankBranch ?? '',
+      bankAccountNumber: vendor?.bankAccountNumber ?? '',
+      bankAccountHolderName: vendor?.bankAccountHolderName ?? '',
+      ifscCode: vendor?.ifscCode ?? '',
       categoryIds: vendor?.categoryIds ?? [],
       contacts:
         vendor?.contacts.map((contact) => ({
@@ -262,6 +267,36 @@ export default function VendorModal({
           </Field>
           <Field id="vendor-pin" label="PIN code" error={errors.pinCode?.message}>
             <TextInput id="vendor-pin" {...register('pinCode')} />
+          </Field>
+        </div>
+
+        <div className={clsx('grid gap-4 sm:grid-cols-2', tab !== 'Bank' && 'hidden')}>
+          <p className="text-sm text-gray-600 sm:col-span-2">
+            Where payments to this vendor are sent. Printed on the payment advice
+            for each payment against their bills.
+          </p>
+          <Field id="vendor-bank-name" label="Bank name" error={errors.bankName?.message}>
+            <TextInput id="vendor-bank-name" {...register('bankName')} />
+          </Field>
+          <Field id="vendor-bank-branch" label="Branch" error={errors.bankBranch?.message}>
+            <TextInput id="vendor-bank-branch" {...register('bankBranch')} />
+          </Field>
+          <Field
+            id="vendor-bank-account"
+            label="Account number"
+            error={errors.bankAccountNumber?.message}
+          >
+            <TextInput id="vendor-bank-account" {...register('bankAccountNumber')} />
+          </Field>
+          <Field id="vendor-ifsc" label="IFSC code" error={errors.ifscCode?.message}>
+            <TextInput id="vendor-ifsc" {...register('ifscCode')} />
+          </Field>
+          <Field
+            id="vendor-bank-holder"
+            label="Account holder name"
+            error={errors.bankAccountHolderName?.message}
+          >
+            <TextInput id="vendor-bank-holder" {...register('bankAccountHolderName')} />
           </Field>
         </div>
 

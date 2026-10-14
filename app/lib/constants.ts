@@ -757,8 +757,30 @@ export const RECONCILIATION_COPY = {
  * refusals — an author looking at a screen that is entirely one template needs to be told *which*
  * field is the problem, and "invalid template" tells them nothing they can act on.
  */
+/**
+ * Kinds whose template is the product's standard wording, the same for every company. The api
+ * refuses a change to their body or name, or a new template for them, with
+ * `LETTER_TEMPLATE_STANDARD_LOCKED`; only `isActive` and the letterhead stay editable. Listed here
+ * because the template view carries no flag for it.
+ */
+export const STANDARD_WORDING_KIND_KEYS: readonly string[] = [
+  'offer',
+  'appointment',
+  'experience',
+  'relieving',
+  'increment',
+  'transfer',
+  'termination',
+  'fnf_settlement',
+  'payment_advice',
+];
+
 export const TEMPLATE_COPY = {
   title: 'Letter Templates',
+  standardBadge: 'Standard wording',
+  standardHint:
+    'Standard wording, the same for every company. It cannot be edited here; only whether it is active can be changed.',
+  view: 'View',
   // Says what the editor is keyed to now. It used to say "one active template per type", and "type"
   // was the five-value enum 017 replaced with fifteen kinds.
   description:
@@ -4092,6 +4114,86 @@ export const LETTER_STATUS_LABELS = {
   composed: LETTER_COPY.composedBadge,
   issued: LETTER_COPY.issuedBadge,
   executed: LETTER_COPY.executedBadge,
+} as const;
+
+/**
+ * The HR documents an employee can be issued from their own screen, in the order HR meets them.
+ *
+ * A list of keys, not of kinds: the kinds themselves (label, signature, active) still come from
+ * `GET /letter-kinds`, and a key here the company has not got — or has deactivated — is simply not
+ * offered. What this decides is only *which screen* a kind belongs on: a work order is a letter
+ * too, and an employee's Letters tab is not where it is issued.
+ *
+ * **No appointment letter here** (2026-10-14): it is Recruitment's document, issued from the
+ * pipeline when the candidate joins — see `RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS`. **No
+ * confirmation or suspension letter** either: the client issues neither, and has no wording for
+ * them.
+ */
+export const EMPLOYEE_LETTER_KIND_KEYS = [
+  'increment',
+  'transfer',
+  'experience',
+  'relieving',
+  'termination',
+  'fnf_settlement',
+] as const;
+
+/**
+ * Recruitment's document for somebody who has just joined. Addressed to the new employee record,
+ * because it prints the employee code, joining date and salary annexure, none of which exist
+ * before joining; issued from Recruitment, because joining is the last step of hiring.
+ */
+export const RECRUITMENT_EMPLOYEE_LETTER_KIND_KEYS = ['appointment'] as const;
+
+/** A candidate is issued an offer, and nothing else, before they join. */
+export const CANDIDATE_LETTER_KIND_KEYS = ['offer'] as const;
+
+/**
+ * The permission each HR kind is issued under — mirrors the api's `letter-permissions.ts`.
+ *
+ * Used only to decide what to *offer*: the api refuses with `LETTER_KIND_FORBIDDEN` regardless,
+ * and a kind missing here is offered and left to the server to judge.
+ */
+export const HR_LETTER_KIND_PERMISSIONS: Record<string, string> = {
+  offer: 'RECRUITMENT',
+  appointment: 'RECRUITMENT',
+  confirmation: 'EMPLOYEES',
+  relieving: 'EMPLOYEES',
+  experience: 'EMPLOYEES',
+  transfer: 'EMPLOYEES',
+  suspension: 'EMPLOYEES',
+  termination: 'EMPLOYEES',
+  increment: 'PAYROLL',
+  fnf_settlement: 'PAYROLL',
+};
+
+/** Copy for the generate-a-document flow (HR documents, 2026-10-13). */
+export const GENERATE_LETTER_COPY = {
+  action: 'Generate document',
+  title: 'Generate document',
+  chooseKind: 'Document',
+  noKinds:
+    'No HR document kind is available to you here. Kinds are configured in Settings → Letter kinds, and each is issued under its own permission.',
+  fromRecords: 'From records',
+  fromRecordsHint: 'Filled in from the records. Edit any of them for this letter only.',
+  toFill: 'To fill in',
+  toFillHint: 'Nothing on record holds these.',
+  noFields: 'This kind declares no fields — it is issued exactly as its template reads.',
+  requiredMissing: 'Required — nothing on record holds this.',
+  signatory: 'Signatory',
+  noSignatories: 'This document carries a signature, and no active signatory is set up. Add one in Settings → Signatories.',
+  signatoriesForbidden:
+    'This document carries a signature, and you may not read the signatory list. Ask an administrator to issue it, or to grant access.',
+  signatoriesFailed: 'The signatories could not be loaded.',
+  issue: 'Issue',
+  submitForApproval: 'Submit for approval',
+  issued: 'Issued',
+  awaitingApproval:
+    'Submitted. This kind needs approval before it is issued; it will get its reference number then.',
+  download: 'Download PDF',
+  prefillFailed: 'The form could not be loaded.',
+  issueFailed: 'The document could not be issued.',
+  downloadFailed: 'The document could not be downloaded.',
 } as const;
 
 /** Copy for payment proof (017 US7). */

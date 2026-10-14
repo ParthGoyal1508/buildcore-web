@@ -1,31 +1,29 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { useState } from 'react';
 
 import {
-  ABSTRACT_BLOCKS,
+  abstractBlocksFor,
   type BillPackageClaim,
-  certifyBillPackage,
-  downloadWorkbook,
   getAbstract,
   getBillPackage,
   getDebitRegister,
   isEditable,
-  issueBillPackage,
   proposalLabel,
-  abandonBillPackage,
   applyDebit,
-  downloadBillPdf,
   recordDebit,
-  reviseBillPackage,
   setClaim,
 } from '@/app/lib/api/bill-packages';
-import { downloadDebitNote } from '@/app/lib/api/billing';
+import { downloadDebitNote, getRaBill } from '@/app/lib/api/billing';
 import { SETTLEMENT_COPY, projectsLabel } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
 import { dateLabel } from '@/app/lib/format';
 import BillAdjustments from '@/app/ui/projects/bill-adjustments';
+import BillDeductionLines from '@/app/ui/projects/bill-deduction-lines';
+import BillLifecycle, { describe } from '@/app/ui/projects/bill-lifecycle';
+import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import { Button } from '@/app/ui/button';
 import MeasurementSheet from '@/app/ui/projects/measurement-sheet';
 import StatusBadge from '@/app/ui/status-badge';
@@ -77,74 +75,23 @@ export default function BillPackageDetail({
     queryFn: () => getDebitRegister(packageId),
   });
 
+  // A certified subcontractor bill is paid here, and each payment produces its payment advice.
+  const certifiedRaBillId =
+    pkg?.direction === 'to_subcontractor' && pkg.status === 'certified'
+      ? pkg.raBillId ?? null
+      : null;
+  const { data: raBill } = useQuery({
+    queryKey: ['raBill', certifiedRaBillId],
+    queryFn: () => getRaBill(certifiedRaBillId as string),
+    enabled: certifiedRaBillId !== null,
+  });
+
   const refresh = () => {
     for (const key of ['billPackage', 'billAbstract', 'billRegister']) {
       void queryClient.invalidateQueries({ queryKey: [key, packageId] });
     }
+    void queryClient.invalidateQueries({ queryKey: ['raBill'] });
   };
-
-  const issue = useMutation({
-    mutationFn: () => issueBillPackage(packageId),
-    onSuccess: (result) => {
-      setError(null);
-      // FR-027a and FR-043a: both are **reported**, never a refusal. A bill that cannot be produced
-      // because a permanent account number is unrecorded is worse than one produced with a blank
-      // somebody fills in by hand — so the gaps are stated and the bill goes out.
-      const gaps: string[] = [];
-      if (result.missingHeaderFields.length > 0) {
-        gaps.push(
-          `Not on file: ${result.missingHeaderFields.join(', ')} — printed blank on every sheet.`,
-        );
-      }
-      setNotice(
-        gaps.length > 0
-          ? `Issued. ${gaps.join(' ')}`
-          : 'Issued. Every figure is now frozen, and this bill will reproduce exactly as it stands.',
-      );
-      refresh();
-    },
-    onError: (err: unknown) => {
-      setNotice(null);
-      setError(describe(err));
-    },
-  });
-
-  /** One place that turns a blob into a named download, so the two buttons cannot differ. */
-  const save = (blob: Blob, filename: string) => {
-    // A blob URL carries no filename, so the `download` attribute is the only way to say what the
-    // file is called — the reason `download-file.ts` exists and uses an anchor rather than
-    // `window.open`.
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadPdf = useMutation({
-    mutationFn: async () => {
-      const { blob, filename } = await downloadBillPdf(
-        packageId,
-        pkg?.label ?? 'bill',
-      );
-      save(blob, filename);
-    },
-    onError: (err: unknown) => setError(describe(err)),
-  });
-
-  const download = useMutation({
-    mutationFn: async () => {
-      const { blob, filename } = await downloadWorkbook(
-        packageId,
-        pkg?.label ?? 'bill',
-      );
-      save(blob, filename);
-    },
-    onError: (err: unknown) => setError(describe(err)),
-  });
 
   if (isLoading || !pkg) {
     return (
@@ -217,92 +164,21 @@ export default function BillPackageDetail({
             this bill was computed at, frozen onto it.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => download.mutate()}
-            disabled={download.isPending}
-          >
-            {download.isPending ? 'Producing…' : 'Download the workbook'}
-          </Button>
-          {/* 025 FR-042. The same bill, rendered from the same stored figures — the workbook is
-              what a client edits before signing, the PDF is what gets emailed and filed. */}
-          <Button
-            onClick={() => downloadPdf.mutate()}
-            disabled={downloadPdf.isPending}
-          >
-            {downloadPdf.isPending ? 'Producing…' : 'Download the PDF'}
-          </Button>
-          {editable && (
-            <Button onClick={() => issue.mutate()} disabled={issue.isPending}>
-              {issue.isPending ? 'Issuing…' : 'Issue'}
-            </Button>
-          )}
-          {editable && (
-            // 025 FR-030. A draft composed for the wrong period or the wrong counterparty had no
-            // way out; the endpoint has existed since 023 and nothing called it. Abandoned rather
-            // than deleted — the period stays accounted for.
-            <Button
-              intent="write"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Abandon this draft? The period stays recorded as one somebody opened and chose not to bill.',
-                  )
-                ) {
-                  abandonBillPackage(packageId)
-                    .then(() => {
-                      setNotice('Abandoned.');
-                      refresh();
-                    })
-                    .catch((err: unknown) => setError(describe(err)));
-                }
-              }}
-            >
-              Abandon
-            </Button>
-          )}
-          {!editable && pkg.status === 'issued' && (
-            <Button
-              onClick={() => {
-                const reason = window.prompt(
-                  'Why is this bill being revised? This records a revision against it — it does not reopen the bill for editing, because what was sent has to stay readable.',
-                );
-                if (reason) {
-                  reviseBillPackage(packageId, reason)
-                    .then(() => {
-                      setNotice(
-                        'Revision recorded, with its reason and a count. What the bill stated at issue is unchanged — a reader reconciling a payment against it must still see what was sent.',
-                      );
-                      refresh();
-                    })
-                    .catch((err: unknown) => setError(describe(err)));
-                }
-              }}
-            >
-              Revise
-            </Button>
-          )}
-          {!editable && pkg.status === 'issued' && (
-            <Button
-              onClick={() => {
-                const amount = window.prompt(
-                  'What did they certify? Kept beside the billed figure, never instead of it.',
-                );
-                if (amount) {
-                  certifyBillPackage(packageId, amount)
-                    .then(() => {
-                      setNotice('Certified amount recorded.');
-                      refresh();
-                    })
-                    .catch((err: unknown) => setError(describe(err)));
-                }
-              }}
-            >
-              Record certification
-            </Button>
-          )}
-        </div>
       </header>
+
+      <BillLifecycle
+        pkg={pkg}
+        abstract={abstract}
+        onChanged={refresh}
+        onNotice={(message) => {
+          setError(null);
+          setNotice(message);
+        }}
+        onError={(message) => {
+          setNotice(null);
+          setError(message);
+        }}
+      />
 
       {notice && (
         <p
@@ -317,11 +193,11 @@ export default function BillPackageDetail({
           {error}
         </p>
       )}
-      {!editable && (
+      {!editable && pkg.status !== 'abandoned' && (
         <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
-          This bill has been issued, so its lines cannot be edited. A bill is a
-          document that was sent — reconciling a payment against one whose
-          history has moved is the one thing nobody can do.
+          {pkg.status === 'pending_approval' || pkg.status === 'approved'
+            ? 'This bill is with its approver, so its lines are locked — an approval is of the figures the approver saw. Withdraw it to draft to change anything.'
+            : 'This bill has been issued, so its lines cannot be edited. A bill is a document that was sent — reconciling a payment against one whose history has moved is the one thing nobody can do.'}
         </p>
       )}
       {pkg.unpricedClaimedCount > 0 && editable && (
@@ -472,6 +348,7 @@ export default function BillPackageDetail({
       {editable && abstract && (
         <BillAdjustments
           packageId={packageId}
+          direction={pkg.direction}
           abstract={abstract}
           debitTotal={register?.recoveredOnThisPackage ?? null}
           onSaved={() => {
@@ -479,6 +356,18 @@ export default function BillPackageDetail({
             setNotice('Figures saved. The abstract below has moved with them.');
             refresh();
           }}
+        />
+      )}
+      {editable && pkg.direction === 'to_subcontractor' && (
+        <BillDeductionLines
+          key={JSON.stringify(pkg.deductionLines ?? [])}
+          pkg={pkg}
+          onSaved={() => {
+            setError(null);
+            setNotice('Lines saved. The abstract below has moved with them.');
+            refresh();
+          }}
+          onError={(message) => setError(message)}
         />
       )}
 
@@ -510,7 +399,7 @@ export default function BillPackageDetail({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {ABSTRACT_BLOCKS.map((block) => (
+                {abstractBlocksFor(pkg.direction).map((block) => (
                   // The key belongs on the fragment, not on the first row inside it. A bare `<>` in
                   // a list is itself the child React is keying, so keying its children instead
                   // leaves the list unkeyed — which is what the warning was reporting.
@@ -523,21 +412,56 @@ export default function BillPackageDetail({
                         {block.title}
                       </td>
                     </tr>
-                    {block.rows.map((row) => (
+                    {block.rows
+                      .filter(
+                        (row) =>
+                          !row.hideWhenNil ||
+                          [
+                            abstract.columns.uptoDate,
+                            abstract.columns.uptoPrevious,
+                            abstract.columns.thisBill,
+                          ].some((column) => Number(column[row.key] ?? 0) !== 0),
+                      )
+                      .flatMap((row) =>
+                        // The bill's own lines go just before the block's total.
+                        row.isTotal && block.customSection
+                          ? [
+                              ...(abstract.deductionLines ?? [])
+                                .filter((line) => line.section === block.customSection)
+                                .map((line) => ({
+                                  key: `custom:${line.label}`,
+                                  label: line.label,
+                                  isTotal: false,
+                                  custom: line,
+                                })),
+                              row,
+                            ]
+                          : [row],
+                      )
+                      .map((row) => (
                       <tr
-                        key={`${block.title}-${row.key}`}
+                        // Keyed by the **label**, not the column: a client's abstract prints the
+                        // taxable amount twice, once as the total of 1A−1B and once as what the
+                        // tax was computed on, exactly as the authority's own sheet does.
+                        key={`${block.title}-${row.label}`}
                         className={row.isTotal ? 'font-semibold' : undefined}
                       >
                         <td className="px-3 py-2">{row.label}</td>
                         {/* Printed as sent. See this file's docblock for the rupee that settles it. */}
                         <td className="px-3 py-2 text-right">
-                          {abstract.columns.uptoDate[row.key] ?? '—'}
+                          {'custom' in row
+                            ? row.custom.uptoDate
+                            : abstract.columns.uptoDate[row.key] ?? '—'}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          {abstract.columns.uptoPrevious[row.key] ?? '—'}
+                          {'custom' in row
+                            ? row.custom.uptoPrevious
+                            : abstract.columns.uptoPrevious[row.key] ?? '—'}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          {abstract.columns.thisBill[row.key] ?? '—'}
+                          {'custom' in row
+                            ? row.custom.thisBill
+                            : abstract.columns.thisBill[row.key] ?? '—'}
                         </td>
                       </tr>
                     ))}
@@ -558,6 +482,20 @@ export default function BillPackageDetail({
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {/* ── Payments and payment advice (a certified subcontractor bill) ─── */}
+      {raBill && (
+        <section>
+          <h3 className="mb-1 font-medium text-gray-900">
+            Payments and payment advice
+          </h3>
+          <p className="mb-2 text-xs text-gray-500">
+            Record each payment with its bank reference and transaction number;
+            each one then produces a payment advice on the company’s letterhead.
+          </p>
+          <RaBillSettlement bill={raBill} />
         </section>
       )}
 
@@ -629,7 +567,7 @@ export default function BillPackageDetail({
                                   `${row.noteNumber ?? 'Debit note'}.pdf`,
                                 )
                                   .then(({ blob, filename }) =>
-                                    save(blob, filename),
+                                    saveBlob(blob, filename),
                                   )
                                   .catch((err: unknown) =>
                                     setError(describe(err)),
@@ -808,24 +746,6 @@ function ClaimRow({
   );
 }
 
-function describe(err: unknown): string {
-  const anyErr = err as {
-    status?: number;
-    message?: string;
-    details?: { message?: string };
-  };
-  if (anyErr?.status === 423) {
-    return 'This project is locked, so nothing can be written to the bill. This is not a permission problem.';
-  }
-  if (anyErr?.status === 404) {
-    return 'Not found. It may belong to another company.';
-  }
-  return (
-    anyErr?.details?.message ??
-    anyErr?.message ??
-    'The request was refused and the server gave no reason.'
-  );
-}
 
 /**
  * Raising a debit against a counterparty (025 FR-029).

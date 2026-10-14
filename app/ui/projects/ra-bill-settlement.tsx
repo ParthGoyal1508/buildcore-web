@@ -4,20 +4,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
-  PAYMENT_INSTRUMENTS,
   type PaymentInstrument,
   type RaBill,
   downloadSignedCopy,
   getBillOutstanding,
   getBillSignedCopies,
-  recordBillPayment,
   removeBillPayment,
   uploadBillSignedCopy,
+  downloadPaymentAdvice,
 } from '@/app/lib/api/billing';
-import { saveBlob } from '@/app/lib/api/hr-payroll';
+import { saveBlob } from '@/app/lib/download-file';
 import { SETTLEMENT_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
+import { useCanWrite } from '@/app/lib/write-access';
 import { Button } from '@/app/ui/button';
+import PaymentAdviceDialog from '@/app/ui/projects/payment-advice-dialog';
+import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import HiddenAmount from '@/app/ui/hidden-amount';
 
 /**
@@ -142,6 +144,7 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
       <Payments
         bill={bill}
         payments={position?.payments ?? []}
+        outstanding={position?.outstandingAmount ?? null}
         onError={setError}
         onChanged={refresh}
       />
@@ -160,6 +163,7 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
 function Payments({
   bill,
   payments,
+  outstanding,
   onError,
   onChanged,
 }: {
@@ -172,33 +176,30 @@ function Payments({
     instrument: PaymentInstrument;
     reference: string | null;
     remarks: string | null;
+    transactionNo?: string | null;
+    mode?: string | null;
+    particulars?: string | null;
   }[];
+  /** What is left to pay — prefills the advice's amount. */
+  outstanding: number | null;
   onError: (message: string | null) => void;
   onChanged: () => void;
 }) {
-  const [paidOn, setPaidOn] = useState('');
-  const [amount, setAmount] = useState('');
-  const [instrument, setInstrument] =
-    useState<PaymentInstrument>('bank_transfer');
-  const [reference, setReference] = useState('');
+  const [adviceBusy, setAdviceBusy] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const canWrite = useCanWrite();
 
-  const record = useMutation({
-    mutationFn: () =>
-      recordBillPayment(bill.id, {
-        paidOn,
-        // Sent as the string that was typed. Parsing it to a number here is where the paisa goes.
-        amount,
-        instrument,
-        ...(reference ? { reference } : {}),
-      }),
-    onSuccess: () => {
-      onError(null);
-      setAmount('');
-      setReference('');
-      onChanged();
-    },
-    onError: (err: unknown) => onError(describe(err)),
-  });
+  const advice = async (paymentId: string, format: 'pdf' | 'docx') => {
+    setAdviceBusy(`${paymentId}-${format}`);
+    try {
+      const { blob, filename } = await downloadPaymentAdvice(paymentId, format);
+      saveBlob(blob, filename);
+    } catch (err) {
+      onError(describe(err));
+    } finally {
+      setAdviceBusy(null);
+    }
+  };
 
   const remove = useMutation({
     mutationFn: (paymentId: string) => removeBillPayment(paymentId),
@@ -235,10 +236,31 @@ function Payments({
                 </span>
                 <span className="text-gray-600">
                   {dateLabel(payment.paidOn)} ·{' '}
-                  {SETTLEMENT_COPY.instrumentLabels[payment.instrument] ??
+                  {payment.mode ??
+                    SETTLEMENT_COPY.instrumentLabels[payment.instrument] ??
                     payment.instrument}
                   {payment.reference ? ` · ${payment.reference}` : ''}
+                  {payment.particulars ? ` · ${payment.particulars}` : ''}
                 </span>
+              </span>
+              {/* The payment advice for this payment, on the company's own letterhead. */}
+              <span className="flex items-center gap-1 text-xs">
+                <span className="text-gray-500">Payment advice:</span>
+                {(['pdf', 'docx'] as const).map((format) => (
+                  <SecondaryButton
+                    key={format}
+                    type="button"
+                    className="!h-8 px-2 text-xs"
+                    disabled={adviceBusy !== null}
+                    onClick={() => void advice(payment.id, format)}
+                  >
+                    {adviceBusy === `${payment.id}-${format}`
+                      ? '…'
+                      : format === 'pdf'
+                      ? 'PDF'
+                      : 'Word'}
+                  </SecondaryButton>
+                ))}
               </span>
               <Button
                 type="button"
@@ -257,92 +279,26 @@ function Payments({
         </ul>
       )}
 
-      {/*
-        The action sits below the fields rather than as a fifth column of them.
-        As a column it was a fifth of the width, which wrapped its label; and `self-end` aligned it
-        to the bottom of the tallest cell — the reference field, which carries a hint — so it
-        floated a line below the inputs it belongs to. Four fields, then the button.
-      */}
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          record.mutate();
-        }}
-      >
-        <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-gray-700">
-              {SETTLEMENT_COPY.paidOnLabel}
-            </span>
-            <input
-              type="date"
-              required
-              value={paidOn}
-              onChange={(event) => setPaidOn(event.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-gray-700">
-              {SETTLEMENT_COPY.amountLabel}
-            </span>
-            <input
-              // `inputMode` rather than `type="number"`: a number input rounds what it hands back on
-              // some browsers, and the one thing this field must not do is change the figure.
-              inputMode="decimal"
-              required
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2 tabular-nums"
-              placeholder="600000.00"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-gray-700">
-              {SETTLEMENT_COPY.instrumentLabel}
-            </span>
-            <select
-              value={instrument}
-              onChange={(event) =>
-                setInstrument(event.target.value as PaymentInstrument)
-              }
-              className="rounded-md border border-gray-300 px-3 py-2"
-            >
-              {PAYMENT_INSTRUMENTS.map((option) => (
-                <option key={option} value={option}>
-                  {SETTLEMENT_COPY.instrumentLabels[option] ?? option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-gray-700">
-              {SETTLEMENT_COPY.referenceLabel}
-            </span>
-            <input
-              value={reference}
-              onChange={(event) => setReference(event.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2"
-              placeholder="UTR 316902847561"
-            />
-            <span className="text-xs text-gray-500">
-              {SETTLEMENT_COPY.referenceHint}
-            </span>
-          </label>
-        </div>
-
-        <div>
-          <Button type="submit" disabled={record.isPending}>
-            {record.isPending
-              ? SETTLEMENT_COPY.recording
-              : SETTLEMENT_COPY.record}
-          </Button>
-        </div>
-      </form>
+      {/* One way to pay a certified bill, and it always produces the advice: the dialog asks for
+          the date, amount, mode and bank reference, reads the vendor's bank details, records the
+          payment and downloads the advice (2026-10-13). */}
+      {canWrite && (
+        <Button type="button" onClick={() => setDialogOpen(true)}>
+          Generate payment advice
+        </Button>
+      )}
+      {dialogOpen && (
+        <PaymentAdviceDialog
+          raBillId={bill.id}
+          billNumber={bill.billNumber}
+          outstanding={outstanding}
+          onClose={() => setDialogOpen(false)}
+          onDone={() => {
+            onError(null);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

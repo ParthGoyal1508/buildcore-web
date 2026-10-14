@@ -8,9 +8,7 @@ import Link from 'next/link';
 import { getClientBills, type ClientBill } from '@/app/lib/api/billing';
 import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
-import BillSheet from '@/app/ui/projects/bill-sheet';
 import ClientBillView from '@/app/ui/projects/client-bill-view';
-import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
 /**
  * Client bills for one project: the bills down the left, one of them filling the right (027).
@@ -22,9 +20,10 @@ import { SecondaryButton } from '@/app/ui/settings/form-fields';
  * table of five totals; and the bill's own lines existed nowhere at all — only inside the sheet that
  * creates the next one.
  *
- * The list is the master now and composing is a **mode** that takes over the panel, the way raising
- * a work order does on Subcontractors. The page opens on the most recent bill, so the common act —
- * looking at what was last sent — costs nothing.
+ * The list is the master. New bills are generated as bill packages — proposed from approved daily
+ * work, approved, issued and certified — so this panel reads them rather than composing them
+ * (2026-10-13). The page opens on the most recent bill, so the common act — looking at what was
+ * last sent — costs nothing.
  *
  * ## No tab strip, and that is deliberate
  *
@@ -33,15 +32,9 @@ import { SecondaryButton } from '@/app/ui/settings/form-fields';
  * document. Four tabs over its two sections would be copying that page's shape rather than its
  * point, which is that one subject fills the panel and is named at all times.
  *
- * ## The sheet still needs the history beside it
- *
- * The cumulative quantity a biller measures against comes from the bills already raised, which is
- * why the two were on one screen to begin with. They still are — the list does not go away while
- * composing, it sits alongside. What changed is which of them you land on.
  */
 export default function ClientBillsPanel({ projectId }: { projectId: string }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [composing, setComposing] = useState(false);
 
   const bills = useQuery({
     queryKey: ['clientBills', projectId],
@@ -80,18 +73,8 @@ export default function ClientBillsPanel({ projectId }: { projectId: string }) {
             {BILLING_COPY.composeFromWork}
           </Link>
           <p className="text-xs text-gray-500">
-            {BILLING_COPY.composeFromWorkHint}
-          </p>
-
-          <SecondaryButton
-            type="button"
-            onClick={() => setComposing(true)}
-            aria-pressed={composing}
-          >
-            {BILLING_COPY.composeByHand}
-          </SecondaryButton>
-          <p className="text-xs text-gray-500">
-            {BILLING_COPY.composeByHandHint}
+            {BILLING_COPY.composeFromWorkHint} Each bill goes through approval
+            before it is issued, then is certified by the client.
           </p>
         </div>
 
@@ -114,11 +97,8 @@ export default function ClientBillsPanel({ projectId }: { projectId: string }) {
             <li key={bill.id}>
               <BillRow
                 bill={bill}
-                current={!composing && chosen?.id === bill.id}
-                onPick={() => {
-                  setSelected(bill.id);
-                  setComposing(false);
-                }}
+                current={chosen?.id === bill.id}
+                onPick={() => setSelected(bill.id)}
               />
             </li>
           ))}
@@ -126,24 +106,7 @@ export default function ClientBillsPanel({ projectId }: { projectId: string }) {
       </aside>
 
       <div className="min-w-0">
-        {composing ? (
-          <section className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-base font-semibold text-gray-900">
-                {BILLING_COPY.composeHeading}
-              </h2>
-              <SecondaryButton
-                type="button"
-                onClick={() => setComposing(false)}
-              >
-                {BILLING_COPY.composeCancel}
-              </SecondaryButton>
-            </div>
-            {/* The sheet keeps its own heading, hint, draft recovery and conflict handling. This
-                wraps it rather than reaching inside: what changed is when it is on screen. */}
-            <BillSheet projectId={projectId} />
-          </section>
-        ) : chosen ? (
+        {chosen ? (
           <ClientBillView projectId={projectId} bill={chosen} />
         ) : (
           !bills.isLoading && (

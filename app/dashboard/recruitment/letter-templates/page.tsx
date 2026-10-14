@@ -14,7 +14,7 @@ import {
   type LetterKind,
   type LetterTemplate,
 } from '@/app/lib/api/letters';
-import { TEMPLATE_COPY } from '@/app/lib/constants';
+import { STANDARD_WORDING_KIND_KEYS, TEMPLATE_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import PageHeader from '@/app/ui/page-header';
 import {
@@ -120,10 +120,15 @@ export default function LetterTemplatesPage() {
                     status="active"
                     label={TEMPLATE_COPY.activeBadge}
                   />
+                )}{' '}
+                {STANDARD_WORDING_KIND_KEYS.includes(template.letterType) && (
+                  <StatusBadge status="inactive" label={TEMPLATE_COPY.standardBadge} />
                 )}
               </span>
               <RowAction type="button" onClick={() => setEditing(template)}>
-                {TEMPLATE_COPY.edit}
+                {STANDARD_WORDING_KIND_KEYS.includes(template.letterType)
+                  ? TEMPLATE_COPY.view
+                  : TEMPLATE_COPY.edit}
               </RowAction>
             </div>
           ))}
@@ -165,9 +170,15 @@ function TemplateEditor({
    * written against it must still be editable — otherwise retiring a kind silently strands its
    * templates with no way to correct them.
    */
+  // A kind with standard wording takes no new template: the api refuses one with
+  // `LETTER_TEMPLATE_STANDARD_LOCKED`, so it is not offered.
   const selectable = template
     ? kinds.filter((kind) => kind.key === template.letterType)
-    : kinds.filter((kind) => kind.isActive);
+    : kinds.filter(
+        (kind) => kind.isActive && !STANDARD_WORDING_KIND_KEYS.includes(kind.key),
+      );
+  const locked =
+    !!template && STANDARD_WORDING_KIND_KEYS.includes(template.letterType);
 
   const [letterType, setLetterType] = useState(
     template?.letterType ?? selectable[0]?.key ?? '',
@@ -226,7 +237,10 @@ function TemplateEditor({
 
   const mutation = useMutation({
     mutationFn: () =>
-      template
+      locked
+        ? // Standard wording: only the active switch is the company's to change.
+          updateLetterTemplate(template.id, { isActive })
+        : template
         ? updateLetterTemplate(template.id, {
             name: name.trim(),
             bodyTemplate: body,
@@ -250,8 +264,9 @@ function TemplateEditor({
   // Saving is disabled while the field list could not be loaded, rather than attempted. Without it
   // the editor cannot tell the author which variables are valid, and a save would be a guess the
   // server then refuses.
-  const ready =
-    letterType !== '' &&
+  const ready = locked
+    ? isActive !== template.isActive
+    : letterType !== '' &&
     name.trim() !== '' &&
     body.trim() !== '' &&
     undeclared.length === 0 &&
@@ -283,6 +298,12 @@ function TemplateEditor({
       <div className="space-y-3">
         <FormError message={error} />
 
+        {locked && (
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+            {TEMPLATE_COPY.standardHint}
+          </p>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           <SelectField
             id="template-kind"
@@ -302,6 +323,7 @@ function TemplateEditor({
             id="template-name"
             label={TEMPLATE_COPY.nameLabel}
             value={name}
+            readOnly={locked}
             onChange={(event) => setName(event.target.value)}
           />
         </div>
@@ -319,6 +341,7 @@ function TemplateEditor({
               ref={bodyRef}
               className="h-56 w-full rounded-lg border border-gray-200 p-3 font-mono text-sm"
               value={body}
+              readOnly={locked}
               onChange={(event) => setBody(event.target.value)}
             />
             <p className="mt-1 text-xs text-gray-500">
@@ -349,7 +372,8 @@ function TemplateEditor({
                   <li key={field.token} className="min-w-0">
                     <button
                       type="button"
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-left text-xs hover:bg-gray-50"
+                      disabled={locked}
+                      className="w-full rounded border disabled:cursor-default disabled:hover:bg-transparent border-gray-200 px-2 py-1 text-left text-xs hover:bg-gray-50"
                       onClick={() => insert(field.token)}
                       title={`${TEMPLATE_COPY.insert} {{${field.token}}}`}
                     >

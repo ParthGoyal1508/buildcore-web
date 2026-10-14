@@ -168,8 +168,26 @@ export const clientBillLineSchema = z.object({
 });
 export type ClientBillLine = z.infer<typeof clientBillLineSchema>;
 
+const billPackageRefSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum([
+    'draft',
+    'pending_approval',
+    'approved',
+    'issued',
+    'certified',
+    'abandoned',
+  ]),
+});
+
 export const clientBillSchema = z.object({
   id: z.string(),
+  /**
+   * The bill package this bill is raised through — where it is approved, issued, certified and
+   * paid (2026-10-14). Null for a bill raised on the old sheet.
+   */
+  package: billPackageRefSchema.nullable().optional(),
   projectId: z.string(),
   billNumber: z.string(),
   description: z.string().nullable(),
@@ -371,6 +389,11 @@ export type RaBillLine = z.infer<typeof raBillLineSchema>;
 
 export const raBillSchema = z.object({
   id: z.string(),
+  /**
+   * The bill package this bill is raised through — where it is approved, issued, certified and
+   * paid (2026-10-14). Null for a bill raised on the old sheet.
+   */
+  package: billPackageRefSchema.nullable().optional(),
   projectId: z.string(),
   workOrderId: z.string().nullable(),
   billNumber: z.string(),
@@ -701,6 +724,10 @@ const paymentSchema = z.object({
   instrument: z.enum(PAYMENT_INSTRUMENTS),
   reference: z.string().nullable(),
   remarks: z.string().nullable(),
+  transactionNo: z.string().nullable().optional(),
+  tdsAmount: nullableDecimal.optional(),
+  mode: z.string().nullable().optional(),
+  particulars: z.string().nullable().optional(),
   recordedAt: isoDate,
 });
 export type BillPayment = z.infer<typeof paymentSchema>;
@@ -718,6 +745,8 @@ const billOutstandingSchema = z.object({
   /** **Derived on the server, stored nowhere.** Certified less paid. */
   outstandingAmount: decimal,
   payments: z.array(paymentSchema),
+  /** Sent back by a record call — the payment just made, so its advice can be produced at once. */
+  recordedPaymentId: z.string().optional(),
 });
 export type BillOutstanding = z.infer<typeof billOutstandingSchema>;
 
@@ -760,6 +789,14 @@ export async function recordBillPayment(
     instrument: PaymentInstrument;
     reference?: string;
     remarks?: string;
+    /** The bank's own transaction number — printed on the payment advice beside the reference. */
+    transactionNo?: string;
+    /** Tax deducted at source on this payment, printed on the advice. Not taken off `amount`. */
+    tdsAmount?: string;
+    /** NEFT, RTGS, IMPS, UPI, Cheque or Cash — the advice's *Bank Transaction Mode*. */
+    mode?: PaymentMode;
+    /** The advice's *Particulars*, usually the payment voucher number. */
+    particulars?: string;
   },
 ): Promise<BillOutstanding> {
   return billOutstandingSchema.parse(
@@ -880,6 +917,69 @@ export async function downloadSignedCopy(
  * the number allocated when the debit was raised so the register and the note cannot disagree about
  * which debit it is.
  */
+export const PAYMENT_MODES = ['NEFT', 'RTGS', 'IMPS', 'UPI', 'Cheque', 'Cash'] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
+/** The ledger's coarser instrument for a mode. */
+export function instrumentFor(mode: PaymentMode): PaymentInstrument {
+  return mode === 'Cash' ? 'cash' : mode === 'Cheque' ? 'cheque' : 'bank_transfer';
+}
+
+const payeeSchema = z.object({
+  vendorId: z.string().nullable(),
+  code: z.string().nullable(),
+  name: z.string().nullable(),
+  bankName: z.string().nullable(),
+  bankBranch: z.string().nullable(),
+  bankAccountNumber: z.string().nullable(),
+  bankAccountHolderName: z.string().nullable(),
+  ifscCode: z.string().nullable(),
+  /** The bank fields the advice would print blank. */
+  missing: z.array(z.string()),
+});
+export type Payee = z.infer<typeof payeeSchema>;
+export type PayeeBank = Partial<
+  Pick<
+    Payee,
+    'bankName' | 'bankBranch' | 'bankAccountNumber' | 'bankAccountHolderName' | 'ifscCode'
+  >
+>;
+
+/** Who a bill is paid to, with the bank details its payment advice will print. */
+export async function getPayee(raBillId: string): Promise<Payee> {
+  return payeeSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/payee`),
+  );
+}
+
+/** Fills in the payee's bank details on their vendor record, from the bill being paid. */
+export async function setPayeeBank(
+  raBillId: string,
+  details: PayeeBank,
+): Promise<Payee> {
+  return payeeSchema.parse(
+    await authFetch<unknown>(`/projects/ra-bills/${raBillId}/payee/bank`, {
+      method: 'PATCH',
+      body: JSON.stringify(details),
+    }),
+  );
+}
+
+/**
+ * The payment advice for one payment, as PDF or Word (2026-10-13) — the company's name, logo and
+ * address at its head, the vendor's bank details from their record, and this payment's bank
+ * reference and transaction number. Only a certified bill has payments to advise of.
+ */
+export async function downloadPaymentAdvice(
+  paymentId: string,
+  format: 'pdf' | 'docx',
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/projects/ra-bill-payments/${paymentId}/advice.${format}`,
+  );
+  return { blob, filename: filename ?? `Payment advice.${format}` };
+}
+
 export async function downloadDebitNote(
   debitId: string,
   fallbackName: string,

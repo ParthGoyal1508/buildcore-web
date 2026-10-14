@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import {
+  type OverClaimReport,
   getOverClaimReport,
   getUnderstatementReport,
 } from '@/app/lib/api/bill-packages';
@@ -84,8 +85,15 @@ export default function BillPackageReports({
                 {row.lines.map((line) => (
                   <li key={line.boqItemId}>
                     {line.boqNo}: billed {line.claimed}, approved{' '}
-                    {line.approvedNow} — short by{' '}
+                    {line.approvedNow} — still short by{' '}
                     <strong>{line.understatedBy}</strong>
+                    {line.recoveredLater && Number(line.recoveredLater) > 0 && (
+                      <span className="text-amber-800">
+                        {' '}
+                        ({line.recoveredLater} already claimed back on a later
+                        bill)
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -115,34 +123,113 @@ export default function BillPackageReports({
         ) : !overClaims.data ? (
           <p className="text-sm text-red-700">The report could not be read.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">Bill</th>
-                  <th className="px-3 py-2">State</th>
-                  <th className="px-3 py-2 text-right">Over-claimed</th>
-                  <th className="px-3 py-2">Lines</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {overClaims.data.rows.map((row) => (
-                  <tr key={row.packageId}>
-                    <td className="px-3 py-2">{row.label}</td>
-                    <td className="px-3 py-2 text-gray-600">{row.status}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {row.overClaimedCount} of {row.lineCount}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
-                      {row.lines.map((line) => line.boqNo).join(', ') || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OverClaims report={overClaims.data} />
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * Over-claims with their reasons, and reversals after issue.
+ *
+ * Bills with nothing over-claimed are summed into the denominator rather than listed one per row:
+ * a table of "0 of 120" rows hid the few that mattered.
+ */
+function OverClaims({ report }: { report: OverClaimReport }) {
+  const flagged = report.rows.filter((row) => row.overClaimedCount > 0);
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-gray-700">
+        <strong>{report.totalOverClaimed}</strong> over-claimed line
+        {report.totalOverClaimed === 1 ? '' : 's'} out of {report.totalLines}{' '}
+        across {report.rows.length} bill{report.rows.length === 1 ? '' : 's'}.
+      </p>
+
+      {flagged.length === 0 ? (
+        <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
+          No bill has claimed more than its approved measurement.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-3 py-2">Bill</th>
+                <th className="px-3 py-2">State</th>
+                <th className="px-3 py-2">Item</th>
+                <th className="px-3 py-2 text-right">Measured</th>
+                <th className="px-3 py-2 text-right">Claimed</th>
+                <th className="px-3 py-2">Reason given</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {flagged.flatMap((row) =>
+                row.lines.map((line, index) => (
+                  <tr key={`${row.packageId}-${line.boqNo}-${index}`}>
+                    <td className="px-3 py-2 align-top">
+                      {index === 0 ? (
+                        <>
+                          {row.label}
+                          <span className="block text-xs text-gray-500">
+                            {row.overClaimedCount} of {row.lineCount} lines
+                          </span>
+                        </>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 align-top text-gray-600">
+                      {index === 0 ? projectsLabel(row.status) : null}
+                    </td>
+                    <td className="px-3 py-2">{line.boqNo || '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {line.proposed ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                      {line.claimed}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {line.reason ?? '—'}
+                    </td>
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {report.reversedAfterIssue.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-gray-900">
+            Measurement reduced after the bill went out
+          </h3>
+          <p className="text-sm text-gray-600">
+            These bills claimed what was approved at the time; the approved
+            measurement for their period has since been reduced. They now claim
+            more than was measured. Recover the difference on the next bill to
+            this client, or record a revision.
+          </p>
+          {report.reversedAfterIssue.map((row) => (
+            <div
+              key={row.packageId}
+              className="rounded-md border border-red-200 bg-red-50 p-3"
+            >
+              <p className="text-sm font-medium text-red-900">
+                {row.label} · {dateLabel(row.periodFrom)} –{' '}
+                {dateLabel(row.periodTo)}
+              </p>
+              <ul className="mt-1 space-y-0.5 text-sm text-red-900">
+                {row.lines.map((line) => (
+                  <li key={line.boqNo}>
+                    {line.boqNo}: billed {line.claimed}, now approved{' '}
+                    {line.approvedNow} — over by <strong>{line.overBy}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

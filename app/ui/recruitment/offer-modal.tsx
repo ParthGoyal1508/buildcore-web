@@ -8,14 +8,15 @@ import {
   acceptOffer,
   createOffer,
   declineOffer,
-  generateOffer,
   getOffers,
   type Offer,
 } from '@/app/lib/api/recruitment';
 import { listDepartments, listDesignations } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { recruitmentLabel } from '@/app/lib/constants';
+import { CANDIDATE_LETTER_KIND_KEYS, recruitmentLabel } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
+import GenerateLetterDialog from '@/app/ui/letters/generate-letter-dialog';
+import { offerLetterSubmit } from '@/app/ui/recruitment/offer-letter-submit';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -26,6 +27,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 
 interface Row {
   name: string;
@@ -34,9 +36,11 @@ interface Row {
 
 export default function OfferModal({
   candidateId,
+  candidateName,
   onClose,
 }: {
   candidateId: string;
+  candidateName?: string;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -46,7 +50,11 @@ export default function OfferModal({
   const designations = useQuery({ queryKey: ['designations'], queryFn: () => listDesignations() });
   const offers = useQuery({ queryKey: ['offers', candidateId], queryFn: () => getOffers(candidateId) });
   const canApprove = user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['offers', candidateId] });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['offers', candidateId] });
+    // Generating an offer issues its letter, which the candidate's letter list shows.
+    void queryClient.invalidateQueries({ queryKey: ['letters'] });
+  };
 
   const [designationId, setDesignationId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
@@ -55,6 +63,7 @@ export default function OfferModal({
   const [probationMonths, setProbationMonths] = useState('6');
   const [noticePeriodDays, setNoticePeriodDays] = useState('30');
   const [reportingManagerEmployeeId, setReportingManagerEmployeeId] = useState('');
+  const employees = useEmployeeNames();
   const [rows, setRows] = useState<Row[]>([{ name: 'Basic', monthlyAmount: '' }]);
 
   const total = rows.reduce((s, r) => s + (Number(r.monthlyAmount) || 0), 0);
@@ -79,11 +88,9 @@ export default function OfferModal({
     onSuccess: invalidate,
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not create the offer.'),
   });
-  const generate = useMutation({
-    mutationFn: (id: string) => generateOffer(id),
-    onSuccess: invalidate,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not generate the offer letter.'),
-  });
+  // The offer whose letter is being generated. The letter form replaces this modal rather than
+  // stacking on it — two modals would both close on one Escape.
+  const [generating, setGenerating] = useState<Offer | null>(null);
   const accept = useMutation({
     mutationFn: (id: string) => acceptOffer(id, { acceptedOn: new Date().toISOString().slice(0, 10) }),
     onSuccess: invalidate,
@@ -99,6 +106,24 @@ export default function OfferModal({
 
   const valid =
     designationId && departmentId && offeredCtc && proposedJoiningDate && reportingManagerEmployeeId && reconciles;
+
+  if (generating) {
+    return (
+      <GenerateLetterDialog
+        recipient={{ candidateId }}
+        recipientLabel={candidateName}
+        kindKeys={CANDIDATE_LETTER_KIND_KEYS}
+        initialKindKey="offer"
+        submit={offerLetterSubmit(generating.id, candidateId)}
+        onIssued={() => {
+          invalidate();
+          // The candidate moves to Offer Issued with the offer.
+          void queryClient.invalidateQueries({ queryKey: ['candidates'] });
+        }}
+        onClose={() => setGenerating(null)}
+      />
+    );
+  }
 
   return (
     <Modal title="Offer" onClose={onClose} wide>
@@ -118,7 +143,7 @@ export default function OfferModal({
                   <span className="flex gap-1">
                     {o.status === 'draft' && (
                       <RowAction
-                        onClick={() => generate.mutate(o.id)}
+                        onClick={() => setGenerating(o)}
                         disabled={o.outsideBudget && !canApprove}
                         title={o.outsideBudget && !canApprove ? 'Needs approval to issue' : undefined}
                       >
@@ -148,7 +173,18 @@ export default function OfferModal({
             {departments.data?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </SelectField>
           <TextField id="o-ctc" label="Offered CTC (annual ₹)" type="number" min="0" value={offeredCtc} onChange={(e) => setOfferedCtc(e.target.value)} />
-          <TextField id="o-mgr" label="Reporting manager (employee id)" value={reportingManagerEmployeeId} onChange={(e) => setReportingManagerEmployeeId(e.target.value)} />
+          {/* The existing employee the new hire reports to — the offer letter prints their name
+              and mobile. Chosen from the roster, not typed: nobody knows an employee's id. */}
+          <SelectField
+            id="o-mgr"
+            label="Reporting manager"
+            value={reportingManagerEmployeeId}
+            onChange={(e) => setReportingManagerEmployeeId(e.target.value)}
+            hint={employees.isError ? 'Could not load employees. Try again, or ask HR.' : undefined}
+          >
+            <option value="">Select…</option>
+            {employees.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </SelectField>
           <TextField id="o-join" label="Proposed joining date" type="date" value={proposedJoiningDate} onChange={(e) => setProposedJoiningDate(e.target.value)} />
           <div className="grid grid-cols-2 gap-3">
             <TextField id="o-prob" label="Probation (months)" type="number" min="0" value={probationMonths} onChange={(e) => setProbationMonths(e.target.value)} />

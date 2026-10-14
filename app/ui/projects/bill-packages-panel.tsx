@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import {
@@ -69,11 +70,22 @@ export default function BillPackagesPanel({
   projectId: string;
 }) {
   const queryClient = useQueryClient();
-  const [direction, setDirection] = useState<BillDirection>('to_client');
+  // Prefilled from the link a work order's "Generate the next bill" sends here, so the person lands
+  // on the form for that subcontractor and that award rather than choosing them again.
+  const params = useSearchParams();
+  const [direction, setDirection] = useState<BillDirection>(() =>
+    params.get('direction') === 'to_subcontractor'
+      ? 'to_subcontractor'
+      : 'to_client',
+  );
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
-  const [workOrderId, setWorkOrderId] = useState('');
-  const [partnerId, setPartnerId] = useState('');
+  const [workOrderId, setWorkOrderId] = useState(
+    () => params.get('workOrderId') ?? '',
+  );
+  const [partnerId, setPartnerId] = useState(
+    () => params.get('partnerId') ?? '',
+  );
   const [clearedFor, setClearedFor] = useState<string | null>(null);
   const [externalBillNo, setExternalBillNo] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -499,10 +511,16 @@ function BillTable({
                     >
                       {pkg.label}
                     </Link>
+                    {/* The approver opening the project sees which bill is waiting on them. */}
+                    {pkg.awaitingMe && (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                        Awaiting your approval
+                      </span>
+                    )}
                   </td>
                   {counterparty && (
                     <td className="px-3 py-2">
-                      {counterparty(pkg.counterpartyKey)}
+                      {pkg.counterpartyName ?? counterparty(pkg.counterpartyKey)}
                     </td>
                   )}
                   <td className="px-3 py-2 whitespace-nowrap">

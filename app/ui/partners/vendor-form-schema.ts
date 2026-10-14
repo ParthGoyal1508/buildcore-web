@@ -52,6 +52,18 @@ export const vendorFormSchema = z.object({
   pinCode: optionalText.refine((v) => v === undefined || /^[0-9]{6}$/.test(v), {
     message: 'PIN code must be 6 digits',
   }),
+  // Where the company pays this vendor — printed on the payment advice (2026-10-13).
+  bankName: optionalText,
+  bankBranch: optionalText,
+  bankAccountNumber: optionalText.refine(
+    (v) => v === undefined || /^[0-9A-Za-z]{6,34}$/.test(v),
+    { message: 'Account number must be 6 to 34 letters or digits' },
+  ),
+  bankAccountHolderName: optionalText,
+  ifscCode: optionalText.refine(
+    (v) => v === undefined || /^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(v),
+    { message: 'IFSC looks like BARB0DEOLIX — four letters, a zero, six characters' },
+  ),
   categoryIds: z.array(z.string()),
   contacts: z.array(
     z.object({
