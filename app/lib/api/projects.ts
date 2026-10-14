@@ -589,6 +589,8 @@ const boqItemSchema = z.object({
   startDate: z.string().nullable(),
   finishDate: z.string().nullable(),
   isVariation: z.boolean(),
+  /** Added on a bill to the client, outside the tendered BOQ (NB-1…). Never measured by a DWR. */
+  nonBoq: z.boolean().default(false),
   state: z.enum(BOQ_LINE_STATES),
 });
 

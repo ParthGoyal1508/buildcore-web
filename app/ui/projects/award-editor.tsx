@@ -426,9 +426,13 @@ export default function AwardEditor({
                       {/* The number where there is one. A linked line that the BOQ read could not
                           resolve still shows as linked rather than as a free line. */}
                       {item?.boqNo ??
-                        (row.boqTaskItemId
-                          ? '•'
-                          : WORK_ORDER_COPY.awardUnlinked)}
+                        (row.boqTaskItemId ? (
+                          '•'
+                        ) : (
+                          <span className="rounded bg-indigo-100 px-1 text-xs font-medium text-indigo-800">
+                            Non-BOQ
+                          </span>
+                        ))}
                     </td>
                     <td className="px-2 py-1.5">
                       <input
