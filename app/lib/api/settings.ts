@@ -520,7 +520,14 @@ export async function setCashVisibility(
 
 /** One series as Settings → Numbering shows it. */
 export const numberingEntrySchema = z.object({
-  series: z.enum(['PROJECTS', 'VENDORS', 'WORK_ORDER', 'EQUIPMENT', 'ASSETS']),
+  series: z.enum([
+    'PROJECTS',
+    'VENDORS',
+    'WORK_ORDER',
+    'NOC',
+    'EQUIPMENT',
+    'ASSETS',
+  ]),
   label: z.string(),
   /** `counted`: prefix + (start + n × gap). `named`: letters from the name, serial, year. */
   kind: z.enum(['counted', 'named']),
