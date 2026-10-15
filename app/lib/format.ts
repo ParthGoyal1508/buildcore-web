@@ -45,6 +45,18 @@ export function unitRate(value: number | null | undefined): string {
  *
  * The API's period key is a sort key, not something to put in front of a person.
  */
+/**
+ * A quantity rounded to two decimals, with Indian grouping (2026-10-15) — `807.4639999999999` →
+ * `807.46`, `1420.855` → `1,420.86`, `326` → `326`. Stock figures are sums of three-decimal
+ * Decimals added in floating point, and printed raw they read like a fault.
+ */
+export function quantity(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
 export function periodLabel(period: string): string {
   const [year, month] = period.split('-').map(Number);
   if (!year || !month) return period;
@@ -119,7 +131,8 @@ export function currentPeriod(): string {
  * visibly, so it is derived here once rather than in each screen.
  */
 export function financialYearOf(date: Date = new Date()): string {
-  const year = date.getUTCMonth() >= 3 ? date.getUTCFullYear() : date.getUTCFullYear() - 1;
+  const year =
+    date.getUTCMonth() >= 3 ? date.getUTCFullYear() : date.getUTCFullYear() - 1;
   return `${year}-${String((year + 1) % 100).padStart(2, '0')}`;
 }
 

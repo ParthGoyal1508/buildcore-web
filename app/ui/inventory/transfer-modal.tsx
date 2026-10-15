@@ -10,6 +10,7 @@ import {
   getStockHint,
 } from '@/app/lib/api/inventory';
 import { MESSAGES } from '@/app/lib/constants';
+import { quantity as formatQuantity } from '@/app/lib/format';
 import {
   FormError,
   SecondaryButton,
@@ -193,7 +194,7 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
           </option>
           {(stock.data ?? []).map((row) => (
             <option key={row.itemId} value={row.itemId}>
-              {row.itemName} — {row.inStock} {row.unit}
+              {row.itemName} — {formatQuantity(row.inStock)} {row.unit}
             </option>
           ))}
         </SelectField>

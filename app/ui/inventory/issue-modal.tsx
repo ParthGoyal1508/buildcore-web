@@ -12,6 +12,7 @@ import {
   type IssueInput,
 } from '@/app/lib/api/inventory';
 import { CONTRACTOR_VENDOR_TYPES, MESSAGES } from '@/app/lib/constants';
+import { quantity as formatQuantity } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -229,7 +230,7 @@ export default function IssueModal({
           </option>
           {(stock.data ?? []).map((row) => (
             <option key={row.itemId} value={row.itemId}>
-              {row.itemName} — {row.inStock} {row.unit}
+              {row.itemName} — {formatQuantity(row.inStock)} {row.unit}
             </option>
           ))}
         </SelectField>
