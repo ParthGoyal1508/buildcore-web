@@ -38,6 +38,7 @@ export const ROUTES = {
   settingsTerms: '/dashboard/settings/terms',
   /** The four statutory rates a running-account bill is computed at (025 US4). */
   settingsBillingRates: '/dashboard/settings/billing-rates',
+  settingsNumbering: '/dashboard/settings/numbering',
   /**
    * Personal Settings — the cash visibility switch and whatever joins it; Super Admin only, behind
    * their own password (2026-10-14; renamed from "Cash visibility" on 2026-10-15).
@@ -2182,6 +2183,8 @@ export const SETTINGS_PERMISSIONS = {
   // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
   // computed at, guarded by the same permission as the registration numbers beside them.
   'billing-rates': 'COMPANY_SETTINGS',
+  // 2026-10-15. COMPANY_SETTINGS, matching the backend's guard on the numbering routes.
+  numbering: 'COMPANY_SETTINGS',
   // 2026-10-11. `SETTINGS`, matching the backend: these clauses go onto a document a
   // subcontractor signs, which makes editing them a settings act rather than a
   // project one.

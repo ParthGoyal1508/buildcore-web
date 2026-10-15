@@ -6,11 +6,7 @@ import {
   ASSET_TRACKING_MODES,
 } from '@/app/lib/constants';
 import type { StoredFile } from '@/app/lib/api/client';
-import {
-  authFetch,
-  authFetchBlob,
-  authFetchFile,
-} from '@/app/lib/session';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/dashboard/assets/*` call to `buildcore-api` (feature 012).
@@ -123,7 +119,9 @@ export interface AssetCategoryInput {
 export async function getAssetCategories(
   companyId?: string,
 ): Promise<AssetCategory[]> {
-  const raw = await authFetch<unknown>(`/assets/categories${qs({ companyId })}`);
+  const raw = await authFetch<unknown>(
+    `/assets/categories${qs({ companyId })}`,
+  );
   return z.array(assetCategorySchema).parse(raw);
 }
 
@@ -131,10 +129,13 @@ export async function createAssetCategory(
   input: AssetCategoryInput,
   companyId?: string,
 ): Promise<AssetCategory> {
-  const raw = await authFetch<unknown>(`/assets/categories${qs({ companyId })}`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  const raw = await authFetch<unknown>(
+    `/assets/categories${qs({ companyId })}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
   return assetCategorySchema.parse(raw);
 }
 
@@ -183,10 +184,13 @@ export async function createAssetDocType(
   input: AssetDocTypeInput,
   companyId?: string,
 ): Promise<AssetDocType> {
-  const raw = await authFetch<unknown>(`/assets/doc-types${qs({ companyId })}`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  const raw = await authFetch<unknown>(
+    `/assets/doc-types${qs({ companyId })}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
   return assetDocTypeSchema.parse(raw);
 }
 
@@ -283,6 +287,7 @@ export const assetSchema = z.object({
   quantity: decimal,
   unitOfMeasure: z.string().nullable(),
   purchaseDate: nullableDate,
+  manufacturingYear: z.number().nullable().optional(),
   purchaseCost: decimal,
   capitalisationDate: isoDate,
   depreciationRatePercent: decimal,
@@ -341,8 +346,9 @@ export const assetDetailSchema = assetSchema.extend({
 export type AssetDetail = z.infer<typeof assetDetailSchema>;
 
 export interface AssetInput {
-  assetCode?: string;
   name: string;
+  /** The year it was built — the last part of its code (`DR01/2024`). */
+  manufacturingYear?: number;
   categoryId: string;
   manufacturer?: string;
   modelNumber?: string;
@@ -379,6 +385,20 @@ export async function getAssets(query: AssetQuery = {}) {
 export async function getAsset(id: string): Promise<AssetDetail> {
   const raw = await authFetch<unknown>(`/assets/${id}`);
   return assetDetailSchema.parse(raw);
+}
+
+/**
+ * The code an asset with this name and year would be given (2026-10-15) — a preview for the
+ * registration form; the code is built again when the asset is saved.
+ */
+export async function getNextAssetCode(
+  name: string,
+  year?: number,
+): Promise<string> {
+  const raw = await authFetch<{ code: string }>(
+    `/assets/next-code${qs({ name, ...(year ? { year: String(year) } : {}) })}`,
+  );
+  return raw.code;
 }
 
 export async function createAsset(
@@ -572,7 +592,9 @@ export interface AllocationQuery extends PageQuery {
 }
 
 export async function getAllocations(query: AllocationQuery = {}) {
-  const raw = await authFetch<unknown>(`/assets/allocations${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/assets/allocations${qs({ ...query })}`,
+  );
   return pageOf(allocationSchema).parse(raw);
 }
 

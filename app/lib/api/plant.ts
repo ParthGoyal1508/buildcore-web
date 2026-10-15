@@ -120,10 +120,13 @@ export async function createEquipmentCategory(
   input: EquipmentCategoryInput,
   companyId?: string,
 ): Promise<EquipmentCategory> {
-  const raw = await authFetch<unknown>(`/plant/categories${qs({ companyId })}`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  const raw = await authFetch<unknown>(
+    `/plant/categories${qs({ companyId })}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
   return equipmentCategorySchema.parse(raw);
 }
 
@@ -316,16 +319,15 @@ export async function getEquipment(
   return equipmentPageSchema.parse(raw);
 }
 
-export async function getEquipmentDetail(
-  id: string,
-): Promise<EquipmentDetail> {
+export async function getEquipmentDetail(id: string): Promise<EquipmentDetail> {
   const raw = await authFetch<unknown>(`/plant/equipment/${id}`);
   return equipmentDetailSchema.parse(raw);
 }
 
 export interface EquipmentInput {
-  code?: string;
   name: string;
+  /** The year it was built — the last part of its code (`JCB01/2027`). */
+  manufacturingYear?: number;
   categoryId: string;
   ownership: string;
   vendorId?: string;
@@ -336,6 +338,20 @@ export interface EquipmentInput {
   deployedSiteId?: string;
   currentReading?: number;
   status?: string;
+}
+
+/**
+ * The code a machine with this name and year would be given (2026-10-15) — a preview for the
+ * registration form; the code is built again when the machine is saved.
+ */
+export async function getNextEquipmentCode(
+  name: string,
+  year?: number,
+): Promise<string> {
+  const raw = await authFetch<{ code: string }>(
+    `/plant/equipment/next-code${qs({ name, ...(year ? { year: String(year) } : {}) })}`,
+  );
+  return raw.code;
 }
 
 export async function createEquipment(
@@ -516,9 +532,7 @@ export interface FuelQuery extends PageQuery {
   varianceOnly?: string;
 }
 
-export async function getFuelEntries(
-  query: FuelQuery = {},
-): Promise<FuelPage> {
+export async function getFuelEntries(query: FuelQuery = {}): Promise<FuelPage> {
   const raw = await authFetch<unknown>(`/plant/fuel${qs({ ...query })}`);
   return fuelPageSchema.parse(raw);
 }
@@ -860,10 +874,13 @@ export async function createSparePart(
   input: SparePartInput,
   companyId?: string,
 ): Promise<SparePart> {
-  const raw = await authFetch<unknown>(`/plant/spare-parts${qs({ companyId })}`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  const raw = await authFetch<unknown>(
+    `/plant/spare-parts${qs({ companyId })}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
   return sparePartSchema.parse(raw);
 }
 
@@ -929,9 +946,7 @@ export async function getSparePartMovements(
   return z.array(sparePartMovementSchema).parse(raw);
 }
 
-export async function getJobParts(
-  jobId: string,
-): Promise<SparePartMovement[]> {
+export async function getJobParts(jobId: string): Promise<SparePartMovement[]> {
   const raw = await authFetch<unknown>(`/plant/maintenance/${jobId}/parts`);
   return z.array(sparePartMovementSchema).parse(raw);
 }
@@ -1081,11 +1096,20 @@ export async function deleteServiceBill(id: string): Promise<void> {
 // Fuel exceptions and recovery (020 FR-001 – FR-006 — `bugs.md` item 13)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const FUEL_EXCEPTION_STATUSES = ['open', 'confirmed', 'dismissed'] as const;
+export const FUEL_EXCEPTION_STATUSES = [
+  'open',
+  'confirmed',
+  'dismissed',
+] as const;
 export type FuelExceptionStatus = (typeof FUEL_EXCEPTION_STATUSES)[number];
 
 /** Who bears a confirmed loss. `neither` is a real answer, not an absence of one. */
-export const FUEL_ATTRIBUTIONS = ['hirer', 'operator', 'both', 'neither'] as const;
+export const FUEL_ATTRIBUTIONS = [
+  'hirer',
+  'operator',
+  'both',
+  'neither',
+] as const;
 export type FuelAttribution = (typeof FUEL_ATTRIBUTIONS)[number];
 
 export const fuelExceptionSchema = z.object({
@@ -1164,7 +1188,11 @@ export async function listFuelExceptions(status?: FuelExceptionStatus) {
 export async function raiseFuelExceptions() {
   return z
     .object({ raised: z.number() })
-    .parse(await authFetch<unknown>('/plant/fuel/exceptions/raise', { method: 'POST' }));
+    .parse(
+      await authFetch<unknown>('/plant/fuel/exceptions/raise', {
+        method: 'POST',
+      }),
+    );
 }
 
 export interface ReviewFuelExceptionInput {
@@ -1187,14 +1215,12 @@ export async function reviewFuelException(
   id: string,
   input: ReviewFuelExceptionInput,
 ) {
-  return fuelExceptionSchema
-    .partial()
-    .parse(
-      await authFetch<unknown>(`/plant/fuel/exceptions/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(input),
-      }),
-    );
+  return fuelExceptionSchema.partial().parse(
+    await authFetch<unknown>(`/plant/fuel/exceptions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  );
 }
 
 /**

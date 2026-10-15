@@ -52,7 +52,9 @@ export const companySchema = z.object({
   updatedAt: z.string(),
 });
 export type Company = z.infer<typeof companySchema>;
-export type CompanyInput = Partial<Omit<Company, 'id' | 'createdAt' | 'updatedAt'>>;
+export type CompanyInput = Partial<
+  Omit<Company, 'id' | 'createdAt' | 'updatedAt'>
+>;
 
 export async function listCompanies(): Promise<Company[]> {
   return z.array(companySchema).parse(await authFetch('/settings/companies'));
@@ -81,7 +83,8 @@ export async function createCompany(input: CompanyInput): Promise<Company> {
 export async function uploadCompanyLogo(id: string, file: File): Promise<void> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += 1)
+    binary += String.fromCharCode(bytes[i]);
   await authFetch(`/settings/companies/${id}/logo`, {
     method: 'PUT',
     body: JSON.stringify({ data: btoa(binary) }),
@@ -148,7 +151,9 @@ export async function setBillingRates(
   );
 }
 
-export async function getCodeSeries(companyId: string): Promise<CodeSeriesView> {
+export async function getCodeSeries(
+  companyId: string,
+): Promise<CodeSeriesView> {
   return codeSeriesSchema.parse(
     await authFetch(`/settings/companies/${companyId}/code-series`),
   );
@@ -227,7 +232,9 @@ export async function updateRole(
   );
 }
 
-export async function deleteRole(id: string): Promise<{ clearedAssignments: number }> {
+export async function deleteRole(
+  id: string,
+): Promise<{ clearedAssignments: number }> {
   return z
     .object({ clearedAssignments: z.number() })
     .parse(await authFetch(`/settings/roles/${id}`, { method: 'DELETE' }));
@@ -286,7 +293,9 @@ export type NamedReference = z.infer<typeof namedReferenceSchema>;
 /** `companyId` is honoured only for a cross-company caller; for everyone else the
  * API pins the result to their own company regardless of what is sent. */
 function withCompany(path: string, companyId?: string): string {
-  return companyId ? `${path}?companyId=${encodeURIComponent(companyId)}` : path;
+  return companyId
+    ? `${path}?companyId=${encodeURIComponent(companyId)}`
+    : path;
 }
 
 function namedReferenceApi(resource: 'departments' | 'designations') {
@@ -294,7 +303,9 @@ function namedReferenceApi(resource: 'departments' | 'designations') {
     list: async (companyId?: string): Promise<NamedReference[]> =>
       z
         .array(namedReferenceSchema)
-        .parse(await authFetch(withCompany(`/settings/${resource}`, companyId))),
+        .parse(
+          await authFetch(withCompany(`/settings/${resource}`, companyId)),
+        ),
     create: async (input: {
       companyId?: string;
       name: string;
@@ -305,7 +316,10 @@ function namedReferenceApi(resource: 'departments' | 'designations') {
           body: JSON.stringify(input),
         }),
       ),
-    update: async (id: string, input: { name: string }): Promise<NamedReference> =>
+    update: async (
+      id: string,
+      input: { name: string },
+    ): Promise<NamedReference> =>
       namedReferenceSchema.parse(
         await authFetch(`/settings/${resource}/${id}`, {
           method: 'PATCH',
@@ -439,7 +453,10 @@ export async function createShift(input: ShiftInput): Promise<Shift> {
   );
 }
 
-export async function updateShift(id: string, input: ShiftInput): Promise<Shift> {
+export async function updateShift(
+  id: string,
+  input: ShiftInput,
+): Promise<Shift> {
   return shiftSchema.parse(
     await authFetch(`/settings/shifts/${id}`, {
       method: 'PATCH',
@@ -493,6 +510,63 @@ export async function setCashVisibility(
       method: 'PATCH',
       headers: { 'X-Confirmation-Token': confirmationToken },
       body: JSON.stringify({ hideCashTransactions }),
+    }),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Numbering (2026-10-15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One series as Settings → Numbering shows it. */
+export const numberingEntrySchema = z.object({
+  series: z.enum(['PROJECTS', 'VENDORS', 'WORK_ORDER', 'EQUIPMENT', 'ASSETS']),
+  label: z.string(),
+  /** `counted`: prefix + (start + n × gap). `named`: letters from the name, serial, year. */
+  kind: z.enum(['counted', 'named']),
+  prefix: z.string(),
+  base: z.number(),
+  step: z.number(),
+  width: z.number(),
+  separator: z.string(),
+  isDefault: z.boolean(),
+  examples: z.array(z.string()),
+  /** The code the next record will actually get — counted series only. */
+  nextCode: z.string().nullable(),
+});
+export type NumberingEntry = z.infer<typeof numberingEntrySchema>;
+
+export async function getNumbering(
+  companyId: string,
+): Promise<NumberingEntry[]> {
+  return z
+    .array(numberingEntrySchema)
+    .parse(await authFetch(`/settings/companies/${companyId}/numbering`));
+}
+
+export async function setNumbering(
+  companyId: string,
+  series: NumberingEntry['series'],
+  input: Partial<
+    Pick<NumberingEntry, 'prefix' | 'base' | 'step' | 'width' | 'separator'>
+  >,
+): Promise<NumberingEntry> {
+  return numberingEntrySchema.parse(
+    await authFetch(`/settings/companies/${companyId}/numbering/${series}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+/** Back to the built-in format (Parth Realcon's). */
+export async function resetNumbering(
+  companyId: string,
+  series: NumberingEntry['series'],
+): Promise<NumberingEntry> {
+  return numberingEntrySchema.parse(
+    await authFetch(`/settings/companies/${companyId}/numbering/${series}`, {
+      method: 'DELETE',
     }),
   );
 }

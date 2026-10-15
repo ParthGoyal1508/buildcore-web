@@ -1,11 +1,12 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useDeferredValue, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
   createEquipment,
+  getNextEquipmentCode,
   updateEquipment,
   type Equipment,
   type EquipmentInput,
@@ -35,9 +36,9 @@ import {
 /**
  * Add or edit a machine.
  *
- * Two things are deliberately absent. `code` is only offered on create — it is what
- * the yard knows the machine by and what every logbook entry, fuel entry and hire
- * bill hangs off, so renaming it would detach a machine from its own history.
+ * Two things are deliberately absent. `code` is never typed (2026-10-15): it is built from
+ * the name and the manufacturing year in the company's format, shown before saving, and never
+ * renamed afterwards — every logbook entry, fuel entry and hire bill hangs off it.
  * `under_maintenance` is not in the status list at all: the backend refuses it
  * (006 FR-002), and offering an option that always fails is worse than not offering
  * it. The hint under the field says so rather than leaving it a mystery.
@@ -56,7 +57,7 @@ export default function EquipmentModal({
   const sites = usePlantSites();
   const isEdit = equipment !== undefined;
 
-  const [code, setCode] = useState(equipment?.code ?? '');
+  const [manufacturingYear, setManufacturingYear] = useState('');
   const [name, setName] = useState(equipment?.name ?? '');
   const [categoryId, setCategoryId] = useState(equipment?.categoryId ?? '');
   const [ownership, setOwnership] = useState<string>(
@@ -90,6 +91,21 @@ export default function EquipmentModal({
   const isOwned = ownership === 'owned';
   const underMaintenance = equipment?.status === 'under_maintenance';
 
+  // The code this machine will be given, from the server's own builder (2026-10-15).
+  const previewName = useDeferredValue(name.trim());
+  const previewYear = useDeferredValue(
+    /^\d{4}$/.test(manufacturingYear)
+      ? Number(manufacturingYear)
+      : purchaseDate
+        ? Number(purchaseDate.slice(0, 4))
+        : undefined,
+  );
+  const nextCode = useQuery({
+    queryKey: ['plant', 'next-code', previewName, previewYear],
+    queryFn: () => getNextEquipmentCode(previewName, previewYear),
+    enabled: !isEdit && previewName.length > 0,
+  });
+
   const save = useMutation({
     mutationFn: (input: EquipmentInput) =>
       isEdit
@@ -100,21 +116,27 @@ export default function EquipmentModal({
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     save.mutate({
-      ...(isEdit ? {} : code.trim() ? { code: code.trim() } : {}),
+      ...(!isEdit && /^\d{4}$/.test(manufacturingYear)
+        ? { manufacturingYear: Number(manufacturingYear) }
+        : {}),
       name: name.trim(),
       categoryId,
       ownership,
       ...(isHired && vendorId ? { vendorId } : {}),
       powerSource,
       ...(isOwned && purchaseDate ? { purchaseDate } : {}),
-      ...(isOwned && purchaseCost ? { purchaseCost: Number(purchaseCost) } : {}),
+      ...(isOwned && purchaseCost
+        ? { purchaseCost: Number(purchaseCost) }
+        : {}),
       ...(isOwned && depreciationRate
         ? { depreciationRate: Number(depreciationRate) }
         : {}),
@@ -157,15 +179,23 @@ export default function EquipmentModal({
         {noCategories && <FormError message={MESSAGES.plantNoCategories} />}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {!isEdit && (
-            <TextField
-              id="equipment-code"
-              label="Code"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              hint="The plate or asset number. Leave blank to have one allocated."
-            />
-          )}
+          {/* Never typed (2026-10-15): built from the name and the manufacturing year in the
+              company's format from Settings → Numbering — `JCB01/2027`. */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-gray-700">
+              Code
+            </span>
+            <p className="flex min-h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+              {isEdit
+                ? equipment.code
+                : (nextCode.data ?? (name.trim() ? '…' : 'Enter the name'))}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              {isEdit
+                ? 'Given when the machine was registered; it does not change.'
+                : 'Assigned automatically: letters from the name, a serial, the manufacturing year.'}
+            </p>
+          </div>
 
           <TextField
             id="equipment-name"
@@ -174,6 +204,20 @@ export default function EquipmentModal({
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
+          {!isEdit && (
+            <TextField
+              id="equipment-year"
+              label="Manufacturing year"
+              inputMode="numeric"
+              maxLength={4}
+              value={manufacturingYear}
+              onChange={(event) =>
+                setManufacturingYear(event.target.value.replace(/\D/g, ''))
+              }
+              placeholder={String(new Date().getFullYear())}
+              hint="The last part of the code. Blank uses the purchase year, else this year."
+            />
+          )}
 
           <SelectField
             id="equipment-category"

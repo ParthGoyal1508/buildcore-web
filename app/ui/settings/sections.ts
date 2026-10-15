@@ -4,6 +4,7 @@ import {
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
   DocumentTextIcon,
+  HashtagIcon,
   IdentificationIcon,
   PencilSquareIcon,
   UserCircleIcon,
@@ -89,6 +90,14 @@ export const SETTINGS_SECTIONS: {
     description:
       'The wording of every letter the company issues — HR, recruitment, project and payment — grouped by where it is issued.',
     icon: DocumentTextIcon,
+  },
+  {
+    key: 'numbering',
+    href: ROUTES.settingsNumbering,
+    title: 'Numbering',
+    description:
+      'How project codes, vendor codes, work order numbers, machines and assets are numbered.',
+    icon: HashtagIcon,
   },
   {
     key: 'billing-rates',
