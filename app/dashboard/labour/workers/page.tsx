@@ -27,10 +27,15 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { NocModal } from '@/app/ui/nocs/noc-panel';
 
 export default function WorkersPage() {
   const queryClient = useQueryClient();
   const [siteId, setSiteId] = useState('');
+  // The worker a NOC is being managed for (2026-10-15).
+  const [nocFor, setNocFor] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [deactivating, setDeactivating] = useState<Worker | null>(null);
@@ -61,7 +66,11 @@ export default function WorkersPage() {
   const columns: Column<Worker>[] = [
     { key: 'code', header: 'Code', render: (w) => w.labourCode },
     { key: 'name', header: 'Name', render: (w) => w.fullName },
-    { key: 'skill', header: 'Skill', render: (w) => skillName(w.skillCategoryId) },
+    {
+      key: 'skill',
+      header: 'Skill',
+      render: (w) => skillName(w.skillCategoryId),
+    },
     {
       key: 'engagement',
       header: 'Engagement',
@@ -121,12 +130,31 @@ export default function WorkersPage() {
         isLoading={workers.isPending}
         error={workers.isError ? 'Could not load workers.' : null}
         emptyMessage="No workers match these filters."
-        actions={(w) =>
-          w.status === 'active' ? (
-            <RowAction onClick={() => setDeactivating(w)}>Deactivate</RowAction>
-          ) : null
-        }
+        actions={(w) => (
+          <>
+            <RowAction
+              intent="read"
+              onClick={() => setNocFor({ id: w.id, name: w.fullName })}
+            >
+              NOC
+            </RowAction>
+            {w.status === 'active' && (
+              <RowAction onClick={() => setDeactivating(w)}>
+                Deactivate
+              </RowAction>
+            )}
+          </>
+        )}
       />
+
+      {nocFor && (
+        <NocModal
+          subjectType="labour_worker"
+          subjectId={nocFor.id}
+          title={`NOC — ${nocFor.name}`}
+          onClose={() => setNocFor(null)}
+        />
+      )}
 
       {showForm && (
         <WorkerForm

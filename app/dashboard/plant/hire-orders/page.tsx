@@ -28,6 +28,7 @@ import {
   SelectField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import { NocModal } from '@/app/ui/nocs/noc-panel';
 
 /**
  * Vehicle work/hire orders (2026-10-15), each downloadable in the client's WORK/HIRE ORDER
@@ -48,6 +49,10 @@ export default function HireOrdersPage() {
   });
 
   const [vendorId, setVendorId] = useState('');
+  // The order a NOC is being managed for (2026-10-15).
+  const [nocFor, setNocFor] = useState<{ id: string; code: string } | null>(
+    null,
+  );
   const [projectId, setProjectId] = useState('');
   const [editing, setEditing] = useState<HireOrder | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +178,12 @@ export default function HireOrdersPage() {
               load={(format) => downloadHireOrder(row, format)}
               onError={setError}
             />
+            <RowAction
+              intent="read"
+              onClick={() => setNocFor({ id: row.id, code: row.code })}
+            >
+              NOC
+            </RowAction>
             <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
             <RowAction
               disabled={remove.isPending}
@@ -191,6 +202,15 @@ export default function HireOrdersPage() {
           </div>
         )}
       />
+
+      {nocFor && (
+        <NocModal
+          subjectType="hire_order"
+          subjectId={nocFor.id}
+          title={`NOC — work order ${nocFor.code}`}
+          onClose={() => setNocFor(null)}
+        />
+      )}
 
       {editing && (
         <HireOrderModal

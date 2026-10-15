@@ -524,7 +524,6 @@ export const numberingEntrySchema = z.object({
     'PROJECTS',
     'VENDORS',
     'WORK_ORDER',
-    'NOC',
     // Plant and store documents (2026-10-15).
     'JOB_CARD',
     'ISSUE_SLIP',

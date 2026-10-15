@@ -17,6 +17,7 @@ import {
 import PageHeader from '@/app/ui/page-header';
 import SearchableSelect from '@/app/ui/searchable-select';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { NocModal } from '@/app/ui/nocs/noc-panel';
 
 /**
  * Purchase orders (2026-10-15).
@@ -36,6 +37,9 @@ const PURCHASE_ORDER = 'letter_purchase_order';
 
 export default function PurchaseOrdersPage() {
   const [vendorId, setVendorId] = useState('');
+  const [nocFor, setNocFor] = useState<{ id: string; label: string } | null>(
+    null,
+  );
   const [starting, setStarting] = useState(false);
 
   const kinds = useLetterKinds([PURCHASE_ORDER]);
@@ -174,6 +178,27 @@ export default function PurchaseOrdersPage() {
           letters={orders.data ?? []}
           isLoading={orders.isLoading}
           emptyMessage="No purchase order has been raised yet."
+          // The supplier's NOC against an issued purchase order (2026-10-15).
+          extraActions={(letter) => (
+            <Button
+              onClick={() =>
+                setNocFor({
+                  id: letter.id,
+                  label: letter.referenceNo ?? letter.letterKindLabel,
+                })
+              }
+            >
+              NOC
+            </Button>
+          )}
+        />
+      )}
+      {nocFor && (
+        <NocModal
+          subjectType="purchase_order"
+          subjectId={nocFor.id}
+          title={`NOC — ${nocFor.label}`}
+          onClose={() => setNocFor(null)}
         />
       )}
     </div>

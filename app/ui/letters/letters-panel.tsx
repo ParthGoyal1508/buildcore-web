@@ -285,10 +285,13 @@ export function LetterTable({
   letters,
   isLoading,
   emptyMessage,
+  extraActions,
 }: {
   letters: IssuedLetter[];
   isLoading: boolean;
   emptyMessage: string;
+  /** More actions for an issued letter's row — a purchase order's NOC (2026-10-15). */
+  extraActions?: (letter: IssuedLetter) => React.ReactNode;
 }) {
   const refresh = useRefreshLetters();
   const [error, setError] = useState<string | null>(null);
@@ -477,6 +480,7 @@ export function LetterTable({
                           <Button onClick={() => void download(letter)}>
                             Download
                           </Button>
+                          {extraActions?.(letter)}
                         </div>
                       )}
                     </td>

@@ -39,6 +39,7 @@ import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
+import NocPanel from '@/app/ui/nocs/noc-panel';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -500,6 +501,14 @@ export default function EmployeeDetailTabs({
 
       <TabPanel id="documents" idPrefix="employee-detail" active={tab}>
         <DocumentsTab employeeId={employee.id} />
+        {/* The staff NOC (2026-10-15) — a certificate issued for or about this person. */}
+        <div className="mt-6">
+          <NocPanel
+            subjectType="employee"
+            subjectId={employee.id}
+            title="No Objection Certificates"
+          />
+        </div>
       </TabPanel>
 
       <TabPanel id="letters" idPrefix="employee-detail" active={tab}>
