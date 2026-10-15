@@ -5,16 +5,19 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
+import { payHireBill, verifyHireBill } from '@/app/lib/api/plant';
 import {
-  getHireBills,
-  payHireBill,
-  verifyHireBill,
-  type HireBill,
-} from '@/app/lib/api/plant';
+  downloadHireBill,
+  getHireBillsFull,
+  type HireBillFull,
+} from '@/app/lib/api/plant-hire';
 import { HIRE_BILL_STATUSES, MESSAGES, plantLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import Pager from '@/app/ui/inventory/pager';
-import HireBillModal from '@/app/ui/plant/hire-bill-modal';
+import DocumentDownloads from '@/app/ui/plant/document-downloads';
+import HireBillModal, {
+  HireBillCorrectionModal,
+} from '@/app/ui/plant/hire-bill-modal';
 import {
   usePlantEquipment,
   usePlantVendors,
@@ -48,6 +51,7 @@ export default function HireBillsPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
+  const [correcting, setCorrecting] = useState<HireBillFull | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const companyId = usePlantCompanyId();
@@ -62,7 +66,9 @@ export default function HireBillsPage() {
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['plant', 'hire-bills', filters],
-    queryFn: () => getHireBills(filters),
+    // The fuller row (2026-10-15): basis, readings, deduction and hold for the client's
+    // VEHICLE HIRING BILL, read from the same list endpoint.
+    queryFn: () => getHireBillsFull(filters),
   });
 
   const verify = useMutation({
@@ -101,18 +107,50 @@ export default function HireBillsPage() {
       ),
   });
 
-  const columns: Column<HireBill>[] = [
+  const columns: Column<HireBillFull>[] = [
     {
       key: 'equipment',
       header: 'Machine',
       render: (row) => `${row.equipmentCode} · ${row.equipmentName}`,
     },
-    { key: 'vendor', header: 'Vendor', render: (row) => row.vendorName },
+    {
+      key: 'vendor',
+      header: 'Vendor',
+      render: (row) => (
+        <span className="flex flex-col">
+          <span>{row.vendorName}</span>
+          {row.hireOrderCode && (
+            <span className="text-xs text-gray-500">
+              Work order {row.hireOrderCode}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'basis',
+      header: 'Basis / rate',
+      // The rate folded in here (2026-10-15): on a monthly bill it is the month's rent, which
+      // read as an hourly rate in a column of its own.
+      render: (row) => (
+        <span className="flex flex-col">
+          <span>{row.basis === 'monthly' ? 'Monthly rent' : 'By hours'}</span>
+          <span className="text-xs text-gray-500">
+            {formatRupees(row.monthlyRate ?? row.rate)}
+            {row.basis === 'monthly' ? ' / month' : ' / unit'}
+          </span>
+        </span>
+      ),
+    },
     {
       key: 'period',
       header: 'Period',
-      render: (row) =>
-        `${row.billingPeriodFrom.slice(0, 10)} → ${row.billingPeriodTo.slice(0, 10)}`,
+      render: (row) => (
+        <span className="whitespace-nowrap">
+          {row.billingPeriodFrom.slice(0, 10)} →<br />
+          {row.billingPeriodTo.slice(0, 10)}
+        </span>
+      ),
     },
     {
       key: 'hours',
@@ -140,12 +178,6 @@ export default function HireBillsPage() {
       ),
     },
     {
-      key: 'rate',
-      header: 'Rate',
-      hideOnCard: true,
-      render: (row) => formatRupees(row.rate),
-    },
-    {
       key: 'gross',
       header: 'Gross',
       hideOnCard: true,
@@ -159,6 +191,13 @@ export default function HireBillsPage() {
         row.tdsRate === null
           ? '—'
           : `${formatRupees(row.tdsAmount)} (${row.tdsRate}%)`,
+    },
+    {
+      key: 'deductions',
+      header: 'Deduction / hold',
+      hideOnCard: true,
+      render: (row) =>
+        `${formatRupees(row.deductionAmount ?? 0)} / ${formatRupees(row.holdAmount ?? 0)}`,
     },
     {
       key: 'net',
@@ -204,7 +243,7 @@ export default function HireBillsPage() {
         >
           <option value="">All machines</option>
           {(equipment.data ?? [])
-            .filter((row) => row.ownership === 'hired')
+            .filter((row) => row.ownership !== 'owned')
             .map((row) => (
               <option key={row.id} value={row.id}>
                 {row.code} · {row.name}
@@ -255,7 +294,17 @@ export default function HireBillsPage() {
         error={isError ? MESSAGES.plantLoadFailed : undefined}
         emptyMessage={MESSAGES.plantHireBillsEmpty}
         actions={(row) => (
-          <>
+          // Wrapping, so the three downloads and the row's own actions fit a phone card —
+          // the list's action strip does not wrap on its own (2026-10-15).
+          <div className="flex flex-wrap justify-end gap-2">
+            <DocumentDownloads
+              load={(format) => downloadHireBill(row, format)}
+              onError={setError}
+            />
+            {/* Correctable only until verified: after that the figures are what was approved. */}
+            {row.status === 'pending_verification' && (
+              <RowAction onClick={() => setCorrecting(row)}>Edit</RowAction>
+            )}
             {row.status === 'pending_verification' && (
               <RowAction
                 disabled={verify.isPending}
@@ -305,7 +354,7 @@ export default function HireBillsPage() {
                 Pay
               </RowAction>
             )}
-          </>
+          </div>
         )}
       />
 
@@ -318,6 +367,12 @@ export default function HireBillsPage() {
       />
 
       {showModal && <HireBillModal onClose={() => setShowModal(false)} />}
+      {correcting && (
+        <HireBillCorrectionModal
+          bill={correcting}
+          onClose={() => setCorrecting(null)}
+        />
+      )}
     </div>
   );
 }

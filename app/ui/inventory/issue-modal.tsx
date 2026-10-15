@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   createIssue,
+  getEquipmentChoices,
   getStock,
   getStockHint,
   type IssueInput,
@@ -41,6 +42,11 @@ const today = () => new Date().toISOString().slice(0, 10);
  * issuing material we want to give an option to select Project and vendor or subcontractor".
  * The project follows the store's own until the user picks another; naming a vendor makes the
  * person optional, since the vendor's name is then recorded as who took it.
+ *
+ * The equipment number was added the same day for the client's issue slip ("Equipment No. (if
+ * applicable)"). It is text the registered machines are *suggested* into, not a choice from
+ * them: the slip prints what was written, a hired machine may not be registered yet, and a user
+ * without machinery permission cannot read the register at all — then it is simply a text box.
  */
 export default function IssueModal({
   onClose,
@@ -71,6 +77,7 @@ export default function IssueModal({
   );
   const [vendorId, setVendorId] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [equipmentNo, setEquipmentNo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | null>(null);
 
@@ -86,6 +93,14 @@ export default function IssueModal({
     queryKey: ['inventory', 'stock-hint', itemId, siteId],
     queryFn: () => getStockHint(itemId, siteId),
     enabled: Boolean(itemId && siteId),
+  });
+
+  // No retry: a 403 for a user without machinery permission is the answer, not a blip.
+  const machines = useQuery({
+    queryKey: ['inventory', 'equipment-choices'],
+    queryFn: getEquipmentChoices,
+    retry: false,
+    staleTime: 5 * 60_000,
   });
 
   const storeProjectId =
@@ -120,6 +135,7 @@ export default function IssueModal({
         ...(projectId ? { projectId } : {}),
         ...(vendorId ? { vendorId } : {}),
         ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
+        ...(equipmentNo.trim() ? { equipmentNo: equipmentNo.trim() } : {}),
         ...(indentLineId ? { indentLineId } : {}),
       }),
     onSuccess: () => {
@@ -308,6 +324,27 @@ export default function IssueModal({
           value={issuedTo}
           onChange={(event) => setIssuedTo(event.target.value)}
         />
+
+        <TextField
+          id="issue-equipment"
+          label="Equipment no. (if applicable)"
+          placeholder={
+            machines.data ? 'Pick or type, e.g. JCB01/2027' : 'e.g. JCB01/2027'
+          }
+          autoComplete="off"
+          list={machines.data?.length ? 'issue-equipment-list' : undefined}
+          value={equipmentNo}
+          onChange={(event) => setEquipmentNo(event.target.value)}
+        />
+        {machines.data && (
+          <datalist id="issue-equipment-list">
+            {machines.data.map((machine) => (
+              <option key={machine.id} value={machine.code}>
+                {machine.name}
+              </option>
+            ))}
+          </datalist>
+        )}
 
         <TextField
           id="issue-remarks"

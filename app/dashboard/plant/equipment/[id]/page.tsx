@@ -11,7 +11,10 @@ import {
   getEquipmentDetail,
   getEquipmentDocumentFile,
   getEquipmentMaintenanceCost,
+  REGISTRATION_KIND_LABELS,
+  REGISTRATION_STATUS_LABELS,
   type EquipmentDocument,
+  type RegistrationPaper,
 } from '@/app/lib/api/plant';
 import {
   MESSAGES,
@@ -144,28 +147,74 @@ export default function EquipmentDetailPage() {
     },
   ];
 
+  const registrationColumns: Column<RegistrationPaper>[] = [
+    {
+      key: 'paper',
+      header: 'Paper',
+      render: (row) => REGISTRATION_KIND_LABELS[row.kind],
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => REGISTRATION_STATUS_LABELS[row.status],
+    },
+    {
+      key: 'expires',
+      header: 'Expires',
+      render: (row) => <PaperExpiry paper={row} />,
+    },
+    { key: 'number', header: 'Number', render: (row) => row.number ?? '—' },
+    {
+      key: 'document',
+      header: 'Document on file',
+      render: (row) => (row.hasDocument ? 'Yes' : 'No'),
+    },
+  ];
+
   const facts: { label: string; value: React.ReactNode }[] = [
     { label: 'Category', value: data.categoryName },
     {
+      label: 'Make / model',
+      value: [data.make, data.model].filter(Boolean).join(' ') || '—',
+    },
+    { label: 'Manufacturing year', value: data.manufacturingYear ?? '—' },
+    {
+      label: 'Registration no.',
+      value: data.registrationNo ?? '—',
+    },
+    { label: 'Engine no.', value: data.engineNo ?? '—' },
+    { label: 'Chassis no.', value: data.chassisNo ?? '—' },
+    {
       label: 'Ownership',
       value:
-        data.ownership === 'hired'
-          ? `Hired — ${data.vendorName ?? 'unknown vendor'}`
-          : 'Owned',
+        data.ownership === 'owned'
+          ? 'Owned'
+          : data.vendorName
+            ? `${plantLabel(data.ownership)} — ${data.vendorName}`
+            : plantLabel(data.ownership),
     },
+    { label: 'Supplier', value: data.supplierName ?? '—' },
+    { label: 'Firm (registered owner)', value: data.registeredOwner ?? '—' },
     { label: 'Power source', value: plantLabel(data.powerSource) },
     { label: 'Deployed at', value: data.siteName ?? 'Not deployed' },
+    { label: 'Operator / in-charge', value: data.operatorName ?? '—' },
     {
       label: 'Meter reading',
       value: formatReading(data.currentReading, data.meterType),
     },
     { label: 'Utilisation this month', value: `${data.utilizationPercent}%` },
     {
-      label: 'Purchase',
-      value: data.purchaseCost
-        ? `${formatRupees(data.purchaseCost)} on ${data.purchaseDate?.slice(0, 10) ?? '—'}`
-        : '—',
+      label: 'Last service',
+      value: data.lastServiceDate?.slice(0, 10) ?? '—',
     },
+    data.ownership === 'owned'
+      ? {
+          label: 'Purchase',
+          value: data.purchaseCost
+            ? `${formatRupees(data.purchaseCost)} on ${data.purchaseDate?.slice(0, 10) ?? '—'}`
+            : (data.purchaseDate?.slice(0, 10) ?? '—'),
+        }
+      : { label: 'Hire date', value: data.purchaseDate?.slice(0, 10) ?? '—' },
     {
       label: 'Depreciation',
       value:
@@ -247,6 +296,31 @@ export default function EquipmentDetailPage() {
             </div>
           ))}
         </dl>
+        {data.remarks && (
+          <p className="mt-3 text-sm text-gray-700">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              Remarks{' '}
+            </span>
+            {data.remarks}
+          </p>
+        )}
+      </section>
+
+      {/*
+        The six papers of the client's vehicle register (2026-10-15), in its column order. A
+        paper never recorded is absent from the response and shown as such, so a gap in the
+        paperwork is visible rather than an empty table.
+      */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-gray-900">
+          Registration papers
+        </h2>
+        <ResponsiveList
+          columns={registrationColumns}
+          rows={data.registration}
+          rowKey={(row) => row.kind}
+          emptyMessage="No registration papers are recorded. Edit the machine to add them."
+        />
       </section>
 
       {/*
@@ -369,4 +443,34 @@ export default function EquipmentDetailPage() {
       )}
     </div>
   );
+}
+
+/**
+ * A held paper's expiry, amber within 30 days and red once lapsed — the same marks the
+ * downloaded vehicle register uses (2026-10-15). Compared as calendar dates, so a paper
+ * expiring today is still in force today.
+ */
+function PaperExpiry({ paper }: { paper: RegistrationPaper }) {
+  if (paper.status !== 'held') return <>—</>;
+  if (!paper.expiresAt) return <>Not recorded</>;
+  const date = paper.expiresAt.slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA');
+  const days = Math.round(
+    (Date.parse(date) - Date.parse(today)) / (24 * 60 * 60 * 1000),
+  );
+  if (days < 0) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+        {date} · lapsed
+      </span>
+    );
+  }
+  if (days <= 30) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+        {date} · {days === 0 ? 'today' : `${days} days`}
+      </span>
+    );
+  }
+  return <>{date}</>;
 }

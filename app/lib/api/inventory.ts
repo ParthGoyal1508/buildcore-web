@@ -311,6 +311,27 @@ export interface PurchaseInput {
   billContentType?: string;
   indentLineId?: string;
   remarks?: string;
+  /** What the gate counted, for the GRN (2026-10-15). Left out entirely when nothing was entered. */
+  grn?: GrnDetails;
+}
+
+/** The goods-received conditions the client's GRN offers. */
+export const GRN_CONDITIONS = [
+  'Good',
+  'Damaged',
+  'Short',
+  'Under Inspection',
+] as const;
+
+export interface GrnDetails {
+  challanNo?: string;
+  vehicleNo?: string;
+  receivedQuantity?: number;
+  acceptedQuantity?: number;
+  rejectedQuantity?: number;
+  condition?: (typeof GRN_CONDITIONS)[number];
+  batchDetails?: string;
+  discrepancy?: string;
 }
 
 export async function createPurchase(input: PurchaseInput): Promise<Purchase> {
@@ -360,6 +381,13 @@ export const issueSchema = z.object({
   boqItemId: z.string().nullable(),
   indentLineId: z.string().nullable(),
   remarks: z.string().nullable(),
+  // The client's issue slip and Daily Issue Register (2026-10-15). `slipNo` is null on issues
+  // recorded before the MIS series existed; the return fields stay null until material comes back.
+  slipNo: z.string().nullable().optional(),
+  equipmentNo: z.string().nullable().optional(),
+  returnedQuantity: nullableDecimal.optional(),
+  returnedOn: z.string().nullable().optional(),
+  receivedBy: z.string().nullable().optional(),
 });
 export type Issue = z.infer<typeof issueSchema>;
 
@@ -400,6 +428,9 @@ export interface IssueInput {
   boqItemId?: string;
   indentLineId?: string;
   remarks?: string;
+  /** The machine the material went to, as its number ("JCB01/2027") — free text, because the
+   * slip prints what was written and an inventory-only user may not see the machinery list. */
+  equipmentNo?: string;
 }
 
 export async function createIssue(input: IssueInput): Promise<Issue> {
@@ -408,6 +439,30 @@ export async function createIssue(input: IssueInput): Promise<Issue> {
     body: JSON.stringify(input),
   });
   return issueSchema.parse(raw);
+}
+
+export interface IssueReturnInput {
+  /** The total returned against the issue so far, not this return alone — the register prints
+   * one "Received Qty" per issue, and a total cannot be double-counted by a retried request. */
+  returnedQuantity: number;
+  returnedOn: string;
+  receivedBy: string;
+}
+
+/**
+ * Records material coming back to the store; the server puts the stock back itself.
+ *
+ * The response has no body (checked against the running API), so there is nothing to parse —
+ * the caller refetches the list instead.
+ */
+export async function recordIssueReturn(
+  id: string,
+  input: IssueReturnInput,
+): Promise<void> {
+  await authFetch<void>(`/inventory/issues/${id}/return`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function deleteIssue(id: string): Promise<void> {
@@ -432,6 +487,17 @@ export const transferSchema = z.object({
   quantity: decimal,
   status: z.enum(TRANSFER_STATUSES),
   remarks: z.string().nullable(),
+  // The stock transfer slip and delivery challan (2026-10-15). Optional so a transfer from an
+  // API not yet redeployed still parses; the numbers are null on transfers that predate them.
+  transferNo: z.string().nullable().optional(),
+  challanNo: z.string().nullable().optional(),
+  vehicleNo: z.string().nullable().optional(),
+  transporter: z.string().nullable().optional(),
+  dispatchReference: z.string().nullable().optional(),
+  requestNo: z.string().nullable().optional(),
+  expectedArrival: z.string().nullable().optional(),
+  receivedQuantity: nullableDecimal.optional(),
+  reason: z.string().nullable().optional(),
 });
 export type Transfer = z.infer<typeof transferSchema>;
 
@@ -470,6 +536,15 @@ export interface TransferInput {
   date: string;
   quantity: number;
   remarks?: string;
+  /** The dispatch details the slip and the challan print (2026-10-15). */
+  vehicleNo?: string;
+  transporter?: string;
+  /** Indent / PO / dispatch reference. */
+  dispatchReference?: string;
+  /** The transfer request number. */
+  requestNo?: string;
+  expectedArrival?: string;
+  reason?: string;
 }
 
 export async function createTransfer(input: TransferInput): Promise<Transfer> {
@@ -483,10 +558,17 @@ export async function createTransfer(input: TransferInput): Promise<Transfer> {
 export async function updateTransferStatus(
   id: string,
   status: (typeof TRANSFER_STATUSES)[number],
+  /** Only with `received`: what actually arrived. The slip prints the difference from what was
+   * sent, so a short delivery is on paper rather than in someone's memory. */
+  receivedQuantity?: number,
 ): Promise<{ id: string; status: string }> {
   const raw = await authFetch<unknown>(`/inventory/transfers/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(
+      receivedQuantity === undefined
+        ? { status }
+        : { status, receivedQuantity },
+    ),
   });
   return z.object({ id: z.string(), status: z.string() }).parse(raw);
 }
@@ -668,6 +750,8 @@ export const indentSchema = z.object({
   projectId: z.string().nullable(),
   requiredByDate: isoDate,
   justification: z.string(),
+  // Added 2026-10-15 for the indent document; optional because the list does not return it yet.
+  department: z.string().nullable().optional(),
   status: z.enum(INDENT_STATUSES),
   requestedByUserId: z.string(),
   approvedByUserId: z.string().nullable(),
@@ -710,6 +794,8 @@ export interface IndentInput {
   siteId: string;
   requiredByDate: string;
   justification: string;
+  /** The requesting department, printed on the indent (2026-10-15). */
+  department?: string;
   lines: {
     itemId: string;
     requestedQuantity: number;
@@ -824,4 +910,67 @@ export type ProcurementNeeded = z.infer<typeof procurementNeededSchema>;
 export async function getProcurementNeeded(): Promise<ProcurementNeeded> {
   const raw = await authFetch<unknown>('/inventory/indents/procurement-needed');
   return procurementNeededSchema.parse(raw);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Store documents (2026-10-15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The client's combined store documents — indent, delivery challan, GRN, issue slip and stock
+ * transfer slip — and the Daily Issue Register, each in PDF, Excel or Word.
+ *
+ * All three formats are rendered on the server from one spec, so they cannot disagree; the
+ * server also names the file (the document and its number), which is why the filename is taken
+ * from the response and the fallback here is only for a response that carried none.
+ */
+export type StoreDocumentFormat = 'pdf' | 'xlsx' | 'docx';
+
+export type StoreDocumentKind =
+  'indent' | 'challan' | 'grn' | 'issue-slip' | 'transfer-slip';
+
+export async function downloadStoreDocument(
+  kind: StoreDocumentKind,
+  id: string,
+  format: StoreDocumentFormat,
+): Promise<StoredFile> {
+  return authFetchFile(
+    `/inventory/documents/${kind}/${encodeURIComponent(id)}.${format}`,
+  );
+}
+
+export interface DailyIssueRegisterQuery {
+  siteId: string;
+  dateFrom: string;
+  dateTo?: string;
+}
+
+export async function downloadDailyIssueRegister(
+  query: DailyIssueRegisterQuery,
+  format: StoreDocumentFormat,
+): Promise<StoredFile> {
+  return authFetchFile(
+    `/inventory/documents/daily-issue-register.${format}${qs({ ...query })}`,
+  );
+}
+
+/**
+ * The registered machines, for the issue slip's "Equipment No." — code and name only.
+ *
+ * Read here rather than through the machinery module's own client: the inventory screen needs
+ * two fields, and a store user without machinery permission gets a 403 the caller turns into a
+ * plain text field rather than an error.
+ */
+export const equipmentChoiceSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+});
+export type EquipmentChoice = z.infer<typeof equipmentChoiceSchema>;
+
+export async function getEquipmentChoices(): Promise<EquipmentChoice[]> {
+  const raw = await authFetch<unknown>(
+    `/plant/equipment${qs({ pageSize: 100 })}`,
+  );
+  return z.object({ items: z.array(equipmentChoiceSchema) }).parse(raw).items;
 }

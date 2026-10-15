@@ -4,7 +4,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { createPurchase, type PurchaseInput } from '@/app/lib/api/inventory';
+import {
+  createPurchase,
+  GRN_CONDITIONS,
+  type GrnDetails,
+  type PurchaseInput,
+} from '@/app/lib/api/inventory';
 import { formatRupees } from '@/app/lib/utils';
 import {
   FormError,
@@ -30,6 +35,43 @@ function readAsBase64(file: File): Promise<string> {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const EMPTY_GRN = {
+  challanNo: '',
+  vehicleNo: '',
+  receivedQuantity: '',
+  acceptedQuantity: '',
+  rejectedQuantity: '',
+  condition: '',
+  batchDetails: '',
+  discrepancy: '',
+};
+
+/**
+ * The GRN's gate fields as typed, reduced to what was actually entered (2026-10-15).
+ *
+ * `undefined` when nothing was, so a purchase recorded without them sends no `grn` at all and
+ * the GRN prints its blanks — rather than an object of empty strings the server would have to
+ * tell apart from deliberate answers.
+ */
+function grnFrom(draft: typeof EMPTY_GRN): GrnDetails | undefined {
+  const text = (value: string) => value.trim() || undefined;
+  const number = (value: string) => (value === '' ? undefined : Number(value));
+  const grn: GrnDetails = {
+    challanNo: text(draft.challanNo),
+    vehicleNo: text(draft.vehicleNo),
+    receivedQuantity: number(draft.receivedQuantity),
+    acceptedQuantity: number(draft.acceptedQuantity),
+    rejectedQuantity: number(draft.rejectedQuantity),
+    condition: (draft.condition || undefined) as GrnDetails['condition'],
+    batchDetails: text(draft.batchDetails),
+    discrepancy: text(draft.discrepancy),
+  };
+  const entered = Object.fromEntries(
+    Object.entries(grn).filter(([, value]) => value !== undefined),
+  ) as GrnDetails;
+  return Object.keys(entered).length ? entered : undefined;
+}
+
 export default function PurchaseModal({
   onClose,
   indentLineId,
@@ -54,12 +96,27 @@ export default function PurchaseModal({
   const [rate, setRate] = useState('');
   const [remarks, setRemarks] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [grnDraft, setGrnDraft] = useState(EMPTY_GRN);
   const [error, setError] = useState<string | null>(null);
 
   // Live, because the number a storekeeper is really checking is the total on the
   // vendor's bill — not the two figures it came from (009 FR-002).
   const amount =
     quantity && rate ? Number(quantity) * Number(rate) : Number.NaN;
+
+  const setGrn = (field: keyof typeof EMPTY_GRN) => (value: string) =>
+    setGrnDraft((draft) => ({ ...draft, [field]: value }));
+  // Accepted plus rejected is what was counted at the gate; when both are given and do not add up
+  // to the received figure, say so here — the GRN would otherwise print three numbers that disagree.
+  const grnMismatch =
+    grnDraft.receivedQuantity !== '' &&
+    grnDraft.acceptedQuantity !== '' &&
+    grnDraft.rejectedQuantity !== '' &&
+    Math.abs(
+      Number(grnDraft.acceptedQuantity) +
+        Number(grnDraft.rejectedQuantity) -
+        Number(grnDraft.receivedQuantity),
+    ) > 1e-9;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -73,6 +130,8 @@ export default function PurchaseModal({
         ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
         ...(indentLineId ? { indentLineId } : {}),
       };
+      const grn = grnFrom(grnDraft);
+      if (grn) input.grn = grn;
       if (file) {
         input.billFile = await readAsBase64(file);
         input.billContentType = file.type || 'application/octet-stream';
@@ -93,7 +152,13 @@ export default function PurchaseModal({
   });
 
   const ready =
-    siteId && itemId && vendorId && date && Number(quantity) > 0 && rate !== '';
+    siteId &&
+    itemId &&
+    vendorId &&
+    date &&
+    Number(quantity) > 0 &&
+    rate !== '' &&
+    !grnMismatch;
 
   return (
     <Modal
@@ -229,6 +294,96 @@ export default function PurchaseModal({
             onChange={(event) => setRemarks(event.target.value)}
           />
         </div>
+
+        {/* Collapsed by default: most purchases are entered from the bill afterwards, and the
+            gate's own count is the exception worth opening this for. */}
+        <details className="rounded-md border border-gray-200 sm:col-span-2">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-gray-900">
+            GRN details (as received at the gate)
+          </summary>
+          <div className="grid gap-3 border-t border-gray-100 p-3 sm:grid-cols-2">
+            <TextField
+              id="grn-challan"
+              label="Supplier challan no."
+              autoComplete="off"
+              value={grnDraft.challanNo}
+              onChange={(event) => setGrn('challanNo')(event.target.value)}
+            />
+            <TextField
+              id="grn-vehicle"
+              label="Vehicle no."
+              autoComplete="off"
+              value={grnDraft.vehicleNo}
+              onChange={(event) => setGrn('vehicleNo')(event.target.value)}
+            />
+            <TextField
+              id="grn-received"
+              label="Quantity received"
+              type="number"
+              min={0}
+              step="any"
+              value={grnDraft.receivedQuantity}
+              onChange={(event) =>
+                setGrn('receivedQuantity')(event.target.value)
+              }
+              hint="As counted at the gate, if it differs from the bill."
+            />
+            <SelectField
+              id="grn-condition"
+              label="Condition"
+              value={grnDraft.condition}
+              onChange={(event) => setGrn('condition')(event.target.value)}
+            >
+              <option value="">Not recorded</option>
+              {GRN_CONDITIONS.map((condition) => (
+                <option key={condition} value={condition}>
+                  {condition}
+                </option>
+              ))}
+            </SelectField>
+            <TextField
+              id="grn-accepted"
+              label="Quantity accepted"
+              type="number"
+              min={0}
+              step="any"
+              value={grnDraft.acceptedQuantity}
+              onChange={(event) =>
+                setGrn('acceptedQuantity')(event.target.value)
+              }
+              error={
+                grnMismatch
+                  ? 'Accepted and rejected do not add up to the quantity received.'
+                  : undefined
+              }
+            />
+            <TextField
+              id="grn-rejected"
+              label="Quantity rejected"
+              type="number"
+              min={0}
+              step="any"
+              value={grnDraft.rejectedQuantity}
+              onChange={(event) =>
+                setGrn('rejectedQuantity')(event.target.value)
+              }
+            />
+            <TextField
+              id="grn-batch"
+              label="Batch / lot details"
+              autoComplete="off"
+              value={grnDraft.batchDetails}
+              onChange={(event) => setGrn('batchDetails')(event.target.value)}
+            />
+            <TextField
+              id="grn-discrepancy"
+              label="Discrepancy"
+              autoComplete="off"
+              value={grnDraft.discrepancy}
+              onChange={(event) => setGrn('discrepancy')(event.target.value)}
+            />
+          </div>
+        </details>
 
         <div className="sm:col-span-2">
           <FormError message={error} />

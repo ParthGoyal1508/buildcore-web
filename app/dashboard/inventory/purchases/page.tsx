@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   deletePurchase,
+  downloadStoreDocument,
   getPurchaseBill,
   getPurchases,
   type Purchase,
@@ -17,6 +18,7 @@ import {
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
+import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import { useSites, useVendors } from '@/app/ui/inventory/use-inventory-refs';
 import {
   FormError,
@@ -262,23 +264,32 @@ export default function PurchasesPage() {
         error={isError ? MESSAGES.inventoryLoadFailed : undefined}
         emptyMessage={MESSAGES.purchasesEmpty}
         actions={(row) => (
-          <RowAction
-            onClick={async () => {
-              if (
-                await confirmDialog({
-                  title: 'Delete this purchase?',
-                  message: MESSAGES.confirmDeletePurchase,
-                  confirmLabel: 'Delete',
-                  tone: 'danger',
-                })
-              ) {
-                remove.mutate(row.id);
-              }
-            }}
-            disabled={remove.isPending}
-          >
-            Delete
-          </RowAction>
+          <div className="flex flex-wrap gap-2">
+            {/* The client's GRN (2026-10-15), filled from the purchase and what the gate counted. */}
+            <StoreDocumentDownload
+              label="GRN"
+              fallbackName={`GRN ${row.grnNumber ?? row.date.slice(0, 10)}`}
+              load={(format) => downloadStoreDocument('grn', row.id, format)}
+              onError={setError}
+            />
+            <RowAction
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this purchase?',
+                    message: MESSAGES.confirmDeletePurchase,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                ) {
+                  remove.mutate(row.id);
+                }
+              }}
+              disabled={remove.isPending}
+            >
+              Delete
+            </RowAction>
+          </div>
         )}
       />
 

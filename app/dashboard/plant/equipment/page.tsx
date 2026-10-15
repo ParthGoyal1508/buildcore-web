@@ -4,18 +4,23 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { ApiError } from '@/app/lib/api/client';
 import {
+  PLANT_OWNERSHIPS,
+  downloadEquipmentRegister,
   getEquipment,
   type Equipment,
 } from '@/app/lib/api/plant';
+import { saveBlob } from '@/app/lib/download-file';
 import {
-  EQUIPMENT_OWNERSHIPS,
   EQUIPMENT_STATUSES,
   MESSAGES,
   ROUTES,
   formatReading,
   plantLabel,
 } from '@/app/lib/constants';
+import CategoryOptions from '@/app/ui/plant/category-options';
+import EquipmentImportModal from '@/app/ui/plant/equipment-import-modal';
 import EquipmentModal from '@/app/ui/plant/equipment-modal';
 import Pager from '@/app/ui/inventory/pager';
 import {
@@ -24,6 +29,7 @@ import {
   usePlantCompanyId,
 } from '@/app/ui/plant/use-plant-refs';
 import {
+  FormError,
   RowAction,
   SecondaryButton,
   SelectField,
@@ -45,6 +51,9 @@ export default function AssetRegisterPage() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [downloading, setDownloading] = useState<'pdf' | 'xlsx' | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const companyId = usePlantCompanyId();
 
@@ -63,6 +72,34 @@ export default function AssetRegisterPage() {
     queryFn: () => getEquipment(filters),
   });
 
+  /**
+   * The client's "Vehicle Details (As on …)" sheet for what the filters show (2026-10-15).
+   * The search box is left out: the sheet is the register by category, site, status and
+   * ownership, and a half-typed name would quietly shorten it.
+   */
+  async function downloadRegister(format: 'pdf' | 'xlsx') {
+    setDownloading(format);
+    setDownloadError(null);
+    try {
+      const { blob, filename } = await downloadEquipmentRegister(format, {
+        ...(companyId ? { companyId } : {}),
+        ...(categoryId ? { categoryId } : {}),
+        ...(siteId ? { siteId } : {}),
+        ...(status ? { status } : {}),
+        ...(ownership ? { ownership } : {}),
+      });
+      saveBlob(blob, filename);
+    } catch (err) {
+      setDownloadError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not download the register.',
+      );
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   const hasFilters =
     search !== '' ||
     categoryId !== '' ||
@@ -74,16 +111,41 @@ export default function AssetRegisterPage() {
     {
       key: 'code',
       header: 'Code',
+      // The registration number under the code (2026-10-15): the vehicle number is what the
+      // yard calls a vehicle by, and its own column pushed Status off a laptop screen.
       render: (row) => (
-        <Link
-          href={ROUTES.plantEquipmentDetail(row.id)}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-        >
-          {row.code}
-        </Link>
+        <span>
+          <Link
+            href={ROUTES.plantEquipmentDetail(row.id)}
+            className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          >
+            {row.code}
+          </Link>
+          {row.registrationNo && (
+            <span className="block whitespace-nowrap text-xs text-gray-500">
+              {row.registrationNo}
+            </span>
+          )}
+        </span>
       ),
     },
-    { key: 'name', header: 'Name', render: (row) => row.name },
+    {
+      key: 'name',
+      header: 'Name',
+      // Make and model under the name (2026-10-15): together they say what the machine is,
+      // and a column each would push the register off a laptop screen.
+      render: (row) => {
+        const makeModel = [row.make, row.model].filter(Boolean).join(' ');
+        return (
+          <span>
+            {row.name}
+            {makeModel && (
+              <span className="block text-xs text-gray-500">{makeModel}</span>
+            )}
+          </span>
+        );
+      },
+    },
     {
       key: 'category',
       header: 'Category',
@@ -94,9 +156,13 @@ export default function AssetRegisterPage() {
       key: 'ownership',
       header: 'Ownership',
       render: (row) =>
-        row.ownership === 'hired'
-          ? `Hired — ${row.vendorName ?? 'unknown vendor'}`
-          : 'Owned',
+        row.ownership === 'owned'
+          ? 'Owned'
+          : row.vendorName
+            ? `${plantLabel(row.ownership)} — ${row.vendorName}`
+            : row.ownership === 'hired'
+              ? 'Hired — unknown vendor'
+              : plantLabel(row.ownership),
     },
     {
       key: 'site',
@@ -125,18 +191,21 @@ export default function AssetRegisterPage() {
       header: 'Documents',
       // SC-001: the list answers this itself. `alertDocumentTypes` names *which*
       // paperwork, because "something is expiring" sends someone to open the
-      // machine to find out what.
-      render: (row) =>
-        row.expiryAlert ? (
+      // machine to find out what. It includes the registration papers lapsing within 30
+      // days (2026-10-15), which the API folds in.
+      render: (row) => {
+        const alerts = row.alertDocumentTypes;
+        return alerts.length > 0 ? (
           <span
             className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-            title={row.alertDocumentTypes.join(', ')}
+            title={alerts.join(', ')}
           >
-            {row.alertDocumentTypes.join(', ')}
+            {alerts.join(', ')}
           </span>
         ) : (
           <span className="text-sm text-gray-400">—</span>
-        ),
+        );
+      },
     },
   ];
 
@@ -144,22 +213,44 @@ export default function AssetRegisterPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Asset Register" />
-        <SecondaryButton
-          type="button"
-          onClick={() => {
-            setEditing(null);
-            setShowModal(true);
-          }}
-        >
-          Register a machine
-        </SecondaryButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-600">Download register</span>
+          <SecondaryButton
+            type="button"
+            disabled={downloading !== null}
+            onClick={() => void downloadRegister('pdf')}
+          >
+            {downloading === 'pdf' ? 'PDF…' : 'PDF'}
+          </SecondaryButton>
+          <SecondaryButton
+            type="button"
+            disabled={downloading !== null}
+            onClick={() => void downloadRegister('xlsx')}
+          >
+            {downloading === 'xlsx' ? 'Excel…' : 'Excel'}
+          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => setShowImport(true)}>
+            Import master list
+          </SecondaryButton>
+          <SecondaryButton
+            type="button"
+            onClick={() => {
+              setEditing(null);
+              setShowModal(true);
+            }}
+          >
+            Register a machine
+          </SecondaryButton>
+        </div>
       </div>
+
+      <FormError message={downloadError} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <TextField
           id="equipment-search"
           label="Search"
-          placeholder="Code or name"
+          placeholder="Code, name or registration no."
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -178,11 +269,7 @@ export default function AssetRegisterPage() {
           }}
         >
           <option value="">All categories</option>
-          {(categories.data ?? []).map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
+          <CategoryOptions categories={categories.data ?? []} />
         </SelectField>
         <SelectField
           id="equipment-filter-site"
@@ -225,8 +312,8 @@ export default function AssetRegisterPage() {
             setPage(1);
           }}
         >
-          <option value="">Owned and hired</option>
-          {EQUIPMENT_OWNERSHIPS.map((value) => (
+          <option value="">Any ownership</option>
+          {PLANT_OWNERSHIPS.map((value) => (
             <option key={value} value={value}>
               {plantLabel(value)}
             </option>
@@ -264,6 +351,10 @@ export default function AssetRegisterPage() {
         onPageChange={setPage}
         noun="machine"
       />
+
+      {showImport && (
+        <EquipmentImportModal onClose={() => setShowImport(false)} />
+      )}
 
       {showModal && (
         <EquipmentModal

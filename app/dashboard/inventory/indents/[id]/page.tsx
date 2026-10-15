@@ -8,6 +8,7 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   cancelIndent,
   getIndent,
+  downloadStoreDocument,
   markProcurementNeeded,
   rejectIndent,
   type IndentLine,
@@ -16,6 +17,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, inventoryLabel, overdueLabel } from '@/app/lib/constants';
 import ApproveIndentModal from '@/app/ui/inventory/approve-indent-modal';
 import IssueModal from '@/app/ui/inventory/issue-modal';
+import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import {
   FormError,
   RowAction,
@@ -164,7 +166,9 @@ export default function IndentDetailPage() {
         <div>
           <PageHeader title={data.indentNumber} />
           <p className="text-sm text-gray-600">
-            {data.siteName} · required by {data.requiredByDate.slice(0, 10)}
+            {data.siteName}
+            {data.department ? ` · ${data.department}` : ''} · required by{' '}
+            {data.requiredByDate.slice(0, 10)}
           </p>
           {data.overdue && (
             <p className="text-sm font-medium text-red-700">
@@ -172,7 +176,19 @@ export default function IndentDetailPage() {
             </p>
           )}
         </div>
-        <StatusBadge status={data.status} label={inventoryLabel(data.status)} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The client's Material Indent document (2026-10-15). */}
+          <StoreDocumentDownload
+            label="Download indent"
+            fallbackName={`Indent ${data.indentNumber.replace(/\//g, '-')}`}
+            load={(format) => downloadStoreDocument('indent', data.id, format)}
+            onError={setError}
+          />
+          <StatusBadge
+            status={data.status}
+            label={inventoryLabel(data.status)}
+          />
+        </div>
       </div>
 
       <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">

@@ -23,6 +23,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import CategoryOptions from './category-options';
 import { usePlantCategories, usePlantCompanyId } from './use-plant-refs';
 
 /**
@@ -32,6 +33,10 @@ import { usePlantCategories, usePlantCompanyId } from './use-plant-refs';
  * literals the original spec carried: a fuel variance threshold and a monthly hours
  * target are properties of a *kind of machine*, and a tower crane and a tipper do
  * not deserve the same tolerance.
+ *
+ * Group (2026-10-15) is the family the category sits under in the client's master list — the
+ * heading every category select groups by. Typed, with the existing families offered, so a new
+ * one needs no master of its own.
  */
 export function CategoryModal({
   category,
@@ -42,9 +47,11 @@ export function CategoryModal({
 }) {
   const queryClient = useQueryClient();
   const companyId = usePlantCompanyId();
+  const categories = usePlantCategories();
   const isEdit = category !== undefined;
 
   const [name, setName] = useState(category?.name ?? '');
+  const [group, setGroup] = useState(category?.group ?? '');
   const [meterType, setMeterType] = useState<string>(
     category?.meterType ?? 'hours',
   );
@@ -66,6 +73,8 @@ export function CategoryModal({
     mutationFn: () => {
       const body = {
         name: name.trim(),
+        // Always sent on edit, where a blank clears it; on create a blank is simply left out.
+        ...(isEdit || group.trim() ? { group: group.trim() } : {}),
         meterType,
         ...(fuelBenchmark ? { fuelBenchmark: Number(fuelBenchmark) } : {}),
         fuelVarianceThresholdPercent: Number(threshold),
@@ -80,7 +89,9 @@ export function CategoryModal({
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   return (
@@ -116,6 +127,29 @@ export function CategoryModal({
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
+
+        <TextField
+          id="category-group"
+          label="Group"
+          list="category-group-options"
+          value={group}
+          onChange={(event) => setGroup(event.target.value)}
+          placeholder="Vehicle Fleet"
+          hint="The family it is listed under. Blank lists it under Other."
+        />
+        <datalist id="category-group-options">
+          {[
+            ...new Set(
+              (categories.data ?? []).flatMap((row) =>
+                row.group ? [row.group] : [],
+              ),
+            ),
+          ]
+            .sort()
+            .map((value) => (
+              <option key={value} value={value} />
+            ))}
+        </datalist>
 
         <SelectField
           id="category-meter"
@@ -211,7 +245,9 @@ export function DocTypeModal({
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   return (
@@ -306,7 +342,9 @@ export function HireRateModal({ onClose }: { onClose: () => void }) {
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   return (
@@ -343,11 +381,7 @@ export function HireRateModal({ onClose }: { onClose: () => void }) {
           onChange={(event) => setCategoryId(event.target.value)}
         >
           <option value="">Select a category</option>
-          {(categories.data ?? []).map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
+          <CategoryOptions categories={categories.data ?? []} />
         </SelectField>
 
         <TextField
