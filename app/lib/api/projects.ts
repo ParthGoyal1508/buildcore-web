@@ -143,7 +143,9 @@ export async function getClients(query: ClientQuery = {}): Promise<ClientPage> {
  * themselves, which `getProjects({ clientId })` answers.
  */
 export async function getClient(id: string): Promise<Client> {
-  return clientSchema.parse(await authFetch<unknown>(`/projects/clients/${id}`));
+  return clientSchema.parse(
+    await authFetch<unknown>(`/projects/clients/${id}`),
+  );
 }
 
 export interface ClientInput {
@@ -221,7 +223,9 @@ export interface SiteQuery {
  * working form.
  */
 export async function getSites(query: SiteQuery = {}): Promise<SitePage> {
-  const raw = await authFetch<unknown>(`/projects/sites/list${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/projects/sites/list${qs({ ...query })}`,
+  );
   return sitePageSchema.parse(raw);
 }
 
@@ -479,7 +483,6 @@ export async function getProjectDetail(id: string): Promise<ProjectDetail> {
 }
 
 export interface ProjectInput {
-  code?: string;
   name: string;
   clientId: string;
   location?: string;
@@ -513,6 +516,15 @@ export interface ProjectInput {
    * `POST /projects/:id/documents` is the ordinary path.
    */
   stagedDocumentIds?: string[];
+}
+
+/**
+ * The code the next project will be given (2026-10-15) — `1010`, `1020`, … A preview for the
+ * creation form; the number is drawn when the project is saved.
+ */
+export async function getNextProjectCode(): Promise<string> {
+  const raw = await authFetch<{ code: string }>('/projects/next-code');
+  return raw.code;
 }
 
 export async function createProject(input: ProjectInput): Promise<Project> {
@@ -652,7 +664,11 @@ const importReportSchema = z.object({
   groups: z.number(),
   lines: z.number(),
   units: z.array(
-    z.object({ asTyped: z.string(), normalised: z.string(), lines: z.number() }),
+    z.object({
+      asTyped: z.string(),
+      normalised: z.string(),
+      lines: z.number(),
+    }),
   ),
   totals: importTotalsSchema,
   /**
@@ -748,7 +764,10 @@ export async function planBOQItem(
   return boqItemSchema.parse(raw);
 }
 
-export async function deleteBOQItem(projectId: string, itemId: string): Promise<void> {
+export async function deleteBOQItem(
+  projectId: string,
+  itemId: string,
+): Promise<void> {
   await authFetch<unknown>(`/projects/${projectId}/boq/items/${itemId}`, {
     method: 'DELETE',
   });
@@ -766,10 +785,13 @@ export async function validateBOQImport(
   file: File,
 ): Promise<BoqImportReport> {
   const base64 = await fileToBase64(file);
-  const raw = await authFetch<unknown>(`/projects/${projectId}/boq/import/validate`, {
-    method: 'POST',
-    body: JSON.stringify({ file: base64 }),
-  });
+  const raw = await authFetch<unknown>(
+    `/projects/${projectId}/boq/import/validate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ file: base64 }),
+    },
+  );
   return importReportSchema.parse(raw);
 }
 
@@ -807,10 +829,14 @@ export async function confirmBOQImport(
   projectId: string,
   batchId: string,
 ): Promise<{ groups: number; lines: number; quotedPercentageSet: boolean }> {
-  return authFetch<{ groups: number; lines: number; quotedPercentageSet: boolean }>(
-    `/projects/${projectId}/boq/import/confirm`,
-    { method: 'POST', body: JSON.stringify({ batchId }) },
-  );
+  return authFetch<{
+    groups: number;
+    lines: number;
+    quotedPercentageSet: boolean;
+  }>(`/projects/${projectId}/boq/import/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ batchId }),
+  });
 }
 
 /** The data portion only — the API decodes bytes, not a data URL. */
