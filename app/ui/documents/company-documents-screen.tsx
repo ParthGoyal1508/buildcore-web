@@ -12,6 +12,7 @@ import {
   type CompanyDocument,
 } from '@/app/lib/api/company-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { CompletenessPanel } from '@/app/ui/documents/completeness-panel';
 import {
@@ -36,8 +37,8 @@ export function CompanyDocumentsScreen() {
   const queryClient = useQueryClient();
   const [uploadFor, setUploadFor] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
-  // browsers block when it is opened after a fetch; any other file is still saved.
+  // Preview opens a PDF or a photo in the page's own viewer (2026-10-14) rather than a new tab,
+  // which most browsers block when it is opened after a fetch; Download always saves (2026-10-15).
   const { show, viewer } = useFileViewer();
   const [defineError, setDefineError] = useState<string | null>(null);
 
@@ -125,10 +126,21 @@ export function CompanyDocumentsScreen() {
     isRestricted: k.isRestricted,
   }));
 
-  const open = async (doc: CompanyDocument) => {
+  /**
+   * Fetches the file, then shows it or saves it. The same authenticated, audit-logged endpoint for
+   * both: a second download path is a second thing to audit.
+   */
+  const fetchThen = async (
+    doc: CompanyDocument,
+    action: 'preview' | 'download',
+  ) => {
     setDownloadError(null);
     try {
-      show(await downloadCompanyDocument(doc.id), `${doc.code}-${doc.id}`);
+      const file = await downloadCompanyDocument(doc.id);
+      const fallbackName = `${doc.code}-${doc.id}`;
+      // `show` saves anything a frame cannot render (a Word file, a workbook) instead.
+      if (action === 'preview') show(file, fallbackName, doc.name);
+      else saveBlob(file.blob, file.filename || fallbackName);
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       setDownloadError(
@@ -141,9 +153,14 @@ export function CompanyDocumentsScreen() {
 
   const rowActions = (doc: CompanyDocument) => (
     <>
-      {/* Download, never preview, for a restricted kind — and the same control for
-          every kind, because a second download path is a second thing to audit. */}
-      <RowAction type="button" onClick={() => void open(doc)}>
+      {/* No preview for a restricted kind (FR-013a): an Aadhaar card on a settings screen is a
+          disclosure to everyone who walks past the monitor. Download only. */}
+      {!doc.isRestricted && (
+        <RowAction type="button" onClick={() => void fetchThen(doc, 'preview')}>
+          Preview
+        </RowAction>
+      )}
+      <RowAction type="button" onClick={() => void fetchThen(doc, 'download')}>
         Download
       </RowAction>
       <RowAction type="button" onClick={() => setUploadFor(doc.documentTypeId)}>

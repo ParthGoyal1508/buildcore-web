@@ -79,33 +79,146 @@ function renderable(file: ViewableFile): { blob: Blob; isImage: boolean } {
   };
 }
 
+/** A file name the viewer can put in a URL path: no separators, and ending `.pdf`. */
+function pdfName(name: string): string {
+  const base = name.replace(/[\\/]+/g, '-').trim() || 'document';
+  return /\.pdf$/i.test(base) ? base : `${base}.pdf`;
+}
+
+let viewerWorker: Promise<ServiceWorker | null> | null = null;
+
+/**
+ * The worker that serves a PDF under its own name (`public/file-viewer-worker.js`), once it is
+ * active — or `null` where service workers are unavailable (an insecure origin, a private window
+ * that refuses them), in which case the frame falls back to the blob URL and the UUID name.
+ */
+function fileViewerWorker(): Promise<ServiceWorker | null> {
+  if (viewerWorker) return viewerWorker;
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return Promise.resolve(null);
+  }
+  const attempt: Promise<ServiceWorker | null> = navigator.serviceWorker
+    .register('/file-viewer-worker.js', { scope: '/__view/' })
+    .then(
+      (registration) =>
+        new Promise<ServiceWorker | null>((resolve) => {
+          if (registration.active) return resolve(registration.active);
+          const pending = registration.installing ?? registration.waiting;
+          if (!pending) return resolve(null);
+          pending.addEventListener('statechange', () => {
+            if (pending.state === 'activated') resolve(pending);
+            if (pending.state === 'redundant') resolve(null);
+          });
+        }),
+    )
+    .catch(() => null);
+  // Never wait long: a viewer that opens with the UUID name beats one that does not open.
+  viewerWorker = Promise.race([
+    attempt,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+  ]).then((worker) => {
+    if (!worker) viewerWorker = null;
+    return worker;
+  });
+  return viewerWorker;
+}
+
+function tellWorker(worker: ServiceWorker, message: object): Promise<void> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => resolve();
+    worker.postMessage(message, [channel.port2]);
+  });
+}
+
+/**
+ * The URL a PDF frame loads: `/__view/<id>/<name>` from the viewer worker, so Chrome's own toolbar
+ * shows the file's name and its Download saves under it; the blob URL where the worker is not
+ * available. `null` until one is ready, and released when the blob or the name changes or the
+ * frame goes.
+ */
+function useNamedPdfUrl(blob: Blob, name: string, enabled: boolean) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    let release = () => {};
+    void (async () => {
+      const worker = await fileViewerWorker();
+      if (cancelled) return;
+      if (worker) {
+        const id = crypto.randomUUID();
+        await tellWorker(worker, {
+          type: 'put',
+          id,
+          blob,
+          contentType: blob.type || 'application/pdf',
+        });
+        release = () => void tellWorker(worker, { type: 'drop', id });
+        if (cancelled) return release();
+        setUrl(`/__view/${id}/${encodeURIComponent(pdfName(name))}`);
+      } else {
+        const objectUrl = URL.createObjectURL(blob);
+        release = () => URL.revokeObjectURL(objectUrl);
+        if (cancelled) return release();
+        setUrl(objectUrl);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      release();
+      setUrl(null);
+    };
+  }, [blob, name, enabled]);
+  return url;
+}
+
 /**
  * The document itself — an iframe for a PDF, an `<img>` for an image. The object URL lives exactly as
  * long as the blob it was made from is on screen, and is released when either changes or the viewer
- * closes.
+ * closes. A PDF is served under `name` (see `useNamedPdfUrl`), which is what the browser's own PDF
+ * toolbar shows and saves as.
  */
 function FileFrame({
   file,
+  name,
   title,
   className,
 }: {
   file: ViewableFile;
+  name: string;
   title: string;
   className: string;
 }) {
   const shown = useMemo(() => renderable(file), [file]);
-  const url = useMemo(() => URL.createObjectURL(shown.blob), [shown]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const imageUrl = useMemo(
+    () => (shown.isImage ? URL.createObjectURL(shown.blob) : null),
+    [shown],
+  );
+  useEffect(
+    () => () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    },
+    [imageUrl],
+  );
+  const pdfUrl = useNamedPdfUrl(shown.blob, name, !shown.isImage);
 
-  if (shown.isImage) {
+  if (imageUrl) {
     return (
       <div className={`overflow-auto ${className}`}>
         {/* eslint-disable-next-line @next/next/no-img-element -- a blob URL, which next/image cannot optimise */}
-        <img src={url} alt={title} className="mx-auto max-w-full" />
+        <img src={imageUrl} alt={title} className="mx-auto max-w-full" />
       </div>
     );
   }
-  return <iframe title={title} src={url} className={className} />;
+  if (!pdfUrl) {
+    return (
+      <p className="m-auto p-4 text-sm text-gray-600" role="status">
+        Opening the document…
+      </p>
+    );
+  }
+  return <iframe title={title} src={pdfUrl} className={className} />;
 }
 
 /**
@@ -140,6 +253,7 @@ export function PdfPreview({
       {note && <p className="text-xs text-gray-500">{note}</p>}
       <FileFrame
         file={file}
+        name={title}
         title={title}
         className="h-[75vh] w-full rounded border border-gray-200"
       />
@@ -254,6 +368,7 @@ export function FileViewer({
           {state.status === 'ready' && (
             <FileFrame
               file={state.file}
+              name={state.file.filename || state.fallbackName}
               title={state.title}
               className="h-full min-h-[70vh] w-full flex-1 border-0"
             />

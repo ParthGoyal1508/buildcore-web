@@ -9,6 +9,7 @@ import {
   createCandidate,
   getCandidate,
   getCandidates,
+  getInterviews,
   getOffers,
   getRequisitions,
   markNoShow,
@@ -16,6 +17,8 @@ import {
   transitionStage,
   type Candidate,
   type CandidateDetail,
+  type Interview,
+  type Offer,
 } from '@/app/lib/api/recruitment';
 import {
   CANDIDATE_LETTER_KIND_KEYS,
@@ -51,6 +54,27 @@ const NEXT_STAGE: Record<string, string | undefined> = {
   shortlisted: 'interviewing',
   interviewing: 'selected',
 };
+
+/**
+ * Why a candidate cannot be moved to Selected yet, or null when they can — the server's rule
+ * (`assertRoundsComplete`): at least one round, every round completed, and the final round
+ * recommending selection. Said on the control rather than left to fail when pressed.
+ */
+function selectBlocker(rounds: Interview[] | undefined): string | null {
+  if (!rounds) return null;
+  if (rounds.length === 0) return 'Schedule an interview round first';
+  const pending = rounds.filter((r) => r.status !== 'completed');
+  if (pending.length > 0) {
+    return `Complete interview round${pending.length === 1 ? '' : 's'} ${pending
+      .map((r) => r.roundNumber)
+      .sort((a, b) => a - b)
+      .join(', ')} first`;
+  }
+  const final = [...rounds].sort((a, b) => b.roundNumber - a.roundNumber)[0];
+  return final.feedback.some((f) => f.outcome === 'recommend')
+    ? null
+    : 'The final round must recommend selection';
+}
 
 export default function PipelinePage() {
   return (
@@ -94,6 +118,23 @@ function PipelineInner() {
 
   const items = candidates.data?.items ?? [];
 
+  // The same list the Interviews screen reads, shared through its cache key; only fetched while
+  // somebody on the page is in Interviewing, the one stage whose next step depends on it.
+  const interviews = useQuery({
+    queryKey: ['interviews'],
+    queryFn: () => getInterviews(),
+    enabled: items.some((c) => c.stage === 'interviewing'),
+  });
+  /** Why the forward move is unavailable for `c`, or null. */
+  const blockedReason = (c: Candidate): string | null =>
+    NEXT_STAGE[c.stage] === 'selected'
+      ? selectBlocker(
+          interviews.data?.filter((i) => i.candidateId === c.id) ?? undefined,
+        )
+      : null;
+  const forwardLabel = (c: Candidate) =>
+    `→ ${recruitmentLabel(NEXT_STAGE[c.stage])}`;
+
   const columns: Column<Candidate>[] = [
     { key: 'name', header: 'Name', render: (c) => c.fullName },
     {
@@ -118,9 +159,15 @@ function PipelineInner() {
       key: 'stage',
       header: 'Stage',
       render: (c) => (
-        <span className="flex items-center gap-1">
-          <StatusBadge status={c.stage} label={recruitmentLabel(c.stage)} />
-          {c.noShow && <StatusBadge status="overdue" label="No-show risk" />}
+        <span className="flex flex-col items-start gap-1">
+          <span className="flex items-center gap-1">
+            <StatusBadge status={c.stage} label={recruitmentLabel(c.stage)} />
+            {c.noShow && <StatusBadge status="overdue" label="No-show risk" />}
+          </span>
+          {/* Visible, not only a tooltip: a disabled button shows no title on touch. */}
+          {blockedReason(c) && (
+            <span className="text-xs text-gray-500">{blockedReason(c)}</span>
+          )}
         </span>
       ),
     },
@@ -169,8 +216,15 @@ function PipelineInner() {
                   onClick={() =>
                     move.mutate({ id: c.id, stage: NEXT_STAGE[c.stage]! })
                   }
+                  disabled={!!blockedReason(c) || move.isPending}
+                  title={blockedReason(c) ?? undefined}
+                  aria-label={
+                    blockedReason(c)
+                      ? `${forwardLabel(c)} — ${blockedReason(c)}`
+                      : undefined
+                  }
                 >
-                  → {recruitmentLabel(NEXT_STAGE[c.stage])}
+                  {forwardLabel(c)}
                 </RowAction>
               )}
               <RowAction intent="read" onClick={() => setDrawer(c)}>
@@ -212,18 +266,25 @@ function PipelineInner() {
                         </button>
                         {NEXT_STAGE[c.stage] && (
                           <button
-                            className="text-xs text-blue-600"
+                            className="text-xs text-blue-600 disabled:cursor-not-allowed disabled:text-gray-400"
                             onClick={() =>
                               move.mutate({
                                 id: c.id,
                                 stage: NEXT_STAGE[c.stage]!,
                               })
                             }
+                            disabled={!!blockedReason(c) || move.isPending}
+                            title={blockedReason(c) ?? undefined}
                           >
-                            → {recruitmentLabel(NEXT_STAGE[c.stage])}
+                            {forwardLabel(c)}
                           </button>
                         )}
                       </div>
+                      {blockedReason(c) && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {blockedReason(c)}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -427,7 +488,7 @@ function CandidateForm({
 }
 
 function CandidateDrawer({
-  candidate,
+  candidate: initial,
   onClose,
   onChanged,
 }: {
@@ -435,10 +496,23 @@ function CandidateDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  // The drawer opens on the row it was clicked from, then follows the server: issuing the offer
+  // letter, accepting or joining all move the stage, and a drawer still saying "Selected" invites
+  // the same step twice. Read by requisition, not the page's stage filter, which the candidate may
+  // have just left; invalidating `['candidates']` refreshes this with the list.
+  const live = useQuery({
+    queryKey: ['candidates', 'requisition', initial.requisitionId],
+    queryFn: () => getCandidates({ requisitionId: initial.requisitionId }),
+  });
+  const candidate =
+    live.data?.items.find((c) => c.id === initial.id) ?? initial;
   const [revealed, setRevealed] = useState<CandidateDetail | null>(null);
   const [showOffer, setShowOffer] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
-  const [showLetter, setShowLetter] = useState(false);
+  // The draft offer the letter is being issued from, held for the life of the dialog: issuing it
+  // makes it no longer a draft, and a dialog shown only "while a draft exists" closed itself on the
+  // very success view (reference number, View, Download) it had just reached.
+  const [letterOffer, setLetterOffer] = useState<Offer | null>(null);
   // No appointment letter here (2026-10-15): Recruitment issues the offer letter and nothing else.
   // The appointment letter is HR & Payroll's, issued from the new employee's Letters tab.
   const [error, setError] = useState<string | null>(null);
@@ -490,21 +564,25 @@ function CandidateDrawer({
     );
   // Replaces the drawer rather than stacking on it, as the offer and join flows do: two modals
   // would both close on one Escape.
-  if (showLetter && draftOffer)
+  if (letterOffer)
     return (
       <GenerateLetterDialog
         recipient={{ candidateId: candidate.id }}
         recipientLabel={candidate.fullName}
         kindKeys={CANDIDATE_LETTER_KIND_KEYS}
         initialKindKey="offer"
-        submit={offerLetterSubmit(draftOffer.id, candidate.id)}
+        submit={offerLetterSubmit(letterOffer.id, candidate.id)}
         onIssued={() => {
           void queryClient.invalidateQueries({
             queryKey: ['offers', candidate.id],
           });
+          void queryClient.invalidateQueries({
+            queryKey: ['candidate-timeline', candidate.id],
+          });
+          // The candidate is now Offer Issued: the list and this drawer both re-read it.
           onChanged();
         }}
-        onClose={() => setShowLetter(false)}
+        onClose={() => setLetterOffer(null)}
       />
     );
   if (showJoin)
@@ -591,7 +669,7 @@ function CandidateDrawer({
           {offerStage && offerLetter.kinds.length > 0 && (
             <div className="flex flex-col">
               <SecondaryButton
-                onClick={() => setShowLetter(true)}
+                onClick={() => setLetterOffer(draftOffer)}
                 disabled={!draftOffer}
                 aria-describedby={!draftOffer ? 'offer-letter-hint' : undefined}
               >

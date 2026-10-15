@@ -298,6 +298,8 @@ export default function DwrForm({
   const [unattached, setUnattached] = useState<string[]>([]);
   /** Set once the day is on file, so the form offers the report rather than a second save. */
   const [savedReportId, setSavedReportId] = useState<string | null>(null);
+  /** Saved cleanly and on the way to the next screen — said, so the pause does not read as a stall. */
+  const [leaving, setLeaving] = useState(false);
 
   /**
    * What is already filed against each stored line, so a correction shows it rather than looking
@@ -315,10 +317,15 @@ export default function DwrForm({
   const attachedTo = (lineId: string | undefined) =>
     (lineId && attached.get(lineId)) || [];
 
-  const { data: boqGroups } = useQuery({
+  const {
+    data: boqGroups,
+    isPending: boqLoading,
+    isError: boqFailed,
+  } = useQuery({
     queryKey: ['boq', projectId],
     queryFn: () => getBOQ(projectId),
   });
+  const boqState = boqLoading ? 'loading' : boqFailed ? 'failed' : 'ready';
 
   // Flattened to a single picker. A grouped select would mirror the BOQ tree, which is the right
   // shape for reading a schedule and the wrong one for finding one line fast on a phone at the end
@@ -378,8 +385,21 @@ export default function DwrForm({
       // recorded, and the report is already on file by the time it is being corrected.
       return { dwrId, warnings: report ? [] : saved.warnings, unattached };
     },
-    onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: ['dwr'] });
+    onSuccess: async (saved) => {
+      // Refetched before leaving, not merely marked stale: the list is where a new day lands, and
+      // arriving on it from cache showed the list without the day just saved until a reload. The
+      // list is keyed `['dwrs', projectId]`; `['dwr', id]` is the report screen an edit returns to.
+      // `refetchType: 'all'` because neither is on screen while this form is.
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['dwrs', projectId],
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['dwr', saved.dwrId],
+          refetchType: 'all',
+        }),
+      ]);
       // The day is on file from here on, whatever else is reported below. Remembering that turns
       // the save button into a way onward, because pressing Save twice on a new report files the
       // day twice.
@@ -390,6 +410,7 @@ export default function DwrForm({
       // 201 that quietly carried a warning is a 201 nobody reads.
       setWarnings(saved.warnings);
       if (saved.warnings.length > 0 || saved.unattached.length > 0) return;
+      setLeaving(true);
       router.push(
         report
           ? ROUTES.projectsDwrReport(projectId, saved.dwrId)
@@ -641,6 +662,7 @@ export default function DwrForm({
             key={index}
             line={line}
             boqOptions={boqOptions}
+            boqState={boqState}
             attachedTo={attachedTo}
             onChange={(next) =>
               setLines((rows) =>
@@ -702,7 +724,11 @@ export default function DwrForm({
       <div className="flex gap-3">
         {/* Once the day is on file the primary action is the way onward, not a second save: this
             form creates a report, so pressing Save again files the day twice. */}
-        {savedReportId ? (
+        {leaving ? (
+          <Button type="button" disabled>
+            Saved — opening…
+          </Button>
+        ) : savedReportId ? (
           <Button
             type="button"
             onClick={() =>
@@ -735,12 +761,15 @@ export default function DwrForm({
 function LineEditor({
   line,
   boqOptions,
+  boqState,
   attachedTo,
   onChange,
   onRemove,
 }: {
   line: DraftLine;
   boqOptions: SearchableOption[];
+  /** Whether the schedule has arrived; the picker is disabled until it has. */
+  boqState: 'loading' | 'failed' | 'ready';
   /** File names already filed against a stored line, by that line's id. Empty on a new report. */
   attachedTo: (lineId: string | undefined) => string[];
   onChange: (next: DraftLine) => void;
@@ -781,13 +810,28 @@ function LineEditor({
           value={line.boqItemId}
           onChange={(boqItemId) => onChange({ ...line, boqItemId })}
           options={boqOptions}
-          emptyLabel="— not against a BOQ line —"
+          // Until the schedule arrives the picker would offer only "not against a BOQ line" over
+          // "0 lines in this schedule" — which reads as a project with no BOQ, not a slow one.
+          emptyLabel={
+            boqState === 'loading'
+              ? 'Loading BOQ…'
+              : boqState === 'failed'
+                ? 'BOQ unavailable'
+                : '— not against a BOQ line —'
+          }
           placeholder="Search by item number, description or unit"
+          disabled={boqState !== 'ready'}
         />
-        <span className="text-xs text-gray-500">
-          {boqOptions.length} lines in this schedule. Type any part of the
-          number or the description — “shutter”, “91.05”, “cum”.
-        </span>
+        {boqState === 'failed' ? (
+          <span className="text-xs text-red-700" role="alert">
+            Could not load the BOQ. Reload the page to pick a line.
+          </span>
+        ) : boqState === 'ready' ? (
+          <span className="text-xs text-gray-500">
+            {boqOptions.length} lines in this schedule. Type any part of the
+            number or the description — “shutter”, “91.05”, “cum”.
+          </span>
+        ) : null}
       </div>
 
       {line.kind === 'measured' ? (

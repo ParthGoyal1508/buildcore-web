@@ -71,8 +71,13 @@ export default function DwrReportPage() {
 
   const remove = useMutation({
     mutationFn: () => deleteDwr(params.dwrId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['dwr'] });
+    onSuccess: async () => {
+      // The list it returns to is `['dwrs', projectId]`; re-read before arriving there, or the
+      // deleted day is still on it.
+      await queryClient.invalidateQueries({
+        queryKey: ['dwrs', projectId],
+        refetchType: 'all',
+      });
       router.push(ROUTES.projectsDwr(projectId));
     },
     onError: (err: unknown) => setError(describeDwrError(err)),

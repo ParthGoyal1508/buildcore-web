@@ -2718,6 +2718,41 @@ export const CHALLAN_TYPES = ['pf', 'esic', 'pt'] as const;
 export type ChallanType = (typeof CHALLAN_TYPES)[number];
 
 /**
+ * Words in an enum value that are initialisms, so `enumLabel` prints them in capitals: an
+ * interview round of type `hr` reads "HR", not "Hr" (2026-10-15). Lower-case on purpose — enum
+ * values are, and the match is on the whole word, so `hrs` or `pfx` are left alone.
+ */
+const INITIALISMS = new Set([
+  'hr',
+  'pf',
+  'esic',
+  'esi',
+  'pt',
+  'tds',
+  'gst',
+  'gstin',
+  'pan',
+  'tan',
+  'cin',
+  'uan',
+  'bocw',
+  'boq',
+  'dwr',
+  'dpr',
+  'ra',
+  'po',
+  'grn',
+  'ctc',
+  'id',
+  'msme',
+  'neft',
+  'rtgs',
+  'imps',
+  'upi',
+  'ifsc',
+]);
+
+/**
  * Turns a snake_case enum value into a display label ("full_time" → "Full Time").
  *
  * Deliberately the same transformation `permissionLabel` applies, kept as its own
@@ -2727,7 +2762,11 @@ export type ChallanType = (typeof CHALLAN_TYPES)[number];
 export function enumLabel(value: string): string {
   return value
     .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) =>
+      INITIALISMS.has(word)
+        ? word.toUpperCase()
+        : word.charAt(0).toUpperCase() + word.slice(1),
+    )
     .join(' ');
 }
 
