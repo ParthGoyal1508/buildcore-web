@@ -173,11 +173,29 @@ export function abandonRefresh() {
   refreshInFlight = null;
 }
 
+/**
+ * Set once a refused renewal has sent this page to the sign-in screen (2026-10-15).
+ *
+ * The page keeps running until that navigation commits, and everything still mounted keeps
+ * asking — `me`, the badge counts, the company list. Each of those failed its own renewal and
+ * assigned `location.href` again, and every assignment cancels the navigation in flight and
+ * starts a new one. Wherever the sign-in page took longer than the next failure to arrive (a
+ * production build, its navigation going through the service worker), it never arrived: the
+ * tab sat on "Loading your workspace…" while the same five requests cycled every second.
+ *
+ * So the first refusal navigates and every later request fails at once, without the network,
+ * a renewal or another navigation. Never reset: the next thing this document does is unload.
+ */
+let sessionEnded = false;
+
 async function withAuth<T>(
   path: string,
   init: RequestInit | undefined,
   run: (path: string, init?: RequestInit) => Promise<T>,
 ): Promise<T> {
+  if (sessionEnded) {
+    throw new ApiError('Your session has ended.', 401, SESSION_EXPIRED);
+  }
   const withAuthHeader = (token: string | null): RequestInit => ({
     ...init,
     headers: {
@@ -254,7 +272,8 @@ async function withAuth<T>(
         // `useCanWrite`) turned that into a reload loop about five times a second, ended only
         // by the API's rate limiter refusing the eleventh renewal. The caller is fixed; this
         // keeps the next one from doing it again, since the reason is already on screen.
-        if (window.location.pathname !== ROUTES.login) {
+        if (window.location.pathname !== ROUTES.login && !sessionEnded) {
+          sessionEnded = true;
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
         }
