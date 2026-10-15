@@ -4,6 +4,8 @@ import { useIsFetching, useIsMutating } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { isPageLinkClick } from '@/app/ui/nav-click';
+
 /**
  * A thin bar across the top of the screen while anything is loading (2026-10-15).
  *
@@ -27,18 +29,7 @@ export default function TopLoader() {
   // A link to another page of the app starts the bar; the page arriving ends it.
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
-      // Not `defaultPrevented`: Next's `<Link>` prevents every click it handles, which is every
-      // one this is for.
-      if (event.button !== 0) return;
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
-        return;
-      const link = (event.target as Element | null)?.closest?.('a[href]');
-      if (!(link instanceof HTMLAnchorElement) || link.target === '_blank')
-        return;
-      const url = new URL(link.href, window.location.href);
-      if (url.origin !== window.location.origin) return;
-      if (url.pathname === window.location.pathname) return;
-      setNavigatingFrom(window.location.pathname);
+      if (isPageLinkClick(event)) setNavigatingFrom(window.location.pathname);
     };
     // A row that navigates by `data-row-href` says so (`RowLinks`).
     const onNavigate = () => setNavigatingFrom(window.location.pathname);
@@ -49,6 +40,13 @@ export default function TopLoader() {
       window.removeEventListener('app:navigate', onNavigate);
     };
   }, []);
+  // A click that never becomes a page change (a link something else handled) lets go after
+  // 15s rather than holding the loader for good.
+  useEffect(() => {
+    if (navigatingFrom === null) return;
+    const id = setTimeout(() => setNavigatingFrom(null), 15_000);
+    return () => clearTimeout(id);
+  }, [navigatingFrom]);
 
   const navigating = navigatingFrom !== null && navigatingFrom === pathname;
   const busy = fetching + mutating > 0 || navigating;
