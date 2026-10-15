@@ -178,7 +178,7 @@ export default function IssueModal({
       >
         <SelectField
           id="issue-site"
-          label="Store"
+          label="Site"
           value={siteId}
           onChange={(event) => {
             setSiteId(event.target.value);
@@ -206,7 +206,7 @@ export default function IssueModal({
         >
           <option value="">
             {!siteId
-              ? 'Choose a store first'
+              ? 'Choose a site first'
               : stock.isPending
                 ? 'Loading…'
                 : 'Select…'}
@@ -259,7 +259,7 @@ export default function IssueModal({
           onChange={(event) => setProjectChoice(event.target.value)}
           hint={
             projectChoice === null && storeProjectId
-              ? "The store's own project"
+              ? "The site's own project"
               : undefined
           }
         >

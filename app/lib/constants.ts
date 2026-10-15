@@ -2055,8 +2055,10 @@ export const MESSAGES = {
   transferSameSite: 'Source and destination stores cannot be the same.',
   insufficientStock: (available: number, unit: string) =>
     `Insufficient stock — ${available} ${unit} available.`,
+  // Rounded to the 3 places stock is kept to (2026-10-15): summed decimals showed as
+  // "1454.4240000000002".
   stockHint: (available: number, unit: string) =>
-    `Available: ${available} ${unit}`,
+    `Available: ${Math.round(available * 1000) / 1000} ${unit}`,
   paymentFifoNote:
     "Allocated automatically against this vendor's oldest unpaid bills first. Anything beyond what is owed is recorded as an advance.",
   approvalDoesNotReserve:
