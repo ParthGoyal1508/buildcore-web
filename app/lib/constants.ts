@@ -57,6 +57,7 @@ export const ROUTES = {
   myLeave: '/my/leave',
   mySalary: '/my/salary',
   myFaceEnrol: '/my/face-enrol',
+  myHolidays: '/my/holidays',
   myReimbursements: '/my/reimbursements',
 
   // --- HR & Payroll admin (feature 005) ---
@@ -2558,7 +2559,11 @@ export const NAV_MODULES = [
     href: ROUTES.myWorkspace,
     guardPrefix: '/my',
     guardsSubtree: true,
-    permissions: ['MY_WORKSPACE'],
+    // Open to everyone signed in (2026-10-15). The API serves every `/my` route by ownership —
+    // `@SelfService()`, the employee resolved from the token — and never reads `MY_WORKSPACE`, so
+    // gating on it here only locked employees whose role lacked it (a Site Engineer) out of their
+    // own punch, leave and salary. A login with no employee record is told so on the page.
+    permissions: [],
   },
   {
     id: 'settings',

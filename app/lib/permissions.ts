@@ -18,6 +18,9 @@ function permits(
   permissions: readonly string[],
   navModule: NavModule,
 ): boolean {
+  // A module that names no permission is open to every signed-in user (2026-10-15) — My
+  // Workspace, whose pages are a person's own and are authorised by ownership on the server.
+  if (navModule.permissions.length === 0) return true;
   return navModule.permissions.some((required) => permissions.includes(required));
 }
 
