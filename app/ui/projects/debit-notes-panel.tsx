@@ -8,7 +8,9 @@ import {
   applyDebitNote,
   type DebitNote,
   type DebitRegister,
+  previewDebitNote,
   raiseDebitNote,
+  type RaiseDebitNoteInput,
 } from '@/app/lib/api/bill-packages';
 import { downloadDebitNote } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
@@ -30,7 +32,7 @@ const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
 type Viewer = (file: {
   title: string;
   fileName: string;
-  load: () => Promise<{ blob: Blob; filename: string }>;
+  load: () => Promise<{ blob: Blob; filename: string | null }>;
 }) => Promise<void> | void;
 
 /** "2026-27/001" cannot be a file name; the slash becomes a dash, as the server names it. */
@@ -216,6 +218,7 @@ export default function DebitNotesPanel({
 
       {raising && workOrderId && (
         <RaiseDebitNote
+          view={view}
           projectId={projectId}
           workOrderId={workOrderId}
           defaultTaxBasis={defaultTaxBasis}
@@ -260,12 +263,14 @@ const today = () => new Date().toISOString().slice(0, 10);
  * note prints, so what is saved never depends on this arithmetic.
  */
 function RaiseDebitNote({
+  view,
   projectId,
   workOrderId,
   defaultTaxBasis,
   onClose,
   onDone,
 }: {
+  view: Viewer;
   projectId: string;
   workOrderId: string;
   defaultTaxBasis: string | null;
@@ -293,6 +298,24 @@ function RaiseDebitNote({
   const workDone = lines.reduce((sum, line) => sum + (amountOf(line) ?? 0), 0);
   const tax = Math.round(workDone * Number(gstPercent || 0)) / 100;
 
+  /** What both Preview and Raise send — one shape, so the preview is the note that would be raised. */
+  const input = (): RaiseDebitNoteInput => ({
+    workOrderId,
+    noteDate,
+    ...(natureOfWork.trim() ? { natureOfWork: natureOfWork.trim() } : {}),
+    gstPercent,
+    taxBasis,
+    lines: lines.map((line) => ({
+      description: line.description.trim(),
+      ...(line.specification.trim()
+        ? { specification: line.specification.trim() }
+        : {}),
+      ...(line.unit.trim() ? { unit: line.unit.trim() } : {}),
+      quantity: line.quantity,
+      rate: line.rate,
+    })),
+  });
+
   const ready =
     lines.length > 0 &&
     lines.every(
@@ -314,6 +337,22 @@ function RaiseDebitNote({
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
+          {/* The note exactly as it would print — the same computation as the raise, numbered
+              "Draft" because nothing is saved until Raise. */}
+          <Button
+            type="button"
+            intent="read"
+            disabled={!ready}
+            onClick={() =>
+              void view({
+                title: 'Debit note — preview',
+                fileName: 'Debit Note (draft).pdf',
+                load: () => previewDebitNote(projectId, input()),
+              })
+            }
+          >
+            Preview
+          </Button>
           <Button
             type="submit"
             form="debit-note-form"
@@ -331,24 +370,7 @@ function RaiseDebitNote({
           event.preventDefault();
           setSaving(true);
           setError(null);
-          raiseDebitNote(projectId, {
-            workOrderId,
-            noteDate,
-            ...(natureOfWork.trim()
-              ? { natureOfWork: natureOfWork.trim() }
-              : {}),
-            gstPercent,
-            taxBasis,
-            lines: lines.map((line) => ({
-              description: line.description.trim(),
-              ...(line.specification.trim()
-                ? { specification: line.specification.trim() }
-                : {}),
-              ...(line.unit.trim() ? { unit: line.unit.trim() } : {}),
-              quantity: line.quantity,
-              rate: line.rate,
-            })),
-          })
+          raiseDebitNote(projectId, input())
             .then(onDone)
             .catch((err: unknown) => setError(describe(err)))
             .finally(() => setSaving(false));

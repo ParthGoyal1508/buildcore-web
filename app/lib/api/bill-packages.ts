@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
+import type { StoredFile } from '@/app/lib/api/client';
 import { authFetchBlob, authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
@@ -724,6 +725,18 @@ export async function raiseDebitNote(
       body: JSON.stringify(input),
     }),
   );
+}
+
+/** The note as it would print, before it is raised — nothing is saved and no number is drawn. */
+export async function previewDebitNote(
+  projectId: string,
+  input: RaiseDebitNoteInput,
+): Promise<StoredFile> {
+  return authFetchFile(`/projects/${projectId}/debit-notes/preview.pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
 }
 
 /** A note is recovered on exactly one bill, and only a draft accepts one (023 FR-037, FR-037b). */

@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -12,6 +13,7 @@ import {
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
 import { dateLabel, dateTimeLabel } from '@/app/lib/format';
+import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
 import {
@@ -56,6 +58,43 @@ function hasLapsed(document: { expiresAt?: string | null }): boolean {
   if (!document.expiresAt) return false;
   return (
     document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10)
+  );
+}
+
+/** Whole days from today until a document's expiry; negative once it has lapsed. */
+function daysToExpiry(expiresAt: string): number {
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  const until = new Date(expiresAt.slice(0, 10));
+  return Math.round((until.getTime() - today.getTime()) / 86_400_000);
+}
+
+/**
+ * The expiry as a pill rather than a line of grey text (2026-10-15) — the client: "highlight the
+ * expiry date". Red once lapsed, orange inside thirty days, amber otherwise: a date somebody has
+ * to act on before it passes.
+ */
+function ExpiryPill({ expiresAt }: { expiresAt: string }) {
+  const days = daysToExpiry(expiresAt);
+  const tone =
+    days < 0
+      ? 'border-red-200 bg-red-50 text-red-800'
+      : days <= 30
+        ? 'border-orange-200 bg-orange-50 text-orange-800'
+        : 'border-amber-200 bg-amber-50 text-amber-900';
+  return (
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}
+    >
+      <CalendarDaysIcon className="h-3.5 w-3.5" aria-hidden="true" />
+      {days < 0
+        ? DOCUMENT_COPY.projectDocumentExpired(dateLabel(expiresAt))
+        : DOCUMENT_COPY.projectDocumentExpires(dateLabel(expiresAt))}
+      {days >= 0 && days <= 30 && (
+        <span className="font-normal">
+          · {days === 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -139,6 +178,20 @@ export default function ProjectDocumentsPanel({
     }
   };
 
+  /** Saves the file under the server's own name — the companion to View (2026-10-15). */
+  const download = async (document: ProjectDocument) => {
+    setDownloadError(null);
+    try {
+      const file = await downloadProjectDocument(projectId, document.id);
+      saveBlob(
+        file.blob,
+        file.filename ?? `${document.documentType}-${document.id}`,
+      );
+    } catch {
+      setDownloadError(DOCUMENT_COPY.projectDocumentDownloadFailed);
+    }
+  };
+
   /**
    * Which required kinds this project holds nothing for.
    *
@@ -193,6 +246,19 @@ export default function ProjectDocumentsPanel({
   }
 
   const rows = documents.data ?? [];
+  const mandatoryKinds = new Set(
+    (requirements.data?.requirements ?? [])
+      .filter((requirement) => requirement.isMandatory)
+      .map((requirement) => requirement.documentTypeId),
+  );
+  const mandatoryRows = rows.filter(
+    (document) =>
+      document.documentTypeId && mandatoryKinds.has(document.documentTypeId),
+  );
+  const optionalRows = rows.filter(
+    (document) =>
+      !document.documentTypeId || !mandatoryKinds.has(document.documentTypeId),
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -213,88 +279,94 @@ export default function ProjectDocumentsPanel({
           {DOCUMENT_COPY.projectDocumentsEmpty}
         </p>
       ) : (
-        <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
-          {rows.map((document) => (
-            <li
-              key={document.id}
-              className="flex flex-wrap items-start justify-between gap-2 p-3"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-gray-900">
-                  {document.documentType}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {/*
-                    The name when there is one, the date alone when there is not. A "Filed by —"
-                    with an em dash where a person belongs reads as missing data; the date on its
-                    own reads as what it is.
-                  */}
-                  {document.uploadedByName
-                    ? DOCUMENT_COPY.projectDocumentFiledBy(
-                        document.uploadedByName,
-                        dateTimeLabel(document.uploadedAt),
-                      )
-                    : DOCUMENT_COPY.projectDocumentFiledAt(
-                        dateTimeLabel(document.uploadedAt),
-                      )}
-                </p>
-                {(document.expiresAt || document.documentNumber) && (
-                  <p
-                    className={`mt-0.5 text-xs ${
-                      hasLapsed(document) ? 'text-red-700' : 'text-gray-600'
-                    }`}
-                  >
-                    {[
-                      document.documentNumber &&
-                        DOCUMENT_COPY.projectDocumentNumber(
-                          document.documentNumber,
-                        ),
-                      document.expiresAt &&
-                        (hasLapsed(document)
-                          ? DOCUMENT_COPY.projectDocumentExpired(
-                              dateLabel(document.expiresAt),
-                            )
-                          : DOCUMENT_COPY.projectDocumentExpires(
-                              dateLabel(document.expiresAt),
-                            )),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                )}
-                {document.remark && (
-                  <p className="mt-0.5 break-words text-xs text-gray-600">
-                    {document.remark}
-                  </p>
-                )}
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <span
-                  className={
-                    hasLapsed(document) && document.documentTypeId
-                      ? 'whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900'
-                      : document.documentTypeId
-                        ? 'whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-900'
-                        : 'whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700'
-                  }
-                >
-                  {hasLapsed(document) && document.documentTypeId
-                    ? DOCUMENT_COPY.projectDocumentExpiredBadge
-                    : document.documentTypeId
-                      ? DOCUMENT_COPY.projectDocumentRequiredBadge
-                      : DOCUMENT_COPY.projectDocumentSupplementaryBadge}
-                </span>
-                <RowAction
-                  intent="read"
-                  type="button"
-                  onClick={() => void open(document)}
-                >
-                  {DOCUMENT_COPY.projectDocumentOpen}
-                </RowAction>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Mandatory first, then optional (2026-10-15) — the client: "under docs, can we show
+              mandatory and optional docs". Mandatory is a kind the required set marks mandatory;
+              everything else filed here — an advisory kind, a supplementary paper — is optional. */}
+          {[
+            { title: 'Mandatory documents', list: mandatoryRows },
+            { title: 'Optional documents', list: optionalRows },
+          ].map(
+            (group) =>
+              group.list.length > 0 && (
+                <div key={group.title}>
+                  <h3 className="mb-2 text-sm font-semibold text-gray-800">
+                    {group.title}{' '}
+                    <span className="font-normal text-gray-500">
+                      ({group.list.length})
+                    </span>
+                  </h3>
+                  <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+                    {group.list.map((document) => (
+                      <li
+                        key={document.id}
+                        className="flex flex-wrap items-start justify-between gap-2 p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-2 font-medium text-gray-900">
+                            {document.documentType}
+                            {document.expiresAt && (
+                              <ExpiryPill expiresAt={document.expiresAt} />
+                            )}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {/*
+                              The name when there is one, the date alone when there is not. A
+                              "Filed by —" with an em dash where a person belongs reads as missing
+                              data; the date on its own reads as what it is.
+                            */}
+                            {document.uploadedByName
+                              ? DOCUMENT_COPY.projectDocumentFiledBy(
+                                  document.uploadedByName,
+                                  dateTimeLabel(document.uploadedAt),
+                                )
+                              : DOCUMENT_COPY.projectDocumentFiledAt(
+                                  dateTimeLabel(document.uploadedAt),
+                                )}
+                          </p>
+                          {document.documentNumber && (
+                            <p className="mt-0.5 text-xs text-gray-600">
+                              {DOCUMENT_COPY.projectDocumentNumber(
+                                document.documentNumber,
+                              )}
+                            </p>
+                          )}
+                          {document.remark && (
+                            <p className="mt-0.5 break-words text-xs text-gray-600">
+                              {document.remark}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                          {/* Only a lapsed one is badged: an expired mandatory paper no longer
+                              counts towards readiness, and that is worth saying in red. */}
+                          {hasLapsed(document) && document.documentTypeId && (
+                            <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
+                              {DOCUMENT_COPY.projectDocumentExpiredBadge}
+                            </span>
+                          )}
+                          <RowAction
+                            intent="read"
+                            type="button"
+                            onClick={() => void open(document)}
+                          >
+                            View
+                          </RowAction>
+                          <RowAction
+                            intent="read"
+                            type="button"
+                            onClick={() => void download(document)}
+                          >
+                            Download
+                          </RowAction>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ),
+          )}
+        </>
       )}
 
       {outstanding.length > 0 && (
