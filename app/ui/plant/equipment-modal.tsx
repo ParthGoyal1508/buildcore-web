@@ -8,12 +8,14 @@ import {
   createEquipment,
   getNextEquipmentCode,
   updateEquipment,
+  uploadEquipmentDocument,
   PLANT_OWNERSHIPS,
   REGISTRATION_KINDS,
   REGISTRATION_KIND_LABELS,
   REGISTRATION_STATUSES,
   REGISTRATION_STATUS_LABELS,
   type Equipment,
+  type EquipmentDocType,
   type EquipmentInput,
   type RegistrationKind,
   type RegistrationPaperInput,
@@ -35,9 +37,11 @@ import {
   selectClass,
 } from '@/app/ui/settings/form-fields';
 import CategoryOptions from './category-options';
+import { toBase64 } from './document-modal';
 import {
   usePlantCategories,
   usePlantCompanyId,
+  usePlantDocTypes,
   usePlantSites,
   usePlantVendors,
 } from './use-plant-refs';
@@ -68,6 +72,10 @@ export default function EquipmentModal({
   const categories = usePlantCategories();
   const vendors = usePlantVendors();
   const sites = usePlantSites();
+  const docTypes = usePlantDocTypes();
+  // Set once a new machine is saved (2026-10-15). If a paper's file then fails to upload, the
+  // form stays open, and saving again must update that machine rather than register a second.
+  const [savedId, setSavedId] = useState<string | null>(null);
   const isEdit = equipment !== undefined;
 
   const [manufacturingYear, setManufacturingYear] = useState(
@@ -118,6 +126,10 @@ export default function EquipmentModal({
   const [papers, setPapers] = useState<Record<RegistrationKind, PaperDraft>>(
     () => papersOf(equipment),
   );
+  // The scan for each paper, uploaded under its document type once the machine is saved.
+  const [files, setFiles] = useState<Partial<Record<RegistrationKind, File>>>(
+    {},
+  );
   const [remarks, setRemarks] = useState(equipment?.remarks ?? '');
   const [status, setStatus] = useState<string>(
     equipment?.status === 'under_maintenance'
@@ -140,6 +152,12 @@ export default function EquipmentModal({
   const recordedKinds = new Set(
     (equipment?.registration ?? []).map((paper) => paper.kind),
   );
+  // Papers whose scan is already uploaded — the register's "Doc" column.
+  const recordedDocs = new Set(
+    (equipment?.registration ?? [])
+      .filter((paper) => paper.hasDocument)
+      .map((paper) => paper.kind),
+  );
 
   // The code this machine will be given, from the server's own builder (2026-10-15).
   const previewName = useDeferredValue(name.trim());
@@ -157,12 +175,48 @@ export default function EquipmentModal({
   });
 
   const save = useMutation({
-    mutationFn: (input: EquipmentInput) =>
-      isEdit
-        ? updateEquipment(equipment.id, input)
-        : createEquipment(input, companyId ?? undefined),
-    onSuccess: () => {
+    mutationFn: async (input: EquipmentInput) => {
+      const targetId = equipment?.id ?? savedId;
+      const saved = targetId
+        ? await updateEquipment(targetId, input)
+        : await createEquipment(input, companyId ?? undefined);
+      setSavedId(saved.id);
+      // Each attached paper goes up under its own document type, with the expiry typed in its
+      // row, so the register's "Doc" column and the expiry agree (2026-10-15).
+      const failed: string[] = [];
+      for (const kind of REGISTRATION_KINDS) {
+        const file = files[kind];
+        if (!file) continue;
+        const docType = docTypeForPaper(kind, docTypes.data ?? []);
+        const paper = papers[kind];
+        try {
+          if (!docType) throw new Error('no document type');
+          await uploadEquipmentDocument(saved.id, {
+            docTypeId: docType.id,
+            file: await toBase64(file),
+            fileName: file.name,
+            contentType: file.type || undefined,
+            ...(paper.status === 'held' && paper.expiresAt
+              ? { expiresAt: paper.expiresAt }
+              : {}),
+          });
+          setFiles((current) => ({ ...current, [kind]: undefined }));
+        } catch {
+          failed.push(REGISTRATION_KIND_LABELS[kind]);
+        }
+      }
+      return failed;
+    },
+    onSuccess: (failed) => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
+      if (failed.length > 0) {
+        setError(
+          `The machine is saved, but ${failed.join(', ')} could not be attached. ` +
+            'Check the file (a PDF or image under 10 MB) and save again, or attach it from ' +
+            'the machine’s page.',
+        );
+        return;
+      }
       onClose();
     },
     onError: (err) =>
@@ -524,12 +578,13 @@ export default function EquipmentModal({
           </legend>
           <div
             aria-hidden="true"
-            className="hidden gap-3 text-xs font-medium uppercase tracking-wide text-gray-500 sm:grid sm:grid-cols-[6rem_repeat(3,minmax(0,1fr))]"
+            className="hidden gap-3 text-xs font-medium uppercase tracking-wide text-gray-500 sm:grid sm:grid-cols-[6rem_repeat(3,minmax(0,1fr))_8rem]"
           >
             <span>Paper</span>
             <span>Status</span>
             <span>Expires</span>
             <span>Number</span>
+            <span>Document</span>
           </div>
           {REGISTRATION_KINDS.map((kind) => {
             const paper = papers[kind];
@@ -537,7 +592,7 @@ export default function EquipmentModal({
             return (
               <div
                 key={kind}
-                className="grid grid-cols-2 items-center gap-2 border-b border-gray-100 pb-3 last:border-b-0 sm:grid-cols-[6rem_repeat(3,minmax(0,1fr))] sm:gap-3 sm:border-b-0 sm:pb-0"
+                className="grid grid-cols-2 items-center gap-2 border-b border-gray-100 pb-3 last:border-b-0 sm:grid-cols-[6rem_repeat(3,minmax(0,1fr))_8rem] sm:gap-3 sm:border-b-0 sm:pb-0"
               >
                 <span className="col-span-2 text-sm font-medium text-gray-700 sm:col-span-1">
                   {label}
@@ -586,12 +641,21 @@ export default function EquipmentModal({
                     setPaper(kind, { number: event.target.value })
                   }
                 />
+                <PaperFile
+                  label={label}
+                  file={files[kind]}
+                  onFile={(file) =>
+                    setFiles((current) => ({ ...current, [kind]: file }))
+                  }
+                  onRecord={recordedDocs.has(kind)}
+                />
               </div>
             );
           })}
           <p className="text-xs text-gray-500">
-            The scanned papers themselves are attached on the machine&apos;s
-            page, under Documents.
+            Attach the scanned paper on its row; it is uploaded when you save,
+            with the expiry above. Attached papers are listed, opened and
+            removed on the machine&apos;s page, under Documents.
           </p>
         </fieldset>
 
@@ -686,5 +750,95 @@ function Section({
       </legend>
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
     </fieldset>
+  );
+}
+
+/**
+ * The words that find a paper's document type among the company's own (2026-10-15) — the same
+ * matching the API uses for the register's "Doc" column, so a file attached here is the one that
+ * column then reports.
+ */
+const PAPER_DOC_WORDS: Record<RegistrationKind, string[]> = {
+  rc: ['REGISTRATION', 'RC'],
+  insurance: ['INSURANCE'],
+  fitness: ['FITNESS'],
+  road_tax: ['ROAD TAX', 'TAX'],
+  permit: ['PERMIT'],
+  pollution: ['POLLUTION', 'PUC'],
+};
+
+function docTypeForPaper(
+  kind: RegistrationKind,
+  docTypes: EquipmentDocType[],
+): EquipmentDocType | undefined {
+  return docTypes.find((docType) => {
+    const upper = docType.name.toUpperCase();
+    const words = upper.split(/[^A-Z]+/).filter(Boolean);
+    return PAPER_DOC_WORDS[kind].some((word) =>
+      word.includes(' ') ? upper.includes(word) : words.includes(word),
+    );
+  });
+}
+
+/** Ten megabytes — the API's ceiling for an equipment document. */
+const MAX_PAPER_BYTES = 10 * 1024 * 1024;
+
+/** A paper row's file: "Attach", the chosen file's name with a way to drop it, or "On file". */
+function PaperFile({
+  label,
+  file,
+  onFile,
+  onRecord,
+}: {
+  label: string;
+  file: File | undefined;
+  onFile: (file: File | undefined) => void;
+  onRecord: boolean;
+}) {
+  const [tooBig, setTooBig] = useState(false);
+  if (file) {
+    return (
+      <div className="flex min-w-0 items-center gap-1 text-xs">
+        <span className="truncate text-gray-800" title={file.name}>
+          {file.name}
+        </span>
+        <button
+          type="button"
+          aria-label={`Remove the ${label} file`}
+          className="shrink-0 rounded px-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          onClick={() => onFile(undefined)}
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col">
+      <label className="inline-flex w-fit cursor-pointer items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+        Attach
+        <input
+          type="file"
+          accept="application/pdf,image/*"
+          aria-label={`Attach the ${label} scan`}
+          className="sr-only"
+          onChange={(event) => {
+            const chosen = event.target.files?.[0];
+            event.target.value = '';
+            if (!chosen) return;
+            const big = chosen.size > MAX_PAPER_BYTES;
+            setTooBig(big);
+            if (!big) onFile(chosen);
+          }}
+        />
+      </label>
+      {tooBig ? (
+        <span className="mt-0.5 text-xs text-red-700">Over 10 MB</span>
+      ) : (
+        onRecord && (
+          <span className="mt-0.5 text-xs text-green-700">On file</span>
+        )
+      )}
+    </div>
   );
 }

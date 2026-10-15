@@ -17,7 +17,7 @@ import {
 import { usePlantDocTypes } from './use-plant-refs';
 
 /** Strips the `data:...;base64,` prefix a FileReader result carries. */
-function toBase64(file: File): Promise<string> {
+export function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -70,9 +70,7 @@ export default function DocumentModal({
       onClose();
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : (err as Error).message,
-      ),
+      setError(err instanceof ApiError ? err.message : (err as Error).message),
   });
 
   const noDocTypes = docTypes.data?.length === 0;

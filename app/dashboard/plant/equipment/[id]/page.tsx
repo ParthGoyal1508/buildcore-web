@@ -22,6 +22,7 @@ import {
   formatReading,
   plantLabel,
 } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
 import { formatRupees } from '@/app/lib/utils';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import DocumentModal from '@/app/ui/plant/document-modal';
@@ -85,6 +86,27 @@ export default function EquipmentDetailPage() {
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not open that document.',
+      );
+    } finally {
+      setOpening(null);
+    }
+  }
+
+  /** Saves a stored document under its own name rather than opening it. */
+  async function downloadDocument(documentId: string, fileName: string | null) {
+    setOpening(documentId);
+    setError(null);
+    try {
+      const file = await getEquipmentDocumentFile(id, documentId);
+      saveBlob(
+        file.blob,
+        file.filename ?? fileName ?? `equipment-document-${documentId}`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not download that document.',
       );
     } finally {
       setOpening(null);
@@ -377,22 +399,40 @@ export default function EquipmentDetailPage() {
           rowKey={(row) => row.id}
           emptyMessage="No documents are attached to this machine."
           actions={(row) => (
-            <RowAction
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Remove this document?',
-                    message: MESSAGES.plantConfirmDeleteEquipmentDoc,
-                    confirmLabel: 'Remove',
-                    tone: 'danger',
-                  })
-                ) {
-                  removeDocument.mutate(row.id);
-                }
-              }}
-            >
-              Remove
-            </RowAction>
+            <>
+              {/* Preview opens it in the page's viewer; Download saves it under its own name
+                (2026-10-15). */}
+              <RowAction
+                intent="read"
+                disabled={opening === row.id}
+                onClick={() => void openDocument(row.id)}
+              >
+                Preview
+              </RowAction>
+              <RowAction
+                intent="read"
+                disabled={opening === row.id}
+                onClick={() => void downloadDocument(row.id, row.fileName)}
+              >
+                Download
+              </RowAction>
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Remove this document?',
+                      message: MESSAGES.plantConfirmDeleteEquipmentDoc,
+                      confirmLabel: 'Remove',
+                      tone: 'danger',
+                    })
+                  ) {
+                    removeDocument.mutate(row.id);
+                  }
+                }}
+              >
+                Remove
+              </RowAction>
+            </>
           )}
         />
       </section>
