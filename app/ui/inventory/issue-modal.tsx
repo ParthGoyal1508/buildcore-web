@@ -6,11 +6,14 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   createIssue,
+  getEquipmentChoices,
   getStock,
   getStockHint,
   type IssueInput,
 } from '@/app/lib/api/inventory';
-import { MESSAGES } from '@/app/lib/constants';
+import { CONTRACTOR_VENDOR_TYPES, MESSAGES } from '@/app/lib/constants';
+import { quantity as formatQuantity } from '@/app/lib/format';
+import { Button } from '@/app/ui/button';
 import {
   FormError,
   SecondaryButton,
@@ -18,7 +21,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
-import { useSites } from './use-inventory-refs';
+import { useProjects, useSites, useVendors } from './use-inventory-refs';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -35,6 +38,16 @@ const today = () => new Date().toISOString().slice(0, 10);
  * issue can take the same material; the backend's locked check is the only thing that
  * decides, and its 422 is shown against the quantity field rather than as a page
  * error (009 US4 AC2).
+ *
+ * The project and the vendor or subcontractor were added on 2026-10-15 — the client: "while
+ * issuing material we want to give an option to select Project and vendor or subcontractor".
+ * The project follows the store's own until the user picks another; naming a vendor makes the
+ * person optional, since the vendor's name is then recorded as who took it.
+ *
+ * The equipment number was added the same day for the client's issue slip ("Equipment No. (if
+ * applicable)"). It is text the registered machines are *suggested* into, not a choice from
+ * them: the slip prints what was written, a hired machine may not be registered yet, and a user
+ * without machinery permission cannot read the register at all — then it is simply a text box.
  */
 export default function IssueModal({
   onClose,
@@ -51,13 +64,21 @@ export default function IssueModal({
 }) {
   const queryClient = useQueryClient();
   const sites = useSites();
+  const projects = useProjects();
+  const vendors = useVendors();
 
   const [siteId, setSiteId] = useState(defaults?.siteId ?? '');
   const [itemId, setItemId] = useState(defaults?.itemId ?? '');
   const [date, setDate] = useState(today());
   const [quantity, setQuantity] = useState('');
   const [issuedTo, setIssuedTo] = useState('');
+  // `null` = not chosen, so the store's project applies; '' = deliberately none.
+  const [projectChoice, setProjectChoice] = useState<string | null>(
+    defaults?.projectId ?? null,
+  );
+  const [vendorId, setVendorId] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [equipmentNo, setEquipmentNo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | null>(null);
 
@@ -75,6 +96,27 @@ export default function IssueModal({
     enabled: Boolean(itemId && siteId),
   });
 
+  // No retry: a 403 for a user without machinery permission is the answer, not a blip.
+  const machines = useQuery({
+    queryKey: ['inventory', 'equipment-choices'],
+    queryFn: getEquipmentChoices,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+
+  const storeProjectId =
+    (sites.data ?? []).find((site) => site.id === siteId)?.projectId ?? '';
+  const projectId = projectChoice ?? storeProjectId;
+
+  // Subcontractors first — they are who material is usually issued to on a site.
+  const vendorRows = vendors.data ?? [];
+  const contractors = vendorRows.filter((v) =>
+    CONTRACTOR_VENDOR_TYPES.includes(v.type),
+  );
+  const otherVendors = vendorRows.filter(
+    (v) => !CONTRACTOR_VENDOR_TYPES.includes(v.type),
+  );
+
   const available = hint.data?.inStock ?? null;
   const unit = hint.data?.unit ?? '';
 
@@ -90,8 +132,11 @@ export default function IssueModal({
         itemId,
         date,
         quantity: Number(quantity),
-        issuedTo: issuedTo.trim(),
+        ...(issuedTo.trim() ? { issuedTo: issuedTo.trim() } : {}),
+        ...(projectId ? { projectId } : {}),
+        ...(vendorId ? { vendorId } : {}),
         ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
+        ...(equipmentNo.trim() ? { equipmentNo: equipmentNo.trim() } : {}),
         ...(indentLineId ? { indentLineId } : {}),
       }),
     onSuccess: () => {
@@ -116,7 +161,7 @@ export default function IssueModal({
     itemId &&
     date &&
     Number(quantity) > 0 &&
-    issuedTo.trim() &&
+    (issuedTo.trim() || vendorId) &&
     !exceedsOutstanding;
 
   return (
@@ -128,13 +173,13 @@ export default function IssueModal({
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <SecondaryButton
+          <Button
             type="submit"
             form="issue-form"
             disabled={!ready || save.isPending}
           >
             {save.isPending ? 'Saving…' : 'Issue'}
-          </SecondaryButton>
+          </Button>
         </div>
       }
     >
@@ -150,7 +195,7 @@ export default function IssueModal({
       >
         <SelectField
           id="issue-site"
-          label="Store"
+          label="Site"
           value={siteId}
           onChange={(event) => {
             setSiteId(event.target.value);
@@ -178,14 +223,14 @@ export default function IssueModal({
         >
           <option value="">
             {!siteId
-              ? 'Choose a store first'
+              ? 'Choose a site first'
               : stock.isPending
                 ? 'Loading…'
                 : 'Select…'}
           </option>
           {(stock.data ?? []).map((row) => (
             <option key={row.itemId} value={row.itemId}>
-              {row.itemName} — {row.inStock} {row.unit}
+              {row.itemName} — {formatQuantity(row.inStock)} {row.unit}
             </option>
           ))}
         </SelectField>
@@ -224,16 +269,88 @@ export default function IssueModal({
           }
         />
 
+        <SelectField
+          id="issue-project"
+          label="Project"
+          value={projectId}
+          onChange={(event) => setProjectChoice(event.target.value)}
+          hint={
+            projectChoice === null && storeProjectId
+              ? "The site's own project"
+              : undefined
+          }
+        >
+          <option value="">No project</option>
+          {(projects.data ?? []).map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.code} · {project.name}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          id="issue-vendor"
+          label="Vendor / subcontractor"
+          value={vendorId}
+          onChange={(event) => setVendorId(event.target.value)}
+        >
+          <option value="">None — issued to own staff</option>
+          {contractors.length > 0 && (
+            <optgroup label="Subcontractors">
+              {contractors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {otherVendors.length > 0 && (
+            <optgroup label="Vendors">
+              {otherVendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </SelectField>
+
         <TextField
           id="issue-to"
-          label="Issued to"
+          label={vendorId ? 'Received by (optional)' : 'Issued to'}
+          placeholder={vendorId ? "Their person's name" : 'Name of who took it'}
+          // The browser's own suggestions ("Plinth Work" from some earlier form) popped
+          // over the field and read as part of the app.
+          autoComplete="off"
           value={issuedTo}
           onChange={(event) => setIssuedTo(event.target.value)}
         />
 
         <TextField
+          id="issue-equipment"
+          label="Equipment no. (if applicable)"
+          placeholder={
+            machines.data ? 'Pick or type, e.g. JCB01/2027' : 'e.g. JCB01/2027'
+          }
+          autoComplete="off"
+          list={machines.data?.length ? 'issue-equipment-list' : undefined}
+          value={equipmentNo}
+          onChange={(event) => setEquipmentNo(event.target.value)}
+        />
+        {machines.data && (
+          <datalist id="issue-equipment-list">
+            {machines.data.map((machine) => (
+              <option key={machine.id} value={machine.code}>
+                {machine.name}
+              </option>
+            ))}
+          </datalist>
+        )}
+
+        <TextField
           id="issue-remarks"
           label="Remarks"
+          autoComplete="off"
           value={remarks}
           onChange={(event) => setRemarks(event.target.value)}
         />

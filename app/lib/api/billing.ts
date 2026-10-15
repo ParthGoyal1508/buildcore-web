@@ -482,7 +482,9 @@ export interface ReviseRaBillInput {
 }
 
 export async function getRaBills(projectId: string): Promise<RaBill[]> {
-  const raw = await authFetch<unknown>(`/projects/ra-bills${qs({ projectId })}`);
+  const raw = await authFetch<unknown>(
+    `/projects/ra-bills${qs({ projectId })}`,
+  );
   return z.array(raBillSchema).parse(raw);
 }
 
@@ -903,12 +905,23 @@ export async function downloadSignedCopy(
  * the number allocated when the debit was raised so the register and the note cannot disagree about
  * which debit it is.
  */
-export const PAYMENT_MODES = ['NEFT', 'RTGS', 'IMPS', 'UPI', 'Cheque', 'Cash'] as const;
+export const PAYMENT_MODES = [
+  'NEFT',
+  'RTGS',
+  'IMPS',
+  'UPI',
+  'Cheque',
+  'Cash',
+] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 
 /** The ledger's coarser instrument for a mode. */
 export function instrumentFor(mode: PaymentMode): PaymentInstrument {
-  return mode === 'Cash' ? 'cash' : mode === 'Cheque' ? 'cheque' : 'bank_transfer';
+  return mode === 'Cash'
+    ? 'cash'
+    : mode === 'Cheque'
+      ? 'cheque'
+      : 'bank_transfer';
 }
 
 const payeeSchema = z.object({
@@ -927,7 +940,11 @@ export type Payee = z.infer<typeof payeeSchema>;
 export type PayeeBank = Partial<
   Pick<
     Payee,
-    'bankName' | 'bankBranch' | 'bankAccountNumber' | 'bankAccountHolderName' | 'ifscCode'
+    | 'bankName'
+    | 'bankBranch'
+    | 'bankAccountNumber'
+    | 'bankAccountHolderName'
+    | 'ifscCode'
   >
 >;
 
@@ -967,11 +984,12 @@ export async function downloadPaymentAdvice(
 }
 
 export async function downloadDebitNote(
-  debitId: string,
+  noteId: string,
+  format: 'pdf' | 'docx' | 'xlsx',
   fallbackName: string,
 ): Promise<{ blob: Blob; filename: string }> {
   const { blob, filename } = await authFetchFile(
-    `/projects/bill-package-debits/${debitId}/note.pdf`,
+    `/projects/debit-notes/${noteId}/document.${format}`,
   );
   return { blob, filename: filename ?? fallbackName };
 }

@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { getProcurementNeeded } from '@/app/lib/api/inventory';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { quantity } from '@/app/lib/format';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
@@ -61,7 +62,7 @@ export default function ProcurementNeededPage() {
     {
       key: 'outstanding',
       header: 'Outstanding',
-      render: (row) => row.outstandingQuantity,
+      render: (row) => quantity(row.outstandingQuantity),
     },
     {
       key: 'requiredBy',
@@ -77,17 +78,23 @@ export default function ProcurementNeededPage() {
       render: (row) => `${row.itemName} (${row.unit})`,
     },
     { key: 'site', header: 'Store', render: (row) => row.siteName },
-    { key: 'inStock', header: 'In stock', render: (row) => row.inStock },
+    {
+      key: 'inStock',
+      header: 'In stock',
+      render: (row) => quantity(row.inStock),
+    },
     {
       key: 'reorderLevel',
       header: 'Reorder level',
-      render: (row) => row.reorderLevel,
+      render: (row) => quantity(row.reorderLevel),
     },
     {
       key: 'shortfall',
       header: 'Short by',
       render: (row) => (
-        <span className="font-medium text-red-700">{row.shortfall}</span>
+        <span className="font-medium text-red-700">
+          {quantity(row.shortfall)}
+        </span>
       ),
     },
   ];
@@ -132,8 +139,8 @@ export default function ProcurementNeededPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium text-gray-900">Reorder shortfall</h2>
         <p className="text-sm text-gray-600">
-          Stores holding less than the item&apos;s own reorder level, whether or not
-          anyone has indented it.
+          Stores holding less than the item&apos;s own reorder level, whether or
+          not anyone has indented it.
         </p>
         <ResponsiveList
           columns={shortfallColumns}

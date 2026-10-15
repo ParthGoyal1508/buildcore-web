@@ -4,6 +4,8 @@ import { useIsFetching } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { isPageLinkClick } from '@/app/ui/nav-click';
+
 import { TableSkeleton } from '@/app/ui/skeletons';
 
 /**
@@ -88,17 +90,7 @@ export function PageLoadingOverlay() {
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
-      // Not `defaultPrevented`: Next's `<Link>` prevents every click it handles.
-      if (event.button !== 0) return;
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
-        return;
-      const link = (event.target as Element | null)?.closest?.('a[href]');
-      if (!(link instanceof HTMLAnchorElement) || link.target === '_blank')
-        return;
-      const url = new URL(link.href, window.location.href);
-      if (url.origin !== window.location.origin) return;
-      if (url.pathname === window.location.pathname) return;
-      setLeaving(window.location.pathname);
+      if (isPageLinkClick(event)) setLeaving(window.location.pathname);
     };
     // A row that navigates by `data-row-href` says so (`RowLinks`).
     const onNavigate = () => setLeaving(window.location.pathname);
@@ -109,6 +101,13 @@ export function PageLoadingOverlay() {
       window.removeEventListener('app:navigate', onNavigate);
     };
   }, []);
+  // A click that never becomes a page change (a link something else handled) lets go after
+  // 15s rather than holding the loader for good.
+  useEffect(() => {
+    if (leaving === null) return;
+    const id = setTimeout(() => setLeaving(null), 15_000);
+    return () => clearTimeout(id);
+  }, [leaving]);
   const navigating = leaving !== null && leaving === pathname;
 
   // A new address starts a new arrival.

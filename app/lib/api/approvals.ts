@@ -258,6 +258,21 @@ export async function getApprovalQueue(
 }
 
 /**
+ * An item at an earlier step of a chain the caller sits further along (2026-10-15) — "coming
+ * up". Read-only: `levelLabel` names who it waits on, `yourLevelLabel` the caller's own step.
+ */
+const upcomingEntrySchema = queueEntrySchema.extend({
+  yourPosition: z.number(),
+  yourLevelLabel: z.string(),
+});
+export type ApprovalUpcomingEntry = z.infer<typeof upcomingEntrySchema>;
+
+export async function getApprovalUpcoming(): Promise<ApprovalUpcomingEntry[]> {
+  const raw = await authFetch<unknown>('/approvals/queue/upcoming');
+  return z.object({ items: z.array(upcomingEntrySchema) }).parse(raw).items;
+}
+
+/**
  * The badge count.
  *
  * A separate endpoint from the queue, and it must stay that way: the badge appears on
@@ -610,12 +625,10 @@ export async function getDirectorFinalSet(): Promise<DirectorFinalSet> {
 export async function proposeDirectorFinalChange(
   changes: { actionType: string; isFinal: boolean }[],
 ): Promise<{ instanceId: string; state: string }> {
-  return z
-    .object({ instanceId: z.string(), state: z.string() })
-    .parse(
-      await authFetch<unknown>('/approvals/director-final', {
-        method: 'PATCH',
-        body: JSON.stringify({ changes }),
-      }),
-    );
+  return z.object({ instanceId: z.string(), state: z.string() }).parse(
+    await authFetch<unknown>('/approvals/director-final', {
+      method: 'PATCH',
+      body: JSON.stringify({ changes }),
+    }),
+  );
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import SubjectLetters from '@/app/ui/letters/subject-letters';
 import ProjectDocumentsPanel from '@/app/ui/projects/project-documents-panel';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
@@ -18,13 +17,8 @@ export default function ProjectDocumentsPage() {
   return (
     <div className="flex flex-col gap-8">
       <ProjectDocumentsPanel projectId={project.id} />
-      {/*
-        017 US6 (T029). On the same screen as the project's documents rather than a section of
-        its own: both answer "what paperwork exists for this project", and the client's item 18
-        asks for letters to be reachable from the project module. The subject pair is how a letter
-        names a project — `project`/`:id` — and this app never resolves it.
-      */}
-      <SubjectLetters query={{ subjectType: 'project', subjectId: project.id }} />
+      {/* Letters were listed here too until 2026-10-15; they have their own Letters tab, and the
+          client asked for them to be shown once. */}
     </div>
   );
 }

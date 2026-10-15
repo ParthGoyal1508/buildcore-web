@@ -13,17 +13,15 @@ import {
   getDebitRegister,
   isEditable,
   proposalLabel,
-  applyDebit,
-  recordDebit,
   setClaim,
 } from '@/app/lib/api/bill-packages';
-import { downloadDebitNote, getRaBill } from '@/app/lib/api/billing';
-import { SETTLEMENT_COPY, projectsLabel } from '@/app/lib/constants';
-import { saveBlob } from '@/app/lib/download-file';
+import { getRaBill } from '@/app/lib/api/billing';
+import { projectsLabel } from '@/app/lib/constants';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { dateLabel } from '@/app/lib/format';
 import BillAdjustments from '@/app/ui/projects/bill-adjustments';
 import BillDeductionLines from '@/app/ui/projects/bill-deduction-lines';
+import DebitNotesPanel from '@/app/ui/projects/debit-notes-panel';
 import BillLifecycle, { describe } from '@/app/ui/projects/bill-lifecycle';
 import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import { Button } from '@/app/ui/button';
@@ -568,140 +566,20 @@ export default function BillPackageDetail({
         </section>
       )}
 
-      {/* ── The debit register ────────────────────────────────────────── */}
-      {register && (
-        <section>
-          <h3 className="mb-1 font-medium text-gray-900">Debit register</h3>
-          <p className="mb-2 text-xs text-gray-500">
-            {register.asAtIssue ? (
-              <>
-                This bill has been issued, so the register shown is the register{' '}
-                <strong>as at issue</strong> — a debit recorded afterwards
-                cannot change a document that has been signed.
-              </>
-            ) : (
-              <>
-                Every debit on the project, including those recovered on earlier
-                bills: the running total is the point of a register.
-              </>
-            )}{' '}
-            Recovered on this bill: {register.recoveredOnThisPackage} of{' '}
-            {register.total}.
-          </p>
-          {editable && (
-            <RecordDebit projectId={pkg.projectId} onDone={refresh} />
-          )}
-          {register.groups.length === 0 ? (
-            <p className="text-sm text-gray-600">No debits on this project.</p>
-          ) : (
-            <div className="space-y-4">
-              {register.groups.map((group, index) => (
-                <div key={`${group.heading ?? 'ungrouped'}-${index}`}>
-                  <p className="text-sm font-medium text-gray-800">
-                    {group.heading ?? 'Ungrouped'}
-                  </p>
-                  <div className={clsx(TABLE.wrap, 'mt-1')}>
-                    <table className={TABLE.table}>
-                      <tbody>
-                        {group.rows.map((row) => (
-                          <tr key={row.id} className={TABLE.row}>
-                            <td className={DENSE_TD}>
-                              {row.description}
-                              {/* 028 FR-019. The number the note itself carries, so the register and
-                                the signed document cannot disagree about which debit this is.
-                                Absent on debits raised before the series existed. */}
-                              {row.noteNumber && (
-                                <span className="block font-mono text-xs text-gray-500">
-                                  {row.noteNumber}
-                                </span>
-                              )}
-                            </td>
-                            <td className={clsx(DENSE_TD, 'text-gray-500')}>
-                              {row.location ?? ''}
-                            </td>
-                            <td className={clsx(DENSE_TD, 'text-right')}>
-                              {row.amountWithTax}
-                            </td>
-                            <td
-                              className={clsx(
-                                DENSE_TD,
-                                'text-xs text-gray-500',
-                              )}
-                            >
-                              {row.recoveredOn
-                                ? `debited in ${row.recoveredOn}`
-                                : 'not yet recovered'}
-                            </td>
-                            <td className={clsx(DENSE_TD, 'text-right')}>
-                              {/* 028 FR-018. The standalone note a subcontractor signs to
-                                acknowledge the recovery — the register already prints inside the
-                                package PDF, and this is the single-debit document. */}
-                              <Button
-                                type="button"
-                                intent="read"
-                                onClick={() =>
-                                  void view({
-                                    title: row.noteNumber ?? 'Debit note',
-                                    fileName: `${row.noteNumber ?? 'Debit note'}.pdf`,
-                                    load: () =>
-                                      downloadDebitNote(
-                                        row.id,
-                                        `${row.noteNumber ?? 'Debit note'}.pdf`,
-                                      ),
-                                  })
-                                }
-                              >
-                                View
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={() => {
-                                  downloadDebitNote(
-                                    row.id,
-                                    `${row.noteNumber ?? 'Debit note'}.pdf`,
-                                  )
-                                    .then(({ blob, filename }) =>
-                                      saveBlob(blob, filename),
-                                    )
-                                    .catch((err: unknown) =>
-                                      setError(describe(err)),
-                                    );
-                                }}
-                              >
-                                {SETTLEMENT_COPY.debitNote}
-                              </Button>
-                              {/* 025 FR-029. A debit is recovered on exactly one bill; the server
-                                refuses a second application by name, so the control is offered and
-                                its refusal is shown rather than guessed at here. */}
-                              {editable && !row.recoveredOnPackageId && (
-                                <Button
-                                  onClick={() => {
-                                    applyDebit(row.id, packageId)
-                                      .then(() => {
-                                        setNotice(
-                                          'Recovered on this bill. It cannot be recovered on another.',
-                                        );
-                                        refresh();
-                                      })
-                                      .catch((err: unknown) =>
-                                        setError(describe(err)),
-                                      );
-                                  }}
-                                >
-                                  Recover here
-                                </Button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+      {/* ── Debit notes — subcontractor bills only (2026-10-15) ────────── */}
+      {register?.applicable && (
+        <DebitNotesPanel
+          register={register}
+          packageId={packageId}
+          projectId={pkg.projectId}
+          workOrderId={pkg.workOrderId ?? null}
+          defaultTaxBasis={abstract?.taxBasis ?? null}
+          editable={editable}
+          view={view}
+          onChanged={refresh}
+          onNotice={setNotice}
+          onError={setError}
+        />
       )}
     </div>
   );
@@ -870,120 +748,5 @@ function ClaimRow({
         </tr>
       )}
     </>
-  );
-}
-
-/**
- * Raising a debit against a counterparty (025 FR-029).
- *
- * The endpoint has existed since 023 with no caller, so the register could be read and never
- * written: every debit in the system had to be inserted by hand. Four fields, because four are
- * required — the rest of the register's columns (location, dimensions, unit) are optional on the
- * API and a form that demanded them would refuse a debit nobody measured.
- *
- * **The amount with tax is entered, not derived.** A debit against a subcontractor is raised at a
- * figure somebody agreed, and computing it here from a rate this screen does not know would produce
- * a number that disagrees with the note already sent to them.
- */
-function RecordDebit({
-  projectId,
-  onDone,
-}: {
-  projectId: string;
-  onDone: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [heading, setHeading] = useState('');
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [amountWithTax, setAmountWithTax] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  if (!open) {
-    return (
-      <Button className="mb-3" onClick={() => setOpen(true)}>
-        Raise a debit
-      </Button>
-    );
-  }
-
-  return (
-    <form
-      className="mb-3 flex flex-wrap items-end gap-3 rounded-md border border-gray-200 p-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setSaving(true);
-        recordDebit(projectId, {
-          ...(heading.trim() ? { groupHeading: heading.trim() } : {}),
-          description: description.trim(),
-          rate: amount.trim(),
-          amount: amount.trim(),
-          amountWithTax: amountWithTax.trim() || amount.trim(),
-        })
-          .then(() => {
-            setError(null);
-            setOpen(false);
-            setDescription('');
-            setAmount('');
-            setAmountWithTax('');
-            onDone();
-          })
-          .catch((err: unknown) => setError(describe(err)))
-          .finally(() => setSaving(false));
-      }}
-    >
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-gray-700">Heading</span>
-        <input
-          value={heading}
-          onChange={(event) => setHeading(event.target.value)}
-          placeholder="Debit against the ATMS equipment missing at site"
-          className="w-72 rounded-md border border-gray-300 px-3 py-2"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-gray-700">Description</span>
-        <input
-          required
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          className="w-72 rounded-md border border-gray-300 px-3 py-2"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-gray-700">Amount</span>
-        <input
-          required
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          className="w-32 rounded-md border border-gray-300 px-3 py-2"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-gray-700">With tax</span>
-        <input
-          inputMode="decimal"
-          value={amountWithTax}
-          onChange={(event) => setAmountWithTax(event.target.value)}
-          placeholder="same as amount"
-          className="w-32 rounded-md border border-gray-300 px-3 py-2"
-        />
-      </label>
-      <div className="flex items-center gap-2 pb-1">
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Record'}
-        </Button>
-        <Button type="button" intent="write" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
-      {error && (
-        <p className="w-full text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      )}
-    </form>
   );
 }

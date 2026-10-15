@@ -7,7 +7,7 @@ import clsx from 'clsx';
 import { Squares2X2Icon } from '@heroicons/react/24/outline';
 import { SerwistProvider } from '@serwist/next/react';
 import { useQuery } from '@tanstack/react-query';
-import { submitPunch } from '@/app/lib/api/my-workspace';
+import { getMyEmployee, submitPunch } from '@/app/lib/api/my-workspace';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
@@ -66,6 +66,16 @@ export default function MyWorkspaceLayout({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
+  // Whether this login is an employee (2026-10-15). Punch, leave, salary, claims and face all
+  // belong to an employee record; an administrator's account has none, and each of those screens
+  // used to fail on its own with "Could not load this list". The holiday list needs no record.
+  const { data: employee } = useQuery({
+    queryKey: ['my', 'employee'],
+    queryFn: getMyEmployee,
+    staleTime: 5 * 60_000,
+  });
+  const needsEmployee =
+    pathname !== ROUTES.myWorkspace && pathname !== ROUTES.myHolidays;
 
   useEffect(() => {
     let active = true;
@@ -188,7 +198,11 @@ export default function MyWorkspaceLayout({
                     </button>
                   </p>
                 )}
-                {children}
+                {employee && !employee.linked && needsEmployee ? (
+                  <NoEmployeeRecord />
+                ) : (
+                  children
+                )}
               </div>
             </div>
           </div>
@@ -236,5 +250,35 @@ export default function MyWorkspaceLayout({
         </div>
       </ShellGate>
     </SerwistProvider>
+  );
+}
+
+/** What My Workspace says to a login with no employee record, instead of failing each list. */
+function NoEmployeeRecord() {
+  return (
+    <div
+      role="status"
+      className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
+    >
+      <p className="font-medium">
+        This login is not linked to an employee record.
+      </p>
+      <p className="mt-1">
+        Punching, leave, salary slips, claims and face enrolment are kept
+        against an employee, so they are not available to this account. An
+        employee&apos;s own login — created for them from their employee record
+        — has all of them.
+      </p>
+      <p className="mt-3">
+        The{' '}
+        <Link
+          href={ROUTES.myHolidays}
+          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        >
+          holiday list
+        </Link>{' '}
+        is available to everyone.
+      </p>
+    </div>
   );
 }

@@ -4,7 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { getIndents, type Indent } from '@/app/lib/api/inventory';
+import {
+  downloadStoreDocument,
+  getIndents,
+  type Indent,
+} from '@/app/lib/api/inventory';
 import { getCurrentUser } from '@/app/lib/api/users';
 import {
   INDENT_STATUSES,
@@ -14,8 +18,10 @@ import {
   overdueLabel,
 } from '@/app/lib/constants';
 import IndentForm from '@/app/ui/inventory/indent-form';
+import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import { useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
+  FormError,
   SecondaryButton,
   SelectField,
 } from '@/app/ui/settings/form-fields';
@@ -30,6 +36,7 @@ export default function IndentsPage() {
   const [siteId, setSiteId] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -162,6 +169,8 @@ export default function IndentsPage() {
         </SelectField>
       </div>
 
+      <FormError message={error} />
+
       <ResponsiveList
         columns={columns}
         rows={data?.indents ?? []}
@@ -169,6 +178,15 @@ export default function IndentsPage() {
         isLoading={isPending}
         error={isError ? MESSAGES.inventoryLoadFailed : undefined}
         emptyMessage={MESSAGES.indentsEmpty}
+        // The client's Material Indent document (2026-10-15), without opening the indent first.
+        actions={(row) => (
+          <StoreDocumentDownload
+            label="Indent"
+            fallbackName={`Indent ${row.indentNumber.replace(/\//g, '-')}`}
+            load={(format) => downloadStoreDocument('indent', row.id, format)}
+            onError={setError}
+          />
+        )}
       />
 
       <Pager

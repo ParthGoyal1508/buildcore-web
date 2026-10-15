@@ -6,6 +6,7 @@ import {
   BookOpenIcon,
   ClipboardDocumentCheckIcon,
   Cog6ToothIcon,
+  DocumentTextIcon,
   FireIcon,
   Squares2X2Icon,
   TruckIcon,
@@ -73,6 +74,15 @@ const SECTIONS = [
     permission: PLANT_PERMISSIONS.spareParts,
     description:
       'Workshop stock, its weighted average rate, and what has fallen below its reorder level.',
+  },
+  {
+    // Vehicle work/hire orders (2026-10-15) — on the tab strip from the start, missing here.
+    name: 'Hire Orders',
+    href: ROUTES.plantHireOrders,
+    icon: DocumentTextIcon,
+    permission: PLANT_PERMISSIONS.equipment,
+    description:
+      'Work/hire orders for vehicles and machines, with the PART-A schedule, the fixed terms and the supplier’s NOC.',
   },
   {
     name: 'Hire Bills',

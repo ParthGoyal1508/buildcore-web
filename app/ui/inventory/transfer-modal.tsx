@@ -4,8 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { createTransfer, getStock, getStockHint } from '@/app/lib/api/inventory';
+import {
+  createTransfer,
+  getStock,
+  getStockHint,
+} from '@/app/lib/api/inventory';
 import { MESSAGES } from '@/app/lib/constants';
+import { quantity as formatQuantity } from '@/app/lib/format';
 import {
   FormError,
   SecondaryButton,
@@ -24,6 +29,10 @@ const today = () => new Date().toISOString().slice(0, 10);
  * differ, and that is checked here before the request goes out. The backend refuses
  * it too (400) — this is not the guard, it is the guard's faster twin, so the user
  * finds out while looking at the two fields rather than after a round trip.
+ *
+ * The dispatch details (2026-10-15) are what the client's stock transfer slip and delivery
+ * challan print — vehicle, transporter, the request and indent/PO it answers, when it should
+ * arrive and why it moved. All optional: a handcart between two stores on one site has none.
  */
 export default function TransferModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -35,6 +44,12 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(today());
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [vehicleNo, setVehicleNo] = useState('');
+  const [transporter, setTransporter] = useState('');
+  const [requestNo, setRequestNo] = useState('');
+  const [dispatchReference, setDispatchReference] = useState('');
+  const [expectedArrival, setExpectedArrival] = useState('');
+  const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | null>(null);
 
@@ -64,6 +79,14 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
         date,
         quantity: Number(quantity),
         ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
+        ...(vehicleNo.trim() ? { vehicleNo: vehicleNo.trim() } : {}),
+        ...(transporter.trim() ? { transporter: transporter.trim() } : {}),
+        ...(requestNo.trim() ? { requestNo: requestNo.trim() } : {}),
+        ...(dispatchReference.trim()
+          ? { dispatchReference: dispatchReference.trim() }
+          : {}),
+        ...(expectedArrival ? { expectedArrival } : {}),
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -75,13 +98,20 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
         return;
       }
       setError(
-        err instanceof ApiError ? err.message : 'Could not record this transfer.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not record this transfer.',
       );
     },
   });
 
   const ready =
-    fromSiteId && toSiteId && !sameSite && itemId && date && Number(quantity) > 0;
+    fromSiteId &&
+    toSiteId &&
+    !sameSite &&
+    itemId &&
+    date &&
+    Number(quantity) > 0;
 
   return (
     <Modal
@@ -164,7 +194,7 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
           </option>
           {(stock.data ?? []).map((row) => (
             <option key={row.itemId} value={row.itemId}>
-              {row.itemName} — {row.inStock} {row.unit}
+              {row.itemName} — {formatQuantity(row.inStock)} {row.unit}
             </option>
           ))}
         </SelectField>
@@ -204,6 +234,56 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
           value={remarks}
           onChange={(event) => setRemarks(event.target.value)}
         />
+
+        <fieldset className="grid gap-3 border-t border-gray-100 pt-3 sm:col-span-2 sm:grid-cols-2">
+          <legend className="pt-3 text-sm font-medium text-gray-900">
+            Dispatch details
+          </legend>
+          <TextField
+            id="transfer-vehicle"
+            label="Vehicle no."
+            placeholder="e.g. KA01-AB-1234"
+            autoComplete="off"
+            value={vehicleNo}
+            onChange={(event) => setVehicleNo(event.target.value)}
+          />
+          <TextField
+            id="transfer-transporter"
+            label="Transporter"
+            autoComplete="off"
+            value={transporter}
+            onChange={(event) => setTransporter(event.target.value)}
+          />
+          <TextField
+            id="transfer-request"
+            label="Transfer request no."
+            autoComplete="off"
+            value={requestNo}
+            onChange={(event) => setRequestNo(event.target.value)}
+          />
+          <TextField
+            id="transfer-reference"
+            label="Indent / PO reference"
+            autoComplete="off"
+            value={dispatchReference}
+            onChange={(event) => setDispatchReference(event.target.value)}
+          />
+          <TextField
+            id="transfer-arrival"
+            label="Expected arrival"
+            type="date"
+            min={date || undefined}
+            value={expectedArrival}
+            onChange={(event) => setExpectedArrival(event.target.value)}
+          />
+          <TextField
+            id="transfer-reason"
+            label="Reason for transfer"
+            autoComplete="off"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </fieldset>
 
         <div className="sm:col-span-2">
           <FormError message={error} />

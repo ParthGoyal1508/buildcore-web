@@ -69,7 +69,9 @@ export default function ApproveIndentModal({
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not approve this indent.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not approve this indent.',
       ),
   });
 
@@ -106,8 +108,10 @@ export default function ApproveIndentModal({
 
         {indent.lines.map((line, index) => {
           const decision = decisions[index];
-          const reduced = Number(decision.approvedQuantity) < line.requestedQuantity;
-          const over = Number(decision.approvedQuantity) > line.requestedQuantity;
+          const reduced =
+            Number(decision.approvedQuantity) < line.requestedQuantity;
+          const over =
+            Number(decision.approvedQuantity) > line.requestedQuantity;
           return (
             <div
               key={line.id}

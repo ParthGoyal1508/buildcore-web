@@ -25,11 +25,16 @@ import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import VendorModal from '@/app/ui/partners/vendor-modal';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { NocModal } from '@/app/ui/nocs/noc-panel';
 
 const PAGE_SIZE = 25;
 
 export default function VendorsPage() {
   const [search, setSearch] = useState('');
+  // The vendor a NOC is being managed for (2026-10-15).
+  const [nocFor, setNocFor] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [type, setType] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -241,6 +246,13 @@ export default function VendorsPage() {
           <>
             <button
               type="button"
+              onClick={() => setNocFor({ id: row.id, name: row.name })}
+              className="text-sm font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            >
+              NOC
+            </button>
+            <button
+              type="button"
               onClick={() => openEdit(row.id)}
               className="text-sm font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
@@ -306,6 +318,15 @@ export default function VendorsPage() {
 
       {modalOpen && (
         <VendorModal vendor={editing} onClose={() => setModalOpen(false)} />
+      )}
+
+      {nocFor && (
+        <NocModal
+          subjectType="vendor"
+          subjectId={nocFor.id}
+          title={`NOC — ${nocFor.name}`}
+          onClose={() => setNocFor(null)}
+        />
       )}
     </main>
   );

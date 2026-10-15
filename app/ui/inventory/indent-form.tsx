@@ -45,6 +45,7 @@ export default function IndentForm({ onClose }: { onClose: () => void }) {
   const [siteId, setSiteId] = useState('');
   const [requiredByDate, setRequiredByDate] = useState('');
   const [justification, setJustification] = useState('');
+  const [department, setDepartment] = useState('');
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +64,7 @@ export default function IndentForm({ onClose }: { onClose: () => void }) {
         siteId,
         requiredByDate,
         justification: justification.trim(),
+        ...(department.trim() ? { department: department.trim() } : {}),
         lines: lines
           .filter((line) => line.itemId && Number(line.requestedQuantity) > 0)
           .map((line) => ({
@@ -142,6 +144,16 @@ export default function IndentForm({ onClose }: { onClose: () => void }) {
             onChange={(event) => setRequiredByDate(event.target.value)}
           />
 
+          {/* Printed on the client's indent (2026-10-15); optional, since a small site has one. */}
+          <TextField
+            id="indent-department"
+            label="Department"
+            placeholder="e.g. Civil, MEP, Finishing"
+            autoComplete="off"
+            value={department}
+            onChange={(event) => setDepartment(event.target.value)}
+          />
+
           <div className="sm:col-span-2">
             <TextField
               id="indent-justification"
@@ -158,7 +170,10 @@ export default function IndentForm({ onClose }: { onClose: () => void }) {
           {lines.map((line, index) => {
             const item = itemsById.get(line.itemId);
             return (
-              <div key={line.key} className="grid gap-3 sm:grid-cols-[2fr_1fr_auto]">
+              <div
+                key={line.key}
+                className="grid gap-3 sm:grid-cols-[2fr_1fr_auto]"
+              >
                 <SelectField
                   id={`indent-item-${line.key}`}
                   label={index === 0 ? 'Item' : ''}

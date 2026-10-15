@@ -4,9 +4,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { deleteIssue, getIssues, type Issue } from '@/app/lib/api/inventory';
+import {
+  deleteIssue,
+  downloadStoreDocument,
+  getIssues,
+  type Issue,
+} from '@/app/lib/api/inventory';
 import { INVENTORY_ISSUE_LABEL, MESSAGES } from '@/app/lib/constants';
+import DailyRegisterDownload from '@/app/ui/inventory/daily-register-download';
 import IssueModal from '@/app/ui/inventory/issue-modal';
+import IssueReturnModal from '@/app/ui/inventory/issue-return-modal';
+import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import { useItems, useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
   FormError,
@@ -31,6 +39,7 @@ export default function IssuesPage() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
+  const [returning, setReturning] = useState<Issue | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const filters = {
@@ -59,7 +68,24 @@ export default function IssuesPage() {
   });
 
   const columns: Column<Issue>[] = [
-    { key: 'date', header: 'Date', render: (row) => row.date.slice(0, 10) },
+    {
+      key: 'date',
+      header: 'Slip No. / Date',
+      // One cell, so the extra column (2026-10-15) does not push the row's actions off the
+      // table. Issues recorded before the MIS series have no slip number, only their date.
+      render: (row) => (
+        <span>
+          {row.slipNo && (
+            <span className="block whitespace-nowrap font-mono text-gray-900">
+              {row.slipNo}
+            </span>
+          )}
+          <span className={row.slipNo ? 'text-xs text-gray-500' : undefined}>
+            {row.date.slice(0, 10)}
+          </span>
+        </span>
+      ),
+    },
     { key: 'site', header: 'Store', render: (row) => row.siteName },
     {
       key: 'item',
@@ -67,7 +93,48 @@ export default function IssuesPage() {
       render: (row) => `${row.itemName} (${row.unit})`,
     },
     { key: 'quantity', header: 'Qty', render: (row) => row.quantity },
-    { key: 'issuedTo', header: 'Issued to', render: (row) => row.issuedTo },
+    {
+      key: 'issuedTo',
+      header: 'Issued to',
+      // The vendor or subcontractor, with their person under it when one was named — and the
+      // machine it went to, when there was one (2026-10-15).
+      render: (row) => (
+        <span>
+          {row.vendorName ?? row.issuedTo}
+          {row.vendorName && row.issuedTo !== row.vendorName && (
+            <span className="block text-xs text-gray-500">{row.issuedTo}</span>
+          )}
+          {row.equipmentNo && (
+            <span className="block text-xs text-gray-500">
+              Equipment {row.equipmentNo}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'returned',
+      header: 'Returned',
+      // The register's "Received Qty / Returned On / Received By", in one cell.
+      render: (row) =>
+        row.returnedQuantity ? (
+          <span>
+            {row.returnedQuantity}
+            <span className="block text-xs text-gray-500">
+              {row.returnedOn?.slice(0, 10)}
+              {row.receivedBy ? ` · ${row.receivedBy}` : ''}
+            </span>
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'project',
+      header: 'Project',
+      hideOnCard: true,
+      render: (row) => row.projectName ?? '—',
+    },
     {
       key: 'work',
       header: 'Against',
@@ -159,6 +226,8 @@ export default function IssuesPage() {
         />
       </div>
 
+      <DailyRegisterDownload defaultSiteId={siteId || undefined} />
+
       <FormError message={error} />
 
       <ResponsiveList
@@ -169,23 +238,37 @@ export default function IssuesPage() {
         error={isError ? MESSAGES.inventoryLoadFailed : undefined}
         emptyMessage={MESSAGES.issuesEmpty}
         actions={(row) => (
-          <RowAction
-            onClick={async () => {
-              if (
-                await confirmDialog({
-                  title: 'Delete this issue?',
-                  message: MESSAGES.confirmDeleteIssue,
-                  confirmLabel: 'Delete',
-                  tone: 'danger',
-                })
-              ) {
-                remove.mutate(row.id);
+          <div className="flex flex-wrap gap-2">
+            <StoreDocumentDownload
+              label="Slip"
+              fallbackName={`Issue slip ${row.slipNo ?? row.date.slice(0, 10)}`}
+              load={(format) =>
+                downloadStoreDocument('issue-slip', row.id, format)
               }
-            }}
-            disabled={remove.isPending}
-          >
-            Delete
-          </RowAction>
+              onError={setError}
+            />
+            {/* Nothing left to come back once all of it has. */}
+            {(row.returnedQuantity ?? 0) < row.quantity && (
+              <RowAction onClick={() => setReturning(row)}>Return</RowAction>
+            )}
+            <RowAction
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this issue?',
+                    message: MESSAGES.confirmDeleteIssue,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                ) {
+                  remove.mutate(row.id);
+                }
+              }}
+              disabled={remove.isPending}
+            >
+              Delete
+            </RowAction>
+          </div>
         )}
       />
 
@@ -198,6 +281,12 @@ export default function IssuesPage() {
       />
 
       {showModal && <IssueModal onClose={() => setShowModal(false)} />}
+      {returning && (
+        <IssueReturnModal
+          issue={returning}
+          onClose={() => setReturning(null)}
+        />
+      )}
     </div>
   );
 }

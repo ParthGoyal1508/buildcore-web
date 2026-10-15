@@ -24,9 +24,10 @@ import {
 /**
  * Record fuel drawn.
  *
- * Amount is computed live and rendered read-only (web FR-003), for the same reason
- * Total Hours is on the logbook form: it is `quantity × rate` and nothing else, so
- * an editable field could only ever disagree with the two above it.
+ * Either the rate or the amount paid is typed and the other is computed and shown read-only
+ * (2026-10-15). The pump slip and the log book's "Diesel Advance" give rupees paid, not a rate,
+ * and making someone divide by hand is how the two came to disagree; whichever is typed is the
+ * one sent, so the server derives the other from the same figure.
  *
  * Variance is deliberately *not* previewed here. It is measured against the day's
  * logbook entry and the machine category's own threshold, neither of which this form
@@ -52,12 +53,19 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
+  const [amountPaid, setAmountPaid] = useState('');
+  const [priceBy, setPriceBy] = useState<'rate' | 'amount'>('rate');
+  const [cardNo, setCardNo] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const amount =
     quantity !== '' && rate !== ''
       ? Math.round(Number(quantity) * Number(rate) * 100) / 100
+      : null;
+  const derivedRate =
+    Number(quantity) > 0 && amountPaid !== ''
+      ? Math.round((Number(amountPaid) / Number(quantity)) * 100) / 100
       : null;
 
   // Named in the default option, so "leave it alone" is a visible choice rather than a
@@ -72,7 +80,10 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
         equipmentId,
         date,
         quantity: Number(quantity),
-        rate: Number(rate),
+        ...(priceBy === 'rate'
+          ? { rate: Number(rate) }
+          : { amount: Number(amountPaid) }),
+        ...(cardNo.trim() ? { cardNo: cardNo.trim() } : {}),
         ...(vendorId ? { vendorId } : {}),
         ...(siteId ? { siteId } : {}),
       }),
@@ -81,7 +92,9 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   return (
@@ -146,30 +159,81 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}
           />
-          <TextField
-            id="fuel-rate"
-            label="Rate (₹ per litre)"
-            type="number"
-            required
-            min={0}
-            step="0.01"
-            value={rate}
-            onChange={(event) => setRate(event.target.value)}
-          />
+          {priceBy === 'rate' ? (
+            <TextField
+              id="fuel-rate"
+              label="Rate (₹ per litre)"
+              type="number"
+              required
+              min={0}
+              step="0.01"
+              value={rate}
+              onChange={(event) => setRate(event.target.value)}
+            />
+          ) : (
+            <TextField
+              id="fuel-amount"
+              label="Amount paid (₹)"
+              type="number"
+              required
+              min={0}
+              step="0.01"
+              value={amountPaid}
+              onChange={(event) => setAmountPaid(event.target.value)}
+            />
+          )}
         </div>
 
-        {/* Read-only and computed (web FR-003). */}
+        <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-700">
+          <legend className="sr-only">Price entered as</legend>
+          <span className="text-gray-500">Enter the</span>
+          {(
+            [
+              ['rate', 'rate per litre'],
+              ['amount', 'amount paid'],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                name="fuel-price-by"
+                value={value}
+                checked={priceBy === value}
+                onChange={() => setPriceBy(value)}
+                className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-accent-500"
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+
+        {/* Read-only and computed (web FR-003): the other half of what was typed. */}
         <div>
           <span className="mb-1 block text-sm font-medium text-gray-700">
-            Amount
+            {priceBy === 'rate' ? 'Amount' : 'Rate per litre'}
           </span>
           <p
             aria-live="polite"
             className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900"
           >
-            {amount === null ? '—' : formatRupees(amount)}
+            {priceBy === 'rate'
+              ? amount === null
+                ? '—'
+                : formatRupees(amount)
+              : derivedRate === null
+                ? '—'
+                : formatRupees(derivedRate)}
           </p>
         </div>
+
+        <TextField
+          id="fuel-card"
+          label="Card no."
+          value={cardNo}
+          maxLength={40}
+          onChange={(event) => setCardNo(event.target.value)}
+          hint="The fuel card it was drawn on, if any."
+        />
 
         <SelectField
           id="fuel-vendor"
@@ -195,7 +259,7 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
           <option value="">
             {deployedSiteName
               ? `Where the machine is deployed — ${deployedSiteName}`
-              : "Where the machine is deployed"}
+              : 'Where the machine is deployed'}
           </option>
           {(sites.data ?? []).map((site) => (
             <option key={site.id} value={site.id}>

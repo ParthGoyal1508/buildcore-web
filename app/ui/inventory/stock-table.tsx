@@ -7,6 +7,7 @@ import { getStock, type StockRow } from '@/app/lib/api/inventory';
 import { getCategories } from '@/app/lib/api/inventory';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES } from '@/app/lib/constants';
+import { quantity } from '@/app/lib/format';
 import { formatRupees } from '@/app/lib/utils';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import Pager from './pager';
@@ -85,37 +86,42 @@ export default function StockTable({
       hideOnCard: true,
       render: (row) => row.category,
     },
-    { key: 'unit', header: 'Unit', hideOnCard: true, render: (row) => row.unit },
+    {
+      key: 'unit',
+      header: 'Unit',
+      hideOnCard: true,
+      render: (row) => row.unit,
+    },
     {
       key: 'received',
       header: 'Received',
       hideOnCard: true,
-      render: (row) => row.received,
+      render: (row) => quantity(row.received),
     },
     {
       key: 'issued',
       header: 'Issued',
       hideOnCard: true,
-      render: (row) => row.issued,
+      render: (row) => quantity(row.issued),
     },
     {
       key: 'transferIn',
       header: 'Transfer in',
       hideOnCard: true,
-      render: (row) => row.transferIn,
+      render: (row) => quantity(row.transferIn),
     },
     {
       key: 'transferOut',
       header: 'Transfer out',
       hideOnCard: true,
-      render: (row) => row.transferOut,
+      render: (row) => quantity(row.transferOut),
     },
     {
       key: 'inStock',
       header: 'In stock',
       render: (row) => (
         <span className="flex items-center gap-2">
-          <span className="font-medium">{row.inStock}</span>
+          <span className="font-medium">{quantity(row.inStock)}</span>
           {row.belowReorderLevel && (
             // Words, not only a colour: a red number alone is invisible to anyone
             // who cannot distinguish it, and this is the one flag on the screen
@@ -236,9 +242,9 @@ export default function StockTable({
               type="checkbox"
               checked={belowOnly}
               onChange={(event) => {
-              setBelowOnly(event.target.checked);
-              setPage(1);
-            }}
+                setBelowOnly(event.target.checked);
+                setPage(1);
+              }}
               className="h-4 w-4 rounded border-gray-300 text-blue-600"
             />
             Below reorder level only

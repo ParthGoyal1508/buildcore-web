@@ -23,16 +23,26 @@ import { authFetch, authFetchBlob } from '@/app/lib/session';
 
 const decimal = z
   .union([z.number(), z.string()])
-  .transform((v) => (typeof v === 'number' ? v : v.trim() === '' ? NaN : Number(v)))
+  .transform((v) =>
+    typeof v === 'number' ? v : v.trim() === '' ? NaN : Number(v),
+  )
   .refine((v) => !Number.isNaN(v), { message: 'Not a number' });
 const nullableDecimal = z
   .union([z.number(), z.string(), z.null()])
   .transform((v) =>
-    v === null ? null : typeof v === 'number' ? v : v.trim() === '' ? null : Number(v),
+    v === null
+      ? null
+      : typeof v === 'number'
+        ? v
+        : v.trim() === ''
+          ? null
+          : Number(v),
   )
   .refine((v) => v === null || !Number.isNaN(v), { message: 'Not a number' });
 
-function qs(params: Record<string, string | number | boolean | undefined | null>) {
+function qs(
+  params: Record<string, string | number | boolean | undefined | null>,
+) {
   const s = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined || v === null || v === '') continue;
@@ -96,7 +106,9 @@ export async function getRequisitions(
   );
 }
 export async function getRequisition(id: string): Promise<Requisition> {
-  return requisitionSchema.parse(await authFetch(`/recruitment/requisitions/${id}`));
+  return requisitionSchema.parse(
+    await authFetch(`/recruitment/requisitions/${id}`),
+  );
 }
 export interface RequisitionInput {
   /**
@@ -124,7 +136,9 @@ export interface RequisitionInput {
   budgetedCtcMax: number;
   justification: string;
 }
-export async function createRequisition(input: RequisitionInput): Promise<Requisition> {
+export async function createRequisition(
+  input: RequisitionInput,
+): Promise<Requisition> {
   return requisitionSchema.parse(
     await authFetch('/recruitment/requisitions', {
       method: 'POST',
@@ -140,10 +154,15 @@ const reqAction = (id: string, action: string, body?: unknown) =>
 export async function approveRequisition(id: string): Promise<Requisition> {
   return requisitionSchema.parse(await reqAction(id, 'approve'));
 }
-export async function submitRequisitionForApproval(id: string): Promise<Requisition> {
+export async function submitRequisitionForApproval(
+  id: string,
+): Promise<Requisition> {
   return requisitionSchema.parse(await reqAction(id, 'submit'));
 }
-export async function rejectRequisition(id: string, reason: string): Promise<Requisition> {
+export async function rejectRequisition(
+  id: string,
+  reason: string,
+): Promise<Requisition> {
   return requisitionSchema.parse(await reqAction(id, 'reject', { reason }));
 }
 export async function deleteRequisition(id: string): Promise<void> {
@@ -216,14 +235,20 @@ export interface CandidateQuery {
   page?: number;
   pageSize?: number;
 }
-export async function getCandidates(query: CandidateQuery = {}): Promise<CandidatePage> {
+export async function getCandidates(
+  query: CandidateQuery = {},
+): Promise<CandidatePage> {
   return candidatePageSchema.parse(
-    await authFetch(`/recruitment/candidates${qs({ ...query, pageSize: query.pageSize ?? 200 })}`),
+    await authFetch(
+      `/recruitment/candidates${qs({ ...query, pageSize: query.pageSize ?? 200 })}`,
+    ),
   );
 }
 /** Unmasked detail — never cache the result (spec FR-006). */
 export async function getCandidate(id: string): Promise<CandidateDetail> {
-  return candidateDetailSchema.parse(await authFetch(`/recruitment/candidates/${id}`));
+  return candidateDetailSchema.parse(
+    await authFetch(`/recruitment/candidates/${id}`),
+  );
 }
 const candidateTimelineSchema = z.object({
   addedAt: z.string(),
@@ -243,7 +268,9 @@ export type CandidateTimeline = z.infer<typeof candidateTimelineSchema>;
  * Every stage change with who made it (2026-10-14). No contact details, so — unlike
  * `getCandidate` — reading it is not an audited reveal, and the candidate panel shows it on open.
  */
-export async function getCandidateTimeline(id: string): Promise<CandidateTimeline> {
+export async function getCandidateTimeline(
+  id: string,
+): Promise<CandidateTimeline> {
   return candidateTimelineSchema.parse(
     await authFetch(`/recruitment/candidates/${id}/timeline`),
   );
@@ -288,10 +315,17 @@ export async function uploadResume(id: string, file: Blob) {
   const encoded = await blobToBase64(file);
   return authFetch(`/recruitment/candidates/${id}/resume`, {
     method: 'POST',
-    body: JSON.stringify({ file: encoded, contentType: file.type || 'application/pdf' }),
+    body: JSON.stringify({
+      file: encoded,
+      contentType: file.type || 'application/pdf',
+    }),
   });
 }
-export async function transitionStage(id: string, stage: string, remarks?: string) {
+export async function transitionStage(
+  id: string,
+  stage: string,
+  remarks?: string,
+) {
   return authFetch(`/recruitment/candidates/${id}/stage`, {
     method: 'PATCH',
     body: JSON.stringify({ stage, remarks }),
@@ -337,8 +371,12 @@ const interviewSchema = z.object({
 });
 export type Interview = z.infer<typeof interviewSchema>;
 
-export async function getInterviews(query: { candidateId?: string; status?: string } = {}) {
-  return z.array(interviewSchema).parse(await authFetch(`/recruitment/interviews${qs({ ...query })}`));
+export async function getInterviews(
+  query: { candidateId?: string; status?: string } = {},
+) {
+  return z
+    .array(interviewSchema)
+    .parse(await authFetch(`/recruitment/interviews${qs({ ...query })}`));
 }
 export interface ScheduleInterviewInput {
   roundNumber: number;
@@ -348,7 +386,10 @@ export interface ScheduleInterviewInput {
   interviewerEmployeeIds: string[];
   location?: string;
 }
-export async function scheduleInterview(candidateId: string, input: ScheduleInterviewInput) {
+export async function scheduleInterview(
+  candidateId: string,
+  input: ScheduleInterviewInput,
+) {
   return authFetch(`/recruitment/candidates/${candidateId}/interviews`, {
     method: 'POST',
     body: JSON.stringify(input),
@@ -356,7 +397,12 @@ export async function scheduleInterview(candidateId: string, input: ScheduleInte
 }
 export async function submitInterviewFeedback(
   interviewId: string,
-  input: { interviewerEmployeeId: string; outcome: string; score: number; comments: string },
+  input: {
+    interviewerEmployeeId: string;
+    outcome: string;
+    score: number;
+    comments: string;
+  },
 ) {
   return authFetch(`/recruitment/interviews/${interviewId}/feedback`, {
     method: 'PATCH',
@@ -396,9 +442,9 @@ const offerSchema = z.object({
 export type Offer = z.infer<typeof offerSchema>;
 
 export async function getOffers(candidateId: string): Promise<Offer[]> {
-  return z.array(offerSchema).parse(
-    await authFetch(`/recruitment/candidates/${candidateId}/offers`),
-  );
+  return z
+    .array(offerSchema)
+    .parse(await authFetch(`/recruitment/candidates/${candidateId}/offers`));
 }
 export interface OfferInput {
   designationId: string;
@@ -410,7 +456,10 @@ export interface OfferInput {
   noticePeriodDays: number;
   reportingManagerEmployeeId: string;
 }
-export async function createOffer(candidateId: string, input: OfferInput): Promise<Offer> {
+export async function createOffer(
+  candidateId: string,
+  input: OfferInput,
+): Promise<Offer> {
   return offerSchema.parse(
     await authFetch(`/recruitment/candidates/${candidateId}/offers`, {
       method: 'POST',
@@ -448,7 +497,10 @@ export async function acceptOffer(
     }),
   );
 }
-export async function declineOffer(offerId: string, declineReason: string): Promise<Offer> {
+export async function declineOffer(
+  offerId: string,
+  declineReason: string,
+): Promise<Offer> {
   return offerSchema.parse(
     await authFetch(`/recruitment/offers/${offerId}/decline`, {
       method: 'PATCH',
@@ -507,7 +559,9 @@ const onboardingSchema = z.object({
 export type Onboarding = z.infer<typeof onboardingSchema>;
 
 export async function getOnboarding(employeeId: string): Promise<Onboarding> {
-  return onboardingSchema.parse(await authFetch(`/recruitment/onboarding/${employeeId}`));
+  return onboardingSchema.parse(
+    await authFetch(`/recruitment/onboarding/${employeeId}`),
+  );
 }
 export async function verifyOnboardingDocument(
   itemId: string,
@@ -526,7 +580,10 @@ export async function verifyOnboardingDocument(
     }),
   );
 }
-export async function issueKitItem(itemId: string, quantity: number): Promise<Onboarding> {
+export async function issueKitItem(
+  itemId: string,
+  quantity: number,
+): Promise<Onboarding> {
   return onboardingSchema.parse(
     await authFetch(`/recruitment/onboarding/items/${itemId}/issue`, {
       method: 'PATCH',
@@ -536,12 +593,18 @@ export async function issueKitItem(itemId: string, quantity: number): Promise<On
 }
 export async function completeInduction(itemId: string): Promise<Onboarding> {
   return onboardingSchema.parse(
-    await authFetch(`/recruitment/onboarding/items/${itemId}/complete-induction`, {
-      method: 'PATCH',
-    }),
+    await authFetch(
+      `/recruitment/onboarding/items/${itemId}/complete-induction`,
+      {
+        method: 'PATCH',
+      },
+    ),
   );
 }
-export async function waiveOnboardingItem(itemId: string, reason: string): Promise<Onboarding> {
+export async function waiveOnboardingItem(
+  itemId: string,
+  reason: string,
+): Promise<Onboarding> {
   return onboardingSchema.parse(
     await authFetch(`/recruitment/onboarding/items/${itemId}/waive`, {
       method: 'PATCH',
@@ -584,8 +647,12 @@ const letterSchema = z.object({
 });
 export type GeneratedLetter = z.infer<typeof letterSchema>;
 
-export async function getLetters(query: { employeeId?: string } = {}): Promise<GeneratedLetter[]> {
-  return z.array(letterSchema).parse(await authFetch(`/recruitment/letters${qs({ ...query })}`));
+export async function getLetters(
+  query: { employeeId?: string } = {},
+): Promise<GeneratedLetter[]> {
+  return z
+    .array(letterSchema)
+    .parse(await authFetch(`/recruitment/letters${qs({ ...query })}`));
 }
 export async function generateLetter(input: {
   letterType: string;
@@ -615,13 +682,18 @@ const resignationSchema = z.object({
   agreedLastWorkingDay: z.string().nullable(),
   noticeWaiverDays: z.number().nullable(),
   status: z.enum(RESIGNATION_STATUSES).catch('submitted'),
+  /** Resolved by the server (2026-10-15); optional so an older API still parses. */
+  employeeCode: z.string().nullable().optional(),
+  employeeName: z.string().nullable().optional(),
 });
 export type Resignation = z.infer<typeof resignationSchema>;
 
-export async function getResignations(query: { status?: string } = {}): Promise<Resignation[]> {
-  return z.array(resignationSchema).parse(
-    await authFetch(`/recruitment/resignations${qs({ ...query })}`),
-  );
+export async function getResignations(
+  query: { status?: string } = {},
+): Promise<Resignation[]> {
+  return z
+    .array(resignationSchema)
+    .parse(await authFetch(`/recruitment/resignations${qs({ ...query })}`));
 }
 export interface ResignationInput {
   /**
@@ -644,7 +716,9 @@ export interface ResignationInput {
   reasonDetail: string;
   noticePeriodDays: number;
 }
-export async function createResignation(input: ResignationInput): Promise<Resignation> {
+export async function createResignation(
+  input: ResignationInput,
+): Promise<Resignation> {
   return resignationSchema.parse(
     await authFetch('/recruitment/resignations', {
       method: 'POST',
@@ -654,7 +728,11 @@ export async function createResignation(input: ResignationInput): Promise<Resign
 }
 export async function acceptResignation(
   id: string,
-  input: { agreedLastWorkingDay?: string; noticeWaiverDays?: number; waiverReason?: string },
+  input: {
+    agreedLastWorkingDay?: string;
+    noticeWaiverDays?: number;
+    waiverReason?: string;
+  },
 ): Promise<Resignation> {
   return resignationSchema.parse(
     await authFetch(`/recruitment/resignations/${id}/accept`, {
@@ -663,7 +741,10 @@ export async function acceptResignation(
     }),
   );
 }
-export async function withdrawResignation(id: string, reason: string): Promise<Resignation> {
+export async function withdrawResignation(
+  id: string,
+  reason: string,
+): Promise<Resignation> {
   return resignationSchema.parse(
     await authFetch(`/recruitment/resignations/${id}/withdraw`, {
       method: 'PATCH',

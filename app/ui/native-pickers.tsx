@@ -160,6 +160,8 @@ function usePlacement(
   el: HTMLElement,
   panel: React.RefObject<HTMLDivElement | null>,
   onClose: () => void,
+  /** The select menu takes the field's width; the calendar keeps its own (`w-72`). */
+  matchWidth = false,
 ) {
   const [style, setStyle] = useState<React.CSSProperties>({
     position: 'fixed',
@@ -177,6 +179,12 @@ function usePlacement(
       const height = panel.current?.offsetHeight ?? 0;
       const below = window.innerHeight - rect.bottom - 8;
       const flip = below < Math.min(height, 260) && rect.top > below;
+      // Exactly the field's width, so the menu lines up under it; a long option wraps rather
+      // than widening the menu past the field. A narrow field (a compact filter) still gets a
+      // readable 10rem.
+      const width = matchWidth
+        ? Math.max(rect.width, 160)
+        : (panel.current?.offsetWidth ?? 0);
       setAbove(flip);
       setStyle({
         position: 'fixed',
@@ -184,13 +192,13 @@ function usePlacement(
           8,
           Math.min(
             rect.left,
-            window.innerWidth - 8 - (panel.current?.offsetWidth ?? 0),
+            // From the width the panel *will* have (2026-10-15). Measured before that width
+            // applied, a long option (a work order's full description) made the unconstrained
+            // panel nearly screen-wide, and the menu opened two fields to the left of its own.
+            window.innerWidth - 8 - width,
           ),
         ),
-        // Exactly the field's width, so the menu lines up under it; a long option wraps rather
-        // than widening the menu past the field. A narrow field (a compact filter) still gets a
-        // readable 10rem.
-        width: Math.max(rect.width, 160),
+        ...(matchWidth ? { width } : {}),
         maxHeight: Math.max(160, (flip ? rect.top : below) - 8),
         ...(flip
           ? { bottom: window.innerHeight - rect.top + 4 }
@@ -204,7 +212,7 @@ function usePlacement(
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
     };
-  }, [el, panel, onClose]);
+  }, [el, panel, onClose, matchWidth]);
 
   // A press anywhere but the field and the popup closes it. The field's own press is handled by
   // the document listener above, which toggles.
@@ -256,7 +264,7 @@ function SelectMenu({
     }),
   );
   const [active, setActive] = useState(() => Math.max(0, el.selectedIndex));
-  const { style, above } = usePlacement(el, panel, onClose);
+  const { style, above } = usePlacement(el, panel, onClose, true);
   const typed = useRef({ text: '', at: 0 });
 
   const choose = useCallback(
@@ -521,7 +529,7 @@ function Calendar({
   return createPortal(
     <div
       ref={panel}
-      style={{ ...style, width: undefined }}
+      style={style}
       onMouseDown={(event) => event.preventDefault()}
       className={clsx(
         'z-[1000] w-72 select-none overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 text-sm shadow-xl ring-1 ring-black/5',

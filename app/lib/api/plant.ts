@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 import {
-  EQUIPMENT_OWNERSHIPS,
   EQUIPMENT_STATUSES,
   HIRE_BILL_STATUSES,
   MAINTENANCE_STATUSES,
@@ -91,6 +90,9 @@ export const equipmentCategorySchema = z.object({
   id: z.string(),
   companyId: z.string(),
   name: z.string(),
+  /** The family a category sits under in the client's master list — "Vehicle Fleet",
+   * "Road Construction & Highway Machinery" (2026-10-15). Null for one made by hand. */
+  group: z.string().nullable(),
   meterType: z.enum(METER_TYPES),
   fuelBenchmark: nullableDecimal,
   fuelVarianceThresholdPercent: decimal,
@@ -102,6 +104,8 @@ export type EquipmentCategory = z.infer<typeof equipmentCategorySchema>;
 
 export interface EquipmentCategoryInput {
   name: string;
+  /** Blank clears it on an update. */
+  group?: string;
   meterType: string;
   fuelBenchmark?: number;
   fuelVarianceThresholdPercent?: number;
@@ -120,10 +124,13 @@ export async function createEquipmentCategory(
   input: EquipmentCategoryInput,
   companyId?: string,
 ): Promise<EquipmentCategory> {
-  const raw = await authFetch<unknown>(`/plant/categories${qs({ companyId })}`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  const raw = await authFetch<unknown>(
+    `/plant/categories${qs({ companyId })}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
   return equipmentCategorySchema.parse(raw);
 }
 
@@ -242,14 +249,79 @@ export async function deleteHireRate(id: string): Promise<void> {
 // Equipment
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * How a machine is held (2026-10-15). `leased` joins owned and hired with the client's master
+ * list, which has all three; a hired machine needs its vendor, a leased one may name one.
+ */
+export const PLANT_OWNERSHIPS = ['owned', 'hired', 'leased'] as const;
+export type PlantOwnership = (typeof PLANT_OWNERSHIPS)[number];
+
+/** The six papers of the client's vehicle register, in its column order (2026-10-15). */
+export const REGISTRATION_KINDS = [
+  'rc',
+  'insurance',
+  'fitness',
+  'road_tax',
+  'permit',
+  'pollution',
+] as const;
+export type RegistrationKind = (typeof REGISTRATION_KINDS)[number];
+
+export const REGISTRATION_KIND_LABELS: Record<RegistrationKind, string> = {
+  rc: 'RC',
+  insurance: 'Insurance',
+  fitness: 'Fitness',
+  road_tax: 'Road Tax',
+  permit: 'Permit',
+  pollution: 'Pollution',
+};
+
+/** `lifetime` is the register's "Life time" — a road tax paid once for the vehicle's life. */
+export const REGISTRATION_STATUSES = [
+  'held',
+  'not_applicable',
+  'lifetime',
+] as const;
+export type RegistrationStatus = (typeof REGISTRATION_STATUSES)[number];
+
+export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
+  held: 'Held',
+  not_applicable: 'N/A',
+  lifetime: 'Life time',
+};
+
+export const registrationPaperSchema = z.object({
+  kind: z.enum(REGISTRATION_KINDS),
+  status: z.enum(REGISTRATION_STATUSES),
+  expiresAt: isoDate.nullable(),
+  number: z.string().nullable(),
+  hasDocument: z.boolean(),
+});
+export type RegistrationPaper = z.infer<typeof registrationPaperSchema>;
+
 export const equipmentSchema = z.object({
   id: z.string(),
   companyId: z.string(),
   code: z.string(),
   name: z.string(),
+  // The registration form's details (2026-10-15) — every one may be blank on an older machine.
+  manufacturingYear: z.number().nullable(),
+  make: z.string().nullable(),
+  model: z.string().nullable(),
+  registrationNo: z.string().nullable(),
+  engineNo: z.string().nullable(),
+  chassisNo: z.string().nullable(),
+  supplierName: z.string().nullable(),
+  /** The register's "Firm" — whose name the RC stands in. */
+  registeredOwner: z.string().nullable(),
+  operatorName: z.string().nullable(),
+  remarks: z.string().nullable(),
+  lastServiceDate: isoDate.nullable(),
+  /** A paper never recorded and with no document uploaded is absent, not a row of nulls. */
+  registration: z.array(registrationPaperSchema),
   categoryId: z.string(),
   categoryName: z.string(),
-  ownership: z.enum(EQUIPMENT_OWNERSHIPS),
+  ownership: z.enum(PLANT_OWNERSHIPS),
   vendorId: z.string().nullable(),
   vendorName: z.string().nullable(),
   powerSource: z.enum(POWER_SOURCES),
@@ -316,16 +388,23 @@ export async function getEquipment(
   return equipmentPageSchema.parse(raw);
 }
 
-export async function getEquipmentDetail(
-  id: string,
-): Promise<EquipmentDetail> {
+export async function getEquipmentDetail(id: string): Promise<EquipmentDetail> {
   const raw = await authFetch<unknown>(`/plant/equipment/${id}`);
   return equipmentDetailSchema.parse(raw);
 }
 
+export interface RegistrationPaperInput {
+  kind: RegistrationKind;
+  status: RegistrationStatus;
+  /** YYYY-MM-DD; only meaningful when held. */
+  expiresAt?: string;
+  number?: string;
+}
+
 export interface EquipmentInput {
-  code?: string;
   name: string;
+  /** The year it was built — the last part of its code (`JCB01/2027`). */
+  manufacturingYear?: number;
   categoryId: string;
   ownership: string;
   vendorId?: string;
@@ -336,6 +415,34 @@ export interface EquipmentInput {
   deployedSiteId?: string;
   currentReading?: number;
   status?: string;
+  make?: string;
+  model?: string;
+  registrationNo?: string;
+  engineNo?: string;
+  chassisNo?: string;
+  supplierName?: string;
+  registeredOwner?: string;
+  operatorName?: string;
+  remarks?: string;
+  lastServiceDate?: string;
+  /** Each kind given replaces that paper; kinds left out are kept as they are. */
+  registration?: RegistrationPaperInput[];
+  /** Create only: a periodic service every N hours, or N km on a km-metered category. */
+  serviceInterval?: number;
+}
+
+/**
+ * The code a machine with this name and year would be given (2026-10-15) — a preview for the
+ * registration form; the code is built again when the machine is saved.
+ */
+export async function getNextEquipmentCode(
+  name: string,
+  year?: number,
+): Promise<string> {
+  const raw = await authFetch<{ code: string }>(
+    `/plant/equipment/next-code${qs({ name, ...(year ? { year: String(year) } : {}) })}`,
+  );
+  return raw.code;
 }
 
 export async function createEquipment(
@@ -358,6 +465,51 @@ export async function updateEquipment(
     body: JSON.stringify(input),
   });
   return equipmentSchema.parse(raw);
+}
+
+export interface EquipmentRegisterFilters {
+  companyId?: string;
+  categoryId?: string;
+  siteId?: string;
+  status?: string;
+  ownership?: string;
+}
+
+/**
+ * The client's "M/S <company> - VEHICLE DETAILS (As on …)" sheet for the machines the register
+ * is filtered to (2026-10-15).
+ */
+export async function downloadEquipmentRegister(
+  format: 'pdf' | 'xlsx',
+  filters: EquipmentRegisterFilters,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/plant/equipment/register.${format}${qs({ ...filters })}`,
+  );
+  return { blob, filename: filename ?? `Vehicle details.${format}` };
+}
+
+export const equipmentImportResultSchema = z.object({
+  categoriesCreated: z.number(),
+  categoriesExisting: z.number(),
+  equipmentCreated: z.number(),
+  skipped: z.array(
+    z.object({ row: z.number(), name: z.string(), reason: z.string() }),
+  ),
+});
+export type EquipmentImportResult = z.infer<typeof equipmentImportResultSchema>;
+
+/** The one-time Equipment Master List import (2026-10-15); `file` is base64 without a prefix. */
+export async function importEquipmentMasterList(
+  file: string,
+  fileName: string,
+  companyId?: string,
+): Promise<EquipmentImportResult> {
+  const raw = await authFetch<unknown>(
+    `/plant/equipment/import${qs({ companyId })}`,
+    { method: 'POST', body: JSON.stringify({ file, fileName }) },
+  );
+  return equipmentImportResultSchema.parse(raw);
 }
 
 export const maintenanceCostSchema = z.object({
@@ -482,6 +634,87 @@ export async function deleteLogbookEntry(id: string): Promise<void> {
   await authFetch<void>(`/plant/logbook/${id}`, { method: 'DELETE' });
 }
 
+/**
+ * The client's "Vehicle Log Book and Diesel Report Sheet" (2026-10-15): one machine, one month,
+ * every day of it — the readings are logbook entries, the diesel is fuel entries.
+ */
+export const logbookSheetSchema = z.object({
+  equipment: z.object({
+    id: z.string(),
+    code: z.string(),
+    name: z.string(),
+    registrationNo: z.string().nullable(),
+    meterType: z.enum(METER_TYPES),
+  }),
+  month: z.string(),
+  days: z.array(
+    z.object({
+      date: z.string(),
+      logbookEntryId: z.string().nullable(),
+      openingReading: nullableDecimal,
+      closingReading: nullableDecimal,
+      total: nullableDecimal,
+      cardNo: z.string().nullable(),
+      dieselAmount: nullableDecimal,
+      dieselQuantity: nullableDecimal,
+    }),
+  ),
+  /** The last closing reading before the month — where its first day starts. */
+  carriedReading: nullableDecimal,
+  totals: z.object({
+    dieselAmount: decimal,
+    dieselQuantity: decimal,
+    total: decimal,
+  }),
+  average: nullableDecimal,
+  averageUnit: z.string(),
+});
+export type LogbookSheet = z.infer<typeof logbookSheetSchema>;
+export type LogbookSheetDay = LogbookSheet['days'][number];
+
+export async function getLogbookSheet(
+  equipmentId: string,
+  month: string,
+): Promise<LogbookSheet> {
+  const raw = await authFetch<unknown>(
+    `/plant/logbook/sheet${qs({ equipmentId, month })}`,
+  );
+  return logbookSheetSchema.parse(raw);
+}
+
+export interface LogbookSheetRowInput {
+  date: string;
+  openingReading?: number;
+  closingReading?: number;
+  cardNo?: string;
+  dieselAmount?: number;
+  dieselQuantity?: number;
+}
+
+/** Saves the days entered and returns the refreshed sheet; a day already read is a 409. */
+export async function saveLogbookSheet(input: {
+  equipmentId: string;
+  month: string;
+  rows: LogbookSheetRowInput[];
+}): Promise<LogbookSheet> {
+  const raw = await authFetch<unknown>('/plant/logbook/sheet', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return logbookSheetSchema.parse(raw);
+}
+
+export async function downloadLogbookSheet(
+  equipmentId: string,
+  month: string,
+  format: 'pdf' | 'xlsx',
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/plant/logbook/sheet.${format}${qs({ equipmentId, month })}`,
+  );
+  return { blob, filename: filename ?? `Log book ${month}.${format}` };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Fuel
 // ─────────────────────────────────────────────────────────────────────────────
@@ -516,9 +749,7 @@ export interface FuelQuery extends PageQuery {
   varianceOnly?: string;
 }
 
-export async function getFuelEntries(
-  query: FuelQuery = {},
-): Promise<FuelPage> {
+export async function getFuelEntries(query: FuelQuery = {}): Promise<FuelPage> {
   const raw = await authFetch<unknown>(`/plant/fuel${qs({ ...query })}`);
   return fuelPageSchema.parse(raw);
 }
@@ -527,7 +758,11 @@ export interface FuelInput {
   equipmentId: string;
   date: string;
   quantity: number;
-  rate: number;
+  /** One of `rate` or `amount` (2026-10-15): the amount paid derives the rate on the server. */
+  rate?: number;
+  amount?: number;
+  /** The fuel card it was drawn on. */
+  cardNo?: string;
   vendorId?: string;
   /** Omitted, the API takes it from where the machine is deployed, and stores it. */
   siteId?: string;
@@ -661,6 +896,8 @@ export const maintenanceJobSchema = z.object({
   serviceBillCost: decimal,
   totalCost: decimal,
   linkedServiceScheduleId: z.string().nullable(),
+  /** The job card's number once a card is saved (2026-10-15). */
+  jobCardNo: z.string().nullable().optional(),
   status: z.enum(MAINTENANCE_STATUSES),
 });
 export type MaintenanceJob = z.infer<typeof maintenanceJobSchema>;
@@ -860,10 +1097,13 @@ export async function createSparePart(
   input: SparePartInput,
   companyId?: string,
 ): Promise<SparePart> {
-  const raw = await authFetch<unknown>(`/plant/spare-parts${qs({ companyId })}`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  const raw = await authFetch<unknown>(
+    `/plant/spare-parts${qs({ companyId })}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
   return sparePartSchema.parse(raw);
 }
 
@@ -929,9 +1169,7 @@ export async function getSparePartMovements(
   return z.array(sparePartMovementSchema).parse(raw);
 }
 
-export async function getJobParts(
-  jobId: string,
-): Promise<SparePartMovement[]> {
+export async function getJobParts(jobId: string): Promise<SparePartMovement[]> {
   const raw = await authFetch<unknown>(`/plant/maintenance/${jobId}/parts`);
   return z.array(sparePartMovementSchema).parse(raw);
 }
@@ -1081,11 +1319,20 @@ export async function deleteServiceBill(id: string): Promise<void> {
 // Fuel exceptions and recovery (020 FR-001 – FR-006 — `bugs.md` item 13)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const FUEL_EXCEPTION_STATUSES = ['open', 'confirmed', 'dismissed'] as const;
+export const FUEL_EXCEPTION_STATUSES = [
+  'open',
+  'confirmed',
+  'dismissed',
+] as const;
 export type FuelExceptionStatus = (typeof FUEL_EXCEPTION_STATUSES)[number];
 
 /** Who bears a confirmed loss. `neither` is a real answer, not an absence of one. */
-export const FUEL_ATTRIBUTIONS = ['hirer', 'operator', 'both', 'neither'] as const;
+export const FUEL_ATTRIBUTIONS = [
+  'hirer',
+  'operator',
+  'both',
+  'neither',
+] as const;
 export type FuelAttribution = (typeof FUEL_ATTRIBUTIONS)[number];
 
 export const fuelExceptionSchema = z.object({
@@ -1110,7 +1357,7 @@ export const fuelExceptionSchema = z.object({
       id: z.string(),
       code: z.string(),
       name: z.string(),
-      ownership: z.enum(EQUIPMENT_OWNERSHIPS),
+      ownership: z.enum(PLANT_OWNERSHIPS),
       categoryId: z.string(),
     }),
   }),
@@ -1162,9 +1409,11 @@ export async function listFuelExceptions(status?: FuelExceptionStatus) {
  * the second time — so the screen can offer it without guarding against a double click.
  */
 export async function raiseFuelExceptions() {
-  return z
-    .object({ raised: z.number() })
-    .parse(await authFetch<unknown>('/plant/fuel/exceptions/raise', { method: 'POST' }));
+  return z.object({ raised: z.number() }).parse(
+    await authFetch<unknown>('/plant/fuel/exceptions/raise', {
+      method: 'POST',
+    }),
+  );
 }
 
 export interface ReviewFuelExceptionInput {
@@ -1187,14 +1436,12 @@ export async function reviewFuelException(
   id: string,
   input: ReviewFuelExceptionInput,
 ) {
-  return fuelExceptionSchema
-    .partial()
-    .parse(
-      await authFetch<unknown>(`/plant/fuel/exceptions/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(input),
-      }),
-    );
+  return fuelExceptionSchema.partial().parse(
+    await authFetch<unknown>(`/plant/fuel/exceptions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  );
 }
 
 /**

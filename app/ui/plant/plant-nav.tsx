@@ -44,6 +44,13 @@ const TABS: { tab: SectionTab; permission: string }[] = [
     permission: PLANT_PERMISSIONS.spareParts,
   },
   {
+    // Vehicle work/hire orders (2026-10-15). Gated on `MACHINERY` because that is what the
+    // API asks for them, not `HIRE_BILLS`: raising an order is fleet work, paying a bill is
+    // not.
+    tab: { name: 'Hire Orders', href: ROUTES.plantHireOrders },
+    permission: PLANT_PERMISSIONS.equipment,
+  },
+  {
     tab: { name: 'Hire Bills', href: ROUTES.plantHireBills },
     permission: PLANT_PERMISSIONS.hireBills,
   },

@@ -4,10 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import {
-  getMaintenanceJobs,
-  type MaintenanceJob,
-} from '@/app/lib/api/plant';
+import { getMaintenanceJobs, type MaintenanceJob } from '@/app/lib/api/plant';
 import {
   MAINTENANCE_STATUSES,
   MAINTENANCE_TYPES,
@@ -16,11 +13,9 @@ import {
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import Pager from '@/app/ui/inventory/pager';
+import JobCardModal from '@/app/ui/plant/job-card-modal';
 import JobPartsPanel from '@/app/ui/plant/job-parts-panel';
-import {
-  CloseJobModal,
-  OpenJobModal,
-} from '@/app/ui/plant/maintenance-modal';
+import { CloseJobModal, OpenJobModal } from '@/app/ui/plant/maintenance-modal';
 import ServiceBillPanel from '@/app/ui/plant/service-bill-panel';
 import {
   usePlantEquipment,
@@ -52,6 +47,8 @@ export default function MaintenancePage() {
   const [showOpen, setShowOpen] = useState(false);
   const [closing, setClosing] = useState<MaintenanceJob | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // `jobId: null` is a new card; a string is that job's card.
+  const [jobCard, setJobCard] = useState<{ jobId: string | null } | null>(null);
 
   const companyId = usePlantCompanyId();
 
@@ -70,14 +67,22 @@ export default function MaintenancePage() {
 
   // Read back out of the freshly-fetched page rather than held in state, so the
   // panel's totals move as soon as a part is consumed or a bill is verified.
-  const selected =
-    data?.items.find((row) => row.id === selectedId) ?? null;
+  const selected = data?.items.find((row) => row.id === selectedId) ?? null;
 
   const columns: Column<MaintenanceJob>[] = [
     {
       key: 'equipment',
       header: 'Machine',
       render: (row) => `${row.equipmentCode} · ${row.equipmentName}`,
+    },
+    {
+      key: 'card',
+      header: 'Job card',
+      render: (row) => (
+        <span className="whitespace-nowrap font-mono text-sm">
+          {row.jobCardNo ?? '—'}
+        </span>
+      ),
     },
     { key: 'type', header: 'Type', render: (row) => plantLabel(row.type) },
     {
@@ -130,9 +135,17 @@ export default function MaintenancePage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Maintenance" />
-        <SecondaryButton type="button" onClick={() => setShowOpen(true)}>
-          Open a job
-        </SecondaryButton>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryButton
+            type="button"
+            onClick={() => setJobCard({ jobId: null })}
+          >
+            New job card
+          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => setShowOpen(true)}>
+            Open a job
+          </SecondaryButton>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -205,6 +218,15 @@ export default function MaintenancePage() {
             >
               {selectedId === row.id ? 'Hide detail' : 'Parts & bills'}
             </RowAction>
+            {/* A read: the card's PDF/Excel/Word are there for anyone who can see the job;
+                its Save is gated inside. */}
+            <RowAction
+              intent="read"
+              icon={null}
+              onClick={() => setJobCard({ jobId: row.id })}
+            >
+              Job card
+            </RowAction>
             {row.status === 'open' && (
               <RowAction onClick={() => setClosing(row)}>Close</RowAction>
             )}
@@ -241,6 +263,14 @@ export default function MaintenancePage() {
       )}
 
       {showOpen && <OpenJobModal onClose={() => setShowOpen(false)} />}
+      {jobCard && (
+        <JobCardModal
+          key={jobCard.jobId ?? 'new'}
+          jobId={jobCard.jobId}
+          onClose={() => setJobCard(null)}
+          onCreated={(jobId) => setJobCard({ jobId })}
+        />
+      )}
       {closing && (
         <CloseJobModal job={closing} onClose={() => setClosing(null)} />
       )}

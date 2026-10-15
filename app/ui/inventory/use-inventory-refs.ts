@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getItems } from '@/app/lib/api/inventory';
 import { getVendors } from '@/app/lib/api/partners';
-import { getSites } from '@/app/lib/api/projects';
+import { getProjects, getSites } from '@/app/lib/api/projects';
 
 /**
  * The three dropdown sources every inventory form needs.
@@ -40,6 +40,15 @@ export function useItems() {
   return useQuery({
     queryKey: ['inventory', 'items', { active: true }],
     queryFn: () => getItems({ active: true, pageSize: 200 }),
+    select: (page) => page.items,
+  });
+}
+
+/** Every project, for tagging an issue with what it was for (2026-10-15). */
+export function useProjects() {
+  return useQuery({
+    queryKey: ['inventory', 'projects'],
+    queryFn: () => getProjects({ pageSize: 200 }),
     select: (page) => page.items,
   });
 }

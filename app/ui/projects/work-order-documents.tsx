@@ -20,6 +20,7 @@ import {
   useLetterKinds,
 } from '@/app/ui/letters/letters-panel';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import NocPanel from '@/app/ui/nocs/noc-panel';
 
 /**
  * Rates first, then the LOI, then the work order — one record, three stages (2026-10-15).
@@ -91,7 +92,9 @@ function vendorFields(
   const contact = vendor.contacts.find((c) => c.phone || c.email);
   return {
     vendorName: vendor.name,
-    vendorAddress: vendor.pinCode ? `${place}${place ? ' - ' : ''}${vendor.pinCode}` : place,
+    vendorAddress: vendor.pinCode
+      ? `${place}${place ? ' - ' : ''}${vendor.pinCode}`
+      : place,
     vendorCode: vendor.code,
     vendorMobile: contact?.phone ?? '',
     vendorEmail: contact?.email ?? '',
@@ -113,9 +116,9 @@ export default function WorkOrderDocuments({
 }) {
   const { project } = useProjectShell();
   const projectId = order.projectId;
-  const [composing, setComposing] = useState<typeof LOI | typeof WORK_ORDER | null>(
-    null,
-  );
+  const [composing, setComposing] = useState<
+    typeof LOI | typeof WORK_ORDER | null
+  >(null);
   const kinds = useLetterKinds([LOI, WORK_ORDER]);
   const kindOf = (key: string) => kinds.offered.find((k) => k.key === key);
 
@@ -152,11 +155,16 @@ export default function WorkOrderDocuments({
   // Newest first, as the API lists them — so the first issued LOI is the one in force.
   const latestLoi = mine.find((l) => l.letterKindKey === LOI && issued(l));
   const anyLoi = mine.find((l) => l.letterKindKey === LOI);
-  const latestWo = mine.find((l) => l.letterKindKey === WORK_ORDER && issued(l));
+  const latestWo = mine.find(
+    (l) => l.letterKindKey === WORK_ORDER && issued(l),
+  );
   const anyWo = mine.find((l) => l.letterKindKey === WORK_ORDER);
 
   const ready =
-    award.isSuccess && !boq.isLoading && !vendor.isLoading && !letters.isLoading;
+    award.isSuccess &&
+    !boq.isLoading &&
+    !vendor.isLoading &&
+    !letters.isLoading;
 
   const initialValues = (): Record<string, string> => {
     const boqNoOf = new Map(
@@ -306,11 +314,31 @@ export default function WorkOrderDocuments({
       )}
 
       {mine.length > 0 && (
-        <LetterTable
-          letters={mine}
-          isLoading={false}
-          emptyMessage=""
-        />
+        <LetterTable letters={mine} isLoading={false} emptyMessage="" />
+      )}
+
+      {/* The NOCs that follow each document (2026-10-15): one place once the LOI is generated,
+          another once the work order is. Shown only after the document exists — a NOC answers
+          a letter, and before it there is nothing to answer. */}
+      {(anyLoi || anyWo) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {anyLoi && (
+            <NocPanel
+              subjectType="work_order"
+              subjectId={order.id}
+              stage="loi"
+              title="NOC after the LOI"
+            />
+          )}
+          {anyWo && (
+            <NocPanel
+              subjectType="work_order"
+              subjectId={order.id}
+              stage="work_order"
+              title="NOC after the work order"
+            />
+          )}
+        </div>
       )}
     </section>
   );

@@ -1,12 +1,13 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
   createAsset,
+  getNextAssetCode,
   updateAsset,
   type Asset,
   type AssetInput,
@@ -41,9 +42,9 @@ import {
  * offers Quantity and Unit. Showing both and validating afterwards would invite
  * someone to fill in a field that is about to be rejected.
  *
- * Three fields are create-only. `assetCode` is what the store knows the asset by and
- * what every allocation hangs off, so renaming it would detach an asset from its own
- * history. Category is fixed because the tracking mode, depreciation policy and
+ * Three fields are create-only, and the code is never typed (2026-10-15): it is built
+ * from the name and the manufacturing year in the company's format, shown before saving, and
+ * never renamed — every allocation hangs off it. Category is fixed because the tracking mode, depreciation policy and
  * inspection schedule were all taken from it. Site is fixed because an asset moves
  * through a transfer, never through an edit — a direct change would leave its per-site
  * stock pointing at the old location. The backend refuses all three; the form does not
@@ -64,14 +65,18 @@ export default function AssetModal({
   const grades = useConditionGrades();
   const isEdit = asset !== undefined;
 
-  const [assetCode, setAssetCode] = useState('');
+  const [manufacturingYear, setManufacturingYear] = useState(
+    asset?.manufacturingYear ? String(asset.manufacturingYear) : '',
+  );
   const [name, setName] = useState(asset?.name ?? '');
   const [categoryId, setCategoryId] = useState(asset?.categoryId ?? '');
   const [manufacturer, setManufacturer] = useState(asset?.manufacturer ?? '');
   const [modelNumber, setModelNumber] = useState(asset?.modelNumber ?? '');
   const [serialNumber, setSerialNumber] = useState(asset?.serialNumber ?? '');
   const [quantity, setQuantity] = useState(asset?.quantity?.toString() ?? '1');
-  const [unitOfMeasure, setUnitOfMeasure] = useState(asset?.unitOfMeasure ?? '');
+  const [unitOfMeasure, setUnitOfMeasure] = useState(
+    asset?.unitOfMeasure ?? '',
+  );
   const [purchaseDate, setPurchaseDate] = useState(
     asset?.purchaseDate?.slice(0, 10) ?? '',
   );
@@ -85,7 +90,9 @@ export default function AssetModal({
     asset?.salvageValue?.toString() ?? '',
   );
   const [vendorId, setVendorId] = useState(asset?.vendorId ?? '');
-  const [currentSiteId, setCurrentSiteId] = useState(asset?.currentSiteId ?? '');
+  const [currentSiteId, setCurrentSiteId] = useState(
+    asset?.currentSiteId ?? '',
+  );
   const [conditionGradeId, setConditionGradeId] = useState(
     asset?.currentConditionGradeId ?? '',
   );
@@ -111,6 +118,21 @@ export default function AssetModal({
     capitalisationDate !== '' &&
     capitalisationDate < purchaseDate;
 
+  // The code this asset will be given, from the server's own builder (2026-10-15).
+  const previewName = useDeferredValue(name.trim());
+  const previewYear = useDeferredValue(
+    /^\d{4}$/.test(manufacturingYear)
+      ? Number(manufacturingYear)
+      : purchaseDate
+        ? Number(purchaseDate.slice(0, 4))
+        : undefined,
+  );
+  const nextCode = useQuery({
+    queryKey: ['assets', 'next-code', previewName, previewYear],
+    queryFn: () => getNextAssetCode(previewName, previewYear),
+    enabled: !isEdit && previewName.length > 0,
+  });
+
   const save = useMutation({
     mutationFn: () => {
       const input: AssetInput = {
@@ -118,7 +140,9 @@ export default function AssetModal({
         categoryId,
         capitalisationDate,
         currentSiteId,
-        ...(assetCode.trim() && !isEdit ? { assetCode: assetCode.trim() } : {}),
+        ...(/^\d{4}$/.test(manufacturingYear)
+          ? { manufacturingYear: Number(manufacturingYear) }
+          : {}),
         ...(manufacturer.trim() ? { manufacturer: manufacturer.trim() } : {}),
         ...(modelNumber.trim() ? { modelNumber: modelNumber.trim() } : {}),
         ...(isSerialised && serialNumber.trim()
@@ -192,13 +216,17 @@ export default function AssetModal({
         </>
       }
     >
-      <form id="asset-form" onSubmit={(event) => {
-        event.preventDefault();
-        if (!canSubmit) return;
-        setError(null);
-        setDuplicateCode(null);
-        save.mutate();
-      }} className="flex flex-col gap-4">
+      <form
+        id="asset-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!canSubmit) return;
+          setError(null);
+          setDuplicateCode(null);
+          save.mutate();
+        }}
+        className="flex flex-col gap-4"
+      >
         <FormError message={error} />
         {duplicateCode && (
           <p className="text-sm text-gray-700">
@@ -218,16 +246,23 @@ export default function AssetModal({
           </p>
         )}
 
-        {!isEdit && (
-          <TextField
-            id="asset-code"
-            label="Asset code"
-            value={assetCode}
-            onChange={(event) => setAssetCode(event.target.value)}
-            hint="Leave empty to take the next code from the company series."
-            maxLength={40}
-          />
-        )}
+        {/* Never typed (2026-10-15): built from the name and the manufacturing year in the
+            company's format from Settings → Numbering — `DR01/2024`. */}
+        <div>
+          <span className="mb-1 block text-sm font-medium text-gray-700">
+            Asset code
+          </span>
+          <p className="flex min-h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+            {isEdit
+              ? asset.assetCode
+              : (nextCode.data ?? (name.trim() ? '…' : 'Enter the name'))}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {isEdit
+              ? 'Given when the asset was registered; it does not change.'
+              : 'Assigned automatically: letters from the name, a serial, the manufacturing year.'}
+          </p>
+        </div>
 
         <TextField
           id="asset-name"
@@ -236,6 +271,23 @@ export default function AssetModal({
           onChange={(event) => setName(event.target.value)}
           required
           maxLength={160}
+        />
+
+        <TextField
+          id="asset-year"
+          label="Manufacturing year"
+          inputMode="numeric"
+          maxLength={4}
+          value={manufacturingYear}
+          onChange={(event) =>
+            setManufacturingYear(event.target.value.replace(/\D/g, ''))
+          }
+          placeholder={String(new Date().getFullYear())}
+          hint={
+            isEdit
+              ? 'Recorded for reference; the code was set at registration.'
+              : 'The last part of the code. Blank uses the purchase year, else this year.'
+          }
         />
 
         {isEdit ? (

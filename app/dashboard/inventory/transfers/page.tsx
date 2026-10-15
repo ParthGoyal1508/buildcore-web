@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   deleteTransfer,
+  downloadStoreDocument,
   getTransfers,
   updateTransferStatus,
   type Transfer,
@@ -17,7 +18,9 @@ import {
   inventoryLabel,
   type TransferStatus,
 } from '@/app/lib/constants';
+import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import TransferModal from '@/app/ui/inventory/transfer-modal';
+import TransferReceiveModal from '@/app/ui/inventory/transfer-receive-modal';
 import { useItems, useSites } from '@/app/ui/inventory/use-inventory-refs';
 import {
   FormError,
@@ -41,6 +44,7 @@ export default function TransfersPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
+  const [receiving, setReceiving] = useState<Transfer | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const filters = {
@@ -88,6 +92,22 @@ export default function TransfersPage() {
   });
 
   const columns: Column<Transfer>[] = [
+    {
+      key: 'number',
+      header: 'Transfer / Challan',
+      // Both series began on 2026-10-15; older transfers have neither.
+      render: (row) =>
+        row.transferNo || row.challanNo ? (
+          <span className="whitespace-nowrap font-mono">
+            {row.transferNo ?? '—'}
+            <span className="block text-xs text-gray-500">
+              {row.challanNo ?? '—'}
+            </span>
+          </span>
+        ) : (
+          '—'
+        ),
+    },
     { key: 'date', header: 'Date', render: (row) => row.date.slice(0, 10) },
     { key: 'from', header: 'From', render: (row) => row.fromSiteName },
     { key: 'to', header: 'To', render: (row) => row.toSiteName },
@@ -96,7 +116,30 @@ export default function TransfersPage() {
       header: 'Item',
       render: (row) => `${row.itemName} (${row.unit})`,
     },
-    { key: 'quantity', header: 'Qty', render: (row) => row.quantity },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      // What arrived, under what was sent, only when the two differ.
+      render: (row) =>
+        row.receivedQuantity !== null &&
+        row.receivedQuantity !== undefined &&
+        row.receivedQuantity !== row.quantity ? (
+          <span>
+            {row.quantity}
+            <span className="block text-xs text-amber-700">
+              {row.receivedQuantity} received
+            </span>
+          </span>
+        ) : (
+          row.quantity
+        ),
+    },
+    {
+      key: 'vehicle',
+      header: 'Vehicle',
+      hideOnCard: true,
+      render: (row) => row.vehicleNo ?? '—',
+    },
     {
       key: 'status',
       header: 'Status',
@@ -187,10 +230,31 @@ export default function TransfersPage() {
           <div className="flex flex-wrap gap-2">
             {/* Only the transitions the backend will accept. Offering the rest
                 would be offering a 409. */}
+            <StoreDocumentDownload
+              label="Slip"
+              fallbackName={`Stock transfer slip ${row.transferNo ?? row.date.slice(0, 10)}`}
+              load={(format) =>
+                downloadStoreDocument('transfer-slip', row.id, format)
+              }
+              onError={setError}
+            />
+            <StoreDocumentDownload
+              label="Challan"
+              fallbackName={`Delivery challan ${row.challanNo ?? row.date.slice(0, 10)}`}
+              load={(format) =>
+                downloadStoreDocument('challan', row.id, format)
+              }
+              onError={setError}
+            />
             {TRANSFER_NEXT_STATUSES[row.status].map((next) => (
               <RowAction
                 key={next}
-                onClick={() => advance.mutate({ id: row.id, next })}
+                // Received asks what arrived (2026-10-15); the other steps need nothing.
+                onClick={() =>
+                  next === 'received'
+                    ? setReceiving(row)
+                    : advance.mutate({ id: row.id, next })
+                }
                 disabled={advance.isPending}
               >
                 Mark {inventoryLabel(next).toLowerCase()}
@@ -233,6 +297,12 @@ export default function TransfersPage() {
       />
 
       {showModal && <TransferModal onClose={() => setShowModal(false)} />}
+      {receiving && (
+        <TransferReceiveModal
+          transfer={receiving}
+          onClose={() => setReceiving(null)}
+        />
+      )}
     </div>
   );
 }

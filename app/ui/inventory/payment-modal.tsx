@@ -42,9 +42,8 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
   const [vendorId, setVendorId] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(today());
-  const [paymentMode, setPaymentMode] = useState<(typeof PAYMENT_MODES)[number]>(
-    'bank_transfer',
-  );
+  const [paymentMode, setPaymentMode] =
+    useState<(typeof PAYMENT_MODES)[number]>('bank_transfer');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -56,9 +55,7 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
 
   const outstanding = bills.data?.totalOutstanding ?? null;
   const surplus =
-    outstanding !== null && amount !== ''
-      ? Number(amount) - outstanding
-      : null;
+    outstanding !== null && amount !== '' ? Number(amount) - outstanding : null;
 
   const save = useMutation({
     mutationFn: () =>
@@ -75,7 +72,9 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : 'Could not record this payment.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not record this payment.',
       ),
   });
 
@@ -197,8 +196,8 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
             <p className="text-xs text-gray-500">{MESSAGES.paymentFifoNote}</p>
             {surplus !== null && surplus > 0 && (
               <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                {formatRupees(surplus)} of this payment has no bill to settle and
-                will be recorded as an advance.
+                {formatRupees(surplus)} of this payment has no bill to settle
+                and will be recorded as an advance.
               </p>
             )}
           </div>

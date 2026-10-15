@@ -406,7 +406,9 @@ export async function cancelLeaveApplication(
 // ------------------------------------------------------------------ Salary
 
 export async function getAvailablePeriods(): Promise<string[]> {
-  return z.array(z.string()).parse(await authFetch('/my/salary/available-periods'));
+  return z
+    .array(z.string())
+    .parse(await authFetch('/my/salary/available-periods'));
 }
 
 export async function getSalarySlip(period: string): Promise<SalarySlip> {
@@ -596,4 +598,41 @@ export async function getMyRefusedAttempts(): Promise<RefusedAttempt[]> {
   return z
     .array(refusedAttemptSchema)
     .parse(await authFetch('/my/punch/refusals'));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The caller's employee record, and the holiday list (2026-10-15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const myEmployeeSchema = z.union([
+  z.object({ linked: z.literal(false) }),
+  z.object({
+    linked: z.literal(true),
+    employeeCode: z.string(),
+    name: z.string(),
+  }),
+]);
+export type MyEmployee = z.infer<typeof myEmployeeSchema>;
+
+/** Whether this login is an employee — punch, leave, salary and claims all need one. */
+export async function getMyEmployee(): Promise<MyEmployee> {
+  return myEmployeeSchema.parse(await authFetch('/my/employee'));
+}
+
+const holidaySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  date: z.string(),
+  type: z.string(),
+  appliesToAllSites: z.boolean(),
+});
+export type MyHoliday = z.infer<typeof holidaySchema>;
+
+/** The year's holidays for the caller — their company's, and their own site's. */
+export async function getMyHolidays(
+  year: number,
+): Promise<{ year: number; holidays: MyHoliday[] }> {
+  return z
+    .object({ year: z.number(), holidays: z.array(holidaySchema) })
+    .parse(await authFetch(`/my/holidays?year=${year}`));
 }

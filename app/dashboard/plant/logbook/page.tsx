@@ -13,6 +13,7 @@ import {
 import { MESSAGES } from '@/app/lib/constants';
 import Pager from '@/app/ui/inventory/pager';
 import LogbookModal from '@/app/ui/plant/logbook-modal';
+import LogbookViews from '@/app/ui/plant/logbook-views';
 import {
   usePlantEquipment,
   usePlantCompanyId,
@@ -116,9 +117,12 @@ export default function LogbookPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Logbook" />
-        <SecondaryButton type="button" onClick={() => setShowModal(true)}>
-          Record a day
-        </SecondaryButton>
+        <div className="flex flex-wrap items-center gap-3">
+          <LogbookViews current="entries" />
+          <SecondaryButton type="button" onClick={() => setShowModal(true)}>
+            Record a day
+          </SecondaryButton>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

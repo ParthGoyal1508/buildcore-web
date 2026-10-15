@@ -1,5 +1,7 @@
 import ApprovalHistory from '@/app/ui/approvals/approval-history';
+import HrRequests from '@/app/ui/approvals/hr-requests';
 import ApprovalQueue from '@/app/ui/approvals/queue-table';
+import ApprovalUpcoming from '@/app/ui/approvals/upcoming-table';
 import PageHeader from '@/app/ui/page-header';
 
 export const metadata = { title: 'Approvals' };
@@ -24,7 +26,7 @@ export default function ApprovalsPage() {
     <main className="flex flex-col gap-6">
       <PageHeader
         title="Approvals"
-        description="What is waiting on you, and every approval you can see — by module, with who decided each level."
+        description="What is waiting on you — including leave and reimbursement claims — what is on its way to you, and every approval you can see."
       />
       <section aria-labelledby="approvals-waiting" className="space-y-3">
         <h2
@@ -35,6 +37,10 @@ export default function ApprovalsPage() {
         </h2>
         <ApprovalQueue />
       </section>
+      {/* Leave and reimbursement claims, which have their own review rather than a chain, and
+          items still on their way to this user (2026-10-15). */}
+      <HrRequests />
+      <ApprovalUpcoming />
       <section aria-labelledby="approvals-history" className="space-y-3">
         <h2
           id="approvals-history"

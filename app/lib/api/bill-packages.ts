@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
+import type { StoredFile } from '@/app/lib/api/client';
 import { authFetchBlob, authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
@@ -313,54 +314,59 @@ const measurementSheetSchema = z
 
 export type MeasurementSheet = z.infer<typeof measurementSheetSchema>;
 
-const debitRowSchema = z
+/**
+ * A debit note on a subcontractor (2026-10-15), in the client's DV-04 format: a header — the work
+ * order, the date, the nature of work, the GST — and its items. Every figure is the server's.
+ */
+const debitNoteLineSchema = z
   .object({
     id: z.string(),
-    /**
-     * `PRPL-DN-0004`, allocated when the debit was raised (028 FR-019).
-     *
-     * **Null on every debit recorded before 028**, and rendered as an absence rather than as a
-     * placeholder: those debits were never issued under a number, and printing one would name a
-     * document nobody sent — the decision 027 made for work-order codes.
-     */
-    noteNumber: z.string().nullable().optional(),
-    groupHeading: z.string().nullable(),
     description: z.string(),
-    location: z.string().nullable(),
-    nos: nullableRendered,
-    length: nullableRendered,
-    width: nullableRendered,
-    quantity: nullableRendered,
+    specification: z.string().nullable(),
     unit: z.string().nullable(),
+    quantity: nullableRendered,
     rate: rendered,
     amount: rendered,
-    amountWithTax: rendered,
+  })
+  .passthrough();
+
+const debitNoteSchema = z
+  .object({
+    id: z.string(),
+    /** `2026-27/001`; null on a debit recorded before numbering existed. */
+    noteNumber: z.string().nullable(),
+    noteDate: z.string(),
+    natureOfWork: z.string().nullable(),
+    workOrderId: z.string().nullable(),
+    workOrderNo: z.string().nullable(),
+    partyName: z.string().nullable(),
+    taxBasis: z.string().nullable(),
+    gstPercent: rendered,
+    amount: rendered,
+    taxAmount: rendered,
+    netAmount: rendered,
     recoveredOn: z.string().nullable(),
     recoveredOnPackageId: z.string().nullable(),
     recordedAt: z.string(),
+    lines: z.array(debitNoteLineSchema),
   })
   .passthrough();
 
 const registerSchema = z
   .object({
     packageId: z.string(),
+    /** False on a bill to the client: debit notes are raised on subcontractors only. */
+    applicable: z.boolean(),
     /** True where the bill is issued: this is the register **as at issue** (023 FR-039a). */
     asAtIssue: z.boolean(),
-    groups: z.array(
-      z
-        .object({
-          heading: z.string().nullable(),
-          rows: z.array(debitRowSchema),
-        })
-        .passthrough(),
-    ),
+    notes: z.array(debitNoteSchema),
     recoveredOnThisPackage: rendered,
     total: rendered,
   })
   .passthrough();
 
 export type DebitRegister = z.infer<typeof registerSchema>;
-export type DebitRow = z.infer<typeof debitRowSchema>;
+export type DebitNote = z.infer<typeof debitNoteSchema>;
 
 const issueResultSchema = z
   .object({
@@ -624,9 +630,17 @@ export function adjustmentsFor(direction: BillDirection) {
   if (direction === 'to_client') {
     // The client's payment abstract names these three in its own words.
     return [
-      { key: 'workDeduction', label: 'B) Deduction from the bill of quantities', block: '1' },
+      {
+        key: 'workDeduction',
+        label: 'B) Deduction from the bill of quantities',
+        block: '1',
+      },
       { key: 'theftWithheld', label: '(E) Amount withheld', block: '2' },
-      { key: 'releaseWithheld', label: 'Released amount (from an earlier withholding)', block: '2' },
+      {
+        key: 'releaseWithheld',
+        label: 'Released amount (from an earlier withholding)',
+        block: '2',
+      },
     ] as const;
   }
   return BILL_ADJUSTMENTS.filter((row) => row.key !== 'workDeduction');
@@ -685,40 +699,54 @@ export async function getDebitRegister(
   );
 }
 
-export interface RecordDebitInput {
-  groupHeading?: string;
-  description: string;
-  location?: string;
-  nos?: string;
-  length?: string;
-  width?: string;
-  quantity?: string;
-  unit?: string;
-  rate: string;
-  amount: string;
-  amountWithTax: string;
+export interface RaiseDebitNoteInput {
+  workOrderId: string;
+  noteDate?: string;
+  natureOfWork?: string;
+  gstPercent: string;
+  taxBasis: 'intra_state' | 'inter_state';
+  lines: {
+    description: string;
+    specification?: string;
+    unit?: string;
+    quantity: string;
+    rate: string;
+  }[];
 }
 
-export async function recordDebit(
+/** Raises a note on a subcontractor; its number and every amount are allocated on the server. */
+export async function raiseDebitNote(
   projectId: string,
-  input: RecordDebitInput,
-): Promise<DebitRow> {
-  return debitRowSchema.parse(
-    await authFetch<unknown>(`/projects/${projectId}/bill-package-debits`, {
+  input: RaiseDebitNoteInput,
+): Promise<DebitNote> {
+  return debitNoteSchema.parse(
+    await authFetch<unknown>(`/projects/${projectId}/debit-notes`, {
       method: 'POST',
       body: JSON.stringify(input),
     }),
   );
 }
 
-/** A debit is recovered on exactly one bill, and only a draft accepts one (023 FR-037, FR-037b). */
-export async function applyDebit(
-  debitId: string,
+/** The note as it would print, before it is raised — nothing is saved and no number is drawn. */
+export async function previewDebitNote(
+  projectId: string,
+  input: RaiseDebitNoteInput,
+): Promise<StoredFile> {
+  return authFetchFile(`/projects/${projectId}/debit-notes/preview.pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+/** A note is recovered on exactly one bill, and only a draft accepts one (023 FR-037, FR-037b). */
+export async function applyDebitNote(
+  noteId: string,
   packageId: string,
-): Promise<DebitRow> {
-  return debitRowSchema.parse(
+): Promise<DebitNote> {
+  return debitNoteSchema.parse(
     await authFetch<unknown>(
-      `/projects/bill-package-debits/${debitId}/apply/${packageId}`,
+      `/projects/debit-notes/${noteId}/apply/${packageId}`,
       { method: 'POST' },
     ),
   );
@@ -853,7 +881,9 @@ export async function certifyBillPackage(
 }
 
 /** Sends a draft into its approval chain — `client_bill` or `ra_bill`, set in Settings → Approvals. */
-export async function submitBillPackage(packageId: string): Promise<BillPackage> {
+export async function submitBillPackage(
+  packageId: string,
+): Promise<BillPackage> {
   return packageSchema.parse(
     await authFetch<unknown>(`/projects/bill-packages/${packageId}/submit`, {
       method: 'POST',
@@ -992,7 +1022,10 @@ export async function getOverClaimReport(
  * and they are a single `??` away from being indistinguishable.
  */
 export function proposalLabel(claim: BillPackageClaim): string {
-  if (claim.proposalSource === 'no_measurement_source' || claim.proposedQty === null) {
+  if (
+    claim.proposalSource === 'no_measurement_source' ||
+    claim.proposedQty === null
+  ) {
     return 'no measurement';
   }
   return claim.proposedQty;
@@ -1124,10 +1157,16 @@ export const ABSTRACT_BLOCKS: AbstractBlock[] = [
     title: 'C. Deductions',
     customSection: 'deduction',
     rows: [
-      { key: 'mobilizationAdvance', label: 'Deduction for mobilisation advance' },
+      {
+        key: 'mobilizationAdvance',
+        label: 'Deduction for mobilisation advance',
+      },
       { key: 'retentionAmount', label: 'Retention money' },
       { key: 'performanceSecurity', label: 'Performance security' },
-      { key: 'theftWithheld', label: 'Amount withheld for theft items (incl. GST)' },
+      {
+        key: 'theftWithheld',
+        label: 'Amount withheld for theft items (incl. GST)',
+      },
       { key: 'deductionsTotal', label: 'Total deductions (C)', isTotal: true },
     ],
   },

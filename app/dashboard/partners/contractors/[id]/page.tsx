@@ -25,6 +25,7 @@ import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
+import NocPanel from '@/app/ui/nocs/noc-panel';
 
 /** Reads a File as base64 without the `data:` prefix — the shape the API expects. */
 function toBase64(file: File): Promise<string> {
@@ -192,6 +193,11 @@ export default function ContractorDetailPage() {
           ))}
         </dl>
       </section>
+
+      {/* The vendor's NOCs (2026-10-15), the same list the vendor register's "NOC" opens. */}
+      <div className="mb-6">
+        <NocPanel subjectType="vendor" subjectId={data.vendorId} />
+      </div>
 
       <section className="mb-6">
         <h2 className="mb-3 font-medium text-gray-900">Documents</h2>

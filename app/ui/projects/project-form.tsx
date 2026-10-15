@@ -21,6 +21,7 @@ import {
   ProjectInput,
   createProject,
   getClients,
+  getNextProjectCode,
   updateProject,
 } from '@/app/lib/api/projects';
 import {
@@ -51,7 +52,6 @@ import { confirmDialog } from '@/app/ui/dialogs';
  */
 export const projectSchema = z
   .object({
-    code: z.string().trim().max(50).optional(),
     name: z.string().trim().min(1, 'Project name is required.').max(200),
     clientId: z.string().min(1, 'Choose a client.'),
     location: z.string().trim().optional(),
@@ -138,6 +138,13 @@ export default function ProjectForm({ project }: { project?: Project }) {
    * `/dashboard/projects` behaved; as of 019 Phase 4 it is how the whole application behaves, and the
    * provider that made it unusual here no longer exists.
    */
+  // The code the new project will be given, shown in place of a code field (2026-10-15).
+  const nextCode = useQuery({
+    queryKey: ['projects', 'next-code'],
+    queryFn: getNextProjectCode,
+    enabled: !project,
+  });
+
   const { data: requirementSet } = useQuery({
     queryKey: ['projectDocumentRequirements'],
     queryFn: () => getDocumentRequirements(),
@@ -196,7 +203,6 @@ export default function ProjectForm({ project }: { project?: Project }) {
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      code: project?.code ?? '',
       name: project?.name ?? '',
       clientId: project?.clientId ?? '',
       location: project?.location ?? '',
@@ -291,11 +297,8 @@ export default function ProjectForm({ project }: { project?: Project }) {
           isLocked: values.isLocked,
         });
       }
-      // Omitted rather than sent empty, so the server allocates from the company
-      // PROJECTS series. Sending '' would be a caller-supplied code of no characters.
-      const withCode = values.code
-        ? { ...payload, code: values.code }
-        : payload;
+      // No code is sent: the server numbers every project from the company's series.
+      const withCode = payload;
       const ids = Object.values(staged).map((file) => file.stagedDocumentId);
       // Omitted when empty for the same reason as `code`: an empty array is a statement that no
       // documents were staged, which is only worth making when the server would otherwise assume
@@ -380,17 +383,23 @@ export default function ProjectForm({ project }: { project?: Project }) {
           Basic information
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField
-            id="project-code"
-            label="Project code"
-            hint={
-              project
-                ? undefined
-                : 'Leave blank to allocate the next code automatically.'
-            }
-            error={errors.code?.message}
-            {...register('code')}
-          />
+          {/* Never typed (2026-10-15): every project is numbered from the company's series —
+              1010, 1020, 1030 … — on creation, and the code does not change afterwards. */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-gray-700">
+              Project code
+            </span>
+            <p className="flex min-h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+              {project
+                ? project.code
+                : (nextCode.data ?? (nextCode.isError ? '—' : '…'))}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              {project
+                ? 'Assigned when the project was created; it does not change.'
+                : 'Assigned automatically when the project is saved.'}
+            </p>
+          </div>
           <TextField
             id="project-name"
             label="Project name"

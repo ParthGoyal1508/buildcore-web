@@ -1,6 +1,7 @@
 import {
   BanknotesIcon,
   CalendarDaysIcon,
+  CalendarIcon,
   ClockIcon,
   FaceSmileIcon,
   ReceiptPercentIcon,
@@ -32,6 +33,13 @@ export const MY_SECTIONS = [
     href: ROUTES.myLeave,
     icon: CalendarDaysIcon,
     description: 'Apply for leave and see what your balance is.',
+  },
+  {
+    // Added 2026-10-15: "as a user I don't have any option to see the holiday list".
+    name: 'Holidays',
+    href: ROUTES.myHolidays,
+    icon: CalendarIcon,
+    description: 'The year’s holidays for your company and site.',
   },
   {
     name: 'Salary',

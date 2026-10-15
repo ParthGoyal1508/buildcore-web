@@ -38,6 +38,7 @@ export const ROUTES = {
   settingsTerms: '/dashboard/settings/terms',
   /** The four statutory rates a running-account bill is computed at (025 US4). */
   settingsBillingRates: '/dashboard/settings/billing-rates',
+  settingsNumbering: '/dashboard/settings/numbering',
   /**
    * Personal Settings — the cash visibility switch and whatever joins it; Super Admin only, behind
    * their own password (2026-10-14; renamed from "Cash visibility" on 2026-10-15).
@@ -56,6 +57,7 @@ export const ROUTES = {
   myLeave: '/my/leave',
   mySalary: '/my/salary',
   myFaceEnrol: '/my/face-enrol',
+  myHolidays: '/my/holidays',
   myReimbursements: '/my/reimbursements',
 
   // --- HR & Payroll admin (feature 005) ---
@@ -260,6 +262,7 @@ export const ROUTES = {
   plantFuel: '/dashboard/plant/fuel',
   plantServices: '/dashboard/plant/services',
   plantMaintenance: '/dashboard/plant/maintenance',
+  plantHireOrders: '/dashboard/plant/hire-orders',
   plantHireBills: '/dashboard/plant/hire-bills',
   plantSpareParts: '/dashboard/plant/spare-parts',
   plantMasters: '/dashboard/plant/masters',
@@ -2055,8 +2058,10 @@ export const MESSAGES = {
   transferSameSite: 'Source and destination stores cannot be the same.',
   insufficientStock: (available: number, unit: string) =>
     `Insufficient stock — ${available} ${unit} available.`,
+  // Rounded to the 3 places stock is kept to (2026-10-15): summed decimals showed as
+  // "1454.4240000000002".
   stockHint: (available: number, unit: string) =>
-    `Available: ${available} ${unit}`,
+    `Available: ${Math.round(available * 1000) / 1000} ${unit}`,
   paymentFifoNote:
     "Allocated automatically against this vendor's oldest unpaid bills first. Anything beyond what is owed is recorded as an advance.",
   approvalDoesNotReserve:
@@ -2180,6 +2185,8 @@ export const SETTINGS_PERMISSIONS = {
   // 025. COMPANY_SETTINGS, matching the backend: these are the statutory rates every bill is
   // computed at, guarded by the same permission as the registration numbers beside them.
   'billing-rates': 'COMPANY_SETTINGS',
+  // 2026-10-15. COMPANY_SETTINGS, matching the backend's guard on the numbering routes.
+  numbering: 'COMPANY_SETTINGS',
   // 2026-10-11. `SETTINGS`, matching the backend: these clauses go onto a document a
   // subcontractor signs, which makes editing them a settings act rather than a
   // project one.
@@ -2553,7 +2560,11 @@ export const NAV_MODULES = [
     href: ROUTES.myWorkspace,
     guardPrefix: '/my',
     guardsSubtree: true,
-    permissions: ['MY_WORKSPACE'],
+    // Open to everyone signed in (2026-10-15). The API serves every `/my` route by ownership —
+    // `@SelfService()`, the employee resolved from the token — and never reads `MY_WORKSPACE`, so
+    // gating on it here only locked employees whose role lacked it (a Site Engineer) out of their
+    // own punch, leave and salary. A login with no employee record is told so on the page.
+    permissions: [],
   },
   {
     id: 'settings',
@@ -4162,17 +4173,15 @@ export const DOCUMENT_COPY = {
    * item 3 ends.
    */
   projectDocumentsHint:
-    'Everything filed against this project, required and supplementary alike.',
+    'Everything filed against this project — mandatory documents first, then optional ones.',
   projectDocumentsEmpty: 'Nothing has been filed against this project yet.',
-  projectDocumentRequiredBadge: 'Answers a required kind',
-  projectDocumentSupplementaryBadge: 'Supplementary',
   /**
    * An expired document stops answering its required kind, so the badge has to say so rather
-   * than leaving a reader to compare a date against today in their head. The required badge is
-   * replaced, not decorated: a row reading both "Answers a required kind" and "Expired" states
-   * the opposite of what readiness now counts.
+   * than leaving a reader to compare a date against today in their head. It is the only badge a
+   * row carries (2026-10-15): the list is already split into mandatory and
+   * optional, so a lapsed mandatory paper is the one thing still worth a badge.
    */
-  projectDocumentExpiredBadge: 'Expired — no longer answers',
+  projectDocumentExpiredBadge: 'Expired — not counted',
   projectDocumentExpires: (when: string) => `Expires ${when}`,
   projectDocumentExpired: (when: string) => `Expired ${when}`,
   projectDocumentNumber: (value: string) => `No. ${value}`,
