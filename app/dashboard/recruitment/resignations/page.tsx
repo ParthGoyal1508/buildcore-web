@@ -11,7 +11,9 @@ import {
   withdrawResignation,
   type Resignation,
 } from '@/app/lib/api/recruitment';
+import { listEmployees } from '@/app/lib/api/hr-payroll';
 import { getCurrentUser } from '@/app/lib/api/users';
+import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import {
   RESIGNATION_REASON_CATEGORIES,
   recruitmentLabel,
@@ -36,22 +38,55 @@ export default function ResignationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
-  const resignations = useQuery({ queryKey: ['resignations'], queryFn: () => getResignations() });
-  const canApprove = user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['resignations'] });
+  const employees = useEmployeeNames();
+  const resignations = useQuery({
+    queryKey: ['resignations'],
+    queryFn: () => getResignations(),
+  });
+  const canApprove =
+    user.data?.permissions.includes('RECRUITMENT_APPROVE') ?? false;
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['resignations'] });
 
   const withdraw = useMutation({
     mutationFn: (id: string) => withdrawResignation(id, 'Withdrawn'),
     onSuccess: invalidate,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not withdraw.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not withdraw.'),
   });
 
   const columns: Column<Resignation>[] = [
-    { key: 'emp', header: 'Employee', render: (r) => r.employeeId },
-    { key: 'date', header: 'Resigned', render: (r) => r.resignationDate ?? '—' },
-    { key: 'reason', header: 'Reason', render: (r) => recruitmentLabel(r.reasonCategory) },
-    { key: 'lwd', header: 'Last working day', render: (r) => r.agreedLastWorkingDay ?? r.expectedLastWorkingDay ?? '—' },
-    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} label={recruitmentLabel(r.status)} /> },
+    {
+      key: 'emp',
+      header: 'Employee',
+      // Named by the server (2026-10-15); the roster lookup covers an older API.
+      render: (r) =>
+        r.employeeName
+          ? `${r.employeeName}${r.employeeCode ? ` · ${r.employeeCode}` : ''}`
+          : employees.label(r.employeeId),
+    },
+    {
+      key: 'date',
+      header: 'Resigned',
+      render: (r) => r.resignationDate ?? '—',
+    },
+    {
+      key: 'reason',
+      header: 'Reason',
+      render: (r) => recruitmentLabel(r.reasonCategory),
+    },
+    {
+      key: 'lwd',
+      header: 'Last working day',
+      render: (r) => r.agreedLastWorkingDay ?? r.expectedLastWorkingDay ?? '—',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (r) => (
+        <StatusBadge status={r.status} label={recruitmentLabel(r.status)} />
+      ),
+    },
   ];
 
   return (
@@ -79,26 +114,58 @@ export default function ResignationsPage() {
               <RowAction onClick={() => setAccepting(r)}>Accept</RowAction>
             )}
             {r.status === 'submitted' && (
-              <RowAction onClick={() => withdraw.mutate(r.id)}>Withdraw</RowAction>
+              <RowAction onClick={() => withdraw.mutate(r.id)}>
+                Withdraw
+              </RowAction>
             )}
           </span>
         )}
       />
 
       {showForm && (
-        <ResignationForm onClose={() => setShowForm(false)} onSaved={() => { invalidate(); setShowForm(false); }} />
+        <ResignationForm
+          onClose={() => setShowForm(false)}
+          onSaved={() => {
+            invalidate();
+            setShowForm(false);
+          }}
+        />
       )}
       {accepting && (
-        <AcceptForm resignation={accepting} onClose={() => setAccepting(null)} onSaved={() => { invalidate(); setAccepting(null); }} />
+        <AcceptForm
+          resignation={accepting}
+          onClose={() => setAccepting(null)}
+          onSaved={() => {
+            invalidate();
+            setAccepting(null);
+          }}
+        />
       )}
     </div>
   );
 }
 
-function ResignationForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function ResignationForm({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   // The company a cross-company Super Admin has selected; null for everyone else,
   // who is pinned to their own company by the backend anyway.
   const [employeeId, setEmployeeId] = useState('');
+  // The employee is picked by name or code (2026-10-15), not typed as an id nobody knows.
+  const [search, setSearch] = useState('');
+  const matches = useQuery({
+    queryKey: ['hr', 'employees', 'resignation-picker', search.trim()],
+    queryFn: () =>
+      listEmployees({
+        search: search.trim() || undefined,
+        isActive: true,
+        pageSize: 50,
+      }),
+  });
   const [resignationDate, setResignationDate] = useState('');
   const [reasonCategory, setReasonCategory] = useState('better_opportunity');
   const [reasonDetail, setReasonDetail] = useState('');
@@ -107,7 +174,10 @@ function ResignationForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
 
   const expectedLwd =
     resignationDate && noticePeriodDays
-      ? new Date(new Date(resignationDate).getTime() + Number(noticePeriodDays) * 86400000)
+      ? new Date(
+          new Date(resignationDate).getTime() +
+            Number(noticePeriodDays) * 86400000,
+        )
           .toISOString()
           .slice(0, 10)
       : null;
@@ -122,7 +192,10 @@ function ResignationForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
         noticePeriodDays: Number(noticePeriodDays),
       }),
     onSuccess: onSaved,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not record the resignation.'),
+    onError: (e) =>
+      setError(
+        e instanceof ApiError ? e.message : 'Could not record the resignation.',
+      ),
   });
 
   return (
@@ -132,28 +205,100 @@ function ResignationForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <Button onClick={() => { setError(null); mutation.mutate(); }} disabled={!employeeId || !resignationDate || !reasonDetail}>Save</Button>
+          <Button
+            onClick={() => {
+              setError(null);
+              mutation.mutate();
+            }}
+            disabled={!employeeId || !resignationDate || !reasonDetail}
+          >
+            Save
+          </Button>
         </div>
       }
     >
       <div className="space-y-3">
         <FormError message={error} />
-        <TextField id="res-emp" label="Employee id" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
-        <div className="grid grid-cols-2 gap-3">
-          <TextField id="res-date" label="Resignation date" type="date" value={resignationDate} onChange={(e) => setResignationDate(e.target.value)} />
-          <TextField id="res-notice" label="Notice period (days)" type="number" min="0" value={noticePeriodDays} onChange={(e) => setNoticePeriodDays(e.target.value)} />
-        </div>
-        <SelectField id="res-cat" label="Reason category" value={reasonCategory} onChange={(e) => setReasonCategory(e.target.value)}>
-          {RESIGNATION_REASON_CATEGORIES.map((c) => <option key={c} value={c}>{recruitmentLabel(c)}</option>)}
+        <TextField
+          id="res-emp-search"
+          label="Find employee"
+          placeholder="Name or code"
+          autoComplete="off"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <SelectField
+          id="res-emp"
+          label="Employee"
+          value={employeeId}
+          onChange={(e) => setEmployeeId(e.target.value)}
+        >
+          <option value="">
+            {matches.isPending ? 'Loading…' : 'Select an employee'}
+          </option>
+          {(matches.data?.items ?? []).map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {[employee.firstName, employee.lastName]
+                .filter(Boolean)
+                .join(' ') || employee.employeeCode}{' '}
+              · {employee.employeeCode}
+            </option>
+          ))}
         </SelectField>
-        <TextField id="res-detail" label="Reason detail" value={reasonDetail} onChange={(e) => setReasonDetail(e.target.value)} />
-        {expectedLwd && <p className="text-sm text-gray-600">Expected last working day: {expectedLwd}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            id="res-date"
+            label="Resignation date"
+            type="date"
+            value={resignationDate}
+            onChange={(e) => setResignationDate(e.target.value)}
+          />
+          <TextField
+            id="res-notice"
+            label="Notice period (days)"
+            type="number"
+            min="0"
+            value={noticePeriodDays}
+            onChange={(e) => setNoticePeriodDays(e.target.value)}
+          />
+        </div>
+        <SelectField
+          id="res-cat"
+          label="Reason category"
+          value={reasonCategory}
+          onChange={(e) => setReasonCategory(e.target.value)}
+        >
+          {RESIGNATION_REASON_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {recruitmentLabel(c)}
+            </option>
+          ))}
+        </SelectField>
+        <TextField
+          id="res-detail"
+          label="Reason detail"
+          value={reasonDetail}
+          onChange={(e) => setReasonDetail(e.target.value)}
+        />
+        {expectedLwd && (
+          <p className="text-sm text-gray-600">
+            Expected last working day: {expectedLwd}
+          </p>
+        )}
       </div>
     </Modal>
   );
 }
 
-function AcceptForm({ resignation, onClose, onSaved }: { resignation: Resignation; onClose: () => void; onSaved: () => void }) {
+function AcceptForm({
+  resignation,
+  onClose,
+  onSaved,
+}: {
+  resignation: Resignation;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [agreedLastWorkingDay, setAgreed] = useState('');
   const [noticeWaiverDays, setWaiverDays] = useState('');
   const [waiverReason, setWaiverReason] = useState('');
@@ -168,11 +313,14 @@ function AcceptForm({ resignation, onClose, onSaved }: { resignation: Resignatio
     mutationFn: () =>
       acceptResignation(resignation.id, {
         agreedLastWorkingDay: agreedLastWorkingDay || undefined,
-        noticeWaiverDays: noticeWaiverDays ? Number(noticeWaiverDays) : undefined,
+        noticeWaiverDays: noticeWaiverDays
+          ? Number(noticeWaiverDays)
+          : undefined,
         waiverReason: waiverReason || undefined,
       }),
     onSuccess: onSaved,
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not accept.'),
+    onError: (e) =>
+      setError(e instanceof ApiError ? e.message : 'Could not accept.'),
   });
 
   return (
@@ -182,17 +330,44 @@ function AcceptForm({ resignation, onClose, onSaved }: { resignation: Resignatio
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <Button onClick={() => { setError(null); mutation.mutate(); }} disabled={!!earlier && (!noticeWaiverDays || !waiverReason)}>Accept</Button>
+          <Button
+            onClick={() => {
+              setError(null);
+              mutation.mutate();
+            }}
+            disabled={!!earlier && (!noticeWaiverDays || !waiverReason)}
+          >
+            Accept
+          </Button>
         </div>
       }
     >
       <div className="space-y-3">
         <FormError message={error} />
-        <TextField id="ac-lwd" label="Agreed last working day" type="date" value={agreedLastWorkingDay} onChange={(e) => setAgreed(e.target.value)} hint={`Expected: ${resignation.expectedLastWorkingDay ?? '—'}`} />
+        <TextField
+          id="ac-lwd"
+          label="Agreed last working day"
+          type="date"
+          value={agreedLastWorkingDay}
+          onChange={(e) => setAgreed(e.target.value)}
+          hint={`Expected: ${resignation.expectedLastWorkingDay ?? '—'}`}
+        />
         {earlier && (
           <>
-            <TextField id="ac-waive" label="Notice waiver days" type="number" min="0" value={noticeWaiverDays} onChange={(e) => setWaiverDays(e.target.value)} />
-            <TextField id="ac-wr" label="Waiver reason" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)} />
+            <TextField
+              id="ac-waive"
+              label="Notice waiver days"
+              type="number"
+              min="0"
+              value={noticeWaiverDays}
+              onChange={(e) => setWaiverDays(e.target.value)}
+            />
+            <TextField
+              id="ac-wr"
+              label="Waiver reason"
+              value={waiverReason}
+              onChange={(e) => setWaiverReason(e.target.value)}
+            />
           </>
         )}
       </div>
