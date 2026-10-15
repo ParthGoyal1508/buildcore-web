@@ -8,11 +8,7 @@ import {
   TRANSFER_STATUSES,
 } from '@/app/lib/constants';
 import type { StoredFile } from '@/app/lib/api/client';
-import {
-  authFetch,
-  authFetchBlob,
-  authFetchFile,
-} from '@/app/lib/session';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
 import { amountHidden, hideableDecimal } from './cash-hiding';
 
 /**
@@ -45,7 +41,13 @@ const decimal = z
 const nullableDecimal = z
   .union([z.number(), z.string(), z.null()])
   .transform((v) =>
-    v === null ? null : typeof v === 'number' ? v : v.trim() === '' ? null : Number(v),
+    v === null
+      ? null
+      : typeof v === 'number'
+        ? v
+        : v.trim() === ''
+          ? null
+          : Number(v),
   )
   .refine((v) => v === null || !Number.isNaN(v), { message: 'Not a number' });
 
@@ -290,7 +292,9 @@ export interface PurchaseQuery {
 export async function getPurchases(
   query: PurchaseQuery = {},
 ): Promise<PurchasePage> {
-  const raw = await authFetch<unknown>(`/inventory/purchases${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/inventory/purchases${qs({ ...query })}`,
+  );
   return purchasePageSchema.parse(raw);
 }
 
@@ -347,6 +351,11 @@ export const issueSchema = z.object({
   date: isoDate,
   quantity: decimal,
   issuedTo: z.string(),
+  // Added 2026-10-15; optional so an API not yet redeployed still parses.
+  projectId: z.string().nullable().optional(),
+  projectName: z.string().nullable().optional(),
+  vendorId: z.string().nullable().optional(),
+  vendorName: z.string().nullable().optional(),
   activityId: z.string().nullable(),
   boqItemId: z.string().nullable(),
   indentLineId: z.string().nullable(),
@@ -381,7 +390,12 @@ export interface IssueInput {
   itemId: string;
   date: string;
   quantity: number;
-  issuedTo: string;
+  /** Optional when `vendorId` is set: the vendor's name is recorded instead. */
+  issuedTo?: string;
+  /** Defaults on the server to the store's own project. */
+  projectId?: string;
+  /** The vendor or subcontractor who took the material. */
+  vendorId?: string;
   activityId?: string;
   boqItemId?: string;
   indentLineId?: string;
@@ -443,7 +457,9 @@ export interface TransferQuery {
 export async function getTransfers(
   query: TransferQuery = {},
 ): Promise<TransferPage> {
-  const raw = await authFetch<unknown>(`/inventory/transfers${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/inventory/transfers${qs({ ...query })}`,
+  );
   return transferPageSchema.parse(raw);
 }
 
@@ -566,7 +582,9 @@ export async function downloadPaymentProof(
 export async function getPayments(
   query: PaymentQuery = {},
 ): Promise<PaymentPage> {
-  const raw = await authFetch<unknown>(`/inventory/payments${qs({ ...query })}`);
+  const raw = await authFetch<unknown>(
+    `/inventory/payments${qs({ ...query })}`,
+  );
   return paymentPageSchema.parse(raw);
 }
 
@@ -678,9 +696,7 @@ export interface IndentQuery {
   pageSize?: number;
 }
 
-export async function getIndents(
-  query: IndentQuery = {},
-): Promise<IndentPage> {
+export async function getIndents(query: IndentQuery = {}): Promise<IndentPage> {
   const raw = await authFetch<unknown>(`/inventory/indents${qs({ ...query })}`);
   return indentPageSchema.parse(raw);
 }

@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  INVENTORY_ISSUE_LABEL_SHORT,
-  ROUTES,
-} from '@/app/lib/constants';
+import { INVENTORY_ISSUE_LABEL_SHORT, ROUTES } from '@/app/lib/constants';
 import SectionTabs from '@/app/ui/section-tabs';
 
 /**

@@ -67,7 +67,30 @@ export default function IssuesPage() {
       render: (row) => `${row.itemName} (${row.unit})`,
     },
     { key: 'quantity', header: 'Qty', render: (row) => row.quantity },
-    { key: 'issuedTo', header: 'Issued to', render: (row) => row.issuedTo },
+    {
+      key: 'issuedTo',
+      header: 'Issued to',
+      // The vendor or subcontractor, with their person under it when one was named.
+      render: (row) =>
+        row.vendorName ? (
+          <span>
+            {row.vendorName}
+            {row.issuedTo !== row.vendorName && (
+              <span className="block text-xs text-gray-500">
+                {row.issuedTo}
+              </span>
+            )}
+          </span>
+        ) : (
+          row.issuedTo
+        ),
+    },
+    {
+      key: 'project',
+      header: 'Project',
+      hideOnCard: true,
+      render: (row) => row.projectName ?? '—',
+    },
     {
       key: 'work',
       header: 'Against',

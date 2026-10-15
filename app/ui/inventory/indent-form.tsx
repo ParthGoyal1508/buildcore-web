@@ -158,7 +158,10 @@ export default function IndentForm({ onClose }: { onClose: () => void }) {
           {lines.map((line, index) => {
             const item = itemsById.get(line.itemId);
             return (
-              <div key={line.key} className="grid gap-3 sm:grid-cols-[2fr_1fr_auto]">
+              <div
+                key={line.key}
+                className="grid gap-3 sm:grid-cols-[2fr_1fr_auto]"
+              >
                 <SelectField
                   id={`indent-item-${line.key}`}
                   label={index === 0 ? 'Item' : ''}

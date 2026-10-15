@@ -15,7 +15,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { usePlantEquipment } from './use-plant-refs';
+import { usePlantEquipment, usePlantVendors } from './use-plant-refs';
 
 /**
  * Raise a hire bill.
@@ -28,12 +28,18 @@ import { usePlantEquipment } from './use-plant-refs';
  * previewed at all: it comes from the vendor's record in Partners and this form has
  * no honest value to show for it, so it says so rather than showing a guess it would
  * then contradict.
+ *
+ * The vendor is the machine's own when its record names one. When it does not, the form asks
+ * for it (2026-10-15): it used to send an empty id and show the API's "vendorId should not be
+ * empty", which told the person nothing they could act on. Hire vendors are listed first.
  */
 export default function HireBillModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const equipment = usePlantEquipment();
+  const vendors = usePlantVendors();
 
   const [equipmentId, setEquipmentId] = useState('');
+  const [chosenVendorId, setChosenVendorId] = useState('');
   const [billedHours, setBilledHours] = useState('');
   const [rate, setRate] = useState('');
   const [billingPeriodFrom, setBillingPeriodFrom] = useState('');
@@ -44,6 +50,11 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
     (row) => row.ownership === 'hired',
   );
   const machine = hired.find((row) => row.id === equipmentId);
+  const machineVendorId = machine?.vendorId ?? null;
+  const vendorId = machineVendorId ?? chosenVendorId;
+  const vendorRows = vendors.data ?? [];
+  const hireVendors = vendorRows.filter((v) => v.type === 'hire');
+  const otherVendors = vendorRows.filter((v) => v.type !== 'hire');
 
   // The rate in force for this machine's category on the period's *start*, which is
   // what the backend will default to. Shown so the person raising the bill sees the
@@ -74,7 +85,7 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
     mutationFn: () =>
       createHireBill({
         equipmentId,
-        vendorId: machine?.vendorId ?? '',
+        vendorId,
         billedHours: Number(billedHours),
         ...(rate ? { rate: Number(rate) } : {}),
         billingPeriodFrom,
@@ -85,7 +96,9 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(
+        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+      ),
   });
 
   const noRate =
@@ -108,7 +121,7 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
           <Button
             type="submit"
             form="hire-bill-form"
-            disabled={save.isPending || noRate}
+            disabled={save.isPending || noRate || !vendorId}
           >
             {save.isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -134,9 +147,11 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
           value={equipmentId}
           onChange={(event) => setEquipmentId(event.target.value)}
           hint={
-            machine
+            machine && machineVendorId
               ? `Vendor: ${machine.vendorName ?? 'not recorded'}`
-              : MESSAGES.plantHireBillOwned
+              : machine
+                ? undefined
+                : MESSAGES.plantHireBillOwned
           }
         >
           <option value="">Select a machine</option>
@@ -146,6 +161,37 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
             </option>
           ))}
         </SelectField>
+
+        {machine && !machineVendorId && (
+          <SelectField
+            id="hire-vendor"
+            label="Vendor"
+            required
+            value={chosenVendorId}
+            onChange={(event) => setChosenVendorId(event.target.value)}
+            hint="This machine's record names no vendor — choose who is billing. Recording it on the machine saves asking next time."
+          >
+            <option value="">Select the hire vendor</option>
+            {hireVendors.length > 0 && (
+              <optgroup label="Hire vendors">
+                {hireVendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {otherVendors.length > 0 && (
+              <optgroup label="Other vendors">
+                {otherVendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </SelectField>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
@@ -213,8 +259,8 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="text-xs text-gray-500">
-          Logbook hours for the period are captured when the bill is raised, so it
-          stays checkable against what the logbook said at the time.
+          Logbook hours for the period are captured when the bill is raised, so
+          it stays checkable against what the logbook said at the time.
         </p>
       </form>
     </Modal>

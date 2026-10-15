@@ -4,7 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { createTransfer, getStock, getStockHint } from '@/app/lib/api/inventory';
+import {
+  createTransfer,
+  getStock,
+  getStockHint,
+} from '@/app/lib/api/inventory';
 import { MESSAGES } from '@/app/lib/constants';
 import {
   FormError,
@@ -75,13 +79,20 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
         return;
       }
       setError(
-        err instanceof ApiError ? err.message : 'Could not record this transfer.',
+        err instanceof ApiError
+          ? err.message
+          : 'Could not record this transfer.',
       );
     },
   });
 
   const ready =
-    fromSiteId && toSiteId && !sameSite && itemId && date && Number(quantity) > 0;
+    fromSiteId &&
+    toSiteId &&
+    !sameSite &&
+    itemId &&
+    date &&
+    Number(quantity) > 0;
 
   return (
     <Modal

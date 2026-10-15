@@ -85,7 +85,12 @@ export default function StockTable({
       hideOnCard: true,
       render: (row) => row.category,
     },
-    { key: 'unit', header: 'Unit', hideOnCard: true, render: (row) => row.unit },
+    {
+      key: 'unit',
+      header: 'Unit',
+      hideOnCard: true,
+      render: (row) => row.unit,
+    },
     {
       key: 'received',
       header: 'Received',
@@ -236,9 +241,9 @@ export default function StockTable({
               type="checkbox"
               checked={belowOnly}
               onChange={(event) => {
-              setBelowOnly(event.target.checked);
-              setPage(1);
-            }}
+                setBelowOnly(event.target.checked);
+                setPage(1);
+              }}
               className="h-4 w-4 rounded border-gray-300 text-blue-600"
             />
             Below reorder level only
