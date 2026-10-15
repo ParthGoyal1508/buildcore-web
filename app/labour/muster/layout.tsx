@@ -9,8 +9,8 @@ import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import LabourNav from '@/app/ui/labour/labour-nav';
+import { FullPageLoader } from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
-import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * The muster capture shell.
@@ -47,11 +47,7 @@ export default function MusterLayout({
   } = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
 
   if (isPending) {
-    return (
-      <p className="p-4 text-sm text-gray-500" role="status">
-        <LoadingText />
-      </p>
-    );
+    return <FullPageLoader />;
   }
   if (isError || !user) {
     return <AccessDenied detail={MESSAGES.loadFailed} />;

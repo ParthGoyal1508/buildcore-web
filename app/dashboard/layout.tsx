@@ -2,6 +2,7 @@ import DashboardSearch from '@/app/ui/dashboard-search';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import SessionGuard from '@/app/ui/dashboard/session-guard';
 import ModuleGuard from '@/app/ui/dashboard/module-guard';
+import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
 
 /**
@@ -51,31 +52,37 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:overflow-clip">
+    <>
+      {/* Outside the gate, so a tab with no session is sent to the login page at once rather
+          than after the loader. */}
       <SessionGuard />
-      {/* Search is mounted here and not inside `ShellHeader`, which three shells
+      <ShellGate>
+        <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:overflow-clip">
+          {/* Search is mounted here and not inside `ShellHeader`, which three shells
           share: FR-001 puts it on the dashboard, and a site employee in My Workspace
           has no register to search. The bar runs the full width, logo and all, with the
           sidebar and the content beneath it (2026-10-15). */}
-      <ShellHeader>
-        <DashboardSearch />
-      </ShellHeader>
-      <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
-        <div className="w-full flex-none md:w-64">
-          <SideNav />
-        </div>
-        {/* The content column scrolls on its own beneath the bar. `min-w-0` because a flex child defaults to `min-width: auto`
+          <ShellHeader>
+            <DashboardSearch />
+          </ShellHeader>
+          <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
+            <div className="w-full flex-none md:w-64">
+              <SideNav />
+            </div>
+            {/* The content column scrolls on its own beneath the bar. `min-w-0` because a flex child defaults to `min-width: auto`
             and would otherwise be forced wide by a table or a long unbroken string
             instead of scrolling inside itself. */}
-        {/* `bg-gray-50` (slate since the 2026-10-14 colour pass): a faint cool ground under the
+            {/* `bg-gray-50` (slate since the 2026-10-14 colour pass): a faint cool ground under the
             content, so the white cards and tables every screen is built from read as surfaces
             instead of dissolving into a white page — half of what made the old look washed out. */}
-        <div className="flex min-w-0 flex-grow flex-col bg-gray-50 md:overflow-hidden">
-          <div className="flex-grow p-4 sm:p-6 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
-            <ModuleGuard>{children}</ModuleGuard>
+            <div className="flex min-w-0 flex-grow flex-col bg-gray-50 md:overflow-hidden">
+              <div className="flex-grow p-4 sm:p-6 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
+                <ModuleGuard>{children}</ModuleGuard>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </ShellGate>
+    </>
   );
 }
