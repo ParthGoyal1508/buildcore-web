@@ -2,6 +2,7 @@ import DashboardSearch from '@/app/ui/dashboard-search';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import SessionGuard from '@/app/ui/dashboard/session-guard';
 import ModuleGuard from '@/app/ui/dashboard/module-guard';
+import { PageLoadingOverlay } from '@/app/ui/page-skeleton';
 import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
 
@@ -76,7 +77,10 @@ export default function DashboardLayout({
             content, so the white cards and tables every screen is built from read as surfaces
             instead of dissolving into a white page — half of what made the old look washed out. */}
             <div className="flex min-w-0 flex-grow flex-col bg-gray-50 md:overflow-hidden">
-              <div className="flex-grow p-4 sm:p-6 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
+              <div className="relative flex-grow p-4 sm:p-6 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
+                {/* The skeleton over this column while a screen first loads; top bar and sidebar
+                stay as they are (2026-10-15). */}
+                <PageLoadingOverlay />
                 <ModuleGuard>{children}</ModuleGuard>
               </div>
             </div>

@@ -110,6 +110,10 @@ const config: Config = {
       spin: {
         to: { transform: 'rotate(360deg)' },
       },
+      // `theme.keyframes` replaces Tailwind's defaults, so `animate-pulse` needs its own.
+      pulse: {
+        '50%': { opacity: '0.5' },
+      },
       shimmer: {
         '100%': {
           transform: 'translateX(100%)',

@@ -14,6 +14,7 @@ import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
 import { hasModuleAccess } from '@/app/lib/permissions';
 import AccessDenied from '@/app/ui/access-denied';
 import SideNav from '@/app/ui/dashboard/sidenav';
+import { PageLoadingOverlay } from '@/app/ui/page-skeleton';
 import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
 import { MY_SECTIONS } from '@/app/ui/my/sections';
@@ -153,7 +154,8 @@ export default function MyWorkspaceLayout({
             <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
               {/* `pb-24` clears the fixed bottom bar; at `md` that bar is gone, so the
               padding goes with it and the column scrolls in place like the dashboard's. */}
-              <div className="flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
+              <div className="relative flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
+                <PageLoadingOverlay />
                 {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
                 sidebar beside it already covers moving between shells. */}
                 {pathname !== ROUTES.myWorkspace && (
