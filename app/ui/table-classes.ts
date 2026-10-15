@@ -4,8 +4,13 @@
  * beside the sorting.
  */
 export const TABLE = {
-  /** The scrolling card a table sits in. */
-  wrap: 'overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm',
+  /**
+   * The scrolling card a table sits in. `relative` (2026-10-15) makes it the containing block for
+   * anything absolutely positioned inside the table — the `sr-only` "Actions" header above all. It
+   * was otherwise placed against the page's content column, outside this box's clipping, and on a
+   * phone dragged the whole page 200px sideways with the table's right edge (Reminders).
+   */
+  wrap: 'relative overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm',
   table: 'min-w-full text-sm text-gray-800',
   thead: 'border-b border-gray-200 bg-gray-50 text-left',
   th: 'px-3 py-3 align-bottom text-xs font-semibold text-gray-600',
