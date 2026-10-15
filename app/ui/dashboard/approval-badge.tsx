@@ -4,6 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getApprovalCount } from '@/app/lib/api/approvals';
+import {
+  listAdminClaims,
+  listLeaveApplications,
+} from '@/app/lib/api/hr-payroll';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
 import SideNavItem from '@/app/ui/dashboard/sidenav-item';
 
@@ -51,9 +56,31 @@ export default function ApprovalBadge() {
     refetchOnWindowFocus: true,
   });
 
-  const count = data?.count ?? 0;
+  // Leave and reimbursement claims are decided on the Approvals page too (2026-10-15), so the
+  // badge counts them — read through the same queries the page lists, so the two cannot
+  // disagree. Each only for someone who may decide it, as on the page.
+  const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const permissions = user.data?.permissions ?? [];
+  const leave = useQuery({
+    queryKey: ['approvals', 'leave', 'pending'],
+    queryFn: () => listLeaveApplications({ status: 'pending' }),
+    enabled: permissions.includes('ATTENDANCE'),
+    refetchInterval: APPROVAL_COUNT_POLL_MS,
+    refetchIntervalInBackground: false,
+  });
+  const claims = useQuery({
+    queryKey: ['approvals', 'claims', 'submitted'],
+    queryFn: () => listAdminClaims({ status: 'submitted' }),
+    enabled: permissions.includes('EMPLOYEES'),
+    refetchInterval: APPROVAL_COUNT_POLL_MS,
+    refetchIntervalInBackground: false,
+  });
+
+  const count =
+    (data?.count ?? 0) + (leave.data?.length ?? 0) + (claims.data?.length ?? 0);
   const active =
-    pathname === ROUTES.approvals || pathname.startsWith(`${ROUTES.approvals}/`);
+    pathname === ROUTES.approvals ||
+    pathname.startsWith(`${ROUTES.approvals}/`);
 
   return (
     <SideNavItem
