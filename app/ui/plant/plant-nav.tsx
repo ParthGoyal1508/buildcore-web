@@ -46,8 +46,8 @@ const TABS: { tab: SectionTab; permission: string }[] = [
   {
     // Vehicle work/hire orders (2026-10-15). Gated on `MACHINERY` because that is what the
     // API asks for them, not `HIRE_BILLS`: raising an order is fleet work, paying a bill is
-    // not. The path is literal because `ROUTES` lives in a module this change does not own.
-    tab: { name: 'Hire Orders', href: '/dashboard/plant/hire-orders' },
+    // not.
+    tab: { name: 'Hire Orders', href: ROUTES.plantHireOrders },
     permission: PLANT_PERMISSIONS.equipment,
   },
   {

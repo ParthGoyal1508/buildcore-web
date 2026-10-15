@@ -115,6 +115,12 @@ export async function getHireOrders(
   return z.array(hireOrderSchema).parse(raw);
 }
 
+/** One order, for its own page (2026-10-15). */
+export async function getHireOrder(id: string): Promise<HireOrder> {
+  const raw = await authFetch<unknown>(`/plant/hire-orders/${id}`);
+  return hireOrderSchema.parse(raw);
+}
+
 export async function createHireOrder(
   input: HireOrderInput,
   companyId?: string | null,

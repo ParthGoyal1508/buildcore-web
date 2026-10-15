@@ -262,6 +262,7 @@ export const ROUTES = {
   plantFuel: '/dashboard/plant/fuel',
   plantServices: '/dashboard/plant/services',
   plantMaintenance: '/dashboard/plant/maintenance',
+  plantHireOrders: '/dashboard/plant/hire-orders',
   plantHireBills: '/dashboard/plant/hire-bills',
   plantSpareParts: '/dashboard/plant/spare-parts',
   plantMasters: '/dashboard/plant/masters',

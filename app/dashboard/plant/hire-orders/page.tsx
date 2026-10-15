@@ -11,7 +11,7 @@ import {
   type HireOrder,
 } from '@/app/lib/api/plant-hire';
 import { getProjects } from '@/app/lib/api/projects';
-import { MESSAGES } from '@/app/lib/constants';
+import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import { confirmDialog } from '@/app/ui/dialogs';
 import PageHeader from '@/app/ui/page-header';
@@ -167,6 +167,8 @@ export default function HireOrdersPage() {
         columns={columns}
         rows={data ?? []}
         rowKey={(row) => row.id}
+        // The whole row opens the order (2026-10-15).
+        rowHref={(row) => `${ROUTES.plantHireOrders}/${row.id}`}
         isLoading={isPending}
         error={isError ? MESSAGES.plantLoadFailed : undefined}
         emptyMessage="No work orders yet."
