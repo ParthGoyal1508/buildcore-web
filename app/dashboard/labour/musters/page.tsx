@@ -66,24 +66,26 @@ export default function MustersPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <PageHeader
           title="Musters"
           description="Review and approve supervisor attendance, oldest first."
         />
-        <div className="flex items-end gap-2">
-          <SelectField
-            id="muster-status"
-            label="Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            {MUSTER_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </option>
-            ))}
-          </SelectField>
+        <div className="flex min-w-[16rem] flex-1 items-end gap-2 sm:flex-none">
+          <div className="min-w-0 flex-1">
+            <SelectField
+              id="muster-status"
+              label="Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              {MUSTER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
+              ))}
+            </SelectField>
+          </div>
           {/* The second way into the capture screen, which had none. This list is
               where you stand when you notice a muster is missing, and the screen it
               opens is outside the dashboard shell (013 FR-001). */}

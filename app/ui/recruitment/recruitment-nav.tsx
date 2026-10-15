@@ -53,6 +53,7 @@ export default function RecruitmentNav({
           {
             name: 'Reports',
             href: ROUTES.recruitmentReportsFunnel,
+            match: '/dashboard/recruitment/reports',
             icon: ChartBarIcon,
           },
         ]

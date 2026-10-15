@@ -67,7 +67,7 @@ export default function InterviewsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <PageHeader
           title="Interviews"
           description="Rounds awaiting feedback, today's and upcoming, and completed rounds with their feedback."
@@ -118,7 +118,7 @@ export default function InterviewsPage() {
                           </p>
                         )}
                       </div>
-                      <span className="flex items-center gap-2">
+                      <span className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={i.status} />
                         {i.overdue && (
                           <StatusBadge status="overdue" label="Overdue" />

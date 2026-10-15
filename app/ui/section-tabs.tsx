@@ -12,6 +12,11 @@ export interface SectionTab {
   href: string;
   /** The section's glyph in the phone bottom bar (2026-10-15). */
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  /**
+   * The path that counts as this tab when it is wider than `href` (2026-10-15): Reports opens
+   * the first report, but every page under `/reports` is that tab.
+   */
+  match?: string;
 }
 
 /**

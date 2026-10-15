@@ -58,6 +58,7 @@ export default function LabourNav({
           {
             name: 'Reports',
             href: ROUTES.labourReportsDeployment,
+            match: '/dashboard/labour/reports',
             icon: ChartBarIcon,
           },
         ]

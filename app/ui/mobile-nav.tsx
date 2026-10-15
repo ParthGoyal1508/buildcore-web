@@ -62,6 +62,8 @@ export interface MobileSection {
   name: string;
   href: string;
   icon?: Icon;
+  /** The path that counts as this section, when it is wider than `href` — see `SectionTab`. */
+  match?: string;
 }
 
 interface Registered {
@@ -101,15 +103,23 @@ export function useMobileSections(
   }, [enabled, register, label, key]);
 }
 
-/** The longest tab href the path is on or under — the rule `SectionTabs` uses. */
+/**
+ * The href of the tab the path is on or under, by the longest match — the rule `SectionTabs`
+ * uses. A tab matches on its `match` prefix when it has one, else on its own href.
+ */
 export function activeTabHref(
   pathname: string,
-  tabs: readonly { href: string }[],
+  tabs: readonly { href: string; match?: string }[],
 ): string {
-  return tabs
-    .map((tab) => tab.href)
-    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
-    .reduce((best, href) => (href.length > best.length ? href : best), '');
+  let best: { href: string; length: number } | null = null;
+  for (const tab of tabs) {
+    const prefix = tab.match ?? tab.href;
+    if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) continue;
+    if (!best || prefix.length > best.length) {
+      best = { href: tab.href, length: prefix.length };
+    }
+  }
+  return best?.href ?? '';
 }
 
 /**
