@@ -1,5 +1,15 @@
 'use client';
 
+import {
+  ArchiveBoxIcon,
+  ArrowsRightLeftIcon,
+  ArrowUpTrayIcon,
+  BanknotesIcon,
+  ClipboardDocumentListIcon,
+  DocumentTextIcon,
+  ShoppingCartIcon,
+} from '@heroicons/react/24/outline';
+
 import { INVENTORY_ISSUE_LABEL_SHORT, ROUTES } from '@/app/lib/constants';
 import SectionTabs from '@/app/ui/section-tabs';
 
@@ -13,17 +23,52 @@ import SectionTabs from '@/app/ui/section-tabs';
  * so a user without `SETTINGS` never sees a tab they cannot open.
  */
 const TABS = [
-  { name: 'Stock', href: ROUTES.inventoryStock },
-  { name: 'Purchase orders', href: ROUTES.inventoryPurchaseOrders },
-  { name: 'Purchases', href: ROUTES.inventoryPurchases },
+  { name: 'Stock', href: ROUTES.inventoryStock, icon: ArchiveBoxIcon },
+  {
+    name: 'Purchase orders',
+    href: ROUTES.inventoryPurchaseOrders,
+    icon: DocumentTextIcon,
+  },
+  {
+    name: 'Purchases',
+    href: ROUTES.inventoryPurchases,
+    icon: ShoppingCartIcon,
+  },
   // 028 FR-030: the label only. `ROUTES.inventoryIssues` is unchanged, because renaming a URL
   // breaks every link already sent for no gain anybody can see.
-  { name: INVENTORY_ISSUE_LABEL_SHORT, href: ROUTES.inventoryIssues },
-  { name: 'Transfers', href: ROUTES.inventoryTransfers },
-  { name: 'Payments', href: ROUTES.inventoryPayments },
-  { name: 'Indents', href: ROUTES.inventoryIndents },
+  {
+    name: INVENTORY_ISSUE_LABEL_SHORT,
+    href: ROUTES.inventoryIssues,
+    icon: ArrowUpTrayIcon,
+  },
+  {
+    name: 'Transfers',
+    href: ROUTES.inventoryTransfers,
+    icon: ArrowsRightLeftIcon,
+  },
+  {
+    name: 'Payments',
+    href: ROUTES.inventoryPayments,
+    icon: BanknotesIcon,
+  },
+  {
+    name: 'Indents',
+    href: ROUTES.inventoryIndents,
+    icon: ClipboardDocumentListIcon,
+  },
 ];
 
-export default function InventoryNav() {
-  return <SectionTabs label="Inventory sections" tabs={TABS} />;
+export default function InventoryNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
+  return (
+    <SectionTabs
+      label="Inventory sections"
+      tabs={TABS}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

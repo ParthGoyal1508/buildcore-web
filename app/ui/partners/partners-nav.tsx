@@ -1,5 +1,13 @@
 'use client';
 
+import {
+  BanknotesIcon,
+  BuildingStorefrontIcon,
+  ClipboardDocumentCheckIcon,
+  ShieldCheckIcon,
+  TableCellsIcon,
+  TagIcon,
+} from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -20,15 +28,36 @@ import SectionTabs from '@/app/ui/section-tabs';
  * than a prefix test, which lit Contractors and Compliance together.
  */
 const TABS = [
-  { name: 'Vendors', href: ROUTES.partnersVendors },
-  { name: 'Categories', href: ROUTES.partnersVendorCategories, needsSettings: true },
-  { name: 'Contractors', href: ROUTES.partnersContractors },
-  { name: 'Compliance', href: ROUTES.partnersCompliance },
-  { name: 'RAG matrix', href: ROUTES.partnersRag },
-  { name: 'BOCW cess', href: ROUTES.partnersBocw },
+  {
+    name: 'Vendors',
+    href: ROUTES.partnersVendors,
+    icon: BuildingStorefrontIcon,
+  },
+  {
+    name: 'Categories',
+    href: ROUTES.partnersVendorCategories,
+    icon: TagIcon,
+    needsSettings: true,
+  },
+  {
+    name: 'Contractors',
+    href: ROUTES.partnersContractors,
+    icon: ShieldCheckIcon,
+  },
+  {
+    name: 'Compliance',
+    href: ROUTES.partnersCompliance,
+    icon: ClipboardDocumentCheckIcon,
+  },
+  { name: 'RAG matrix', href: ROUTES.partnersRag, icon: TableCellsIcon },
+  { name: 'BOCW cess', href: ROUTES.partnersBocw, icon: BanknotesIcon },
 ];
 
-export default function PartnersNav() {
+export default function PartnersNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -37,8 +66,16 @@ export default function PartnersNav() {
   // Until the answer is known, show the tabs that need no extra permission rather
   // than flashing Categories and withdrawing it (014 FR-011).
   const tabs = TABS.filter(
-    (tab) => !tab.needsSettings || (user?.permissions.includes('SETTINGS') ?? false),
+    (tab) =>
+      !tab.needsSettings || (user?.permissions.includes('SETTINGS') ?? false),
   );
 
-  return <SectionTabs label="Partners sections" tabs={tabs} />;
+  return (
+    <SectionTabs
+      label="Partners sections"
+      tabs={tabs}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

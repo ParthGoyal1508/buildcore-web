@@ -2,7 +2,11 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { AREA_ACCENTS, AREA_ICONS, type ShellAreaId } from '@/app/ui/module-theme';
+import {
+  AREA_ACCENTS,
+  AREA_ICONS,
+  type ShellAreaId,
+} from '@/app/ui/module-theme';
 
 /**
  * One sidebar entry — a module, Reminders or Approvals (2026-10-14).
@@ -29,6 +33,7 @@ export default function SideNavItem({
   label,
   active,
   badge,
+  labelled = false,
 }: {
   href: string;
   area: ShellAreaId;
@@ -36,6 +41,11 @@ export default function SideNavItem({
   active: boolean;
   /** A count pill, already styled by the caller — its colour carries meaning there. */
   badge?: ReactNode;
+  /**
+   * The desktop row at every width — icon, name and badge on one line. The phone Menu sheet
+   * (`mobile-nav.tsx`) lists the modules this way, by name, instead of as bare icons.
+   */
+  labelled?: boolean;
 }) {
   const Icon = AREA_ICONS[area];
   return (
@@ -46,12 +56,16 @@ export default function SideNavItem({
       aria-label={label}
       title={label}
       className={clsx(
-        'group flex h-[48px] flex-1 basis-[20%] items-center justify-center gap-3 rounded-lg p-2 text-sm font-medium transition-colors',
+        'group flex items-center gap-3 rounded-lg text-sm font-medium transition-colors',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
-        'md:h-9 md:w-full md:flex-none md:basis-auto md:justify-start md:px-2 md:py-1',
+        labelled
+          ? 'h-11 w-full justify-start px-2 py-1'
+          : 'h-[48px] flex-1 basis-[20%] justify-center p-2 md:h-9 md:w-full md:flex-none md:basis-auto md:justify-start md:px-2 md:py-1',
         active
           ? 'bg-brand-600 text-white shadow-sm'
-          : 'bg-white text-gray-700 hover:bg-white hover:text-brand-700 hover:shadow-sm md:bg-transparent',
+          : labelled
+            ? 'text-gray-700 hover:bg-brand-50 hover:text-brand-700'
+            : 'bg-white text-gray-700 hover:bg-white hover:text-brand-700 hover:shadow-sm md:bg-transparent',
       )}
     >
       <span
@@ -62,8 +76,12 @@ export default function SideNavItem({
       >
         <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
       </span>
-      <span className="hidden truncate md:block">{label}</span>
-      {badge ? <span className="md:ml-auto">{badge}</span> : null}
+      <span className={clsx('truncate', !labelled && 'hidden md:block')}>
+        {label}
+      </span>
+      {badge ? (
+        <span className={labelled ? 'ml-auto' : 'md:ml-auto'}>{badge}</span>
+      ) : null}
     </Link>
   );
 }

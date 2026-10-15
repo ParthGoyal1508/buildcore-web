@@ -11,7 +11,11 @@ import SectionTabs from '@/app/ui/section-tabs';
  * Filtered by the same `visibleSettingsSections()` the index tiles use, so the strip
  * cannot offer a section the layout guard would refuse.
  */
-export default function SettingsNav() {
+export default function SettingsNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -20,9 +24,17 @@ export default function SettingsNav() {
   const tabs = visibleSettingsSections(user).map((section) => ({
     name: section.title,
     href: section.href,
+    icon: section.icon,
   }));
 
   if (tabs.length === 0) return null;
 
-  return <SectionTabs label="Settings sections" tabs={tabs} />;
+  return (
+    <SectionTabs
+      label="Settings sections"
+      tabs={tabs}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

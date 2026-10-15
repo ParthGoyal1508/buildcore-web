@@ -1,5 +1,16 @@
 'use client';
 
+import {
+  BanknotesIcon,
+  BookOpenIcon,
+  ClipboardDocumentCheckIcon,
+  Cog6ToothIcon,
+  DocumentTextIcon,
+  FireIcon,
+  Squares2X2Icon,
+  TruckIcon,
+  WrenchIcon,
+} from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -20,47 +31,71 @@ import SectionTabs, { type SectionTab } from '@/app/ui/section-tabs';
  */
 const TABS: { tab: SectionTab; permission: string }[] = [
   {
-    tab: { name: 'Register', href: ROUTES.plantEquipment },
+    tab: { name: 'Register', href: ROUTES.plantEquipment, icon: TruckIcon },
     permission: PLANT_PERMISSIONS.equipment,
   },
   {
-    tab: { name: 'Logbook', href: ROUTES.plantLogbook },
+    tab: { name: 'Logbook', href: ROUTES.plantLogbook, icon: BookOpenIcon },
     permission: PLANT_PERMISSIONS.logbook,
   },
   {
-    tab: { name: 'Fuel', href: ROUTES.plantFuel },
+    tab: { name: 'Fuel', href: ROUTES.plantFuel, icon: FireIcon },
     permission: PLANT_PERMISSIONS.fuel,
   },
   {
-    tab: { name: 'Maintenance', href: ROUTES.plantMaintenance },
+    tab: {
+      name: 'Maintenance',
+      href: ROUTES.plantMaintenance,
+      icon: WrenchIcon,
+    },
     permission: PLANT_PERMISSIONS.maintenance,
   },
   {
-    tab: { name: 'Services', href: ROUTES.plantServices },
+    tab: {
+      name: 'Services',
+      href: ROUTES.plantServices,
+      icon: ClipboardDocumentCheckIcon,
+    },
     permission: PLANT_PERMISSIONS.services,
   },
   {
-    tab: { name: 'Spare Parts', href: ROUTES.plantSpareParts },
+    tab: {
+      name: 'Spare Parts',
+      href: ROUTES.plantSpareParts,
+      icon: Cog6ToothIcon,
+    },
     permission: PLANT_PERMISSIONS.spareParts,
   },
   {
     // Vehicle work/hire orders (2026-10-15). Gated on `MACHINERY` because that is what the
     // API asks for them, not `HIRE_BILLS`: raising an order is fleet work, paying a bill is
     // not.
-    tab: { name: 'Hire Orders', href: ROUTES.plantHireOrders },
+    tab: {
+      name: 'Hire Orders',
+      href: ROUTES.plantHireOrders,
+      icon: DocumentTextIcon,
+    },
     permission: PLANT_PERMISSIONS.equipment,
   },
   {
-    tab: { name: 'Hire Bills', href: ROUTES.plantHireBills },
+    tab: {
+      name: 'Hire Bills',
+      href: ROUTES.plantHireBills,
+      icon: BanknotesIcon,
+    },
     permission: PLANT_PERMISSIONS.hireBills,
   },
   {
-    tab: { name: 'Masters', href: ROUTES.plantMasters },
+    tab: { name: 'Masters', href: ROUTES.plantMasters, icon: Squares2X2Icon },
     permission: PLANT_PERMISSIONS.masters,
   },
 ];
 
-export default function PlantNav() {
+export default function PlantNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -75,5 +110,12 @@ export default function PlantNav() {
 
   if (tabs.length === 0) return null;
 
-  return <SectionTabs label="Plant sections" tabs={tabs} />;
+  return (
+    <SectionTabs
+      label="Plant sections"
+      tabs={tabs}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

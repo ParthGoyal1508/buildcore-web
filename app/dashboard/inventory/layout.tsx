@@ -69,7 +69,7 @@ export default function InventoryLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      {!isModuleIndex && <InventoryNav />}
+      <InventoryNav stripHidden={isModuleIndex} />
       {/* The page's content is the `<main>` landmark, matching how `hr`, `projects`,
           `partners` and `settings` each mark it on their own pages. This module's
           screens had none at all — a browser pass over 103 routes found 60 with

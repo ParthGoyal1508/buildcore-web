@@ -8,7 +8,8 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
-  const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [promptEvent, setPromptEvent] =
+    useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function InstallPrompt() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 rounded-xl border border-slate-200 bg-white p-4 shadow-lg md:left-auto md:right-4 md:max-w-sm">
+    <div className="fixed inset-x-4 bottom-20 z-50 md:bottom-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg md:left-auto md:right-4 md:max-w-sm">
       <p className="text-sm font-semibold text-slate-900">Install BuildCore</p>
       <p className="mt-1 text-sm text-slate-600">
         Add it to your home screen for faster access and offline use.

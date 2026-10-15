@@ -59,8 +59,14 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
 
   // Not on the index: there the tiles are the navigation, and a strip repeating
   // them would be the same links twice with no tab active.
+  // The phone bottom bar still takes this module's sections from the nav (2026-10-15).
   if (pathname === ROUTES.hr) {
-    return <>{children}</>;
+    return (
+      <>
+        <HrNav stripHidden />
+        {children}
+      </>
+    );
   }
 
   return (

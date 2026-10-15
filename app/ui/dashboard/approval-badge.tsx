@@ -39,9 +39,47 @@ import SideNavItem from '@/app/ui/dashboard/sidenav-item';
  * the queue really is empty. The *count* still appears only when there is something waiting, so
  * the signal that something needs attention is unchanged.
  */
-export default function ApprovalBadge() {
+export default function ApprovalBadge({
+  labelled = false,
+}: {
+  labelled?: boolean;
+} = {}) {
   const pathname = usePathname();
+  const count = useApprovalTotal();
+  const active =
+    pathname === ROUTES.approvals ||
+    pathname.startsWith(`${ROUTES.approvals}/`);
 
+  return (
+    <SideNavItem
+      href={ROUTES.approvals}
+      area="approvals"
+      label="Approvals"
+      active={active}
+      labelled={labelled}
+      badge={
+        count > 0 && (
+          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-green-800">
+            {/* The screen-reader text carries what the colour and position convey. */}
+            <span aria-hidden="true">{count}</span>
+            <span className="sr-only">
+              {count === 1
+                ? '1 item awaiting your approval'
+                : `${count} items awaiting your approval`}
+            </span>
+          </span>
+        )
+      }
+    />
+  );
+}
+
+/**
+ * Everything awaiting the caller's decision: spine items, leave and claims. Shared with the phone
+ * bar's Menu button (2026-10-15), which shows the same number — the queries are the badge's own, so
+ * the two read one cache and cannot disagree.
+ */
+export function useApprovalTotal(): number {
   const { data } = useQuery({
     queryKey: ['approvalCount'],
     queryFn: getApprovalCount,
@@ -78,29 +116,5 @@ export default function ApprovalBadge() {
 
   const count =
     (data?.count ?? 0) + (leave.data?.length ?? 0) + (claims.data?.length ?? 0);
-  const active =
-    pathname === ROUTES.approvals ||
-    pathname.startsWith(`${ROUTES.approvals}/`);
-
-  return (
-    <SideNavItem
-      href={ROUTES.approvals}
-      area="approvals"
-      label="Approvals"
-      active={active}
-      badge={
-        count > 0 && (
-          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-green-800">
-            {/* The screen-reader text carries what the colour and position convey. */}
-            <span aria-hidden="true">{count}</span>
-            <span className="sr-only">
-              {count === 1
-                ? '1 item awaiting your approval'
-                : `${count} items awaiting your approval`}
-            </span>
-          </span>
-        )
-      }
-    />
-  );
+  return count;
 }

@@ -26,7 +26,12 @@ const NOTICE = 'basis-full rounded-lg bg-white px-3 py-2 text-xs';
  * whose permissions could not be read at all (FR-010) — so the pending state is a
  * placeholder and the failed state shows nothing.
  */
-export default function NavLinks() {
+export default function NavLinks({
+  labelled = false,
+}: {
+  /** Name each module at every width — the phone Menu sheet. */
+  labelled?: boolean;
+} = {}) {
   const pathname = usePathname();
   const {
     data: user,
@@ -87,6 +92,7 @@ export default function NavLinks() {
           area={navModule.id}
           label={navModule.name}
           active={current === navModule.id}
+          labelled={labelled}
         />
       ))}
     </>

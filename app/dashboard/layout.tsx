@@ -2,12 +2,14 @@ import DashboardSearch from '@/app/ui/dashboard-search';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import SessionGuard from '@/app/ui/dashboard/session-guard';
 import ModuleGuard from '@/app/ui/dashboard/module-guard';
+import { MobileNavShell } from '@/app/ui/mobile-nav';
 import { PageLoadingOverlay } from '@/app/ui/page-skeleton';
 import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
 
 /**
- * The dashboard shell: sidebar beside a content column, stacked on mobile.
+ * The dashboard shell: sidebar beside a content column; on a phone, the content alone above the
+ * shared bottom bar (`mobile-nav.tsx`).
  *
  * The root is `min-h-screen` on mobile and `h-screen` from `md`. A hard `h-screen`
  * capped the mobile content column's box at whatever the nav block left over — about
@@ -58,34 +60,40 @@ export default function DashboardLayout({
           than after the loader. */}
       <SessionGuard />
       <ShellGate>
-        <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:overflow-clip">
-          {/* Search is mounted here and not inside `ShellHeader`, which three shells
+        <MobileNavShell>
+          <div className="flex min-h-screen flex-col md:fixed md:inset-0 md:h-screen md:overflow-clip">
+            {/* Search is mounted here and not inside `ShellHeader`, which three shells
           share: FR-001 puts it on the dashboard, and a site employee in My Workspace
           has no register to search. The bar runs the full width, logo and all, with the
           sidebar and the content beneath it (2026-10-15). */}
-          <ShellHeader>
-            <DashboardSearch />
-          </ShellHeader>
-          <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
-            <div className="w-full flex-none md:w-64">
-              <SideNav />
-            </div>
-            {/* The content column scrolls on its own beneath the bar. `min-w-0` because a flex child defaults to `min-width: auto`
+            <ShellHeader>
+              <DashboardSearch />
+            </ShellHeader>
+            <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
+              {/* Desktop only (2026-10-15). On a phone this was a grid of unlabelled module icons
+            stacked above every page; the modules now sit, by name, behind Menu in the bottom
+            bar (`mobile-nav.tsx`), with the module's own sections beside it. */}
+              <div className="hidden flex-none md:block md:w-64">
+                <SideNav />
+              </div>
+              {/* The content column scrolls on its own beneath the bar. `min-w-0` because a flex child defaults to `min-width: auto`
             and would otherwise be forced wide by a table or a long unbroken string
             instead of scrolling inside itself. */}
-            {/* `bg-gray-50` (slate since the 2026-10-14 colour pass): a faint cool ground under the
+              {/* `bg-gray-50` (slate since the 2026-10-14 colour pass): a faint cool ground under the
             content, so the white cards and tables every screen is built from read as surfaces
             instead of dissolving into a white page — half of what made the old look washed out. */}
-            <div className="flex min-w-0 flex-grow flex-col bg-gray-50 md:overflow-hidden">
-              <div className="relative flex-grow p-4 sm:p-6 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
-                {/* The skeleton over this column while a screen first loads; top bar and sidebar
+              <div className="flex min-w-0 flex-grow flex-col bg-gray-50 md:overflow-hidden">
+                {/* `pb-24` clears the phone bottom bar; at `md` that bar is gone. */}
+                <div className="relative flex-grow p-4 pb-24 sm:p-6 sm:pb-24 md:overflow-y-auto md:px-8 md:pb-12 md:pt-8 lg:px-12">
+                  {/* The skeleton over this column while a screen first loads; top bar and sidebar
                 stay as they are (2026-10-15). */}
-                <PageLoadingOverlay />
-                <ModuleGuard>{children}</ModuleGuard>
+                  <PageLoadingOverlay />
+                  <ModuleGuard>{children}</ModuleGuard>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </MobileNavShell>
       </ShellGate>
     </>
   );

@@ -1,5 +1,16 @@
 'use client';
 
+import {
+  BanknotesIcon,
+  CameraIcon,
+  ChartBarIcon,
+  ClipboardDocumentCheckIcon,
+  CreditCardIcon,
+  DocumentTextIcon,
+  UserGroupIcon,
+  UsersIcon,
+} from '@heroicons/react/24/outline';
+
 import { ROUTES } from '@/app/lib/constants';
 import SectionTabs from '@/app/ui/section-tabs';
 
@@ -20,23 +31,45 @@ import SectionTabs from '@/app/ui/section-tabs';
 export default function LabourNav({
   canSeeReports,
   className,
+  stripHidden = false,
 }: {
   canSeeReports: boolean;
   className?: string;
+  stripHidden?: boolean;
 }) {
   const tabs = [
-    { name: 'Capture Muster', href: ROUTES.musterCapture },
-    { name: 'Wage Rates', href: ROUTES.labourWageRates },
-    { name: 'Workers', href: ROUTES.labourWorkers },
-    { name: 'Gangs', href: ROUTES.labourGangs },
-    { name: 'Musters', href: ROUTES.labourMusters },
-    { name: 'Payment Sheets', href: ROUTES.labourPaymentSheets },
-    { name: 'Advances', href: ROUTES.labourAdvances },
+    { name: 'Capture Muster', href: ROUTES.musterCapture, icon: CameraIcon },
+    { name: 'Wage Rates', href: ROUTES.labourWageRates, icon: BanknotesIcon },
+    { name: 'Workers', href: ROUTES.labourWorkers, icon: UserGroupIcon },
+    { name: 'Gangs', href: ROUTES.labourGangs, icon: UsersIcon },
+    {
+      name: 'Musters',
+      href: ROUTES.labourMusters,
+      icon: ClipboardDocumentCheckIcon,
+    },
+    {
+      name: 'Payment Sheets',
+      href: ROUTES.labourPaymentSheets,
+      icon: DocumentTextIcon,
+    },
+    { name: 'Advances', href: ROUTES.labourAdvances, icon: CreditCardIcon },
     ...(canSeeReports
-      ? [{ name: 'Reports', href: ROUTES.labourReportsDeployment }]
+      ? [
+          {
+            name: 'Reports',
+            href: ROUTES.labourReportsDeployment,
+            icon: ChartBarIcon,
+          },
+        ]
       : []),
   ];
   return (
-    <SectionTabs label="Labour sections" tabs={tabs} className={className} />
+    <SectionTabs
+      label="Labour sections"
+      tabs={tabs}
+      className={className}
+      mobile
+      stripHidden={stripHidden}
+    />
   );
 }
