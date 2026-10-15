@@ -139,6 +139,58 @@ export function useOfferableLetterKinds(
   return { kinds: offerable, isPending: kinds.isPending || user.isPending };
 }
 
+/** What the employee record fills in when it holds no gender (2026-10-15). */
+const NEUTRAL_FORMS: Record<string, string> = {
+  relation: 'S/o / D/o',
+  pronounSubject: 'they',
+  pronounObject: 'them',
+  pronounPossessive: 'their',
+};
+const MALE_FORMS: Record<string, string> = {
+  relation: 'S/o',
+  pronounSubject: 'he',
+  pronounObject: 'him',
+  pronounPossessive: 'his',
+};
+const FEMALE_FORMS: Record<string, string> = {
+  relation: 'D/o',
+  pronounSubject: 'she',
+  pronounObject: 'her',
+  pronounPossessive: 'her',
+};
+
+/**
+ * A salutation typed over a record that holds no gender decides the relation and pronouns the
+ * record left neutral (2026-10-15): typing "Mr." turns "S/o / D/o" into "S/o" and "them" into
+ * "him". Only fields still showing the record's neutral value, or a form this put there, follow
+ * it — anything HR typed into them stays.
+ */
+function followSalutation(
+  values: Record<string, string>,
+  original: Record<string, string>,
+): Record<string, string> {
+  const s = (values.salutation ?? '').trim().toLowerCase().replace(/\.$/, '');
+  const forms =
+    s === 'mr'
+      ? MALE_FORMS
+      : ['ms', 'mrs', 'miss'].includes(s)
+        ? FEMALE_FORMS
+        : NEUTRAL_FORMS;
+  const out = { ...values };
+  for (const key of Object.keys(NEUTRAL_FORMS)) {
+    if (!(key in out) || original[key] !== NEUTRAL_FORMS[key]) continue;
+    const current = out[key];
+    if (
+      current === NEUTRAL_FORMS[key] ||
+      current === MALE_FORMS[key] ||
+      current === FEMALE_FORMS[key]
+    ) {
+      out[key] = forms[key];
+    }
+  }
+  return out;
+}
+
 /**
  * Generate an HR document on demand: pick the kind, check the form the records filled in, issue,
  * download (HR documents, 2026-10-13).
@@ -443,7 +495,11 @@ function LetterFields({
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
       ) => {
         const next = e.target.value;
-        setValues((prev) => ({ ...prev, [f.token]: next }));
+        setValues((prev) =>
+          f.token === 'salutation'
+            ? followSalutation({ ...prev, salutation: next }, original)
+            : { ...prev, [f.token]: next },
+        );
         if (isFlagged && next.trim()) {
           setFlagged((prev) => prev.filter((t) => t !== f.token));
         }

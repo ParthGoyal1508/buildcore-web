@@ -80,14 +80,15 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     toggle,
   } = useSortedRows(reports ?? [], DWR_COLUMNS);
 
+  /** Resolves once the list has been re-read, so a notice can wait for the row it describes. */
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['dwrs', projectId] });
     // Approval moved BOQ executed quantities, so anything reading them is now stale. Named
     // individually rather than clearing everything: a blanket reset re-fetches the whole project.
     void queryClient.invalidateQueries({ queryKey: ['boq', projectId] });
     void queryClient.invalidateQueries({
       queryKey: ['billPackages', projectId],
     });
+    return queryClient.invalidateQueries({ queryKey: ['dwrs', projectId] });
   };
 
   const act = useMutation({
@@ -104,7 +105,11 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
       if (job.kind === 'return') return returnDwr(job.dwrId, job.reason ?? '');
       return reverseDwr(job.dwrId, job.reason ?? '');
     },
-    onSuccess: (_result, job) => {
+    // Awaits the list before saying anything: "Submitted for approval" over a row still reading
+    // Draft is two answers to one question. The mutation stays pending meanwhile, so its buttons
+    // stay disabled until the row and the notice agree.
+    onSuccess: async (_result, job) => {
+      await refresh();
       setError(null);
       setNotice(
         job.kind === 'approve'
@@ -117,7 +122,6 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
                 ? 'Submitted for approval. Nothing has moved yet — approval is what does that.'
                 : 'Returned to the author.',
       );
-      refresh();
     },
     onError: (err: unknown) => {
       setNotice(null);
