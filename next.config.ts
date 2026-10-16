@@ -88,6 +88,36 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: '/bff/:path*', destination: `${API_ORIGIN}/:path*` }];
   },
+
+  /**
+   * Headers for the installed app (029 FR-050).
+   *
+   * `/sw.js` is never cached by the browser's HTTP cache. A stale worker keeps serving the old
+   * caching rules — including whatever fix the new one carries — until the cache entry lapses,
+   * and on a phone that rarely reloads that can be days. `/sw.js` is also where every update
+   * check goes, so `no-cache` costs one small conditional request per check.
+   *
+   * The credential pages (an invite link, a reset link) carry their token in the URL. No
+   * referrer, so nothing followed from them learns it; no-store, so no cache keeps the page; no
+   * indexing, belt and braces. The service worker skips them as well (app/sw.ts).
+   */
+  async headers() {
+    const credentialPage = [
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+      { key: 'Cache-Control', value: 'no-store' },
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+    ];
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        ],
+      },
+      { source: '/reset-password/:token*', headers: credentialPage },
+      { source: '/set-password/:token*', headers: credentialPage },
+    ];
+  },
 };
 
 // Serwist is deliberately NOT wrapped around this config. Next.js 16 builds with

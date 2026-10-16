@@ -7,6 +7,7 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   cancelLeaveApplication,
   getLeaveApplications,
+  requestStage,
   type LeaveApplication,
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
@@ -64,7 +65,12 @@ export default function LeaveApplications() {
       ),
     },
     { key: 'days', header: 'Days', render: (row) => row.dayCount },
-    { key: 'reason', header: 'Reason', render: (row) => row.reason, hideOnCard: true },
+    {
+      key: 'reason',
+      header: 'Reason',
+      render: (row) => row.reason,
+      hideOnCard: true,
+    },
     {
       key: 'status',
       header: 'Status',
@@ -78,6 +84,19 @@ export default function LeaveApplications() {
           >
             {row.status}
           </span>
+          {/* Where a pending application is (2026-10-16): the reporting manager decides first. */}
+          {row.status === 'pending' && (
+            <p className="mt-1 text-xs text-gray-500">
+              {requestStage(row) === 'manager'
+                ? 'With your reporting manager'
+                : 'With HR'}
+            </p>
+          )}
+          {row.managerRemarks && row.managerRemarks !== row.adminRemarks && (
+            <p className="mt-1 text-xs text-gray-500">
+              Manager: {row.managerRemarks}
+            </p>
+          )}
           {/* Remarks matter most on a rejection — being told "no" without a reason
               gives the employee nothing to act on. */}
           {row.adminRemarks && (
@@ -90,7 +109,9 @@ export default function LeaveApplications() {
 
   return (
     <section className="mt-8">
-      <h2 className="mb-3 text-lg font-medium text-gray-900">My applications</h2>
+      <h2 className="mb-3 text-lg font-medium text-gray-900">
+        My applications
+      </h2>
       <FormError message={error} />
 
       <ResponsiveList

@@ -17,7 +17,11 @@ import { visibleProjectSections } from '@/app/ui/projects/sections';
  * The active-tab rule lives in `SectionTabs`; see it for why longest match rather
  * than a prefix test.
  */
-export default function ProjectsNav() {
+export default function ProjectsNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -26,8 +30,16 @@ export default function ProjectsNav() {
   const tabs = visibleProjectSections(user).map((section) => ({
     name: section.title,
     href: section.href,
+    icon: section.icon,
   }));
   if (tabs.length === 0) return null;
 
-  return <SectionTabs label="Projects sections" tabs={tabs} />;
+  return (
+    <SectionTabs
+      label="Projects sections"
+      tabs={tabs}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

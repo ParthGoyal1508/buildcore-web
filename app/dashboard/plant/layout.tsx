@@ -86,7 +86,7 @@ export default function PlantLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      {!isModuleIndex && <PlantNav />}
+      <PlantNav stripHidden={isModuleIndex} />
       {/*
         Renders a company selector for a cross-company administrator and nothing at
         all for everyone else. Without it their lists show every tenant's rows at

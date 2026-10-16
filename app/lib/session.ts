@@ -87,6 +87,31 @@ export function clearSessionHint() {
  * approach) let a stale history entry render a previous user's name after a
  * logout-and-switch.
  */
+/**
+ * Empties what the service worker cached while this person was signed in (029).
+ *
+ * Every cache except the precache — the app's own build files, identical for everyone and what
+ * lets `/my` open offline. What goes is whatever was stored at run time: page data, images, and
+ * anything an older worker kept before its rules were tightened. On a shared site phone the next
+ * person to sign in must start from nothing the last one left behind.
+ *
+ * Best effort: a sign-out must not hang on, or fail because of, a storage API a browser may
+ * refuse (private mode, an insecure origin).
+ */
+export async function purgeRuntimeCaches(): Promise<void> {
+  if (typeof caches === 'undefined') return;
+  try {
+    const names = await caches.keys();
+    await Promise.all(
+      names
+        .filter((name) => !name.startsWith('serwist-precache'))
+        .map((name) => caches.delete(name)),
+    );
+  } catch {
+    // Nothing to do: the worst case is the state before this existed.
+  }
+}
+
 let justLoggedIn = false;
 
 export function markJustLoggedIn() {
@@ -173,11 +198,29 @@ export function abandonRefresh() {
   refreshInFlight = null;
 }
 
+/**
+ * Set once a refused renewal has sent this page to the sign-in screen (2026-10-15).
+ *
+ * The page keeps running until that navigation commits, and everything still mounted keeps
+ * asking — `me`, the badge counts, the company list. Each of those failed its own renewal and
+ * assigned `location.href` again, and every assignment cancels the navigation in flight and
+ * starts a new one. Wherever the sign-in page took longer than the next failure to arrive (a
+ * production build, its navigation going through the service worker), it never arrived: the
+ * tab sat on "Loading your workspace…" while the same five requests cycled every second.
+ *
+ * So the first refusal navigates and every later request fails at once, without the network,
+ * a renewal or another navigation. Never reset: the next thing this document does is unload.
+ */
+let sessionEnded = false;
+
 async function withAuth<T>(
   path: string,
   init: RequestInit | undefined,
   run: (path: string, init?: RequestInit) => Promise<T>,
 ): Promise<T> {
+  if (sessionEnded) {
+    throw new ApiError('Your session has ended.', 401, SESSION_EXPIRED);
+  }
   const withAuthHeader = (token: string | null): RequestInit => ({
     ...init,
     headers: {
@@ -222,6 +265,7 @@ async function withAuth<T>(
       // redirecting the user back into a shell they can no longer load.
       clearSessionHint();
       abandonRefresh();
+      void purgeRuntimeCaches();
       if (typeof window !== 'undefined') {
         // Deliberately a full document navigation, not router.push(): the session
         // has just been invalidated, and a client-side transition would keep the
@@ -254,7 +298,8 @@ async function withAuth<T>(
         // `useCanWrite`) turned that into a reload loop about five times a second, ended only
         // by the API's rate limiter refusing the eleventh renewal. The caller is fixed; this
         // keeps the next one from doing it again, since the reason is already on screen.
-        if (window.location.pathname !== ROUTES.login) {
+        if (window.location.pathname !== ROUTES.login && !sessionEnded) {
+          sessionEnded = true;
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
         }

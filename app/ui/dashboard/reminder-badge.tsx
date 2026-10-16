@@ -27,7 +27,11 @@ import SideNavItem from '@/app/ui/dashboard/sidenav-item';
  * Rendered only for a user holding DASHBOARD, so it never becomes the dead link that
  * feature exists to prevent.
  */
-export default function ReminderBadge() {
+export default function ReminderBadge({
+  labelled = false,
+}: {
+  labelled?: boolean;
+} = {}) {
   const pathname = usePathname();
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -48,7 +52,8 @@ export default function ReminderBadge() {
   const total = data?.total ?? 0;
   const overdue = data?.bySeverity.overdue ?? 0;
   const active =
-    pathname === ROUTES.reminders || pathname.startsWith(`${ROUTES.reminders}/`);
+    pathname === ROUTES.reminders ||
+    pathname.startsWith(`${ROUTES.reminders}/`);
 
   return (
     <SideNavItem
@@ -56,6 +61,7 @@ export default function ReminderBadge() {
       area="reminders"
       label="Reminders"
       active={active}
+      labelled={labelled}
       badge={
         total > 0 && (
           <span

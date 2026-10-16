@@ -1,13 +1,13 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import clsx from 'clsx';
 import { changePassword } from '@/app/lib/api/auth';
 import { passwordRules } from '@/app/lib/api/account-creation';
+import PasswordRules from '@/app/ui/password-rules';
 import { ApiError } from '@/app/lib/api/client';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
 
@@ -22,8 +22,9 @@ import { FormError, TextField } from '@/app/ui/settings/form-fields';
  * in the same write as the new hash, and its refusal reads live account state rather
  * than the token, so nothing needs re-issuing.
  */
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({ home }: { home: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -40,10 +41,8 @@ export default function ChangePasswordForm() {
   const submit = useMutation({
     mutationFn: () => changePassword({ oldPassword, newPassword }),
     onSuccess: () => {
-      // Straight on, not back to login: the session is still valid and the refusal
-      // that sent them here has already stopped. Bouncing to /login would read as
-      // the change having failed.
-      router.replace(ROUTES.dashboard);
+      // The cached user still says "must change"; the next screen must not believe it.
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     },
     onError: (err: unknown) =>
       setError(
@@ -54,6 +53,22 @@ export default function ChangePasswordForm() {
           : MESSAGES.saveFailed,
       ),
   });
+
+  if (submit.isSuccess) {
+    // Confirmed, then on: the session is still valid and the refusal that may have sent them
+    // here has already stopped. Going to /login would read as the change having failed.
+    return (
+      <div role="status" className="space-y-3">
+        <p className="rounded-md bg-green-50 px-3 py-3 text-green-800">
+          Password changed. Any other device signed in to your account has been signed out,
+          and we have emailed you a confirmation.
+        </p>
+        <Button type="button" onClick={() => router.replace(home)}>
+          Continue
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <form
@@ -85,21 +100,7 @@ export default function ChangePasswordForm() {
 
       {/* Each rule shown separately, and only once the user has started typing:
           one flat "invalid password" leaves them guessing which part is wrong. */}
-      {newPassword.length > 0 && (
-        <ul className="space-y-1 text-xs">
-          {passwordRules.map((rule) => {
-            const met = rule.test(newPassword);
-            return (
-              <li
-                key={rule.label}
-                className={clsx(met ? 'text-green-700' : 'text-gray-500')}
-              >
-                {met ? '✓' : '•'} {rule.label}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {newPassword.length > 0 && <PasswordRules value={newPassword} />}
 
       <TextField
         id="confirm-password"

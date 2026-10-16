@@ -1,5 +1,6 @@
 import ApprovalHistory from '@/app/ui/approvals/approval-history';
 import HrRequests from '@/app/ui/approvals/hr-requests';
+import TeamRequests from '@/app/ui/approvals/team-requests';
 import ApprovalQueue from '@/app/ui/approvals/queue-table';
 import ApprovalUpcoming from '@/app/ui/approvals/upcoming-table';
 import PageHeader from '@/app/ui/page-header';
@@ -37,6 +38,9 @@ export default function ApprovalsPage() {
         </h2>
         <ApprovalQueue />
       </section>
+      {/* Leave and claims from the people who report to this user — their decision comes before
+          HR's (2026-10-16). Renders nothing for someone with no team requests waiting. */}
+      <TeamRequests />
       {/* Leave and reimbursement claims, which have their own review rather than a chain, and
           items still on their way to this user (2026-10-15). */}
       <HrRequests />

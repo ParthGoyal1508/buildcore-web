@@ -7,7 +7,9 @@ export default function GroupDashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardPermissionGuard also="EMPLOYEES">
+    // Group-level users only (2026-10-16 access-control audit, H1): the API now refuses
+    // everyone else, and a single-company user opening this by URL is sent home.
+    <DashboardPermissionGuard also={['EMPLOYEES', 'CROSS_COMPANY_ACCESS']}>
       <div className="flex flex-col gap-6">
         <DashboardNav />
         {children}

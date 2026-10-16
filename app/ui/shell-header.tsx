@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
-import { landingRoute } from '@/app/lib/permissions';
+import { homeRoute } from '@/app/lib/permissions';
 import CompanySwitcher from '@/app/ui/company-switcher';
 import NotificationBell from '@/app/ui/dashboard/notification-bell';
 import CompanyLogo from '@/app/ui/company-logo';
@@ -29,7 +29,8 @@ import UserMenu from '@/app/ui/user-menu';
  * The wordmark is shown at every width: the bar runs the full width of the screen above the
  * sidebar, which no longer carries a copy of its own (2026-10-15).
  *
- * It links to `landingRoute()`, not to `/dashboard`. Hardcoding `/dashboard` makes it
+ * It links to `homeRoute()` — the role's chosen home, else `landingRoute()` — not to
+ * `/dashboard`. Hardcoding `/dashboard` makes it
  * a dead link for exactly the users most likely to tap it: a site employee holding
  * only `MY_WORKSPACE` has no Dashboard to go home to, and `ModuleGuard` would refuse
  * them — the dead link feature 014 exists to prevent. A user with no module at all
@@ -56,7 +57,8 @@ export default function ShellHeader({
   // `?? ROUTES.dashboard` only while the answer is pending — the sidebar renders its
   // own wordmark against the same assumption, and a tap in that window is rare enough
   // that a guard screen is a better outcome than a heading that shifts under a thumb.
-  const home = user ? landingRoute(user.permissions) : ROUTES.dashboard;
+  // The role's chosen home first (029 FR-021), then the first module held.
+  const home = user ? homeRoute(user) : ROUTES.dashboard;
 
   const wordmark = (
     <CompanyLogo

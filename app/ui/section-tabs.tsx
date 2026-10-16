@@ -3,10 +3,20 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import type { ComponentType, SVGProps } from 'react';
+
+import { activeTabHref, useMobileSections } from '@/app/ui/mobile-nav';
 
 export interface SectionTab {
   name: string;
   href: string;
+  /** The section's glyph in the phone bottom bar (2026-10-15). */
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  /**
+   * The path that counts as this tab when it is wider than `href` (2026-10-15): Reports opens
+   * the first report, but every page under `/reports` is that tab.
+   */
+  match?: string;
 }
 
 /**
@@ -30,21 +40,38 @@ export default function SectionTabs({
   label,
   tabs,
   className,
+  mobile = false,
+  stripHidden = false,
 }: {
   /** Names the strip for assistive tech, e.g. "Partners sections". */
   label: string;
   tabs: readonly SectionTab[];
   className?: string;
+  /**
+   * A module's own sections (2026-10-15): on a phone they move into the bottom bar
+   * (`mobile-nav.tsx`) and the strip is shown from `md` only. Left off for a strip *inside* a
+   * page — a project's tabs — which stays where it is at every width.
+   */
+  mobile?: boolean;
+  /** Feed the bar but draw no strip — a module index, whose tiles already name each section. */
+  stripHidden?: boolean;
 }) {
   const pathname = usePathname();
+  useMobileSections(label, tabs, mobile);
 
-  const activeHref = tabs
-    .map((tab) => tab.href)
-    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
-    .reduce((best, href) => (href.length > best.length ? href : best), '');
+  const activeHref = activeTabHref(pathname, tabs);
+
+  if (stripHidden) return null;
 
   return (
-    <nav aria-label={label} className={clsx('overflow-x-auto', className)}>
+    <nav
+      aria-label={label}
+      className={clsx(
+        'overflow-x-auto',
+        mobile && 'hidden md:block',
+        className,
+      )}
+    >
       <ul className="flex min-w-max gap-1 border-b border-gray-200">
         {tabs.map((tab) => {
           const isActive = tab.href === activeHref;

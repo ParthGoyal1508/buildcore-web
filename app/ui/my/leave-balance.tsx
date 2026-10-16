@@ -22,7 +22,8 @@ export const LEAVE_TYPE_LABEL: Record<LeaveBalance['leaveType'], string> = {
  * from another.
  */
 export function financialYearOf(date: Date): string {
-  const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+  const startYear =
+    date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
   return `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
 }
 

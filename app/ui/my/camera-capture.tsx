@@ -147,8 +147,7 @@ export default function CameraCapture({
 
   const switchCamera = useCallback(() => {
     setFacing((current) => {
-      const next: CameraFacing =
-        current === 'user' ? 'environment' : 'user';
+      const next: CameraFacing = current === 'user' ? 'environment' : 'user';
       storeFacing(next);
       return next;
     });

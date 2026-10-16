@@ -88,3 +88,23 @@ export function hasModuleAccess(
 export function landingRoute(permissions: readonly string[]): string | null {
   return visibleModules(permissions)[0]?.href ?? null;
 }
+
+/**
+ * Where a user lands after signing in (029 FR-021): their role's chosen home when they can open
+ * it, otherwise the first module they hold — `landingRoute`, exactly the behaviour before roles
+ * had a home.
+ *
+ * `homeModule` is a nav-module id, the same keys the API's `HOME_MODULES` uses. An id this client
+ * does not know, or a module the user cannot open (a role edited after the home was set), falls
+ * back rather than sending them somewhere that would refuse them.
+ *
+ * `null` under the same rule as `landingRoute`: the caller renders the empty state.
+ */
+export function homeRoute(user: {
+  permissions: readonly string[];
+  homeModule?: string | null;
+}): string | null {
+  const chosen = NAV_MODULES.find((navModule) => navModule.id === user.homeModule);
+  if (chosen && permits(user.permissions, chosen)) return chosen.href;
+  return landingRoute(user.permissions);
+}

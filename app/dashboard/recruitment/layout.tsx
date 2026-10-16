@@ -52,7 +52,10 @@ export default function RecruitmentLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      {!isModuleIndex && <RecruitmentNav canSeeReports={canSeeReports} />}
+      <RecruitmentNav
+        canSeeReports={canSeeReports}
+        stripHidden={isModuleIndex}
+      />
       {/*
         Renders a company selector for a cross-company administrator and nothing at
         all for everyone else — the same mounting Plant does across its subtree.

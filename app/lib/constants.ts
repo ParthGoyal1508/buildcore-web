@@ -14,6 +14,9 @@ export const ROUTES = {
   login: '/login',
   dashboard: '/dashboard',
   changePassword: '/change-password',
+  forgotPassword: '/forgot-password',
+  /** Resolves where this user lands and goes there (029 FR-021) — the PWA's way in. */
+  home: '/home',
   settings: '/dashboard/settings',
   settingsCompanies: '/dashboard/settings/companies',
   settingsRoles: '/dashboard/settings/roles',
@@ -58,6 +61,12 @@ export const ROUTES = {
   mySalary: '/my/salary',
   myFaceEnrol: '/my/face-enrol',
   myHolidays: '/my/holidays',
+  // My Workspace additions (2026-10-16).
+  myRequests: '/my/requests',
+  myLoans: '/my/loans',
+  myTax: '/my/tax',
+  myProfile: '/my/profile',
+  myResignation: '/my/resignation',
   myReimbursements: '/my/reimbursements',
 
   // --- HR & Payroll admin (feature 005) ---

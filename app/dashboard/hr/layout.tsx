@@ -11,6 +11,7 @@ import {
   type HrSection,
 } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import RedirectHome from '@/app/ui/redirect-home';
 import HrNav from '@/app/ui/hr/hr-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -53,14 +54,21 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
   // permission of its own — same treatment the Settings index gets.
   if (section && section in HR_PERMISSIONS) {
     if (!user.permissions.includes(HR_PERMISSIONS[section])) {
-      return <AccessDenied />;
+      // A section outside this role, reached by URL: home (2026-10-16 access-control audit, M1).
+      return <RedirectHome />;
     }
   }
 
   // Not on the index: there the tiles are the navigation, and a strip repeating
   // them would be the same links twice with no tab active.
+  // The phone bottom bar still takes this module's sections from the nav (2026-10-15).
   if (pathname === ROUTES.hr) {
-    return <>{children}</>;
+    return (
+      <>
+        <HrNav stripHidden />
+        {children}
+      </>
+    );
   }
 
   return (

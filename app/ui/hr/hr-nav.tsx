@@ -17,7 +17,11 @@ import SectionTabs from '@/app/ui/section-tabs';
  * Ten sections is more than fits at most widths; `SectionTabs` scrolls horizontally
  * inside its own container rather than letting the page scroll sideways.
  */
-export default function HrNav() {
+export default function HrNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -26,9 +30,17 @@ export default function HrNav() {
   const tabs = visibleHrSections(user).map((section) => ({
     name: section.title,
     href: section.href,
+    icon: section.icon,
   }));
 
   if (tabs.length === 0) return null;
 
-  return <SectionTabs label="HR & Payroll sections" tabs={tabs} />;
+  return (
+    <SectionTabs
+      label="HR & Payroll sections"
+      tabs={tabs}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

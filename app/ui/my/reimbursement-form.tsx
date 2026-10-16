@@ -97,7 +97,10 @@ export default function ReimbursementForm({
   // The employee already has a receipt on file when editing a draft that carried
   // one, so the requirement is satisfied without re-attaching it.
   const hasReceipt = receipt !== null || Boolean(editing?.receiptRef);
-  const needsReceipt = receiptIsRequired(category?.receiptRequiredAbove, amount);
+  const needsReceipt = receiptIsRequired(
+    category?.receiptRequiredAbove,
+    amount,
+  );
   const receiptMissing = needsReceipt && !hasReceipt;
 
   const submit = useMutation({

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +19,9 @@ import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import { Button } from './button';
 import { login } from '@/app/lib/api/auth';
 import { ApiError } from '@/app/lib/api/client';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
+import { homeRoute } from '@/app/lib/permissions';
 import { markJustLoggedIn } from '@/app/lib/session';
 
 const loginSchema = z.object({
@@ -30,6 +33,7 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -49,8 +53,8 @@ export default function LoginForm() {
       // step the back button can return to (research.md route-protection
       // intent extended to this direction too).
       if (result.mustChangePassword) {
-        // Password-change is a separate, not-yet-built feature — routed to a
-        // placeholder path per spec.md edge case / tasks.md T018a.
+        // An administrator chose the password in force; the API refuses everything else
+        // until it is replaced (010 FR-017, 029 FR-016).
         router.replace(ROUTES.changePassword);
         return;
       }
@@ -59,7 +63,14 @@ export default function LoginForm() {
       // the back button rendered the previous user's name. The dashboard
       // resolves it from the live session instead (welcome-banner.tsx).
       markJustLoggedIn();
-      router.replace(ROUTES.dashboard);
+      // Straight to this person's home (029 FR-021). Fetched into the shared cache rather than
+      // thrown away: the shell asks for the same user the moment it renders, so this costs no
+      // round trip overall — and on a site's connection that is the difference between landing
+      // on My Workspace and watching Dashboard flash up and redirect.
+      const user = await queryClient
+        .fetchQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser })
+        .catch(() => null);
+      router.replace((user && homeRoute(user)) ?? ROUTES.dashboard);
     } catch (err) {
       setServerError(
         err instanceof ApiError ? err.message : 'Something went wrong.',
@@ -87,6 +98,12 @@ export default function LoginForm() {
                 id="identifier"
                 type="text"
                 autoComplete="username"
+                // A phone would otherwise capitalise and "correct" an email or username.
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
+                enterKeyHint="next"
                 placeholder="Enter your email or username"
                 {...register('identifier')}
               />
@@ -135,7 +152,7 @@ export default function LoginForm() {
               session that ended when they closed the browser. Every session now lasts
               the same 90 days, so there is nothing left to ask. */}
           <div className="mt-4 flex items-center justify-end">
-            <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline">
+            <Link href={ROUTES.forgotPassword} className="text-xs text-blue-600 hover:underline">
               Forgot Password?
             </Link>
           </div>

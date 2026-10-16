@@ -6,9 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { hasModuleAccess, landingRoute } from '@/app/lib/permissions';
+import { hasModuleAccess, homeRoute, landingRoute } from '@/app/lib/permissions';
 import { canWriteAt, isWriteByNature } from '@/app/lib/write-access';
 import AccessDenied from '@/app/ui/access-denied';
+import RedirectHome from '@/app/ui/redirect-home';
 import { LoadingText } from '@/app/ui/spinner';
 
 /**
@@ -52,7 +53,7 @@ export default function ModuleGuard({
   // every mistyped URL would silently teleport them somewhere else.
   const redirectTo =
     user && access === 'refused' && pathname === ROUTES.dashboard
-      ? landingRoute(user.permissions)
+      ? homeRoute(user)
       : null;
 
   useEffect(() => {
@@ -102,7 +103,8 @@ export default function ModuleGuard({
         />
       );
     }
-    return <AccessDenied />;
+    // A module outside this role, reached by URL: home, not a dead end (2026-10-16 audit, M1).
+    return <RedirectHome />;
   }
 
   return <>{children}</>;

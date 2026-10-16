@@ -38,7 +38,21 @@ export default function RoleList() {
   });
 
   const columns: Column<Role>[] = [
-    { key: 'name', header: 'Role', render: (r) => r.name },
+    {
+      key: 'name',
+      header: 'Role',
+      render: (r) => (
+        <>
+          {r.name}
+          {/* 029 FR-001: the role a new account gets when none is chosen. */}
+          {r.isDefault && (
+            <span className="ml-2 inline-flex rounded-full bg-accent-50 px-2 py-0.5 text-xs text-accent-800">
+              Default for new accounts
+            </span>
+          )}
+        </>
+      ),
+    },
     {
       key: 'permissions',
       header: 'Permissions',
@@ -82,8 +96,16 @@ export default function RoleList() {
             </RowAction>
             <RowAction
               type="button"
-              disabled={role.isProtected}
-              title={role.isProtected ? MESSAGES.protectedRole : undefined}
+              // The default role cannot be deleted either (029 FR-001) — the API refuses it, and
+              // a button that only ever fails is worse than one that says why it is off.
+              disabled={role.isProtected || role.isDefault}
+              title={
+                role.isProtected
+                  ? MESSAGES.protectedRole
+                  : role.isDefault
+                    ? 'New accounts are given this role, so it cannot be deleted.'
+                    : undefined
+              }
               onClick={() => {
                 setDeleteError(null);
                 setConfirming(role);

@@ -1,8 +1,6 @@
 'use client';
 
-import ResponsiveList, {
-  type Column,
-} from '@/app/ui/settings/responsive-list';
+import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import type { ReportData } from '@/app/lib/api/dashboard';
 
 /** Renders a report's tabular result, reusing the app-wide `ResponsiveList`. */

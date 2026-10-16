@@ -63,3 +63,24 @@ input[type='number']::-webkit-outer-spin-button {
     cursor: pointer;
   }
 }
+
+/*
+ * No zoom-on-focus on phones and tablets (029, 2026-10-16).
+ *
+ * iOS Safari — and the installed app, which is Safari underneath — zooms the page into any text
+ * field whose font is smaller than 16px the moment it is focused, and leaves it zoomed after.
+ * Every field here is `text-sm` (14px), so every form on a phone jumped. Touch devices get 16px;
+ * a mouse-driven screen keeps the compact 14px the design was laid out with.
+ *
+ * Keyed on the pointer, not the width: an iPad is wide and zooms all the same. Not done by
+ * `maximum-scale=1` in the viewport, which also stops Android users pinch-zooming — an
+ * accessibility loss to fix an iOS quirk. Outside any layer, and with attribute selectors in it,
+ * so it outranks the `text-*` utilities on the fields.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

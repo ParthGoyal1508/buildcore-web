@@ -215,7 +215,7 @@ export default function CompanySwitcher() {
         <ul
           role="listbox"
           aria-label={COMPANY_SWITCHER.label}
-          className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 text-gray-900 shadow-xl ring-1 ring-black/5"
+          className="absolute left-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] overflow-hidden md:left-auto md:right-0 md:w-72 rounded-xl border border-gray-200 bg-white p-1.5 text-gray-900 shadow-xl ring-1 ring-black/5"
         >
           {companies.map((company) => {
             const isSelected = company.id === (pending ?? selectedId);

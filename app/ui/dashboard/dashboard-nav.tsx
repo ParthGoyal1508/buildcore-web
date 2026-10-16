@@ -1,5 +1,13 @@
 'use client';
 
+import {
+  BuildingOffice2Icon,
+  ChartBarIcon,
+  ClockIcon,
+  HomeIcon,
+  ListBulletIcon,
+  MapPinIcon,
+} from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -29,24 +37,47 @@ import SectionTabs from '@/app/ui/section-tabs';
  * standing on `/dashboard/reports` correctly sees a strip of one.
  */
 const SECTIONS = [
-  { name: 'Overview', href: ROUTES.dashboard, permission: 'DASHBOARD' },
+  {
+    name: 'Overview',
+    href: ROUTES.dashboard,
+    permission: 'DASHBOARD',
+    icon: HomeIcon,
+  },
   // Overview, Group, Site — the client's order (2026-10-15): the company, then every company,
   // then one site.
   {
     name: 'Group Dashboard',
     href: ROUTES.groupDashboard,
-    permission: 'DASHBOARD',
+    // Group-level users only (2026-10-16 access-control audit, H1).
+    permission: 'CROSS_COMPANY_ACCESS',
+    icon: BuildingOffice2Icon,
   },
   {
     name: 'Site Dashboard',
     href: ROUTES.siteDashboard,
     permission: 'DASHBOARD',
+    icon: MapPinIcon,
   },
-  { name: 'Reminders', href: ROUTES.reminders, permission: 'DASHBOARD' },
-  { name: 'Reports', href: ROUTES.reports, permission: 'REPORTS' },
+  {
+    name: 'Reminders',
+    href: ROUTES.reminders,
+    permission: 'DASHBOARD',
+    icon: ClockIcon,
+  },
+  {
+    name: 'Reports',
+    href: ROUTES.reports,
+    permission: 'REPORTS',
+    icon: ChartBarIcon,
+  },
   // Last since 2026-10-15, matching the overview, where the log now sits at the foot of
   // the page: the client asked for the Activity Log to come after everything else.
-  { name: 'Activity Log', href: ROUTES.activityLog, permission: 'DASHBOARD' },
+  {
+    name: 'Activity Log',
+    href: ROUTES.activityLog,
+    permission: 'DASHBOARD',
+    icon: ListBulletIcon,
+  },
 ] as const;
 
 export default function DashboardNav({ className }: { className?: string }) {
@@ -59,12 +90,17 @@ export default function DashboardNav({ className }: { className?: string }) {
   // sidebar follows, so a restricted user never sees a tab flash and disappear.
   const permissions: readonly string[] = user?.permissions ?? [];
   const tabs = SECTIONS.filter((s) => permissions.includes(s.permission)).map(
-    ({ name, href }) => ({ name, href }),
+    ({ name, href, icon }) => ({ name, href, icon }),
   );
 
   if (tabs.length === 0) return null;
 
   return (
-    <SectionTabs label="Dashboard sections" tabs={tabs} className={className} />
+    <SectionTabs
+      label="Dashboard sections"
+      tabs={tabs}
+      className={className}
+      mobile
+    />
   );
 }

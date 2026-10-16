@@ -7,6 +7,7 @@ import {
   setSessionHint,
   clearSessionHint,
   abandonRefresh,
+  purgeRuntimeCaches,
 } from '@/app/lib/session';
 import { MESSAGES, formatLockoutMessage } from '@/app/lib/constants';
 
@@ -14,6 +15,9 @@ const loginResponseSchema = z.object({
   accessToken: z.string(),
   name: z.string(),
   mustChangePassword: z.boolean(),
+  /** Where this user lands (029 FR-021). Optional so this client can deploy before the API
+   * that sends it; absent means the same as null — the first module they can open. */
+  homeModule: z.string().nullable().optional(),
 });
 
 const refreshResponseSchema = z.object({
@@ -78,6 +82,9 @@ export async function logout(): Promise<void> {
     // A renewal already on its way would otherwise resolve after this and repopulate
     // the access token, quietly undoing the sign-out (015 FR-010).
     abandonRefresh();
+    // Awaited here, unlike on an expired session: this is a sign-out the user asked for, and
+    // the page it lands on must not be served anything of theirs (029).
+    await purgeRuntimeCaches();
   }
 }
 
@@ -128,4 +135,99 @@ export async function changePassword(input: {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
+}
+
+// ------------------------------------------------------------ Password reset (029)
+
+/**
+ * Forgot Password. The API answers the same way whether or not the address has an account,
+ * so this resolves on any 202 and the screen must not suggest otherwise.
+ *
+ * Public — the person has no session — so `apiFetch`, never `authFetch`.
+ */
+export async function requestPasswordReset(identifier: string): Promise<void> {
+  try {
+    await apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ identifier: identifier.trim() }),
+    });
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) {
+      throw new ApiError(MESSAGES.rateLimited, err.status);
+    }
+    throw err;
+  }
+}
+
+export const resetLinkValidationSchema = z.union([
+  z.object({ valid: z.literal(true) }),
+  z.object({
+    valid: z.literal(false),
+    reason: z.enum(['expired', 'consumed', 'not_found']),
+  }),
+]);
+export type ResetLinkValidation = z.infer<typeof resetLinkValidationSchema>;
+
+/**
+ * Whether a reset link still works. The token goes in the body, not the URL: a request path
+ * lands in proxy and access logs, and this token is a working credential until it is used.
+ */
+export async function validateResetLink(
+  token: string,
+): Promise<ResetLinkValidation> {
+  try {
+    const raw = await apiFetch<unknown>('/auth/reset-password/validate', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    return resetLinkValidationSchema.parse(raw);
+  } catch (err) {
+    // A token that is not even the right shape is refused by validation (400) before any
+    // lookup — to the person holding it, that is a link that does not work.
+    if (err instanceof ApiError && err.status === 400) {
+      return { valid: false, reason: 'not_found' };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Sets the new password. Every session for the account ends server-side — this browser's
+ * included — so any local session state is cleared too, or the next screen would try to
+ * renew a session that no longer exists.
+ */
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<void> {
+  await apiFetch('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+  clearSession();
+  clearSessionHint();
+  // Every session for the account has just ended, this one included.
+  void purgeRuntimeCaches();
+}
+
+export type AdminResetMethod = 'link' | 'temporary_password';
+
+const adminResetResultSchema = z.object({
+  method: z.enum(['link', 'temporary_password']),
+  /** Present only when the server generated it. Shown once; never stored client-side. */
+  temporaryPassword: z.string().optional(),
+  emailDispatchFailed: z.boolean(),
+});
+export type AdminResetResult = z.infer<typeof adminResetResultSchema>;
+
+/** An administrator gets someone back into their account (029 FR-014). */
+export async function adminResetPassword(
+  targetAccountId: string,
+  method: AdminResetMethod,
+): Promise<AdminResetResult> {
+  const raw = await authFetch<unknown>('/auth/admin/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ targetAccountId, method }),
+  });
+  return adminResetResultSchema.parse(raw);
 }

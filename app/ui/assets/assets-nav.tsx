@@ -1,5 +1,12 @@
 'use client';
 
+import {
+  ArchiveBoxIcon,
+  ArrowsRightLeftIcon,
+  ChartPieIcon,
+  ClipboardDocumentListIcon,
+  Squares2X2Icon,
+} from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -18,28 +25,40 @@ import SectionTabs, { type SectionTab } from '@/app/ui/section-tabs';
  */
 const TABS: { tab: SectionTab; permission: string }[] = [
   {
-    tab: { name: 'Register', href: ROUTES.assetsRegister },
+    tab: {
+      name: 'Register',
+      href: ROUTES.assetsRegister,
+      icon: ClipboardDocumentListIcon,
+    },
     permission: ASSETS_PERMISSIONS.register,
   },
   {
-    tab: { name: 'Allocations', href: ROUTES.assetsAllocations },
+    tab: {
+      name: 'Allocations',
+      href: ROUTES.assetsAllocations,
+      icon: ArrowsRightLeftIcon,
+    },
     permission: ASSETS_PERMISSIONS.allocations,
   },
   {
-    tab: { name: 'Stock', href: ROUTES.assetsStock },
+    tab: { name: 'Stock', href: ROUTES.assetsStock, icon: ArchiveBoxIcon },
     permission: ASSETS_PERMISSIONS.stock,
   },
   {
-    tab: { name: 'Summary', href: ROUTES.assetsSummary },
+    tab: { name: 'Summary', href: ROUTES.assetsSummary, icon: ChartPieIcon },
     permission: ASSETS_PERMISSIONS.summary,
   },
   {
-    tab: { name: 'Masters', href: ROUTES.assetsMasters },
+    tab: { name: 'Masters', href: ROUTES.assetsMasters, icon: Squares2X2Icon },
     permission: ASSETS_PERMISSIONS.masters,
   },
 ];
 
-export default function AssetsNav() {
+export default function AssetsNav({
+  stripHidden = false,
+}: {
+  stripHidden?: boolean;
+} = {}) {
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -54,5 +73,12 @@ export default function AssetsNav() {
 
   if (tabs.length === 0) return null;
 
-  return <SectionTabs label="Assets sections" tabs={tabs} />;
+  return (
+    <SectionTabs
+      label="Assets sections"
+      tabs={tabs}
+      mobile
+      stripHidden={stripHidden}
+    />
+  );
 }

@@ -60,9 +60,41 @@ declare const self: ServiceWorkerGlobalScope;
  * again — reinstating both problems above, leakage included, as a side effect of a
  * change that has nothing to do with caching.
  */
+/**
+ * Pages are cached only under `/my` — the area this worker exists to keep usable offline (029).
+ *
+ * `defaultCache` ends with a catch-all that keeps every same-origin GET — page loads included —
+ * in an "others" cache for 24 hours, keyed by URL, and its RSC rules do the same for client-side
+ * navigations. Left to it, every page anyone opened on a shared site phone stayed in Cache
+ * Storage after they signed out: the dashboard and HR screens, and worse, the invite and reset
+ * pages, whose URL *is* a working credential. None of those is any use offline — each needs the
+ * API — so nothing is lost by never storing them.
+ *
+ * `/my` keeps the default treatment: its pages are static shells (every figure on them comes from
+ * `/bff`, which is never cached), and they are what has to open with no signal.
+ *
+ * Matched by path, not by how the request was made. A page reaches this worker three ways — a page
+ * load, a client-side navigation (`RSC` header), and `SerwistProvider`'s cache-on-navigation,
+ * which re-fetches each visited URL from inside the worker as a plain request with neither mark.
+ * The third is how `/login` was still being stored after sign-out when this keyed on the request.
+ * A page route is anything outside `/_next/` without a file extension; scripts, styles, fonts,
+ * images and the manifest fall through to `defaultCache` as before.
+ */
+const OFFLINE_AREA = '/my';
+const isPageRoute = (pathname: string) =>
+  !pathname.startsWith('/_next/') && !/\.[a-z0-9]+$/i.test(pathname);
+
 const runtimeCaching: RuntimeCaching[] = [
   {
     matcher: ({ sameOrigin, url }) => !sameOrigin || url.pathname.startsWith('/bff'),
+    handler: new NetworkOnly(),
+  },
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin &&
+      isPageRoute(url.pathname) &&
+      url.pathname !== OFFLINE_AREA &&
+      !url.pathname.startsWith(`${OFFLINE_AREA}/`),
     handler: new NetworkOnly(),
   },
   ...defaultCache,

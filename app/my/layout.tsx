@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import clsx from 'clsx';
-import { Squares2X2Icon } from '@heroicons/react/24/outline';
 import { SerwistProvider } from '@serwist/next/react';
 import { useQuery } from '@tanstack/react-query';
 import { getMyEmployee, submitPunch } from '@/app/lib/api/my-workspace';
@@ -17,6 +15,7 @@ import SideNav from '@/app/ui/dashboard/sidenav';
 import { PageLoadingOverlay } from '@/app/ui/page-skeleton';
 import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
+import { MobileNavShell } from '@/app/ui/mobile-nav';
 import { MY_SECTIONS } from '@/app/ui/my/sections';
 import SectionTabs from '@/app/ui/section-tabs';
 
@@ -150,104 +149,67 @@ export default function MyWorkspaceLayout({
           bring a focused element into view — leaving the shell shifted sideways with no scrollbar
           to bring it back. This shell carries the same wide tables, so it carries the same trap. */}
       <ShellGate>
-        <div className="flex min-h-screen flex-col bg-gray-50 md:fixed md:inset-0 md:h-screen md:overflow-clip md:bg-transparent">
-          <ShellHeader />
-          <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
-            {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
+        <MobileNavShell>
+          <div className="flex min-h-screen flex-col bg-gray-50 md:fixed md:inset-0 md:h-screen md:overflow-clip md:bg-transparent">
+            <ShellHeader />
+            <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
+              {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
             keeps every module they can reach instead of being stranded in this one. */}
-            <div className="hidden flex-none md:block md:w-64">
-              <SideNav />
-            </div>
+              <div className="hidden flex-none md:block md:w-64">
+                <SideNav />
+              </div>
 
-            {/* A separately scrolling body beneath the full-width bar, the same shape
+              {/* A separately scrolling body beneath the full-width bar, the same shape
             `/dashboard` uses. */}
-            <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
-              {/* `pb-24` clears the fixed bottom bar; at `md` that bar is gone, so the
+              <div className="flex min-w-0 flex-grow flex-col md:overflow-hidden">
+                {/* `pb-24` clears the fixed bottom bar; at `md` that bar is gone, so the
               padding goes with it and the column scrolls in place like the dashboard's. */}
-              <div className="relative flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
-                <PageLoadingOverlay />
-                {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
+                <div className="relative flex-grow p-4 pb-24 md:overflow-y-auto md:p-12 md:pb-12">
+                  <PageLoadingOverlay />
+                  {/* The bottom bar's job on desktop. Omits its "Admin" entry, since the
                 sidebar beside it already covers moving between shells. */}
-                {pathname !== ROUTES.myWorkspace && (
+                  {/* On a phone the same sections are the shared bottom bar (2026-10-15), whose Menu
+                replaces the "Admin" entry this shell's own bar used to carry. */}
                   <SectionTabs
                     label="My Workspace sections"
                     tabs={MY_SECTIONS}
-                    className="mb-6 hidden md:block"
+                    className="mb-6"
+                    mobile
+                    stripHidden={pathname === ROUTES.myWorkspace}
                   />
-                )}
-                {queued > 0 && (
-                  <p
-                    role="status"
-                    className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
-                  >
-                    {MESSAGES.punchQueuedCount(queued)}
-                  </p>
-                )}
-                {syncNotice && (
-                  <p
-                    role="status"
-                    className="mb-4 flex items-start justify-between gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
-                  >
-                    <span>{syncNotice}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSyncNotice(null)}
-                      className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  {queued > 0 && (
+                    <p
+                      role="status"
+                      className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
                     >
-                      Dismiss
-                    </button>
-                  </p>
-                )}
-                {employee && !employee.linked && needsEmployee ? (
-                  <NoEmployeeRecord />
-                ) : (
-                  children
-                )}
+                      {MESSAGES.punchQueuedCount(queued)}
+                    </p>
+                  )}
+                  {syncNotice && (
+                    <p
+                      role="status"
+                      className="mb-4 flex items-start justify-between gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+                    >
+                      <span>{syncNotice}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSyncNotice(null)}
+                        className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                      >
+                        Dismiss
+                      </button>
+                    </p>
+                  )}
+                  {employee && !employee.linked && needsEmployee ? (
+                    <NoEmployeeRecord />
+                  ) : (
+                    children
+                  )}
+                </div>
               </div>
             </div>
           </div>
-
-          <nav
-            aria-label="My Workspace"
-            className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white md:hidden"
-          >
-            <ul className="flex">
-              {MY_SECTIONS.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = pathname.startsWith(tab.href);
-                return (
-                  <li key={tab.href} className="flex-1">
-                    <Link
-                      href={tab.href}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={clsx(
-                        'flex flex-col items-center gap-1 py-2 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500',
-                        isActive
-                          ? 'text-blue-600'
-                          : 'text-gray-500 hover:text-blue-600',
-                      )}
-                    >
-                      <Icon className="w-6" />
-                      {tab.name}
-                    </Link>
-                  </li>
-                );
-              })}
-              {/* The cross-shell link for a dual-role user (research.md §2, FR-017).
-              A plain link, not a merged layout: the two shells are deliberately
-              different shapes and collapsing them would compromise both. */}
-              <li className="flex-1">
-                <Link
-                  href={ROUTES.dashboard}
-                  className="flex flex-col items-center gap-1 py-2 text-xs font-medium text-gray-500 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500"
-                >
-                  <Squares2X2Icon className="w-6" />
-                  Admin
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
+        </MobileNavShell>
       </ShellGate>
     </SerwistProvider>
   );
