@@ -693,6 +693,9 @@ export const SLIP_DELIVERY_COPY = {
   hint: 'Emails each employee their payslip for this run, as an attachment. Sending is deliberate rather than automatic.',
   loading: 'Checking who has been sent their payslip…',
   loadFailed: 'Could not load the delivery status for this run.',
+  /** 2026-10-16: payslip email switched off (`PAYSLIP_EMAIL_ENABLED` on the API). */
+  turnedOff:
+    'Emailing payslips is turned off. Employees can view and download their payslips in My Workspace → Salary.',
   send: 'Email payslips',
   sendRemaining: (count: number) =>
     count === 0 ? 'Email payslips' : `Email the remaining ${count}`,

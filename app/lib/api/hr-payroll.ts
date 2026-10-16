@@ -1803,6 +1803,11 @@ export const slipDeliverySummarySchema = z.object({
    * them sends somebody retrying what was never attempted.
    */
   notAttempted: z.number(),
+  /**
+   * Whether payslips may be emailed at all — the API's `PAYSLIP_EMAIL_ENABLED`, off since
+   * 2026-10-16. Defaults to on for an API that predates the field, which is what it did then.
+   */
+  emailEnabled: z.boolean().default(true),
   rows: z.array(slipDeliveryRowSchema),
 });
 export type SlipDeliverySummary = z.infer<typeof slipDeliverySummarySchema>;
