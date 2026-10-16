@@ -11,6 +11,7 @@ import {
   getUnlinkedEmployees,
 } from '@/app/lib/api/account-creation';
 import { listActiveCompanies, listRoles } from '@/app/lib/api/settings';
+import { USERS_NOTICE_KEY } from '@/app/ui/settings/user-list';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -57,7 +58,11 @@ export default function CreateUserForm() {
     queryFn: listActiveCompanies,
   });
 
-  const selectedRole = roles.find((r) => r.id === roleId);
+  // The default role is preselected (029 FR-001) — derived rather than written into state once
+  // the roles load, so the choice is still the admin's the moment they touch the field.
+  const defaultRole = roles.find((r) => r.isDefault);
+  const effectiveRoleId = roleId || defaultRole?.id || '';
+  const selectedRole = roles.find((r) => r.id === effectiveRoleId);
   const roleIsCrossCompany = Boolean(
     selectedRole?.permissions.includes(CROSS_COMPANY_ACCESS),
   );
@@ -91,13 +96,27 @@ export default function CreateUserForm() {
     mutationFn: createUser,
     onSuccess: (created) => {
       // The new account appears in 002's list, so its cache is stale now.
+      // `['users']` is the key the Users list actually reads; the other is kept for anything
+      // still keyed the older way.
+      queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['settings', 'users'] });
-      const message = created.emailDispatchFailed
-        ? `Account created, but the invite email could not be sent to ${created.email}. Use Resend invite to try again.`
-        : `Invite sent to ${created.email}.`;
-      router.push(
-        `/dashboard/settings/users?notice=${encodeURIComponent(message)}`,
-      );
+      // A password set here opens the account at once and sends a welcome rather than an
+      // invite (029 FR-031), so the two say different things.
+      const direct = created.status === 'active';
+      const message = direct
+        ? created.emailDispatchFailed
+          ? `Account created for ${created.email}, but the welcome email could not be sent. Give them the password you set; they will choose their own at first sign-in.`
+          : `Account created for ${created.email}. Give them the password you set; they will choose their own at first sign-in.`
+        : created.emailDispatchFailed
+          ? `Account created, but the invite email could not be sent to ${created.email}. Use Resend invite to try again.`
+          : `Invite sent to ${created.email}.`;
+      // Handed over in memory, not in the URL: nothing read the `?notice=` it used to travel in,
+      // and text a page renders from its own URL is text anyone can put there with a link.
+      queryClient.setQueryData(USERS_NOTICE_KEY, {
+        tone: created.emailDispatchFailed ? 'warn' : 'ok',
+        text: message,
+      });
+      router.push('/dashboard/settings/users');
     },
     onError: (error: unknown) => {
       // 409s carry the backend's distinct wording — active vs deactivated vs
@@ -128,7 +147,7 @@ export default function CreateUserForm() {
 
     const parsed = createUserSchema.safeParse({
       email,
-      roleId,
+      roleId: effectiveRoleId,
       companyId: effectiveCompanyId || undefined,
       employeeId:
         effectiveNameSource === 'employee'
@@ -167,8 +186,13 @@ export default function CreateUserForm() {
       <SelectField
         id="roleId"
         label="Role"
-        value={roleId}
+        value={effectiveRoleId}
         error={fieldErrors.roleId}
+        hint={
+          selectedRole?.isDefault
+            ? 'The default for new accounts: My Workspace only. Choose another role to give more access.'
+            : undefined
+        }
         onChange={(e) => setRoleId(e.target.value)}
       >
         <option value="">Select a role…</option>

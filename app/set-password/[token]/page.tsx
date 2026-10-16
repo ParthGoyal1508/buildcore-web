@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import { lusitana } from '@/app/ui/fonts';
 import SetPasswordForm from '@/app/ui/account-creation/set-password-form';
 
-export const metadata: Metadata = { title: 'Set your password' };
+export const metadata: Metadata = {
+  title: 'Set your password',
+  // The invite token is in this page's URL — see the reset page (029 FR-012).
+  referrer: 'no-referrer',
+  robots: { index: false, follow: false },
+};
 
 /**
  * Public route — the recipient has no account to sign in with yet, which is why

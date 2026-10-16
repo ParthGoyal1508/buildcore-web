@@ -23,6 +23,11 @@ const currentUserSchema = z.object({
   firstname: z.string().nullable().optional(),
   lastname: z.string().nullable().optional(),
   roleNames: z.array(z.string()),
+  /** Where this user lands after signing in, from their roles (029 FR-021). Optional so this
+   * client can deploy ahead of the API; absent means the first module they can open. */
+  homeModule: z.string().nullable().optional(),
+  /** An administrator chose the current password and it must be replaced (029 FR-016). */
+  mustChangePassword: z.boolean().optional(),
   /**
    * The areas this caller holds **at some level**.
    *

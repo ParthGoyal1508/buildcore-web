@@ -60,9 +60,37 @@ declare const self: ServiceWorkerGlobalScope;
  * again — reinstating both problems above, leakage included, as a side effect of a
  * change that has nothing to do with caching.
  */
+/**
+ * Pages are cached only under `/my` — the area this worker exists to keep usable offline (029).
+ *
+ * `defaultCache` ends with a catch-all that keeps every same-origin GET — page loads included —
+ * in an "others" cache for 24 hours, keyed by URL, and its RSC rules do the same for client-side
+ * navigations. Left to it, every page anyone opened on a shared site phone stayed in Cache
+ * Storage after they signed out: the dashboard and HR screens, and worse, the invite and reset
+ * pages, whose URL *is* a working credential. None of those is any use offline — each needs the
+ * API — so nothing is lost by never storing them.
+ *
+ * `/my` keeps the default treatment: its pages are static shells (every figure on them comes from
+ * `/bff`, which is never cached), and they are what has to open with no signal.
+ *
+ * A page load is told apart by `mode: 'navigate'`; a client-side navigation by the `RSC` header
+ * Next sends with it. Scripts, styles, fonts and images fall through to `defaultCache` as before.
+ */
+const OFFLINE_AREA = '/my';
+const isPageRequest = (request: Request) =>
+  request.mode === 'navigate' || request.headers.get('RSC') === '1';
+
 const runtimeCaching: RuntimeCaching[] = [
   {
     matcher: ({ sameOrigin, url }) => !sameOrigin || url.pathname.startsWith('/bff'),
+    handler: new NetworkOnly(),
+  },
+  {
+    matcher: ({ sameOrigin, url, request }) =>
+      sameOrigin &&
+      isPageRequest(request) &&
+      url.pathname !== OFFLINE_AREA &&
+      !url.pathname.startsWith(`${OFFLINE_AREA}/`),
     handler: new NetworkOnly(),
   },
   ...defaultCache,

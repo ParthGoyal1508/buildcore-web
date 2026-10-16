@@ -87,6 +87,31 @@ export function clearSessionHint() {
  * approach) let a stale history entry render a previous user's name after a
  * logout-and-switch.
  */
+/**
+ * Empties what the service worker cached while this person was signed in (029).
+ *
+ * Every cache except the precache — the app's own build files, identical for everyone and what
+ * lets `/my` open offline. What goes is whatever was stored at run time: page data, images, and
+ * anything an older worker kept before its rules were tightened. On a shared site phone the next
+ * person to sign in must start from nothing the last one left behind.
+ *
+ * Best effort: a sign-out must not hang on, or fail because of, a storage API a browser may
+ * refuse (private mode, an insecure origin).
+ */
+export async function purgeRuntimeCaches(): Promise<void> {
+  if (typeof caches === 'undefined') return;
+  try {
+    const names = await caches.keys();
+    await Promise.all(
+      names
+        .filter((name) => !name.startsWith('serwist-precache'))
+        .map((name) => caches.delete(name)),
+    );
+  } catch {
+    // Nothing to do: the worst case is the state before this existed.
+  }
+}
+
 let justLoggedIn = false;
 
 export function markJustLoggedIn() {
@@ -240,6 +265,7 @@ async function withAuth<T>(
       // redirecting the user back into a shell they can no longer load.
       clearSessionHint();
       abandonRefresh();
+      void purgeRuntimeCaches();
       if (typeof window !== 'undefined') {
         // Deliberately a full document navigation, not router.push(): the session
         // has just been invalidated, and a client-side transition would keep the

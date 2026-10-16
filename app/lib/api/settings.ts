@@ -189,6 +189,11 @@ export const roleSchema = z.object({
    */
   grants: z.array(roleGrantSchema).default([]),
   isProtected: z.boolean(),
+  /** New accounts get this role when the creator names none (029 FR-001). Defaulted so a
+   * server predating the field still parses. */
+  isDefault: z.boolean().default(false),
+  /** Where holders land after signing in — a module key (029 FR-020). Null: their first module. */
+  homeModule: z.string().nullable().default(null),
   assignedUserCount: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -211,6 +216,7 @@ export async function createRole(input: {
   name: string;
   permissions: string[];
   grants?: RoleGrant[];
+  homeModule?: string | null;
 }): Promise<Role> {
   return roleSchema.parse(
     await authFetch('/settings/roles', {
@@ -222,7 +228,12 @@ export async function createRole(input: {
 
 export async function updateRole(
   id: string,
-  input: { name?: string; permissions?: string[]; grants?: RoleGrant[] },
+  input: {
+    name?: string;
+    permissions?: string[];
+    grants?: RoleGrant[];
+    homeModule?: string | null;
+  },
 ): Promise<Role> {
   return roleSchema.parse(
     await authFetch(`/settings/roles/${id}`, {
@@ -251,9 +262,11 @@ export const userSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string(),
-  username: z.string(),
+  username: z.string().nullable(),
   roles: z.array(z.object({ id: z.string(), name: z.string() })),
-  status: z.enum(['active', 'deactivated']),
+  /** `pending`: invited, has not set a password yet (010). Missing from this enum until 029,
+   * which made the whole list fail to parse the moment anyone was invited. */
+  status: z.enum(['pending', 'active', 'deactivated']),
   companyId: z.string().nullable(),
   lastLoginAt: z.string().nullable(),
 });

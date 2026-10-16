@@ -28,9 +28,9 @@ const SESSION_ENDED_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ activated?: string; reason?: string }>;
+  searchParams: Promise<{ activated?: string; reason?: string; reset?: string }>;
 }) {
-  const { activated, reason } = await searchParams;
+  const { activated, reason, reset } = await searchParams;
   const sessionEnded = reason ? SESSION_ENDED_MESSAGES[reason] : undefined;
 
   return (
@@ -42,6 +42,11 @@ export default async function LoginPage({
         {activated === '1' && (
           <p className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">
             Account activated — log in with your new password.
+          </p>
+        )}
+        {reset === '1' && (
+          <p className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">
+            Password changed — sign in with your new password.
           </p>
         )}
         {sessionEnded && (

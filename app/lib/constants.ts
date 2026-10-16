@@ -14,6 +14,9 @@ export const ROUTES = {
   login: '/login',
   dashboard: '/dashboard',
   changePassword: '/change-password',
+  forgotPassword: '/forgot-password',
+  /** Resolves where this user lands and goes there (029 FR-021) — the PWA's way in. */
+  home: '/home',
   settings: '/dashboard/settings',
   settingsCompanies: '/dashboard/settings/companies',
   settingsRoles: '/dashboard/settings/roles',

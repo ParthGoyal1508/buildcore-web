@@ -25,7 +25,7 @@ import {
 
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
-import { landingRoute } from '@/app/lib/permissions';
+import { homeRoute } from '@/app/lib/permissions';
 import ApprovalBadge, {
   useApprovalTotal,
 } from '@/app/ui/dashboard/approval-badge';
@@ -169,7 +169,7 @@ function MobileBottomBar({ sections }: { sections: Registered | null }) {
     }
   } else {
     // A page outside any module's sections (Approvals, Account Creation): home and the queue.
-    const home = user ? landingRoute(user.permissions) : null;
+    const home = user ? homeRoute(user) : null;
     shown = [
       ...(home ? [{ name: 'Home', href: home, icon: HomeIcon }] : []),
       { name: 'Approvals', href: ROUTES.approvals, icon: CheckCircleIcon },

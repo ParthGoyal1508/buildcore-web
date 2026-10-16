@@ -12,11 +12,13 @@ export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has(SESSION_HINT_COOKIE);
   const isLoginRoute = request.nextUrl.pathname === '/login';
 
-  // Already signed in and heading for the login page — send them on to the
-  // dashboard instead of asking them to log in again.
+  // Already signed in and heading for the login page — send them on to their
+  // home instead of asking them to log in again. `/home` works out where that is
+  // from their roles (029 FR-021); this is also the path every launch of the
+  // installed app takes (`/` → `/login` → here).
   if (isLoginRoute) {
     return hasSession
-      ? NextResponse.redirect(new URL('/dashboard', request.url))
+      ? NextResponse.redirect(new URL('/home', request.url))
       : NextResponse.next();
   }
 
@@ -36,5 +38,6 @@ export const config = {
   // shell, feature 003), so it needs its own matcher entry — the existing pattern
   // does not cover it, and without this the shell would render to a signed-out
   // visitor before any request failed (spec FR-016, SC-007).
-  matcher: ['/dashboard/:path*', '/my/:path*', '/login'],
+  // `/change-password` needs a session too: without one, its form can only fail.
+  matcher: ['/dashboard/:path*', '/my/:path*', '/login', '/home', '/change-password'],
 };

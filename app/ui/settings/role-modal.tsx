@@ -12,6 +12,7 @@ import {
 import {
   MESSAGES,
   NAV_GOVERNING_PERMISSIONS,
+  NAV_MODULES,
   NAV_MODULE_BY_PERMISSION,
   PERMISSIONS,
   ROLE_LEVELS,
@@ -23,6 +24,7 @@ import {
   CheckboxField,
   FormError,
   SecondaryButton,
+  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 
@@ -152,6 +154,22 @@ function PermissionRow({
   );
 }
 
+/**
+ * Says when the chosen home is one this role cannot open (029 FR-021). Not refused: a holder with
+ * a second role may well open it — but someone with only this one lands on their first module
+ * instead, and the editor should know that before saving rather than hear it from a user.
+ */
+function homeHint(homeModule: string, selected: string[]): string | undefined {
+  const chosen = NAV_MODULES.find((navModule) => navModule.id === homeModule);
+  if (!chosen) return 'Where holders of this role land when they sign in or open the app.';
+  const required: readonly string[] = chosen.permissions;
+  const opens =
+    required.length === 0 || required.some((permission) => selected.includes(permission));
+  return opens
+    ? 'Where holders of this role land when they sign in or open the app.'
+    : `This role does not include ${chosen.name}, so anyone holding only this role will land on their first module instead.`;
+}
+
 export default function RoleModal({
   role,
   onClose,
@@ -176,6 +194,8 @@ export default function RoleModal({
   const [writable, setWritable] = useState<Set<string>>(
     () => new Set(initialWritable(role)),
   );
+  /** Where holders land after signing in (029 FR-020); '' is "their first module". */
+  const [homeModule, setHomeModule] = useState(role?.homeModule ?? '');
   const [nameError, setNameError] = useState<string | undefined>();
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -187,11 +207,13 @@ export default function RoleModal({
             name: name.trim(),
             permissions: selected,
             grants: grantsFor(selected, writable),
+            homeModule: homeModule || null,
           })
         : createRole({
             name: name.trim(),
             permissions: selected,
             grants: grantsFor(selected, writable),
+            homeModule: homeModule || null,
           }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
@@ -275,6 +297,21 @@ export default function RoleModal({
           error={nameError}
           onChange={(event) => setName(event.target.value)}
         />
+
+        <SelectField
+          id="role-home"
+          label="Home page after sign-in"
+          value={homeModule}
+          hint={homeHint(homeModule, selected)}
+          onChange={(event) => setHomeModule(event.target.value)}
+        >
+          <option value="">First module they can open</option>
+          {NAV_MODULES.map((navModule) => (
+            <option key={navModule.id} value={navModule.id}>
+              {navModule.name}
+            </option>
+          ))}
+        </SelectField>
 
         {/* 019 FR-021. Said once, above both groups: the choice is per area and it is about
             changing records, not about a permission model. */}
