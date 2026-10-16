@@ -57,13 +57,21 @@ import {
  */
 const decimal = z
   .union([z.number(), z.string()])
-  .transform((v) => (typeof v === 'number' ? v : v.trim() === '' ? NaN : Number(v)))
+  .transform((v) =>
+    typeof v === 'number' ? v : v.trim() === '' ? NaN : Number(v),
+  )
   .refine((v) => !Number.isNaN(v), { message: 'Not a number' });
 
 const nullableDecimal = z
   .union([z.number(), z.string(), z.null()])
   .transform((v) =>
-    v === null ? null : typeof v === 'number' ? v : v.trim() === '' ? null : Number(v),
+    v === null
+      ? null
+      : typeof v === 'number'
+        ? v
+        : v.trim() === ''
+          ? null
+          : Number(v),
   )
   .refine((v) => v === null || !Number.isNaN(v), { message: 'Not a number' });
 
@@ -75,7 +83,9 @@ const enumOf = <T extends readonly [string, ...string[]]>(values: T) =>
   z.enum(values);
 
 /** Query-string builder that drops empty values rather than sending `?x=undefined`. */
-function qs(params: Record<string, string | number | boolean | undefined | null>) {
+function qs(
+  params: Record<string, string | number | boolean | undefined | null>,
+) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === '') continue;
@@ -598,7 +608,9 @@ export type AttendanceExceptionRow = z.infer<
 export async function getPendingAttendanceExceptions(): Promise<
   AttendanceExceptionRow[]
 > {
-  const data = await authFetch<unknown>('/workspace-admin/attendance-exceptions');
+  const data = await authFetch<unknown>(
+    '/workspace-admin/attendance-exceptions',
+  );
   return z.array(attendanceExceptionRowSchema).parse(data);
 }
 
@@ -666,15 +678,17 @@ const attendanceModificationsSchema = paginated(
     .default([]),
 });
 
-export async function getAttendanceModifications(filters: {
-  employeeId?: string;
-  /** 016 FR-012d. Composes with the others rather than replacing them. */
-  actorUserId?: string;
-  from?: string;
-  to?: string;
-  page?: number;
-  pageSize?: number;
-} = {}) {
+export async function getAttendanceModifications(
+  filters: {
+    employeeId?: string;
+    /** 016 FR-012d. Composes with the others rather than replacing them. */
+    actorUserId?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+  } = {},
+) {
   const data = await authFetch<unknown>(
     `/hr/attendance/modifications${qs({ ...filters })}`,
   );
@@ -811,7 +825,10 @@ export async function listHolidays(
 ) {
   const data = await authFetch<unknown>(`/hr/holidays${qs({ ...filters })}`);
   const parsed = z
-    .union([z.array(holidaySchema), z.object({ items: z.array(holidaySchema) })])
+    .union([
+      z.array(holidaySchema),
+      z.object({ items: z.array(holidaySchema) }),
+    ])
     .parse(data);
   return Array.isArray(parsed) ? parsed : parsed.items;
 }
@@ -904,7 +921,10 @@ export const leaveBalanceSchema = z.object({
   balance: decimal.optional(),
 });
 
-export async function getLeaveBalances(employeeId: string, financialYear?: string) {
+export async function getLeaveBalances(
+  employeeId: string,
+  financialYear?: string,
+) {
   const data = await authFetch<unknown>(
     `/hr/leave/balances${qs({ employeeId, financialYear })}`,
   );
@@ -929,10 +949,13 @@ export async function decideLeaveApplication(
   decision: 'approved' | 'rejected',
   remarks?: string,
 ) {
-  return authFetch<unknown>(`/workspace-admin/leave-applications/${id}/decide`, {
-    method: 'POST',
-    body: JSON.stringify({ decision, remarks }),
-  });
+  return authFetch<unknown>(
+    `/workspace-admin/leave-applications/${id}/decide`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ decision, remarks }),
+    },
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1199,7 +1222,10 @@ const loanDetailSchema = loanSchema.extend({
 });
 
 export async function listLoans(
-  filters: { employeeId?: string; status?: (typeof LOAN_STATUSES)[number] } = {},
+  filters: {
+    employeeId?: string;
+    status?: (typeof LOAN_STATUSES)[number];
+  } = {},
 ) {
   const data = await authFetch<unknown>(`/hr/loans${qs({ ...filters })}`);
   const parsed = z
@@ -1267,7 +1293,9 @@ export async function listSalaryAdvances(
     status?: (typeof SALARY_ADVANCE_STATUSES)[number];
   } = {},
 ) {
-  const data = await authFetch<unknown>(`/hr/salary-advances${qs({ ...filters })}`);
+  const data = await authFetch<unknown>(
+    `/hr/salary-advances${qs({ ...filters })}`,
+  );
   const parsed = z
     .union([
       z.array(salaryAdvanceSchema),
@@ -1312,7 +1340,10 @@ export const taxSlabBandSchema = z.object({
 
 export type TaxSlabBand = z.infer<typeof taxSlabBandSchema>;
 
-export async function getTaxSlabs(financialYear: string, regime: 'old' | 'new') {
+export async function getTaxSlabs(
+  financialYear: string,
+  regime: 'old' | 'new',
+) {
   const data = await authFetch<unknown>(
     `/hr/tds/slabs${qs({ financialYear, regime })}`,
   );
@@ -1361,7 +1392,10 @@ const declarationSchema = z.object({
 
 export type TaxDeclaration = z.infer<typeof declarationSchema>;
 
-export async function getTaxDeclaration(employeeId: string, financialYear: string) {
+export async function getTaxDeclaration(
+  employeeId: string,
+  financialYear: string,
+) {
   return declarationSchema
     .nullable()
     .parse(
@@ -1413,7 +1447,9 @@ export async function getQuarterlyTds(
   quarter: 1 | 2 | 3 | 4,
 ) {
   return quarterlyTdsSchema.parse(
-    await authFetch<unknown>(`/hr/tds/quarterly${qs({ financialYear, quarter })}`),
+    await authFetch<unknown>(
+      `/hr/tds/quarterly${qs({ financialYear, quarter })}`,
+    ),
   );
 }
 
@@ -1592,9 +1628,16 @@ export const adminClaimSchema = z.object({
 export type AdminClaim = z.infer<typeof adminClaimSchema>;
 
 export async function listAdminClaims(
-  filters: { status?: string; employeeId?: string; from?: string; to?: string } = {},
+  filters: {
+    status?: string;
+    employeeId?: string;
+    from?: string;
+    to?: string;
+  } = {},
 ) {
-  const data = await authFetch<unknown>(`/hr/reimbursements${qs({ ...filters })}`);
+  const data = await authFetch<unknown>(
+    `/hr/reimbursements${qs({ ...filters })}`,
+  );
   const parsed = z
     .union([
       z.array(adminClaimSchema),
@@ -2012,10 +2055,14 @@ const salaryRevisionSchema = z.object({
 export type SalaryRevision = z.infer<typeof salaryRevisionSchema>;
 
 /** Newest effective date first. */
-export async function listSalaryRevisions(employeeId: string): Promise<SalaryRevision[]> {
+export async function listSalaryRevisions(
+  employeeId: string,
+): Promise<SalaryRevision[]> {
   return z
     .array(salaryRevisionSchema)
-    .parse(await authFetch<unknown>(`/hr/employees/${employeeId}/salary-revisions`));
+    .parse(
+      await authFetch<unknown>(`/hr/employees/${employeeId}/salary-revisions`),
+    );
 }
 
 export interface SalaryRevisionInput {
@@ -2051,15 +2098,146 @@ export async function createSalaryRevision(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Periods (`YYYY-MM`) this employee has a published payslip for, newest first. */
-export async function listEmployeeSlipPeriods(employeeId: string): Promise<string[]> {
+export async function listEmployeeSlipPeriods(
+  employeeId: string,
+): Promise<string[]> {
   return z
     .array(z.string())
-    .parse(await authFetch<unknown>(`/hr/payroll/employees/${employeeId}/slips`));
+    .parse(
+      await authFetch<unknown>(`/hr/payroll/employees/${employeeId}/slips`),
+    );
 }
 
 /** One payslip as a PDF on the company letterhead, with the server's file name. */
-export async function downloadEmployeeSlipPdf(employeeId: string, period: string) {
+export async function downloadEmployeeSlipPdf(
+  employeeId: string,
+  period: string,
+) {
   return authFetchFile(
     `/hr/payroll/employees/${employeeId}/slips/${encodeURIComponent(period)}/pdf`,
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Leave policy, crediting, adjustments and opening balances (2026-10-16)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CREDITED_LEAVE_TYPES = ['earned', 'casual', 'sick'] as const;
+export type CreditedLeaveType = (typeof CREDITED_LEAVE_TYPES)[number];
+
+export const leavePolicyRowSchema = z.object({
+  leaveType: z.enum(CREDITED_LEAVE_TYPES),
+  annualDays: z.number(),
+  creditMode: z.enum(['monthly', 'yearly']),
+  carryForward: z.boolean(),
+  carryForwardCap: z.number().nullable(),
+  prorateJoiners: z.boolean(),
+  isDefault: z.boolean().optional(),
+});
+export type LeavePolicyRow = z.infer<typeof leavePolicyRowSchema>;
+
+const withCompany = (companyId: string | null) =>
+  companyId ? `companyId=${encodeURIComponent(companyId)}` : '';
+
+export async function getLeavePolicy(companyId: string | null) {
+  return z
+    .array(leavePolicyRowSchema)
+    .parse(
+      await authFetch<unknown>(`/hr/leave/policy?${withCompany(companyId)}`),
+    );
+}
+
+export async function saveLeavePolicy(
+  companyId: string | null,
+  rows: Omit<LeavePolicyRow, 'isDefault'>[],
+) {
+  return z.array(leavePolicyRowSchema).parse(
+    await authFetch<unknown>(`/hr/leave/policy?${withCompany(companyId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ rows }),
+    }),
+  );
+}
+
+export async function runLeaveCredits(companyId: string | null) {
+  return z
+    .object({ employees: z.number(), entries: z.number(), days: z.number() })
+    .parse(
+      await authFetch<unknown>(
+        `/hr/leave/credits/run?${withCompany(companyId)}`,
+        { method: 'POST' },
+      ),
+    );
+}
+
+export async function adjustLeave(
+  companyId: string | null,
+  input: {
+    employeeId: string;
+    leaveType: CreditedLeaveType;
+    financialYear: string;
+    days: number;
+    reason: string;
+  },
+) {
+  return authFetch<unknown>(`/hr/leave/adjustments?${withCompany(companyId)}`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export const leaveLedgerEntrySchema = z.object({
+  id: z.string(),
+  leaveType: z.enum(CREDITED_LEAVE_TYPES),
+  kind: z.enum([
+    'monthly_credit',
+    'yearly_credit',
+    'carry_forward',
+    'adjustment',
+    'opening_import',
+  ]),
+  period: z.string().nullable(),
+  days: z.number(),
+  reason: z.string().nullable(),
+  byUser: z.boolean(),
+  createdAt: z.string(),
+});
+export type LeaveLedgerEntry = z.infer<typeof leaveLedgerEntrySchema>;
+
+export async function getLeaveLedger(
+  companyId: string | null,
+  employeeId: string,
+  financialYear?: string,
+) {
+  return z
+    .array(leaveLedgerEntrySchema)
+    .parse(
+      await authFetch<unknown>(
+        `/hr/leave/ledger${qs({ employeeId, financialYear, companyId: companyId ?? undefined })}`,
+      ),
+    );
+}
+
+export async function downloadLeaveOpeningTemplate(
+  companyId: string | null,
+  financialYear: string,
+) {
+  return authFetchFile(
+    `/hr/leave/opening-balances/template.xlsx${qs({ financialYear, companyId: companyId ?? undefined })}`,
+  );
+}
+
+export async function importLeaveOpening(
+  companyId: string | null,
+  financialYear: string,
+  file: string,
+) {
+  return z
+    .object({ applied: z.number(), unknownCodes: z.array(z.string()) })
+    .parse(
+      await authFetch<unknown>(
+        `/hr/leave/opening-balances?${withCompany(companyId)}`,
+        { method: 'POST', body: JSON.stringify({ financialYear, file }) },
+      ),
+    );
 }

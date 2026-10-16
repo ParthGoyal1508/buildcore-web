@@ -33,13 +33,26 @@ const STATUS_CLASS: Record<AttendanceDay['status'], string> = {
 };
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 const timeOnly = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ? new Date(iso).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     : '—';
 
 /**
@@ -152,9 +165,7 @@ function DayModifications({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-1">
-                  {MY_ATTENDANCE_MESSAGES.noFieldsChanged}
-                </p>
+                <p className="mt-1">{MY_ATTENDANCE_MESSAGES.noFieldsChanged}</p>
               )}
               <p className="mt-1 italic">
                 {modification.reason
@@ -186,7 +197,7 @@ export default function AttendanceHistory() {
   const isCurrentMonth = month === currentMonth && year === currentYear;
 
   function step(delta: number) {
-    // Arithmetic on a Date rather than manual month/year wrapping — December → 
+    // Arithmetic on a Date rather than manual month/year wrapping — December →
     // January is exactly the boundary hand-rolled code gets wrong.
     const shifted = new Date(Date.UTC(year, month - 1 + delta, 1));
     const shiftedMonth = shifted.getUTCMonth() + 1;
@@ -282,7 +293,10 @@ export default function AttendanceHistory() {
         rowKey={(day) => day.date}
         detail={(day) =>
           day.modifications.length > 0 ? (
-            <DayModifications day={day.date} modifications={day.modifications} />
+            <DayModifications
+              day={day.date}
+              modifications={day.modifications}
+            />
           ) : null
         }
         isLoading={isLoading}

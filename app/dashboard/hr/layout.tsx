@@ -11,6 +11,7 @@ import {
   type HrSection,
 } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import RedirectHome from '@/app/ui/redirect-home';
 import HrNav from '@/app/ui/hr/hr-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -53,7 +54,8 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
   // permission of its own — same treatment the Settings index gets.
   if (section && section in HR_PERMISSIONS) {
     if (!user.permissions.includes(HR_PERMISSIONS[section])) {
-      return <AccessDenied />;
+      // A section outside this role, reached by URL: home (2026-10-16 access-control audit, M1).
+      return <RedirectHome />;
     }
   }
 

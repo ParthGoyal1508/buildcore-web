@@ -9,6 +9,7 @@ import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { hasModuleAccess, homeRoute, landingRoute } from '@/app/lib/permissions';
 import { canWriteAt, isWriteByNature } from '@/app/lib/write-access';
 import AccessDenied from '@/app/ui/access-denied';
+import RedirectHome from '@/app/ui/redirect-home';
 import { LoadingText } from '@/app/ui/spinner';
 
 /**
@@ -102,7 +103,8 @@ export default function ModuleGuard({
         />
       );
     }
-    return <AccessDenied />;
+    // A module outside this role, reached by URL: home, not a dead end (2026-10-16 audit, M1).
+    return <RedirectHome />;
   }
 
   return <>{children}</>;

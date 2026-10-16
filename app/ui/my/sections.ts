@@ -1,10 +1,15 @@
 import {
+  ArrowRightStartOnRectangleIcon,
   BanknotesIcon,
+  CalculatorIcon,
   CalendarDaysIcon,
   CalendarIcon,
   ClockIcon,
+  CreditCardIcon,
   FaceSmileIcon,
+  InboxStackIcon,
   ReceiptPercentIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 
 import { ROUTES } from '@/app/lib/constants';
@@ -35,6 +40,14 @@ export const MY_SECTIONS = [
     description: 'Apply for leave and see what your balance is.',
   },
   {
+    // 2026-10-16: one place to see where everything you asked for stands.
+    name: 'Requests',
+    href: ROUTES.myRequests,
+    icon: InboxStackIcon,
+    description:
+      'Leave, claims, attendance corrections and approvals you raised — and where each stands.',
+  },
+  {
     // Added 2026-10-15: "as a user I don't have any option to see the holiday list".
     name: 'Holidays',
     href: ROUTES.myHolidays,
@@ -61,5 +74,30 @@ export const MY_SECTIONS = [
     href: ROUTES.myFaceEnrol,
     icon: FaceSmileIcon,
     description: 'Enrol the face your punches are matched against.',
+  },
+  // Added 2026-10-16 — the rest of an employee's own records.
+  {
+    name: 'Loans',
+    href: ROUTES.myLoans,
+    icon: CreditCardIcon,
+    description: 'Your loans and salary advances, and what is left to repay.',
+  },
+  {
+    name: 'Tax',
+    href: ROUTES.myTax,
+    icon: CalculatorIcon,
+    description: 'Declare your investments for the year’s TDS.',
+  },
+  {
+    name: 'Profile',
+    href: ROUTES.myProfile,
+    icon: UserCircleIcon,
+    description: 'Your employee record and the documents on file.',
+  },
+  {
+    name: 'Resignation',
+    href: ROUTES.myResignation,
+    icon: ArrowRightStartOnRectangleIcon,
+    description: 'Resign, and follow it through to your last working day.',
   },
 ];

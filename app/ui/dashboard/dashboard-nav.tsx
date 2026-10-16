@@ -48,7 +48,8 @@ const SECTIONS = [
   {
     name: 'Group Dashboard',
     href: ROUTES.groupDashboard,
-    permission: 'DASHBOARD',
+    // Group-level users only (2026-10-16 access-control audit, H1).
+    permission: 'CROSS_COMPANY_ACCESS',
     icon: BuildingOffice2Icon,
   },
   {

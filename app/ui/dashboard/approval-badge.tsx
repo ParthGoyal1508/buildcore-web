@@ -10,6 +10,7 @@ import {
 } from '@/app/lib/api/hr-payroll';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
+import { useTeamClaims, useTeamLeave } from '@/app/ui/approvals/team-requests';
 import SideNavItem from '@/app/ui/dashboard/sidenav-item';
 
 /**
@@ -114,7 +115,15 @@ export function useApprovalTotal(): number {
     refetchIntervalInBackground: false,
   });
 
+  // And the reporting-manager queues (2026-10-16), which anyone may have.
+  const teamLeave = useTeamLeave();
+  const teamClaims = useTeamClaims();
+
   const count =
-    (data?.count ?? 0) + (leave.data?.length ?? 0) + (claims.data?.length ?? 0);
+    (data?.count ?? 0) +
+    (leave.data?.length ?? 0) +
+    (claims.data?.length ?? 0) +
+    (teamLeave.data?.length ?? 0) +
+    (teamClaims.data?.length ?? 0);
   return count;
 }

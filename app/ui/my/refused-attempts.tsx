@@ -55,7 +55,9 @@ export default function RefusedAttempts() {
       key: 'type',
       header: REFUSED_ATTEMPTS.columnType,
       render: (row) =>
-        row.type === 'in' ? REFUSED_ATTEMPTS.punchIn : REFUSED_ATTEMPTS.punchOut,
+        row.type === 'in'
+          ? REFUSED_ATTEMPTS.punchIn
+          : REFUSED_ATTEMPTS.punchOut,
     },
     {
       key: 'reason',
@@ -80,7 +82,9 @@ export default function RefusedAttempts() {
       <h2 className="text-sm font-semibold text-gray-900">
         {REFUSED_ATTEMPTS.heading}
       </h2>
-      <p className="mb-2 text-xs text-gray-500">{REFUSED_ATTEMPTS.subheading}</p>
+      <p className="mb-2 text-xs text-gray-500">
+        {REFUSED_ATTEMPTS.subheading}
+      </p>
 
       <ResponsiveList
         columns={columns}

@@ -47,7 +47,12 @@ const dateText = (date: Date) =>
  */
 const CLOCK_PLACEHOLDER = '--:--:--';
 const timeOnly = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  iso
+    ? new Date(iso).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—';
 
 /**
  * Reads the current position, rejecting a fix too vague to be worth sending
@@ -205,7 +210,13 @@ export default function PunchClock() {
   const dayIsComplete = punchState?.isComplete === true;
 
   const punch = useMutation({
-    mutationFn: async ({ type, photo }: { type: 'in' | 'out'; photo: Blob }) => {
+    mutationFn: async ({
+      type,
+      photo,
+    }: {
+      type: 'in' | 'out';
+      photo: Blob;
+    }) => {
       const capturedAt = new Date().toISOString();
 
       setPhase('locating');
@@ -295,11 +306,11 @@ export default function PunchClock() {
           punchedInAt:
             punchResult.type === 'in'
               ? punchResult.capturedAt
-              : previous?.punchedInAt ?? null,
+              : (previous?.punchedInAt ?? null),
           punchedOutAt:
             punchResult.type === 'out'
               ? punchResult.capturedAt
-              : previous?.punchedOutAt ?? null,
+              : (previous?.punchedOutAt ?? null),
           isComplete: punchResult.type === 'out',
         }),
       );
@@ -379,7 +390,10 @@ export default function PunchClock() {
           ['Out time', timeOnly(todayRow?.outTime ?? null)],
           ['OT hours', todayRow?.otHours != null ? `${todayRow.otHours}` : '—'],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-white p-3 text-center shadow-sm">
+          <div
+            key={label}
+            className="rounded-lg bg-white p-3 text-center shadow-sm"
+          >
             <dt className="text-xs uppercase tracking-wide text-gray-500">
               {label}
             </dt>
