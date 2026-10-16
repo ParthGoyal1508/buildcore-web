@@ -10,6 +10,7 @@ import {
   getReimbursementClaims,
   updateReimbursementClaim,
   withdrawReimbursementClaim,
+  requestStage,
   type ReimbursementClaim,
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
@@ -146,6 +147,17 @@ export default function ReimbursementClaims() {
           >
             {STATUS_LABEL[row.status]}
           </span>
+          {/* Where a submitted claim is (2026-10-16): the reporting manager decides first. */}
+          {row.status === 'submitted' && (
+            <p className="mt-1 text-xs text-gray-500">
+              {requestStage(row) === 'manager'
+                ? 'With your reporting manager'
+                : 'With HR'}
+            </p>
+          )}
+          {row.status === 'rejected' && row.adminRemarks && (
+            <p className="mt-1 text-xs text-gray-500">{row.adminRemarks}</p>
+          )}
           {/* How it was settled only exists once it has been (US8 AC4). */}
           {row.status === 'paid' && row.paymentMode && (
             <p className="mt-1 text-xs text-gray-500">
