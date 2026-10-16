@@ -86,11 +86,10 @@ export default function MustersPage() {
               ))}
             </SelectField>
           </div>
-          {/* The second way into the capture screen, which had none. This list is
-              where you stand when you notice a muster is missing, and the screen it
-              opens is outside the dashboard shell (013 FR-001). */}
-          <Link href={ROUTES.musterCapture}>
-            <SecondaryButton type="button">Capture muster</SecondaryButton>
+          {/* Since 031 a day's muster is built from the supervisors' face punches; this is
+              where you stand when you notice one is missing. */}
+          <Link href={ROUTES.labourAttendance}>
+            <SecondaryButton type="button">Mark attendance</SecondaryButton>
           </Link>
         </div>
       </div>

@@ -1,21 +1,24 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
-  createWorker,
   deactivateWorker,
-  getSkillCategories,
+  enrolWorkerFace,
+  getMyLabourSites,
   getWorkers,
-  type SkillCategory,
   type Worker,
 } from '@/app/lib/api/labour';
-import { getContractors, type Contractor } from '@/app/lib/api/partners';
-import { getSites } from '@/app/lib/api/projects';
-import { labourLabel } from '@/app/lib/constants';
+import {
+  LABOUR_ENROLMENT_PHOTOS,
+  LABOUR_GENDER_LABELS,
+  ROUTES,
+} from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import FacePhotoPicker from '@/app/ui/labour/face-photo-picker';
 import {
   FormError,
   RowAction,
@@ -29,6 +32,11 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
 
+/**
+ * The labour registry (031). Registration happens on the field screen, because it needs the
+ * camera for the 3–5 face photos; this list links there. Supervisors see only their assigned
+ * sites' labour; the HR office sees everyone.
+ */
 export default function WorkersPage() {
   const queryClient = useQueryClient();
   const [siteId, setSiteId] = useState('');
@@ -37,16 +45,12 @@ export default function WorkersPage() {
     null,
   );
   const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
   const [deactivating, setDeactivating] = useState<Worker | null>(null);
+  const [photosFor, setPhotosFor] = useState<Worker | null>(null);
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
-    queryFn: () => getSites({ pageSize: 200 }),
-  });
-  const skills = useQuery({
-    queryKey: ['skill-categories'],
-    queryFn: () => getSkillCategories(),
+    queryKey: ['labour', 'my-sites'],
+    queryFn: getMyLabourSites,
   });
   const workers = useQuery({
     queryKey: ['workers', siteId, search],
@@ -58,30 +62,46 @@ export default function WorkersPage() {
       }),
   });
 
-  const skillName = (id: string) =>
-    skills.data?.find((s) => s.id === id)?.name ?? id;
   const siteName = (id: string) =>
-    sites.data?.items.find((s) => s.id === id)?.name ?? id;
+    sites.data?.find((s) => s.id === id)?.name ?? '—';
 
   const columns: Column<Worker>[] = [
     { key: 'code', header: 'Code', render: (w) => w.labourCode },
     { key: 'name', header: 'Name', render: (w) => w.fullName },
     {
-      key: 'skill',
-      header: 'Skill',
-      render: (w) => skillName(w.skillCategoryId),
+      key: 'father',
+      header: "Father's name",
+      render: (w) => w.fatherName ?? '—',
+      hideOnCard: true,
     },
     {
-      key: 'engagement',
-      header: 'Engagement',
-      render: (w) => labourLabel(w.engagementType),
+      key: 'gender',
+      header: 'Gender',
+      render: (w) =>
+        w.gender ? (
+          LABOUR_GENDER_LABELS[w.gender]
+        ) : (
+          // Pre-031 labour whose free-text gender did not read as male or female: no rate applies
+          // until it is set, and the payment sheet says so by name.
+          <span className="text-amber-700">Not set</span>
+        ),
+    },
+    {
+      key: 'phone',
+      header: 'Mobile',
+      render: (w) => w.phone ?? '—',
+      hideOnCard: true,
     },
     { key: 'site', header: 'Site', render: (w) => siteName(w.siteId) },
     {
-      key: 'aadhaar',
-      header: 'Aadhaar',
-      render: (w) => w.aadhaarNumber ?? '—',
-      hideOnCard: true,
+      key: 'face',
+      header: 'Face',
+      render: (w) =>
+        w.faceEnrolled ? (
+          <StatusBadge status="active" label="Registered" />
+        ) : (
+          <StatusBadge status="pending" label="No photos" />
+        ),
     },
     {
       key: 'status',
@@ -94,10 +114,15 @@ export default function WorkersPage() {
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <PageHeader
-          title="Workers"
-          description="The labour registry — Aadhaar and bank account are shown masked."
+          title="Labour"
+          description="Everyone registered for attendance. Codes are issued automatically."
         />
-        <Button onClick={() => setShowForm(true)}>New Worker</Button>
+        <Link
+          href={ROUTES.labourRegister}
+          className="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-500 sm:h-10"
+        >
+          Register Labour
+        </Link>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -108,7 +133,7 @@ export default function WorkersPage() {
           onChange={(e) => setSiteId(e.target.value)}
         >
           <option value="">All sites</option>
-          {sites.data?.items.map((s) => (
+          {sites.data?.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
             </option>
@@ -117,7 +142,7 @@ export default function WorkersPage() {
         <TextField
           id="filter-search"
           label="Search"
-          placeholder="Name, code or phone"
+          placeholder="Name, code, father's name or mobile"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -128,10 +153,15 @@ export default function WorkersPage() {
         rows={workers.data?.items ?? []}
         rowKey={(w) => w.id}
         isLoading={workers.isPending}
-        error={workers.isError ? 'Could not load workers.' : null}
-        emptyMessage="No workers match these filters."
+        error={workers.isError ? 'Could not load labour.' : null}
+        emptyMessage="No labour matches these filters."
         actions={(w) => (
           <>
+            {w.status === 'active' && (
+              <RowAction onClick={() => setPhotosFor(w)}>
+                {w.faceEnrolled ? 'Retake photos' : 'Add photos'}
+              </RowAction>
+            )}
             <RowAction
               intent="read"
               onClick={() => setNocFor({ id: w.id, name: w.fullName })}
@@ -156,14 +186,13 @@ export default function WorkersPage() {
         />
       )}
 
-      {showForm && (
-        <WorkerForm
-          sites={sites.data?.items ?? []}
-          skills={skills.data ?? []}
-          onClose={() => setShowForm(false)}
+      {photosFor && (
+        <FacePhotosForm
+          worker={photosFor}
+          onClose={() => setPhotosFor(null)}
           onSaved={() => {
-            queryClient.invalidateQueries({ queryKey: ['workers'] });
-            setShowForm(false);
+            void queryClient.invalidateQueries({ queryKey: ['workers'] });
+            setPhotosFor(null);
           }}
         />
       )}
@@ -182,193 +211,58 @@ export default function WorkersPage() {
   );
 }
 
-function WorkerForm({
-  sites,
-  skills,
+/** Takes (or replaces) a labour's 3–5 face photos — for anyone registered before 031, or whose
+ * face has changed enough that matching keeps refusing them. */
+function FacePhotosForm({
+  worker,
   onClose,
   onSaved,
 }: {
-  sites: { id: string; name: string }[];
-  skills: SkillCategory[];
+  worker: Worker;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [gender, setGender] = useState('male');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [skillCategoryId, setSkillCategoryId] = useState('');
-  const [engagementType, setEngagementType] = useState<'direct' | 'contractor'>(
-    'direct',
-  );
-  const [contractorId, setContractorId] = useState('');
-  const [siteId, setSiteId] = useState('');
-  const [aadhaarNumber, setAadhaarNumber] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
-  const [rateOverride, setRateOverride] = useState('');
+  const [photos, setPhotos] = useState<Blob[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const contractors = useQuery({
-    queryKey: ['contractors'],
-    queryFn: () => getContractors(),
-    enabled: engagementType === 'contractor',
-  });
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      createWorker({
-        fullName,
-        phone,
-        gender,
-        dateOfBirth,
-        skillCategoryId,
-        engagementType,
-        contractorId:
-          engagementType === 'contractor' ? contractorId : undefined,
-        siteId,
-        aadhaarNumber: aadhaarNumber || undefined,
-        bankAccount: bankAccount || undefined,
-        rateOverride: rateOverride ? Number(rateOverride) : undefined,
-      }),
+  const save = useMutation({
+    mutationFn: () => enrolWorkerFace(worker.id, photos),
     onSuccess: onSaved,
     onError: (e) =>
       setError(
-        e instanceof ApiError ? e.message : 'Could not register the worker.',
+        e instanceof ApiError && e.status === 400
+          ? e.message
+          : 'Could not save the photos.',
       ),
   });
 
-  const valid =
-    fullName &&
-    phone &&
-    dateOfBirth &&
-    skillCategoryId &&
-    siteId &&
-    (engagementType === 'direct' || contractorId);
-
   return (
     <Modal
-      title="New Worker"
+      title={`Face photos — ${worker.fullName}`}
       onClose={onClose}
-      wide
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
-              mutation.mutate();
+              save.mutate();
             }}
-            disabled={!valid}
+            disabled={photos.length < LABOUR_ENROLMENT_PHOTOS.min || save.isPending}
           >
-            Save
+            {save.isPending ? 'Saving…' : 'Save photos'}
           </Button>
         </div>
       }
     >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="space-y-3">
         <FormError message={error} />
-        <TextField
-          id="w-name"
-          label="Full name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-        />
-        <TextField
-          id="w-phone"
-          label="Phone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-        <SelectField
-          id="w-gender"
-          label="Gender"
-          value={gender}
-          onChange={(e) => setGender(e.target.value)}
-        >
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="other">Other</option>
-        </SelectField>
-        <TextField
-          id="w-dob"
-          label="Date of birth"
-          type="date"
-          value={dateOfBirth}
-          onChange={(e) => setDateOfBirth(e.target.value)}
-        />
-        <SelectField
-          id="w-skill"
-          label="Skill category"
-          value={skillCategoryId}
-          onChange={(e) => setSkillCategoryId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {skills.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          id="w-site"
-          label="Site"
-          value={siteId}
-          onChange={(e) => setSiteId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {sites.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          id="w-engagement"
-          label="Engagement type"
-          value={engagementType}
-          onChange={(e) =>
-            setEngagementType(e.target.value as 'direct' | 'contractor')
-          }
-        >
-          <option value="direct">Direct</option>
-          <option value="contractor">Contractor</option>
-        </SelectField>
-        {engagementType === 'contractor' && (
-          <SelectField
-            id="w-contractor"
-            label="Contractor"
-            value={contractorId}
-            onChange={(e) => setContractorId(e.target.value)}
-          >
-            <option value="">Select…</option>
-            {contractors.data?.map((c: Contractor) => (
-              <option key={c.id} value={c.vendorId}>
-                {c.vendorName ?? c.vendorCode ?? c.vendorId}
-              </option>
-            ))}
-          </SelectField>
+        {worker.faceEnrolled && (
+          <p className="text-sm text-gray-600">
+            These replace the photos taken before.
+          </p>
         )}
-        <TextField
-          id="w-aadhaar"
-          label="Aadhaar (optional)"
-          value={aadhaarNumber}
-          onChange={(e) => setAadhaarNumber(e.target.value)}
-        />
-        <TextField
-          id="w-bank"
-          label="Bank account (optional)"
-          value={bankAccount}
-          onChange={(e) => setBankAccount(e.target.value)}
-        />
-        <TextField
-          id="w-override"
-          label="Rate override (optional, ₹)"
-          type="number"
-          min="0"
-          step="0.01"
-          value={rateOverride}
-          onChange={(e) => setRateOverride(e.target.value)}
-        />
+        <FacePhotoPicker photos={photos} onChange={setPhotos} />
       </div>
     </Modal>
   );

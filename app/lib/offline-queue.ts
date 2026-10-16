@@ -7,10 +7,11 @@
  * `drainQueue` stays, because punches captured under the old promise are still sitting on devices
  * and discarding them would throw away days people actually worked. See `drainQueue` below.
  *
- * The muster store (013 FR-006) is **unaffected and still enqueues**. It was a separate object
- * store for exactly this reason. A muster is a supervisor recording other people's attendance in a
- * place that frequently has no signal, and nothing about it is refused at capture time — the two
- * acts look similar and are not.
+ * **The muster store is retired too, since 031 (2026-10-17).** Labour attendance became a face
+ * punch the server matches and can refuse, which a queue cannot carry back to the supervisor while
+ * the labour is still standing there — the same reason as above. Unlike punches nothing drains it:
+ * the endpoint it drained to is gone, so whatever a device still holds there could only fail. The
+ * object store itself stays (see `DB_VERSION`).
  *
  * Original note (research.md §5, spec FR-009):
  *
@@ -41,14 +42,8 @@ const DB_NAME = 'buildcore-my-workspace';
 const DB_VERSION = 3;
 const STORE = 'punch-queue';
 /**
- * Muster capture queue (feature 013 FR-006).
- *
- * A second object store in the **same** database and the **same** module — the labour
- * muster reuses this queue's mechanics (`openDb`, `promisify`, the `DrainResult`
- * shape, the capture-order replay) rather than growing a second queue implementation.
- * It is a separate store, not a shared one, only so the punch drain
- * (`drainQueue`) and the muster drain (`drainMusters`) never try to submit each
- * other's payloads; both are driven by the identical logic below.
+ * The retired muster queue (013 FR-006 → 031). Named so the upgrade below keeps creating it on a
+ * fresh device: removing a store needs a version bump, and a version only ever goes up.
  */
 const MUSTER_STORE = 'muster-queue';
 
@@ -97,27 +92,6 @@ export interface OfflineQueueEntry {
   accuracyMeters?: number;
 }
 
-/** One worker's marking within a queued muster; the photo is held as a Blob. */
-export interface MusterQueueLine {
-  workerId: string;
-  attendanceType: string;
-  overtimeHours?: number;
-  photo: Blob;
-}
-
-/** A whole muster captured with no connectivity, awaiting sync (013 FR-011). */
-export interface MusterQueueEntry {
-  id?: number;
-  siteId: string;
-  date: string;
-  latitude: number;
-  longitude: number;
-  accuracyMetres: number;
-  /** ISO 8601 at capture time, not sync time. */
-  capturedAt: string;
-  lines: MusterQueueLine[];
-}
-
 /** Resolves null where IndexedDB is unavailable (SSR, or a browser with storage
  * disabled) so callers can degrade rather than crash. */
 export function openDb(): Promise<IDBDatabase | null> {
@@ -158,8 +132,8 @@ export function promisify<T>(request: IDBRequest<T>): Promise<T> {
  * `enqueue` was here, and is deliberately gone (020 T008).
  *
  * Removed rather than left unused, so that re-introducing offline punching takes a decision and a
- * diff somebody reviews, instead of an import nobody noticed was still available. `enqueueMuster`
- * below is the one that remains, and it is a different act.
+ * diff somebody reviews, instead of an import nobody noticed was still available. The muster queue's
+ * `enqueueMuster` followed in 031, for the same reason.
  */
 
 /** Every queued punch, oldest capture first. */
@@ -246,84 +220,6 @@ export async function drainQueue(
         reason: error instanceof Error ? error.message : 'Unknown error',
       });
       if (entry.id !== undefined) await remove(entry.id);
-    }
-  }
-
-  return { synced, failures };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Muster queue (013 FR-006) — the same three operations against the muster store.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Stores a whole muster for later submission. */
-export async function enqueueMuster(entry: MusterQueueEntry): Promise<void> {
-  const db = await openDb();
-  if (!db) throw new Error('Offline storage is unavailable on this device.');
-  const tx = db.transaction(MUSTER_STORE, 'readwrite');
-  const { id: _id, ...record } = entry;
-  void _id;
-  await promisify(tx.objectStore(MUSTER_STORE).add(record));
-  db.close();
-}
-
-/** Every queued muster, oldest capture first. */
-export async function listQueuedMusters(): Promise<MusterQueueEntry[]> {
-  const db = await openDb();
-  if (!db) return [];
-  const tx = db.transaction(MUSTER_STORE, 'readonly');
-  const rows = await promisify(
-    tx.objectStore(MUSTER_STORE).getAll() as IDBRequest<MusterQueueEntry[]>,
-  );
-  db.close();
-  return rows.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
-}
-
-export async function getQueuedMusterCount(): Promise<number> {
-  const db = await openDb();
-  if (!db) return 0;
-  const tx = db.transaction(MUSTER_STORE, 'readonly');
-  const count = await promisify(tx.objectStore(MUSTER_STORE).count());
-  db.close();
-  return count;
-}
-
-export async function removeMuster(id: number): Promise<void> {
-  const db = await openDb();
-  if (!db) return;
-  const tx = db.transaction(MUSTER_STORE, 'readwrite');
-  await promisify(tx.objectStore(MUSTER_STORE).delete(id));
-  db.close();
-}
-
-/**
- * Submits every queued muster in capture order, mirroring `drainQueue` exactly: a
- * connectivity drop mid-drain stops and keeps everything queued; a permanent
- * rejection (a rate changed, a worker deactivated — spec's offline edge cases) is
- * reported once and removed rather than retried forever.
- */
-export async function drainMusters(
-  submit: (entry: MusterQueueEntry) => Promise<unknown>,
-): Promise<DrainResult> {
-  const entries = await listQueuedMusters();
-  const failures: DrainFailure[] = [];
-  let synced = 0;
-
-  for (const entry of entries) {
-    try {
-      await submit(entry);
-      if (entry.id !== undefined) await removeMuster(entry.id);
-      synced += 1;
-    } catch (error) {
-      const isOffline =
-        typeof navigator !== 'undefined' && navigator.onLine === false;
-      if (isOffline) break;
-
-      failures.push({
-        capturedAt: entry.capturedAt,
-        reason: error instanceof Error ? error.message : 'Unknown error',
-      });
-      if (entry.id !== undefined) await removeMuster(entry.id);
     }
   }
 

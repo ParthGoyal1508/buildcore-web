@@ -13,9 +13,9 @@ import { FullPageLoader } from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
 
 /**
- * The muster capture shell.
+ * The field shell for labour attendance and registration (031; formerly the muster capture shell).
  *
- * This screen lives OUTSIDE `/dashboard` (spec FR-001, matching how 003 places field
+ * These screens live OUTSIDE `/dashboard` (spec FR-001, matching how 003 places field
  * surfaces), so the dashboard shell's `ModuleGuard`, sidebar and padding do not reach
  * it. That is still the right route — it is a supervisor's phone flow — but for a
  * while it meant the page rendered as a bare column on a desktop: no sidebar, no
@@ -32,10 +32,10 @@ import ShellHeader from '@/app/ui/shell-header';
  * mismatch and no flash of the wrong shell.
  *
  * The `DAILY_WORKER_REGISTRY` check stands in for the `ModuleGuard` that does not
- * reach this path — the same permission the backend's muster endpoints require. No
+ * reach this path — the same permission the backend's attendance endpoints require. No
  * `middleware.ts`: the token is in memory only.
  */
-export default function MusterLayout({
+export default function LabourFieldLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -54,7 +54,7 @@ export default function MusterLayout({
   }
   if (!user.permissions.includes('DAILY_WORKER_REGISTRY')) {
     return (
-      <AccessDenied detail="Muster capture needs the Daily Worker Registry permission." />
+      <AccessDenied detail="Labour attendance needs the Daily Worker Registry permission." />
     );
   }
 
@@ -84,12 +84,12 @@ export default function MusterLayout({
 
             <LabourNav
               canSeeReports={user.permissions.includes('REPORTS')}
+              canManage={user.permissions.includes('LABOUR_APPROVE')}
               className="mb-6 hidden md:block"
             />
 
-            {/* The wizard stays a narrow column at every width — it is a form, and a
-                three-step form stretched to a 1400px content area is harder to fill,
-                not easier. */}
+            {/* A narrow column at every width — a list of people and a camera, which a
+                1400px content area makes harder to use, not easier. */}
             <div className="mx-auto max-w-xl md:mx-0">{children}</div>
           </div>
         </div>
