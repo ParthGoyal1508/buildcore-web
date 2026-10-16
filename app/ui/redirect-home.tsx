@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { landingRoute } from '@/app/lib/permissions';
+import { homeRoute } from '@/app/lib/permissions';
 
 /**
  * Where a page this user may not open sends them: their own home (2026-10-16 access-control
@@ -26,9 +26,8 @@ export default function RedirectHome() {
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
-  const home = user
-    ? (landingRoute(user.permissions) ?? ROUTES.myWorkspace)
-    : null;
+  // The role's chosen home first (029 FR-021), then the first module held.
+  const home = user ? (homeRoute(user) ?? ROUTES.myWorkspace) : null;
 
   useEffect(() => {
     if (home) router.replace(home);

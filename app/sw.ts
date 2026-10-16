@@ -73,12 +73,16 @@ declare const self: ServiceWorkerGlobalScope;
  * `/my` keeps the default treatment: its pages are static shells (every figure on them comes from
  * `/bff`, which is never cached), and they are what has to open with no signal.
  *
- * A page load is told apart by `mode: 'navigate'`; a client-side navigation by the `RSC` header
- * Next sends with it. Scripts, styles, fonts and images fall through to `defaultCache` as before.
+ * Matched by path, not by how the request was made. A page reaches this worker three ways — a page
+ * load, a client-side navigation (`RSC` header), and `SerwistProvider`'s cache-on-navigation,
+ * which re-fetches each visited URL from inside the worker as a plain request with neither mark.
+ * The third is how `/login` was still being stored after sign-out when this keyed on the request.
+ * A page route is anything outside `/_next/` without a file extension; scripts, styles, fonts,
+ * images and the manifest fall through to `defaultCache` as before.
  */
 const OFFLINE_AREA = '/my';
-const isPageRequest = (request: Request) =>
-  request.mode === 'navigate' || request.headers.get('RSC') === '1';
+const isPageRoute = (pathname: string) =>
+  !pathname.startsWith('/_next/') && !/\.[a-z0-9]+$/i.test(pathname);
 
 const runtimeCaching: RuntimeCaching[] = [
   {
@@ -86,9 +90,9 @@ const runtimeCaching: RuntimeCaching[] = [
     handler: new NetworkOnly(),
   },
   {
-    matcher: ({ sameOrigin, url, request }) =>
+    matcher: ({ sameOrigin, url }) =>
       sameOrigin &&
-      isPageRequest(request) &&
+      isPageRoute(url.pathname) &&
       url.pathname !== OFFLINE_AREA &&
       !url.pathname.startsWith(`${OFFLINE_AREA}/`),
     handler: new NetworkOnly(),
