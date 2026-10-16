@@ -1,5 +1,6 @@
 'use client';
 
+import { getCurrentUser } from '@/app/lib/api/users';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -48,10 +49,24 @@ export default function CreateUserForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data: roles = [] } = useQuery({
+  const { data: allRoles = [] } = useQuery({
     queryKey: ['settings', 'roles'],
     queryFn: listRoles,
   });
+  // Only roles the creator may give (2026-10-16 access-control audit, C2): the API refuses a role
+  // carrying any permission its creator lacks — Super Admin, for a company administrator — so the
+  // list does not offer one. MY_WORKSPACE is open to everybody and grants nothing.
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  const roles = allRoles.filter((role) =>
+    role.permissions.every(
+      (permission) =>
+        permission === 'MY_WORKSPACE' ||
+        (me?.permissions ?? []).includes(permission),
+    ),
+  );
   const { data: companies = [] } = useQuery({
     queryKey: ['settings', 'companies', 'active'],
     queryFn: listActiveCompanies,
@@ -135,7 +150,9 @@ export default function CreateUserForm() {
           ? effectiveEmployeeId || undefined
           : undefined,
       displayName:
-        effectiveNameSource === 'displayName' ? displayName || undefined : undefined,
+        effectiveNameSource === 'displayName'
+          ? displayName || undefined
+          : undefined,
       password: password || undefined,
       roleIsCrossCompany,
     });
@@ -258,11 +275,13 @@ export default function CreateUserForm() {
               </option>
               {employeeOptions}
             </SelectField>
-            {effectiveCompanyId && !loadingEmployees && employees.length === 0 && (
-              <p className="text-sm text-gray-500">
-                Every employee in this company already has an account.
-              </p>
-            )}
+            {effectiveCompanyId &&
+              !loadingEmployees &&
+              employees.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  Every employee in this company already has an account.
+                </p>
+              )}
           </>
         ) : (
           <TextField

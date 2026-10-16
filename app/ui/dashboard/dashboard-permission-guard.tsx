@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import RedirectHome from '@/app/ui/redirect-home';
 import { LoadingText } from '@/app/ui/spinner';
 
 /**
@@ -29,7 +30,7 @@ export default function DashboardPermissionGuard({
    * `EMPLOYEES`, so without this the page would render a search box and an error
    * message instead of saying plainly that it is not the caller's.
    */
-  also?: string;
+  also?: string | readonly string[];
 }) {
   const {
     data: user,
@@ -49,12 +50,15 @@ export default function DashboardPermissionGuard({
     return <AccessDenied detail={MESSAGES.loadFailed} />;
   }
 
+  // Refused by URL: home rather than a dead end (2026-10-16 access-control audit, M1).
   if (!user.permissions.includes('DASHBOARD')) {
-    return <AccessDenied />;
+    return <RedirectHome />;
   }
 
-  if (also && !user.permissions.includes(also)) {
-    return <AccessDenied />;
+  // Every one of `also` (the Group Dashboard needs EMPLOYEES *and* CROSS_COMPANY_ACCESS).
+  const extra = also === undefined ? [] : Array.isArray(also) ? also : [also];
+  if (extra.some((permission) => !user.permissions.includes(permission))) {
+    return <RedirectHome />;
   }
 
   return <>{children}</>;
