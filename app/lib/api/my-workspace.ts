@@ -706,3 +706,195 @@ export async function getMyHolidays(
     .object({ year: z.number(), holidays: z.array(holidaySchema) })
     .parse(await authFetch(`/my/holidays?year=${year}`));
 }
+
+// ---------------------------------------- Loans, advances, tax (2026-10-16)
+
+export const myLoanSchema = z.object({
+  id: z.string(),
+  amount: z.number(),
+  emiAmount: z.number(),
+  disbursementDate: z.string(),
+  reason: z.string(),
+  status: z.string(),
+  totalRecovered: z.number(),
+  outstanding: z.number(),
+  instalments: z.number(),
+  schedule: z.array(
+    z.object({ month: z.string(), emiAmount: z.number(), status: z.string() }),
+  ),
+});
+export type MyLoan = z.infer<typeof myLoanSchema>;
+
+export async function getMyLoans(): Promise<MyLoan[]> {
+  return z.array(myLoanSchema).parse(await authFetch<unknown>('/my/loans'));
+}
+
+export const myAdvanceSchema = z.object({
+  id: z.string(),
+  amount: z.number(),
+  reason: z.string(),
+  recoveryMonth: z.string(),
+  outstandingBalance: z.number(),
+  recovered: z.number(),
+  status: z.string(),
+  disbursedOn: z.string().nullable(),
+});
+export type MyAdvance = z.infer<typeof myAdvanceSchema>;
+
+export async function getMySalaryAdvances(): Promise<MyAdvance[]> {
+  return z
+    .array(myAdvanceSchema)
+    .parse(await authFetch<unknown>('/my/salary-advances'));
+}
+
+export const TAX_REGIMES = ['new', 'old'] as const;
+
+export const myDeclarationSchema = z.object({
+  id: z.string(),
+  financialYear: z.string(),
+  regime: z.enum(TAX_REGIMES),
+  lines: z.array(
+    z.object({
+      id: z.string(),
+      sectionCode: z.string(),
+      declaredAmount: z.number(),
+      cappedAmount: z.number(),
+      status: z.enum(['declared', 'verified']),
+      wasCapped: z.boolean().optional(),
+      hasProof: z.boolean().optional(),
+    }),
+  ),
+});
+export type MyDeclaration = z.infer<typeof myDeclarationSchema>;
+
+export async function getMyDeclaration(
+  financialYear: string,
+): Promise<MyDeclaration | null> {
+  const raw = await authFetch<unknown>(
+    `/my/tds/declaration?financialYear=${encodeURIComponent(financialYear)}`,
+  );
+  // An absent declaration comes back as an empty body.
+  return raw ? myDeclarationSchema.parse(raw) : null;
+}
+
+export async function saveMyDeclaration(input: {
+  financialYear: string;
+  regime: (typeof TAX_REGIMES)[number];
+  lines: { sectionCode: string; declaredAmount: number }[];
+}): Promise<MyDeclaration> {
+  return myDeclarationSchema.parse(
+    await authFetch<unknown>('/my/tds/declaration', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+// ------------------------------------------ Profile and documents (2026-10-16)
+
+/** The employee record as the server masks it, plus the names it resolves. */
+export const myProfileSchema = z
+  .object({
+    employeeCode: z.string(),
+    firstName: z.string(),
+    lastName: z.string().nullable(),
+    dateOfJoining: z.string().nullable(),
+    employmentType: z.string().nullable(),
+    departmentName: z.string().nullable(),
+    designationName: z.string().nullable(),
+    siteName: z.string().nullable(),
+    reportingManagerName: z.string().nullable(),
+    mobile: z.string().nullable(),
+    email: z.string().nullable(),
+    presentAddress: z.string().nullable(),
+    presentCity: z.string().nullable(),
+    presentState: z.string().nullable(),
+    presentPinCode: z.string().nullable(),
+    emergencyContactName: z.string().nullable(),
+    emergencyContactRelation: z.string().nullable(),
+    emergencyContactPhone: z.string().nullable(),
+    bankName: z.string().nullable(),
+    bankAccountNumber: z.string().nullable(),
+    ifscCode: z.string().nullable(),
+    uan: z.string().nullable(),
+    pan: z.string().nullable(),
+    aadhaar: z.string().nullable(),
+  })
+  .partial()
+  .required({ employeeCode: true, firstName: true });
+export type MyProfile = z.infer<typeof myProfileSchema>;
+
+export async function getMyProfile(): Promise<MyProfile> {
+  return myProfileSchema.parse(await authFetch<unknown>('/my/profile'));
+}
+
+export const myDocumentsSchema = z.object({
+  documents: z.array(
+    z.object({
+      id: z.string(),
+      documentTypeName: z.string(),
+      isMandatory: z.boolean(),
+      documentNumber: z.string().nullable(),
+      expiresAt: z.string().nullable(),
+      expiryState: z.string(),
+      daysToExpiry: z.number().nullable(),
+      uploadedAt: z.string(),
+    }),
+  ),
+  missingMandatory: z.array(z.object({ id: z.string(), name: z.string() })),
+  mandatoryTotal: z.number(),
+  mandatoryHeld: z.number(),
+});
+export type MyDocuments = z.infer<typeof myDocumentsSchema>;
+
+export async function getMyDocuments(): Promise<MyDocuments> {
+  return myDocumentsSchema.parse(await authFetch<unknown>('/my/documents'));
+}
+
+// ---------------------------------------------------- Resignation (2026-10-16)
+
+export const RESIGNATION_REASONS = [
+  'better_opportunity',
+  'personal',
+  'relocation',
+  'health',
+  'compensation',
+  'work_environment',
+  'other',
+] as const;
+
+export const myResignationSchema = z.object({
+  id: z.string(),
+  resignationDate: z.string(),
+  reasonCategory: z.enum(RESIGNATION_REASONS),
+  reasonDetail: z.string(),
+  noticePeriodDays: z.number(),
+  expectedLastWorkingDay: z.string(),
+  agreedLastWorkingDay: z.string().nullable(),
+  status: z.enum(['submitted', 'accepted', 'withdrawn']),
+});
+export type MyResignation = z.infer<typeof myResignationSchema>;
+
+export async function getMyResignations(): Promise<MyResignation[]> {
+  return z
+    .array(myResignationSchema)
+    .parse(await authFetch<unknown>('/my/resignation'));
+}
+
+export async function submitMyResignation(input: {
+  resignationDate: string;
+  reasonCategory: (typeof RESIGNATION_REASONS)[number];
+  reasonDetail: string;
+}) {
+  return authFetch<unknown>('/my/resignation', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function withdrawMyResignation(id: string, reason: string) {
+  return authFetch<unknown>(`/my/resignation/${id}/withdraw`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}

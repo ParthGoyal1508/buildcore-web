@@ -105,7 +105,9 @@ export default function ApplyLeaveForm() {
 
   return (
     <section className="mt-8 rounded-lg bg-white p-4 shadow-sm">
-      <h2 className="mb-4 text-lg font-medium text-gray-900">Apply for leave</h2>
+      <h2 className="mb-4 text-lg font-medium text-gray-900">
+        Apply for leave
+      </h2>
 
       <form
         className="space-y-4"
@@ -147,7 +149,9 @@ export default function ApplyLeaveForm() {
             type="date"
             min={form.fromDate || undefined}
             value={form.toDate}
-            onChange={(event) => setForm({ ...form, toDate: event.target.value })}
+            onChange={(event) =>
+              setForm({ ...form, toDate: event.target.value })
+            }
           />
         </div>
 
