@@ -1,6 +1,11 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -8,10 +13,11 @@ import { useState } from 'react';
 
 import {
   BILL_DIRECTIONS,
+  BILL_PACKAGES_PAGE_SIZE,
   type BillDirection,
   type BillPackageListItem,
   composeBillPackage,
-  listBillPackages,
+  listBillPackagesPage,
 } from '@/app/lib/api/bill-packages';
 import { getWorkOrders } from '@/app/lib/api/billing';
 import {
@@ -22,7 +28,15 @@ import {
 } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import Pager from '@/app/ui/inventory/pager';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import { useVendorOptions } from '@/app/ui/projects/ra-bills-panel';
+import QueryError from '@/app/ui/query-error';
+import SearchableSelect from '@/app/ui/searchable-select';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import {
   UNASSIGNED_SUBCONTRACTOR,
   visibleWorkOrders,
@@ -182,10 +196,25 @@ export default function BillPackagesPanel({
     return vendors.byId.get(order.partnerId) ?? counterpartyKey;
   };
 
-  const { data: packages, isLoading } = useQuery({
-    queryKey: ['billPackages', projectId],
-    queryFn: () => listBillPackages(projectId),
+  /**
+   * 036 I17 + I26 (2026-10-18): one page at a time, with its total, rather than every package on the
+   * project in one (capped) response — and a failed read says so with a Retry instead of falling
+   * through to "No bills yet", which told a person on a dropped connection that nothing had ever
+   * been billed. The key stays under `['billPackages', projectId]`, so every existing invalidation
+   * of that prefix (this composer, the DWR panel) still refreshes it. `keepPreviousData` holds the
+   * current page on screen while the next one loads, so Next does not blank the tables.
+   *
+   * Both direction tables read the same page: the API pages the project's packages as one list,
+   * and the pager under them counts that list.
+   */
+  const [page, setPage] = useState(1);
+  const packagesQuery = useQuery({
+    queryKey: ['billPackages', projectId, 'page', page],
+    queryFn: () => listBillPackagesPage(projectId, page),
+    placeholderData: keepPreviousData,
   });
+  const packages = packagesQuery.data?.items;
+  const { isLocked } = useProjectLock();
 
   const compose = useMutation({
     mutationFn: () =>
@@ -222,6 +251,14 @@ export default function BillPackagesPanel({
         </p>
       </header>
 
+      {/* Absent on a locked project (036 Wave 3, 2026-10-18): composing is a write the server
+          refuses with a 423, so a form here would only collect a period to be turned away. */}
+      {isLocked ? (
+        <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+          This project is locked, so no bill can be composed on it. The bills
+          already raised are below.
+        </p>
+      ) : (
       <form
         className="grid items-start gap-4 rounded-md border border-gray-200 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
         onSubmit={(event) => {
@@ -268,6 +305,9 @@ export default function BillPackagesPanel({
             required
             value={periodFrom}
             onChange={(event) => setPeriodFrom(event.target.value)}
+            // 036 I18 (2026-10-18): the picker itself refuses a period that ends before it starts,
+            // rather than the server answering a submit with a 400.
+            max={periodTo || undefined}
             className="rounded-md border border-gray-300 px-3 py-2"
           />
         </label>
@@ -279,6 +319,7 @@ export default function BillPackagesPanel({
             required
             value={periodTo}
             onChange={(event) => setPeriodTo(event.target.value)}
+            min={periodFrom || undefined}
             className="rounded-md border border-gray-300 px-3 py-2"
           />
           <span className="text-xs text-gray-500">
@@ -294,29 +335,42 @@ export default function BillPackagesPanel({
               <span className="font-medium text-gray-700">
                 {BILL_PACKAGE_PICKER_COPY.subcontractorLabel}
               </span>
-              <select
+              {/* 036 I18 (2026-10-18): typed into rather than scrolled. The list is the
+                  subcontractors holding a work order on this project — narrowed from the
+                  project's own orders, so it is held in memory and searched there; a server
+                  search over the whole vendor register would offer people who cannot be billed
+                  here. A vendor whose record this user cannot read still has work orders, so its
+                  entry stands with the register's own fallback rather than vanishing; and the
+                  unassigned orders keep their own entry (FR-027), never a filter. */}
+              <SearchableSelect
                 value={partnerId}
-                onChange={(event) => chooseSubcontractor(event.target.value)}
-                className="rounded-md border border-gray-300 px-3 py-2"
-              >
-                <option value="">
-                  {BILL_PACKAGE_PICKER_COPY.subcontractorAll}
-                </option>
-                {subcontractors.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {/* A vendor whose record this user cannot read still has work orders, so the
-                        entry stands with the register's own fallback rather than vanishing. */}
-                    {name ?? BILL_PACKAGE_PICKER_COPY.subcontractorUnassigned}
-                  </option>
-                ))}
-                {hasUnassigned && (
-                  // FR-027. Its own entry, never a filter: these work orders are billable, and a
-                  // reader who cannot see them cannot know to set a subcontractor on one.
-                  <option value={UNASSIGNED_SUBCONTRACTOR}>
-                    {BILL_PACKAGE_PICKER_COPY.subcontractorUnassigned}
-                  </option>
-                )}
-              </select>
+                onChange={chooseSubcontractor}
+                emptyLabel={BILL_PACKAGE_PICKER_COPY.subcontractorAll}
+                placeholder="Type a subcontractor’s name"
+                options={[
+                  ...subcontractors.map(([id, name]) => ({
+                    id,
+                    label:
+                      name ?? BILL_PACKAGE_PICKER_COPY.subcontractorUnassigned,
+                  })),
+                  ...(hasUnassigned
+                    ? [
+                        {
+                          id: UNASSIGNED_SUBCONTRACTOR,
+                          label: BILL_PACKAGE_PICKER_COPY.subcontractorUnassigned,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+              {workOrders.isError && (
+                <QueryError
+                  compact
+                  error={workOrders.error}
+                  fallback="The work orders could not be loaded."
+                  onRetry={workOrders.refetch}
+                />
+              )}
               <span className="text-xs text-gray-500">
                 {partnerId === UNASSIGNED_SUBCONTRACTOR
                   ? BILL_PACKAGE_PICKER_COPY.unassignedHint
@@ -326,44 +380,45 @@ export default function BillPackagesPanel({
 
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-gray-700">Work order</span>
-              <select
+              {/* 036 I18: searchable by number, detail or award state. An order with no award
+                  captured cannot be billed — the server refuses it by name — so it is listed with
+                  that said rather than hidden (a work order missing from this list reads as one
+                  that does not exist), and choosing it explains instead of selecting. The number
+                  leads where there is one, because it is what the order is called everywhere
+                  else; orders raised before 027 numbered them read by their detail alone. */}
+              <SearchableSelect
                 value={workOrderId}
-                onChange={(event) => {
-                  setWorkOrderId(event.target.value);
+                onChange={(next) => {
+                  const order = visibleOrders.find((o) => o.id === next);
+                  if (order && order.awardLineCount === 0) {
+                    setError(
+                      `${order.code ?? order.workDetail} has no award captured yet, so it cannot be billed. Capture its award on Subcontractors first.`,
+                    );
+                    return;
+                  }
+                  setError(null);
+                  setWorkOrderId(next);
                   setClearedFor(null);
                 }}
-                className="rounded-md border border-gray-300 px-3 py-2"
-              >
-                <option value="">
-                  {workOrders.isLoading
+                emptyLabel={
+                  workOrders.isLoading
                     ? 'Loading work orders…'
                     : visibleOrders.length === 0 && partnerId !== ''
                       ? BILL_PACKAGE_PICKER_COPY.noWorkOrders
-                      : 'Choose a work order'}
-                </option>
-                {visibleOrders.map((order) => (
-                  // An award is what a subcontractor bill measures, so one with none captured
-                  // cannot be billed — the server refuses it by name. Offered as a disabled row
-                  // rather than hidden: a work order missing from this list reads as a work order
-                  // that does not exist, and the thing to do about it is capture its award.
-                  <option
-                    key={order.id}
-                    value={order.id}
-                    disabled={order.awardLineCount === 0}
-                  >
-                    {/* The number leads, because it is what the work order is called everywhere
-                        else — on the order itself, and in what the subcontractor quotes back.
-                        Null on the work orders raised before 027 numbered them, which read by
-                        their detail alone rather than by an empty prefix. */}
-                    {order.code ? `${order.code} — ` : ''}
-                    {order.workDetail}
-                    {` — retention ${(Number(order.retentionPercent) * 100).toFixed(2)}%`}
-                    {order.awardLineCount === 0
+                      : 'Choose a work order'
+                }
+                placeholder="Type a number or the work"
+                options={visibleOrders.map((order) => ({
+                  id: order.id,
+                  label: order.code ?? order.workDetail,
+                  sublabel: order.code ? order.workDetail : undefined,
+                  note: `retention ${(Number(order.retentionPercent) * 100).toFixed(2)}%${
+                    order.awardLineCount === 0
                       ? ' · no award captured yet'
-                      : ` · ${order.awardLineCount} award line${order.awardLineCount === 1 ? '' : 's'}`}
-                  </option>
-                ))}
-              </select>
+                      : ` · ${order.awardLineCount} award line${order.awardLineCount === 1 ? '' : 's'}`
+                  }`,
+                }))}
+              />
               <span className="text-xs text-gray-500">
                 A bill to a subcontractor measures that subcontractor&rsquo;s
                 award lines. Capture the award on{' '}
@@ -405,11 +460,12 @@ export default function BillPackagesPanel({
             one line, and the spacer stands in for the label this button does not have. */}
         <div>
           <FieldLabelSpacer />
-          <Button type="submit" disabled={compose.isPending}>
+          <Button type="submit" loading={compose.isPending}>
             {compose.isPending ? 'Composing…' : 'Compose'}
           </Button>
         </div>
       </form>
+      )}
 
       {error && (
         <p
@@ -420,10 +476,21 @@ export default function BillPackagesPanel({
         </p>
       )}
 
-      {isLoading ? (
-        <p className="text-sm text-gray-500" role="status">
-          Loading bills…
-        </p>
+      {packagesQuery.isLoading ? (
+        <div role="status" aria-label="Loading bills…">
+          <ListSkeleton
+            headers={['Bill', 'Period', 'State', 'Issued', 'Payable']}
+            rows={4}
+          />
+        </div>
+      ) : packagesQuery.isError ? (
+        // 036 I17: a failed read is not "No bills yet" — the empty states below only render once
+        // the list has actually arrived.
+        <QueryError
+          error={packagesQuery.error}
+          fallback="The bills could not be loaded."
+          onRetry={packagesQuery.refetch}
+        />
       ) : (
         <>
           <BillTable
@@ -444,6 +511,13 @@ export default function BillPackagesPanel({
               (pkg) => pkg.direction === 'to_subcontractor',
             )}
             counterparty={subcontractorOf}
+          />
+          <Pager
+            total={packagesQuery.data?.total ?? 0}
+            page={page}
+            pageSize={packagesQuery.data?.pageSize ?? BILL_PACKAGES_PAGE_SIZE}
+            onPageChange={setPage}
+            noun="bill"
           />
         </>
       )}
@@ -592,9 +666,8 @@ function describe(err: unknown): string {
     message?: string;
     details?: { message?: string; code?: string };
   };
-  if (anyErr?.status === 423) {
-    return 'This project is locked, so a bill cannot be composed against it. This is not a permission problem.';
-  }
+  // 036 Wave 3: the one lock sentence every project screen uses.
+  if (anyErr?.status === 423) return projectErrorMessage(err);
   // Every refusal 023 can give names its own condition and says what to do — a period that
   // overlaps one already billed, a project with no BOQ, a missing retention term. Passing the
   // server's own sentence through is the whole value of having written them.
