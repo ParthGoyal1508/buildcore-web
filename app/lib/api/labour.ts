@@ -41,6 +41,9 @@ const nullableDecimal = z
   )
   .refine((v) => v === null || !Number.isNaN(v), { message: 'Not a number' });
 
+/** A name the API added beside an id (036 O8). Tolerant, so an older API that omits it still parses. */
+const optionalName = z.string().nullable().optional().catch(null).transform((v) => v ?? null);
+
 function qs(
   params: Record<string, string | number | boolean | undefined | null>,
 ): string {
@@ -236,6 +239,32 @@ export async function getWorkers(
   return workerPageSchema.parse(data);
 }
 
+/**
+ * One page of workers as picker options (036 O11, O12): searched on the server, so a worker past
+ * the first 200 can still be found — the pickers used to load `pageSize: 200` and stop there.
+ */
+export async function searchWorkerOptions(
+  term: string,
+  page: number,
+  query: Omit<WorkerQuery, 'search' | 'page' | 'pageSize'> = {},
+): Promise<{ items: { id: string; label: string; sublabel?: string }[]; total: number }> {
+  const result = await getWorkers({
+    status: 'active',
+    ...query,
+    search: term || undefined,
+    page,
+    pageSize: 25,
+  });
+  return {
+    items: result.items.map((w) => ({
+      id: w.id,
+      label: w.fullName,
+      sublabel: w.labourCode,
+    })),
+    total: result.total,
+  };
+}
+
 export async function getWorker(id: string): Promise<WorkerDetail> {
   const data = await authFetch<unknown>(`/labour/workers/${id}`);
   return workerDetailSchema.parse(data);
@@ -337,8 +366,10 @@ const attendanceType = z.enum(ATTENDANCE_TYPES).catch('full_day');
 const musterListItemSchema = z.object({
   id: z.string(),
   siteId: z.string(),
+  siteName: optionalName,
   date: z.string(),
   supervisorId: z.string(),
+  supervisorName: optionalName,
   status: z.enum(MUSTER_STATUSES),
   lineCount: z.number(),
   geofenceViolation: z.boolean(),
@@ -350,6 +381,11 @@ export type MusterListItem = z.infer<typeof musterListItemSchema>;
 const musterLineSchema = z.object({
   id: z.string(),
   workerId: z.string(),
+  // 036 O8: names beside the ids.
+  workerName: optionalName,
+  labourCode: optionalName,
+  contractorName: optionalName,
+  skillCategoryName: optionalName,
   attendanceType,
   overtimeHours: nullableDecimal,
   photoRef: z.string().nullable(),
@@ -364,9 +400,12 @@ const musterDetailSchema = z.object({
   id: z.string(),
   companyId: z.string(),
   siteId: z.string(),
+  siteName: optionalName,
   projectId: z.string().nullable(),
   date: z.string(),
   supervisorId: z.string(),
+  supervisorName: optionalName,
+  approvedByName: optionalName,
   latitude: decimal,
   longitude: decimal,
   accuracyMetres: decimal,
@@ -451,6 +490,11 @@ const deductionSchema = z.object({
 const paymentSheetLineSchema = z.object({
   id: z.string(),
   workerId: z.string(),
+  workerName: optionalName,
+  labourCode: optionalName,
+  /** 036 O4: `carry_forward` pays an earlier sheet's shortfall and has no days of its own. */
+  kind: z.enum(['wage', 'carry_forward']).catch('wage'),
+  carriedFromLineId: z.string().nullable().optional().catch(null),
   daysWorked: decimal,
   overtimeHours: decimal,
   resolvedRate: decimal,
@@ -472,6 +516,7 @@ const paymentSheetSchema = z.object({
   id: z.string(),
   projectId: z.string().nullable(),
   siteId: z.string().nullable().catch(null),
+  siteName: optionalName,
   periodFrom: z.string(),
   periodTo: z.string(),
   engagementType,
@@ -487,6 +532,8 @@ const paymentSheetSchema = z.object({
     pendingCount: z.number(),
     disbursedAmount: decimal,
     outstandingAmount: decimal,
+    /** 036 O4: what this sheet pays of earlier sheets' shortfalls. */
+    carriedForwardAmount: decimal.optional().catch(0).transform((v) => v ?? 0),
   }),
   lines: z.array(paymentSheetLineSchema),
 });
@@ -549,6 +596,26 @@ export async function reopenPaymentSheet(
     body: JSON.stringify({ reason }),
   });
   return paymentSheetSchema.parse(data);
+}
+
+/**
+ * Works a draft sheet out again from the attendance as it stands (036 O2) — after a rate is set,
+ * an advance disbursed, a punch corrected. Draft only.
+ */
+export async function regeneratePaymentSheet(id: string): Promise<PaymentSheet> {
+  const data = await authFetch<unknown>(
+    `/labour/payment-sheets/${id}/regenerate`,
+    { method: 'POST' },
+  );
+  return paymentSheetSchema.parse(data);
+}
+
+/** Deletes a draft sheet (036 O2): its days can be corrected again and its advances are freed. */
+export async function deletePaymentSheet(id: string, reason?: string): Promise<void> {
+  await authFetch<unknown>(`/labour/payment-sheets/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify(reason ? { reason } : {}),
+  });
 }
 
 const denominationBreakupSchema = z.object({
@@ -617,6 +684,13 @@ const advanceSchema = z.object({
   exceedsLimit: z.boolean(),
   status: z.enum(ADVANCE_STATUSES),
   recoveryAtRisk: z.boolean(),
+  // 036 O8 / O12: names beside the ids, and who asked — the requester may not approve their own.
+  workerName: optionalName,
+  labourCode: optionalName,
+  createdBy: optionalName,
+  createdByName: optionalName,
+  approvedBy: optionalName,
+  approvedByName: optionalName,
 });
 export type Advance = z.infer<typeof advanceSchema>;
 
@@ -651,6 +725,10 @@ export async function getAdvance(id: string): Promise<AdvanceDetail> {
   const data = await authFetch<unknown>(`/labour/advances/${id}`);
   return advanceDetailSchema.parse(data);
 }
+
+/** The server's own limits on an advance (036 O12), mirrored so the form refuses first. */
+export const MAX_ADVANCE_AMOUNT = 1_000_000;
+export const MAX_RECOVERY_INSTALMENTS = 104;
 
 export interface AdvanceInput {
   companyId?: string;
@@ -696,7 +774,13 @@ export interface ReportPeriodQuery {
 const deploymentReportSchema = z.object({
   groupBy: z.string(),
   groups: z.array(
-    z.object({ key: z.string(), headcount: z.number(), manDays: decimal }),
+    z.object({
+      key: z.string(),
+      /** 036 O8: the site, contractor or skill name for `key`. */
+      label: optionalName,
+      headcount: z.number(),
+      manDays: decimal,
+    }),
   ),
   totalManDays: decimal,
 });
@@ -713,10 +797,13 @@ export async function getDeploymentReport(
 
 const attendanceReportSchema = z.object({
   siteId: z.string(),
+  siteName: optionalName,
   totalMusterDays: z.number(),
   workers: z.array(
     z.object({
       workerId: z.string(),
+      workerName: optionalName,
+      labourCode: optionalName,
       daysPresent: z.number(),
       halfDays: z.number(),
       absentDays: z.number(),
@@ -741,7 +828,13 @@ const paymentRegisterSchema = z.object({
   lines: z.array(
     z.object({
       sheetId: z.string(),
+      siteName: optionalName,
+      periodFrom: z.string().optional().catch(undefined),
+      periodTo: z.string().optional().catch(undefined),
       workerId: z.string(),
+      workerName: optionalName,
+      labourCode: optionalName,
+      kind: z.enum(['wage', 'carry_forward']).catch('wage'),
       daysWorked: decimal,
       grossWage: decimal,
       netPayable: decimal,
@@ -783,6 +876,11 @@ const labourDayRowSchema = z.object({
   faceEnrolled: z.boolean(),
   punchInAt: z.string().nullable(),
   punchOutAt: z.string().nullable(),
+  /**
+   * 036 O5: an in-punch from yesterday still open (within 16 hours) — a night shift the supervisor
+   * can punch out today. Null otherwise.
+   */
+  openShiftFrom: z.string().nullable().optional().catch(null).transform((v) => v ?? null),
   status: z.string().catch('absent'),
   hours: z.number().nullable().catch(null),
   overtimeHours: z.number().catch(0),
@@ -1086,6 +1184,8 @@ export interface PunchCorrectionInput {
   /** HH:mm, 24-hour. */
   punchIn?: string;
   punchOut?: string;
+  /** 036 O5: the punch out is on the day after `date` — a night shift, at most 16 h after the in. */
+  punchOutNextDay?: boolean;
   reason: string;
 }
 
