@@ -6,6 +6,7 @@ import type * as React from 'react';
 import { useState } from 'react';
 
 import { decideApproval } from '@/app/lib/api/approvals';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   type IssuedLetter,
   type LetterKind,
@@ -24,10 +25,13 @@ import { GENERATE_LETTER_COPY, LETTER_COPY } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import ActionReview from '@/app/ui/approvals/action-review';
+import { confirmDialog } from '@/app/ui/dialogs';
 import LineItemsEditor, {
   type LineItemsSource,
 } from '@/app/ui/letters/line-items-editor';
 import { PdfPreview, useFileViewer } from '@/app/ui/pdf-viewer';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
 import {
   SortHeader,
@@ -35,6 +39,7 @@ import {
   useSortedRows,
   type SortableColumn,
 } from '@/app/ui/table';
+import { useToast } from '@/app/ui/toast';
 
 // The inline draft preview now lives with the shared viewer (2026-10-14); re-exported so a screen
 // that took it from here keeps working.
@@ -146,7 +151,27 @@ const MULTI_LINE = new Set([
   'subcontractorScope',
   'companyScope',
   'paymentTerms',
+  // 036 J3 (2026-10-17): an address and the delivery terms run to several lines on the client's
+  // own orders, and a single-line box hid all but the first few words of what was being signed.
+  'companyAddress',
+  'deliveryTerms',
 ]);
+
+/**
+ * 036 J3 (2026-10-17): what is said before a letter is issued. Issuing gives it its permanent
+ * reference number — the next in the company's sequence, never reused — and the issued letter
+ * cannot be edited; a correction is a reissue, which supersedes it and keeps both. That used to
+ * happen on one click with no word of warning, from a button beside Preview.
+ */
+function confirmIssue(label: string) {
+  return confirmDialog({
+    title: `Issue this ${label.toLowerCase()}?`,
+    message:
+      'Issuing gives it a permanent reference number, and it cannot be edited afterwards — a correction means reissuing it as a new version. Preview it first if you have not.',
+    confirmLabel: 'Issue',
+    tone: 'default',
+  });
+}
 
 /**
  * Fields read from a record that are still offered for editing (2026-10-14): the company's own
@@ -240,7 +265,15 @@ export default function SubjectLettersPanel({
             rather than released.
           </p>
         ) : (
-          offered.offered.map((kind) => (
+          offered.isError ? (
+            // 036 J1 (2026-10-17): a failed read of the kinds offered nothing and said nothing.
+            <QueryError
+              compact
+              error={offered.error}
+              fallback="The letter kinds could not be loaded."
+              onRetry={offered.refetch}
+            />
+          ) : offered.offered.map((kind) => (
             <Button key={kind.id} onClick={() => setComposing(kind)}>
               Issue a {kind.label.toLowerCase()}
             </Button>
@@ -265,6 +298,8 @@ export default function SubjectLettersPanel({
       <LetterTable
         letters={letters.data ?? []}
         isLoading={letters.isLoading}
+        error={letters.error}
+        onRetry={letters.refetch}
         emptyMessage={emptyMessage}
       />
     </section>
@@ -284,12 +319,20 @@ function useRefreshLetters() {
 export function LetterTable({
   letters,
   isLoading,
+  error,
+  onRetry,
   emptyMessage,
   extraActions,
   statusExtra,
 }: {
   letters: IssuedLetter[];
   isLoading: boolean;
+  /**
+   * 036 J1 (2026-10-17): the list query's error. A failed fetch used to fall through to the empty
+   * message — "No letter has been issued on this project" — which is a claim, and a wrong one.
+   */
+  error?: unknown;
+  onRetry?: () => unknown;
   emptyMessage: string;
   /** More actions for an issued letter's row — a purchase order's NOC (2026-10-15). */
   extraActions?: (letter: IssuedLetter) => React.ReactNode;
@@ -297,7 +340,12 @@ export function LetterTable({
   statusExtra?: (letter: IssuedLetter) => React.ReactNode;
 }) {
   const refresh = useRefreshLetters();
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  /** The letter whose Preview or Issue is in flight, for its button's spinner. */
+  const [pending, setPending] = useState<{
+    id: string;
+    action: 'preview' | 'issue';
+  } | null>(null);
   /** An issued letter read in the page, without saving it (2026-10-14). */
   const { view, viewer } = useFileViewer();
   /** A composed letter's draft, open for reading before it is approved or issued. */
@@ -315,36 +363,40 @@ export function LetterTable({
       anchor.download = `${letter.referenceNo ?? letter.letterKindLabel}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setError('That letter could not be downloaded.');
+    } catch (err) {
+      toast.error(errorMessage(err, 'That letter could not be downloaded.'));
     }
   };
 
   const preview = async (letter: IssuedLetter) => {
-    setError(null);
+    setPending({ id: letter.id, action: 'preview' });
     try {
       setPreviewing({
         title: `${letter.letterKindLabel} — draft`,
         blob: await previewComposedLetter(letter.id),
       });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'That letter could not be previewed.',
-      );
+      toast.error(errorMessage(err, 'That letter could not be previewed.'));
+    } finally {
+      setPending(null);
     }
   };
 
   const issue = async (letter: IssuedLetter) => {
-    setError(null);
+    if (!(await confirmIssue(letter.letterKindLabel))) return;
+    setPending({ id: letter.id, action: 'issue' });
     try {
-      await issueLetter(letter.id, {});
+      const issued = await issueLetter(letter.id, {});
+      toast.success(
+        issued.referenceNo
+          ? `Issued as ${issued.referenceNo}.`
+          : `${letter.letterKindLabel} issued.`,
+      );
       refresh();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'That letter could not be issued.',
-      );
+      toast.error(errorMessage(err, 'That letter could not be issued.'));
+    } finally {
+      setPending(null);
     }
   };
 
@@ -352,19 +404,25 @@ export function LetterTable({
   const { sorted, sort, toggle } = useSortedRows(letters, LETTER_COLUMNS);
 
   if (isLoading) {
-    return <p className="text-sm text-gray-500">Loading letters…</p>;
+    return (
+      <ListSkeleton
+        headers={[...LETTER_COLUMNS.map((c) => c.label), 'Document']}
+        rows={3}
+      />
+    );
+  }
+  if (error) {
+    return (
+      <QueryError
+        error={error}
+        fallback="The letters could not be loaded."
+        onRetry={onRetry}
+      />
+    );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {error && (
-        <p
-          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
       {viewer}
       {previewing && (
         <PdfPreview
@@ -454,6 +512,11 @@ export function LetterTable({
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <Button
                             intent="write"
+                            loading={
+                              pending?.id === letter.id &&
+                              pending.action === 'preview'
+                            }
+                            disabled={pending !== null}
                             onClick={() => void preview(letter)}
                           >
                             Preview
@@ -463,7 +526,14 @@ export function LetterTable({
                               Issued once approved
                             </span>
                           ) : (
-                            <Button onClick={() => void issue(letter)}>
+                            <Button
+                              loading={
+                                pending?.id === letter.id &&
+                                pending.action === 'issue'
+                              }
+                              disabled={pending !== null}
+                              onClick={() => void issue(letter)}
+                            >
                               Issue
                             </Button>
                           )}
@@ -538,6 +608,7 @@ export function LetterComposer({
   onComposed?: () => void;
 }) {
   const refresh = useRefreshLetters();
+  const toast = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
   const [signatoryId, setSignatoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -617,11 +688,7 @@ export function LetterComposer({
     try {
       setDraft(await previewLetter(input()));
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'The preview could not be produced.',
-      );
+      setError(errorMessage(err, 'The preview could not be produced.'));
     } finally {
       setPreviewBusy(false);
     }
@@ -633,6 +700,11 @@ export function LetterComposer({
       setError(null);
       refresh();
       if (letter.status === 'issued') {
+        toast.success(
+          letter.referenceNo
+            ? `Issued as ${letter.referenceNo}.`
+            : `${kind.label} issued.`,
+        );
         onIssued();
       } else {
         setNotice(
@@ -641,14 +713,19 @@ export function LetterComposer({
         onComposed?.();
       }
     },
-    onError: (err: Error) => setError(err.message),
+    // What was typed stays in the form: a refusal is fixed and resent, never retyped.
+    onError: (err: Error) =>
+      setError(errorMessage(err, 'The letter could not be issued.')),
   });
 
   return (
     <form
       className="flex flex-col gap-3 rounded-md border border-gray-200 p-4"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
+        // An ungated kind is issued by this very call, so it asks first (036 J3). A gated one only
+        // goes for approval here; the reference is given when it is issued, which asks then.
+        if (!kind.requiresApproval && !(await confirmIssue(kind.label))) return;
         compose.mutate();
       }}
     >
@@ -661,14 +738,11 @@ export function LetterComposer({
           Reading the kind&rsquo;s fields…
         </p>
       ) : prefill.isError ? (
-        <p
-          className="rounded-md bg-red-50 p-3 text-sm text-red-800"
-          role="alert"
-        >
-          {prefill.error instanceof Error
-            ? prefill.error.message
-            : 'This letter’s fields could not be read.'}
-        </p>
+        <QueryError
+          error={prefill.error}
+          fallback="This letter’s fields could not be read."
+          onRetry={prefill.refetch}
+        />
       ) : manual.length === 0 ? (
         <p className="text-sm text-gray-600">
           This kind fills itself from its records and needs nothing typed.
@@ -789,18 +863,24 @@ export function LetterComposer({
         <Button
           type="button"
           intent="write"
-          disabled={previewBusy || noSignatory || !prefill.isSuccess}
+          loading={previewBusy}
+          disabled={noSignatory || !prefill.isSuccess}
           onClick={() => void showPreview()}
         >
           {previewBusy ? 'Preparing…' : draft ? 'Refresh preview' : 'Preview'}
         </Button>
         <Button
           type="submit"
-          disabled={
-            compose.isPending || noSignatory || !prefill.isSuccess || !!notice
-          }
+          loading={compose.isPending}
+          disabled={noSignatory || !prefill.isSuccess || !!notice}
         >
-          {compose.isPending ? 'Issuing…' : 'Issue'}
+          {kind.requiresApproval
+            ? compose.isPending
+              ? 'Submitting…'
+              : 'Submit for approval'
+            : compose.isPending
+              ? 'Issuing…'
+              : 'Issue'}
         </Button>
         <Button type="button" intent="write" onClick={onClose}>
           {notice ? 'Close' : 'Cancel'}
