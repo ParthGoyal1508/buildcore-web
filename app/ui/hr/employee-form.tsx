@@ -41,6 +41,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { focusFirstInvalid } from '@/app/lib/form-focus';
 
 const TABS = [
   { id: 'identity', label: 'Identity' },
@@ -479,10 +480,24 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
     TAB_FIELDS[candidate.id].some((field) => errors[field]),
   );
 
+  // A failed Save shows the first tab with an error and focuses its first invalid field (036 A22);
+  // the banner below still lists every tab that has one.
+  const onInvalid = (
+    formErrors: Partial<Record<string, unknown>>,
+    event?: React.BaseSyntheticEvent,
+  ) => {
+    const first = TABS.find((candidate) =>
+      TAB_FIELDS[candidate.id].some((field) => formErrors[field]),
+    );
+    if (first) setTab(first.id);
+    focusFirstInvalid(event?.target as HTMLFormElement | undefined);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit((values) =>
-        mutation.mutateAsync(values as EmployeeFormOutput),
+      onSubmit={handleSubmit(
+        (values) => mutation.mutateAsync(values as EmployeeFormOutput),
+        onInvalid,
       )}
       className="flex flex-col gap-2"
       noValidate

@@ -47,8 +47,53 @@ export const inlineSelectClass = `block min-h-10 min-w-[10rem] py-2 pl-3 pr-9 ${
 /** A select inside a dense table cell, where a full-height field would grow the row. */
 export const compactSelectClass = `block w-full py-1 pl-2 pr-7 ${FIELD_BOX}`;
 
+/**
+ * A field's label, with the required marker built in (036 A22).
+ *
+ * The audit found required fields with no `*` and no `aria-required`, so the first a user heard of
+ * a required field was the error after submitting. The asterisk is visual only — hidden from
+ * assistive tech, because the control itself carries `aria-required` (and, where the form uses it,
+ * the native `required`), which a screen reader already announces as "required". Saying it in the
+ * label as well would announce it twice.
+ */
+export function FieldLabel({
+  htmlFor,
+  label,
+  required,
+}: {
+  htmlFor: string;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-gray-700">
+      {label}
+      {required && (
+        <span className="ml-0.5 text-red-600" aria-hidden="true">
+          *
+        </span>
+      )}
+    </label>
+  );
+}
+
+/** The ids a field's hint and error get, joined for `aria-describedby`. */
+function describedBy(id: string, error?: string, hint?: string) {
+  return (
+    [error && `${id}-error`, hint && `${id}-hint`].filter(Boolean).join(' ') ||
+    undefined
+  );
+}
+
 /** A labelled text input. Native `<label htmlFor>` so clicking the label focuses the
- * field and screen readers announce it (spec FR-024). */
+ * field and screen readers announce it (spec FR-024).
+ *
+ * `required` shows the marker and sets `aria-required`, and still reaches the input as the native
+ * attribute, exactly as before. A react-hook-form field validated by its schema, where the browser's
+ * own bubble is unwanted, passes `aria-required` alone and gets the marker all the same.
+ *
+ * `error` sets `aria-invalid` and is linked by `aria-describedby`, as is `hint` — so the message is
+ * read with the field rather than only from a banner at the top of the form. */
 export function TextField({
   id,
   label,
@@ -61,24 +106,46 @@ export function TextField({
   error?: string;
   hint?: string;
 }) {
-  const describedBy = [error && `${id}-error`, hint && `${id}-hint`]
-    .filter(Boolean)
-    .join(' ');
+  const required = isRequired(rest);
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1 block text-sm font-medium text-gray-700"
-      >
-        {label}
-      </label>
+      <FieldLabel htmlFor={id} label={label} required={required} />
       <input
         id={id}
         aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy || undefined}
+        aria-describedby={describedBy(id, error, hint)}
+        aria-required={required || undefined}
         {...rest}
         className={clsx(fieldClass, error && 'border-red-500')}
       />
+      <FieldMessages id={id} error={error} hint={hint} />
+    </div>
+  );
+}
+
+/** `required`, or an explicit `aria-required` — either way the field gets its marker. */
+function isRequired(props: {
+  required?: boolean;
+  'aria-required'?: boolean | 'true' | 'false';
+}) {
+  return (
+    !!props.required ||
+    props['aria-required'] === true ||
+    props['aria-required'] === 'true'
+  );
+}
+
+function FieldMessages({
+  id,
+  error,
+  hint,
+}: {
+  id: string;
+  error?: string;
+  hint?: string;
+}) {
+  return (
+    <>
       {hint && (
         <p id={`${id}-hint`} className="mt-1 text-xs text-gray-500">
           {hint}
@@ -93,7 +160,7 @@ export function TextField({
           {error}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
@@ -133,40 +200,21 @@ export function SelectField({
    * say *why* under itself, not leave the reader to guess. */
   hint?: string;
 }) {
-  const describedBy = [error && `${id}-error`, hint && `${id}-hint`]
-    .filter(Boolean)
-    .join(' ');
+  const required = isRequired(rest);
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1 block text-sm font-medium text-gray-700"
-      >
-        {label}
-      </label>
+      <FieldLabel htmlFor={id} label={label} required={required} />
       <select
         id={id}
         aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy || undefined}
+        aria-describedby={describedBy(id, error, hint)}
+        aria-required={required || undefined}
         {...rest}
         className={clsx(selectClass, error && 'border-red-500')}
       >
         {children}
       </select>
-      {hint && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-gray-500">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p
-          id={`${id}-error`}
-          className="mt-1 text-xs text-red-600"
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
+      <FieldMessages id={id} error={error} hint={hint} />
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { focusFirstInvalid } from '@/app/lib/form-focus';
 
 // Same statutory formats the API validates against, checked here first so an
 // obvious typo never costs a round trip.
@@ -263,6 +264,8 @@ export default function CompanyModal({
   const onInvalid = (formErrors: Record<string, unknown>) => {
     const firstField = Object.keys(formErrors)[0];
     if (firstField && FIELD_TAB[firstField]) setTab(FIELD_TAB[firstField]);
+    // …and put the keyboard on the field once its tab is showing (036 A22).
+    focusFirstInvalid(document.getElementById('company-form'));
   };
 
   const err = (field: keyof FormValues) => errors[field]?.message as string | undefined;
