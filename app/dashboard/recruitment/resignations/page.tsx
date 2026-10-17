@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   acceptResignation,
   createResignation,
@@ -18,7 +18,11 @@ import {
   RESIGNATION_REASON_CATEGORIES,
   recruitmentLabel,
 } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
+import AsyncSelect from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
+import { promptDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   RowAction,
@@ -35,7 +39,7 @@ export default function ResignationsPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [accepting, setAccepting] = useState<Resignation | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
   const employees = useEmployeeNames();
@@ -48,12 +52,30 @@ export default function ResignationsPage() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['resignations'] });
 
+  // 036 H3: one tap withdrew a resignation, with "Withdrawn" sent as the reason the API asks for.
+  // It now asks for the real one, and the row's button waits while the request is out.
   const withdraw = useMutation({
-    mutationFn: (id: string) => withdrawResignation(id, 'Withdrawn'),
-    onSuccess: invalidate,
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not withdraw.'),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      withdrawResignation(id, reason),
+    onSuccess: () => {
+      toast.success('Resignation withdrawn');
+      return invalidate();
+    },
+    onError: (e) => toast.error(errorMessage(e, 'Could not withdraw.')),
   });
+  const askWithdraw = async (r: Resignation) => {
+    const reason = await promptDialog({
+      title: 'Withdraw resignation',
+      message: `Withdraw the resignation of ${r.employeeName ?? employees.label(r.employeeId)}? They stay on the rolls.`,
+      label: 'Reason',
+      required: true,
+      multiline: true,
+      confirmLabel: 'Withdraw',
+      tone: 'danger',
+    });
+    if (reason === null) return;
+    withdraw.mutate({ id: r.id, reason: reason.trim() });
+  };
 
   const columns: Column<Resignation>[] = [
     {
@@ -68,7 +90,7 @@ export default function ResignationsPage() {
     {
       key: 'date',
       header: 'Resigned',
-      render: (r) => r.resignationDate ?? '—',
+      render: (r) => (r.resignationDate ? dateLabel(r.resignationDate) : '—'),
     },
     {
       key: 'reason',
@@ -78,7 +100,10 @@ export default function ResignationsPage() {
     {
       key: 'lwd',
       header: 'Last working day',
-      render: (r) => r.agreedLastWorkingDay ?? r.expectedLastWorkingDay ?? '—',
+      render: (r) => {
+        const lwd = r.agreedLastWorkingDay ?? r.expectedLastWorkingDay;
+        return lwd ? dateLabel(lwd) : '—';
+      },
     },
     {
       key: 'status',
@@ -99,14 +124,13 @@ export default function ResignationsPage() {
         <Button onClick={() => setShowForm(true)}>New Resignation</Button>
       </div>
 
-      <FormError message={error} />
-
       <ResponsiveList
         columns={columns}
         rows={resignations.data ?? []}
         rowKey={(r) => r.id}
         isLoading={resignations.isPending}
-        error={resignations.isError ? 'Could not load resignations.' : null}
+        error={resignations.isError ? resignations.error : null}
+        onRetry={resignations.refetch}
         emptyMessage="No resignations recorded."
         actions={(r) => (
           <span className="flex gap-2">
@@ -114,7 +138,11 @@ export default function ResignationsPage() {
               <RowAction onClick={() => setAccepting(r)}>Accept</RowAction>
             )}
             {r.status === 'submitted' && (
-              <RowAction onClick={() => withdraw.mutate(r.id)}>
+              <RowAction
+                onClick={() => askWithdraw(r)}
+                loading={withdraw.isPending && withdraw.variables?.id === r.id}
+                disabled={withdraw.isPending}
+              >
                 Withdraw
               </RowAction>
             )}
@@ -152,20 +180,12 @@ function ResignationForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  // The company a cross-company Super Admin has selected; null for everyone else,
-  // who is pinned to their own company by the backend anyway.
-  const [employeeId, setEmployeeId] = useState('');
   // The employee is picked by name or code (2026-10-15), not typed as an id nobody knows.
-  const [search, setSearch] = useState('');
-  const matches = useQuery({
-    queryKey: ['hr', 'employees', 'resignation-picker', search.trim()],
-    queryFn: () =>
-      listEmployees({
-        search: search.trim() || undefined,
-        isActive: true,
-        pageSize: 50,
-      }),
-  });
+  // 036 H3: through the server-search picker. The separate search box and select it replaces kept
+  // the chosen id when a new search filtered that person out of the list, so Save recorded the
+  // resignation against somebody no longer shown on screen; the picker's value is what it shows.
+  const [employeeId, setEmployeeId] = useState('');
+  const toast = useToast();
   const [resignationDate, setResignationDate] = useState('');
   const [reasonCategory, setReasonCategory] = useState('better_opportunity');
   const [reasonDetail, setReasonDetail] = useState('');
@@ -191,17 +211,20 @@ function ResignationForm({
         reasonDetail,
         noticePeriodDays: Number(noticePeriodDays),
       }),
-    onSuccess: onSaved,
+    onSuccess: () => {
+      toast.success('Resignation recorded');
+      onSaved();
+    },
     onError: (e) =>
-      setError(
-        e instanceof ApiError ? e.message : 'Could not record the resignation.',
-      ),
+      setError(errorMessage(e, 'Could not record the resignation.')),
   });
 
   return (
     <Modal
       title="New Resignation"
       onClose={onClose}
+      isDirty={Boolean(employeeId || resignationDate || reasonDetail)}
+      pending={mutation.isPending}
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
@@ -210,7 +233,8 @@ function ResignationForm({
               setError(null);
               mutation.mutate();
             }}
-            disabled={!employeeId || !resignationDate || !reasonDetail}
+            disabled={!employeeId || !resignationDate || !reasonDetail.trim()}
+            loading={mutation.isPending}
           >
             Save
           </Button>
@@ -219,36 +243,43 @@ function ResignationForm({
     >
       <div className="space-y-3">
         <FormError message={error} />
-        <TextField
-          id="res-emp-search"
-          label="Find employee"
-          placeholder="Name or code"
-          autoComplete="off"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <SelectField
-          id="res-emp"
-          label="Employee"
-          value={employeeId}
-          onChange={(e) => setEmployeeId(e.target.value)}
-        >
-          <option value="">
-            {matches.isPending ? 'Loading…' : 'Select an employee'}
-          </option>
-          {(matches.data?.items ?? []).map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {[employee.firstName, employee.lastName]
-                .filter(Boolean)
-                .join(' ') || employee.employeeCode}{' '}
-              · {employee.employeeCode}
-            </option>
-          ))}
-        </SelectField>
+        <div>
+          <label
+            htmlFor="res-emp"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Employee *
+          </label>
+          <AsyncSelect
+            id="res-emp"
+            value={employeeId}
+            onChange={(id) => setEmployeeId(id)}
+            placeholder="Name or code"
+            cacheKey={['hr', 'employees', 'active']}
+            search={(term, page) =>
+              listEmployees({
+                search: term || undefined,
+                isActive: true,
+                page,
+                pageSize: 25,
+              }).then((r) => ({
+                total: r.total,
+                items: r.items.map((employee) => ({
+                  id: employee.id,
+                  label:
+                    [employee.firstName, employee.lastName]
+                      .filter(Boolean)
+                      .join(' ') || employee.employeeCode,
+                  note: employee.employeeCode,
+                })),
+              }))
+            }
+          />
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <TextField
             id="res-date"
-            label="Resignation date"
+            label="Resignation date *"
             type="date"
             value={resignationDate}
             onChange={(e) => setResignationDate(e.target.value)}
@@ -276,13 +307,13 @@ function ResignationForm({
         </SelectField>
         <TextField
           id="res-detail"
-          label="Reason detail"
+          label="Reason detail *"
           value={reasonDetail}
           onChange={(e) => setReasonDetail(e.target.value)}
         />
         {expectedLwd && (
           <p className="text-sm text-gray-600">
-            Expected last working day: {expectedLwd}
+            Expected last working day: {dateLabel(expectedLwd)}
           </p>
         )}
       </div>
@@ -303,6 +334,7 @@ function AcceptForm({
   const [noticeWaiverDays, setWaiverDays] = useState('');
   const [waiverReason, setWaiverReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const earlier =
     agreedLastWorkingDay &&
@@ -318,15 +350,18 @@ function AcceptForm({
           : undefined,
         waiverReason: waiverReason || undefined,
       }),
-    onSuccess: onSaved,
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not accept.'),
+    onSuccess: () => {
+      toast.success('Resignation accepted');
+      onSaved();
+    },
+    onError: (e) => setError(errorMessage(e, 'Could not accept.')),
   });
 
   return (
     <Modal
       title="Accept Resignation"
       onClose={onClose}
+      pending={mutation.isPending}
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
@@ -336,6 +371,7 @@ function AcceptForm({
               mutation.mutate();
             }}
             disabled={!!earlier && (!noticeWaiverDays || !waiverReason)}
+            loading={mutation.isPending}
           >
             Accept
           </Button>
@@ -350,7 +386,7 @@ function AcceptForm({
           type="date"
           value={agreedLastWorkingDay}
           onChange={(e) => setAgreed(e.target.value)}
-          hint={`Expected: ${resignation.expectedLastWorkingDay ?? '—'}`}
+          hint={`Expected: ${resignation.expectedLastWorkingDay ? dateLabel(resignation.expectedLastWorkingDay) : '—'}`}
         />
         {earlier && (
           <>
