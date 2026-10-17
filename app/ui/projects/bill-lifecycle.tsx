@@ -13,6 +13,8 @@ import {
   abandonBillPackage,
   certifyBillPackage,
   downloadBillDocument,
+  getBillPackageHeaderPreview,
+  headerFieldLabel,
   issueBillPackage,
   markBillShared,
   readCertifiedCopy,
@@ -21,11 +23,16 @@ import {
   withdrawBillPackage,
 } from '@/app/lib/api/bill-packages';
 import { downloadCertificate, downloadSignedCopy } from '@/app/lib/api/billing';
+import { ApiError } from '@/app/lib/api/client';
 import { saveBlob } from '@/app/lib/download-file';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { useCanWrite } from '@/app/lib/write-access';
 import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import ActionReview from '@/app/ui/approvals/action-review';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import { Button } from '@/app/ui/button';
 import {
   FieldLabelSpacer,
@@ -91,6 +98,138 @@ export default function BillLifecycle({
 
   const approval = pkg.approval ?? null;
   const awaiting = pkg.status === 'pending_approval';
+  /**
+   * 036 Wave 3 (2026-10-18): every lifecycle write — send, abandon, issue, withdraw, share, certify,
+   * revise — is guarded by the project lock on the server, so on a locked project none is offered.
+   * The approval decision stays: it belongs to the approvals module, and an approver holding a
+   * bill should not be stranded by a lock placed after it was sent.
+   */
+  const { isLocked } = useProjectLock();
+  const writable = canWrite && !isLocked;
+
+  /**
+   * Issuing, behind a confirmation that says what is about to be frozen (036 I16, 2026-10-18).
+   *
+   * Issue was one click that froze every figure, the cumulative position and the statutory header
+   * permanently — while Abandon, which loses nothing, asked first. The dialog states the three
+   * things a person can still act on before pressing it: the **payable** the document will carry,
+   * the **number** it goes out under, and anything **missing** — a party with no name on record,
+   * an unpriced line (which the server refuses), and the tax-basis advisory when the parties'
+   * GSTINs disagree with the tax this bill charges.
+   *
+   * The payable is the abstract's own rendered figure (whole rupees, computed once on the server)
+   * put through `rupees` for its separators — never recomputed here (024 FR-009).
+   *
+   * Two people pressing Issue together: the second gets a 409 from the conditional update. That is
+   * not a failure to report as one — the bill *is* issued — so it is said plainly and the screen
+   * re-reads, which brings the issued state and its downloads up.
+   */
+  const issue = async () => {
+    const payable = abstract?.columns.thisBill.payable;
+    const party = toClient ? 'client' : 'subcontractor';
+    const missing: string[] = [];
+    if (!pkg.counterpartyName) missing.push(`the ${party}’s name`);
+    if (!toClient && !pkg.workOrderId) missing.push('the work order');
+    const warning = abstract?.taxBasisWarning ?? null;
+    // 036 I16: the party identifiers issuing would leave blank, asked for now rather than reported
+    // after the figures are frozen. Best effort: a failed read falls back to the note below.
+    const headerGaps = await getBillPackageHeaderPreview(pkg.id).catch(
+      () => null,
+    );
+    if (headerGaps) missing.push(...headerGaps.map(headerFieldLabel));
+    const ok = await confirmDialog({
+      title: `Issue ${pkg.label}?`,
+      confirmLabel: 'Issue the bill',
+      tone: 'default',
+      message: (
+        <div className="flex flex-col gap-2 text-sm">
+          <p>
+            Issuing freezes every figure on this bill, its cumulative position
+            and its header. It cannot be undone — a correction afterwards is a
+            recorded revision, not an edit.
+          </p>
+          <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+            <dt className="text-gray-500">Bill number</dt>
+            <dd className="font-medium text-gray-900">{pkg.label}</dd>
+            <dt className="text-gray-500">Period</dt>
+            <dd className="text-gray-900">
+              {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}
+            </dd>
+            {pkg.counterpartyName && (
+              <>
+                <dt className="text-gray-500">
+                  {toClient ? 'Client' : 'Subcontractor'}
+                </dt>
+                <dd className="text-gray-900">{pkg.counterpartyName}</dd>
+              </>
+            )}
+            <dt className="text-gray-500">Net payable</dt>
+            <dd className="font-semibold text-gray-900">
+              {payable != null && payable !== ''
+                ? rupees(Number(payable))
+                : 'Not loaded — check the abstract before issuing'}
+            </dd>
+          </dl>
+          {missing.length > 0 && (
+            <p className="rounded-md bg-amber-50 p-2 text-amber-900">
+              Not on record: {missing.join(', ')}. It prints blank on the
+              issued bill.
+            </p>
+          )}
+          {pkg.unpricedClaimedCount > 0 && (
+            <p className="rounded-md bg-red-50 p-2 text-red-800">
+              {pkg.unpricedClaimedCount} line(s) carry a claim and no rate, so
+              this will be refused. Price them first.
+            </p>
+          )}
+          {warning && (
+            <p className="rounded-md bg-amber-50 p-2 text-amber-900">
+              {warning}
+            </p>
+          )}
+          {headerGaps === null && (
+            <p className="text-xs text-gray-500">
+              The party details could not be checked just now; any not on file
+              (a GSTIN, PAN or address) are listed once the bill is issued.
+            </p>
+          )}
+        </div>
+      ),
+    });
+    if (!ok) return;
+    setBusy('issue');
+    try {
+      const result = await issueBillPackage(pkg.id);
+      const notes = [
+        'Issued. Every figure is now frozen. Download it, send it, then mark it shared.',
+      ];
+      if (result.missingHeaderFields.length > 0) {
+        notes.push(
+          `Not on file: ${result.missingHeaderFields.join(', ')} — printed blank.`,
+        );
+      }
+      if (result.taxBasisWarning) notes.push(result.taxBasisWarning);
+      onNotice(notes.join(' '));
+      setForm(null);
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // The same 409 also answers a bill that is no longer `approved` for another reason (it was
+        // withdrawn meanwhile), so only the "already issued" one gets this sentence; either way
+        // the screen re-reads, because what it showed is out of date.
+        onError(
+          /already been issued/i.test(err.message)
+            ? 'This bill has already been issued — somebody else issued it a moment ago. The screen has been refreshed.'
+            : describe(err),
+        );
+        onChanged();
+      } else {
+        onError(describe(err));
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-gray-200 p-4">
@@ -154,8 +293,14 @@ export default function BillLifecycle({
       )}
 
       {/* ── The next step ─────────────────────────────────────────────── */}
+      {isLocked && pkg.status !== 'abandoned' && (
+        <p className="text-sm text-gray-600">
+          This project is locked, so this bill cannot move to its next step.
+          Unlock the project to send, issue, share or certify it.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        {pkg.status === 'draft' && (
+        {pkg.status === 'draft' && !isLocked && (
           <>
             <Button
               onClick={() =>
@@ -165,12 +310,14 @@ export default function BillLifecycle({
                   'Sent for approval. The approver sees Approve / Reject on this bill and in their Approvals inbox.',
                 )
               }
+              loading={busy === 'submit'}
               disabled={busy !== null}
             >
               {busy === 'submit' ? 'Sending…' : 'Send for approval'}
             </Button>
             <SecondaryButton
-              hidden={!canWrite}
+              hidden={!writable}
+              loading={busy === 'abandon'}
               onClick={async () => {
                 if (
                   await confirmDialog({
@@ -195,22 +342,10 @@ export default function BillLifecycle({
           </>
         )}
 
-        {pkg.status === 'approved' && (
+        {pkg.status === 'approved' && !isLocked && (
           <Button
-            onClick={() =>
-              run(
-                'issue',
-                async () => {
-                  const result = await issueBillPackage(pkg.id);
-                  if (result.missingHeaderFields.length > 0) {
-                    onNotice(
-                      `Issued. Not on file: ${result.missingHeaderFields.join(', ')} — printed blank.`,
-                    );
-                  }
-                },
-                'Issued. Every figure is now frozen. Download it, send it, then mark it shared.',
-              )
-            }
+            onClick={() => void issue()}
+            loading={busy === 'issue'}
             disabled={busy !== null}
           >
             {busy === 'issue' ? 'Issuing…' : 'Issue the bill'}
@@ -219,7 +354,8 @@ export default function BillLifecycle({
 
         {(pkg.status === 'pending_approval' || pkg.status === 'approved') && (
           <SecondaryButton
-            hidden={!canWrite}
+            hidden={!writable}
+            loading={busy === 'withdraw'}
             onClick={async () => {
               const reason = await promptDialog({
                 title: 'Withdraw to draft?',
@@ -243,7 +379,8 @@ export default function BillLifecycle({
           </SecondaryButton>
         )}
 
-        {(pkg.status === 'issued' || pkg.status === 'certified') && (
+        {(pkg.status === 'issued' || pkg.status === 'certified') &&
+          !isLocked && (
           <>
             {pkg.sharedAt ? (
               <SecondaryButton
@@ -274,7 +411,7 @@ export default function BillLifecycle({
         )}
       </div>
 
-      {form === 'share' && (
+      {form === 'share' && !isLocked && (
         <ShareForm
           pkg={pkg}
           busy={busy === 'share'}
@@ -287,7 +424,7 @@ export default function BillLifecycle({
           }
         />
       )}
-      {form === 'certify' && (
+      {form === 'certify' && !isLocked && (
         <CertifyForm
           pkg={pkg}
           abstract={abstract}
@@ -303,7 +440,7 @@ export default function BillLifecycle({
           }
         />
       )}
-      {form === 'revise' && (
+      {form === 'revise' && !isLocked && (
         <ReviseForm
           busy={busy === 'revise'}
           onSubmit={(reason) =>
@@ -1088,9 +1225,8 @@ export function describe(err: unknown): string {
     message?: string;
     details?: { message?: string };
   };
-  if (anyErr?.status === 423) {
-    return 'This project is locked, so nothing can be written to the bill. This is not a permission problem.';
-  }
+  // 036 Wave 3: the one lock sentence every project screen uses.
+  if (anyErr?.status === 423) return projectErrorMessage(err);
   if (anyErr?.status === 404) {
     return 'Not found. It may belong to another company.';
   }

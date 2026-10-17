@@ -238,6 +238,12 @@ const abstractSchema = z
     taxBasis: z.string(),
     /** How the basis was decided — shown, because a tax decision nobody sees is one nobody made. */
     taxBasisSource: z.string(),
+    /**
+     * 036 I5/I16 (2026-10-18): set when the parties' GSTIN state codes say the opposite of
+     * `taxBasis` — "both in state 27, but this bill charges IGST". Advisory: the project's choice
+     * still decides. Optional so an older server parses.
+     */
+    taxBasisWarning: z.string().nullable().optional(),
     /** True while the package is a draft: the cumulative column is not yet frozen (024 FR-008). */
     cumulativeProvisional: z.boolean(),
     rates: ratesSchema,
@@ -373,6 +379,8 @@ const issueResultSchema = z
     package: packageSchema,
     /** Reported, never a refusal (023 FR-027, FR-027a). */
     missingHeaderFields: z.array(z.string()),
+    /** 036 I16: the same advisory as the abstract's, read from the header just frozen. */
+    taxBasisWarning: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -488,6 +496,41 @@ export async function listBillPackages(
 ): Promise<BillPackageListItem[]> {
   const raw = await authFetch<unknown>(`/projects/${projectId}/bill-packages`);
   return z.array(packageListItemSchema).parse(raw);
+}
+
+/** Rows per page of a project's bill packages (036 I26) — the same 50 the other billing lists use. */
+export const BILL_PACKAGES_PAGE_SIZE = 50;
+
+export interface BillPackagePage {
+  items: BillPackageListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * One page of a project's bill packages, newest first (036 I26, 2026-10-18).
+ *
+ * Asking with `page`/`pageSize` is what makes the API answer `{ items, total, page, pageSize }`;
+ * without them it still sends the bare (capped) array `listBillPackages` reads, so that caller is
+ * unchanged.
+ */
+export async function listBillPackagesPage(
+  projectId: string,
+  page: number,
+  pageSize = BILL_PACKAGES_PAGE_SIZE,
+): Promise<BillPackagePage> {
+  const raw = await authFetch<unknown>(
+    `/projects/${projectId}/bill-packages?page=${page}&pageSize=${pageSize}`,
+  );
+  return z
+    .object({
+      items: z.array(packageListItemSchema),
+      total: z.number(),
+      page: z.number(),
+      pageSize: z.number(),
+    })
+    .parse(raw);
 }
 
 export async function getBillPackage(packageId: string): Promise<BillPackage> {
@@ -750,6 +793,29 @@ export async function applyDebitNote(
       { method: 'POST' },
     ),
   );
+}
+
+/**
+ * The party identifiers issuing now would leave blank (036 I16) — `issuerPan`, `receiverGstin`, …,
+ * the same names the issue response carries — so the confirmation names them *before* issue.
+ */
+export async function getBillPackageHeaderPreview(
+  packageId: string,
+): Promise<string[]> {
+  const raw = await authFetch<unknown>(
+    `/projects/bill-packages/${packageId}/header-preview`,
+  );
+  return z
+    .object({ missingHeaderFields: z.array(z.string()) })
+    .parse(raw).missingHeaderFields;
+}
+
+/** `issuerPan` → `issuer PAN`, for a person reading the list. */
+export function headerFieldLabel(field: string): string {
+  return field
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/\b(pan|gstin|gst|cin|tan)\b/g, (word) => word.toUpperCase());
 }
 
 export async function issueBillPackage(
