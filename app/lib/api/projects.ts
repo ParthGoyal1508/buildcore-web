@@ -153,11 +153,13 @@ export interface ClientInput {
   name: string;
   contactPerson?: string;
   phone?: string;
-  email?: string;
+  /** `null` clears it (036 I19/I20); a blank must never be sent as `""` to `@IsEmail`. */
+  email?: string | null;
   address?: string;
-  gstin?: string;
-  pan?: string;
-  state?: string;
+  /** `null` clears it on edit — `undefined` means "unchanged", so a wrong GSTIN stayed for ever. */
+  gstin?: string | null;
+  pan?: string | null;
+  state?: string | null;
   status?: string;
 }
 
