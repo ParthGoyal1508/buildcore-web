@@ -5,6 +5,7 @@ import clsx from 'clsx';
 
 import { getMeasurementSheet } from '@/app/lib/api/bill-packages';
 import { dateLabel } from '@/app/lib/format';
+import QueryError from '@/app/ui/query-error';
 import { TABLE } from '@/app/ui/table';
 
 /**
@@ -45,7 +46,7 @@ export default function MeasurementSheet({
   packageId: string;
   scheduleLineId: string;
 }) {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['measurement-sheet', packageId, scheduleLineId],
     queryFn: () => getMeasurementSheet(packageId, scheduleLineId),
   });
@@ -57,11 +58,16 @@ export default function MeasurementSheet({
       </p>
     );
   }
+  // 036 I17 (2026-10-17): the failure with a retry, not a dead end.
   if (isError || !data) {
     return (
-      <p className="p-3 text-sm text-red-700" role="alert">
-        That measurement sheet could not be read.
-      </p>
+      <QueryError
+        compact
+        className="m-3"
+        error={error}
+        fallback="That measurement sheet could not be read."
+        onRetry={refetch}
+      />
     );
   }
 

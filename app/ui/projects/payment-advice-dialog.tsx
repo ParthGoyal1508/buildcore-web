@@ -24,6 +24,8 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import { FileIcon } from '@/app/ui/file-icons';
 import { todayIso } from '@/app/lib/format';
+import QueryError from '@/app/ui/query-error';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * Generating a payment advice for a certified subcontractor bill (2026-10-13).
@@ -52,6 +54,7 @@ export default function PaymentAdviceDialog({
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const payee = useQuery({
     queryKey: ['raBillPayee', raBillId],
     queryFn: () => getPayee(raBillId),
@@ -93,6 +96,7 @@ export default function PaymentAdviceDialog({
         );
         saveBlob(blob, filename);
       }
+      toast.success('The payment was recorded.');
       onDone();
       onClose();
     } catch (err) {
@@ -115,7 +119,8 @@ export default function PaymentAdviceDialog({
           <Button
             type="submit"
             form="payment-advice-form"
-            disabled={busy || !amount.trim() || !paidOn}
+            loading={busy}
+            disabled={!amount.trim() || !paidOn}
           >
             {busy ? 'Generating…' : 'Record payment & download advice'}
           </Button>
@@ -123,6 +128,15 @@ export default function PaymentAdviceDialog({
       }
     >
       <div className="flex flex-col gap-5">
+        {/* 036 I17 (2026-10-17): a failed payee read, with a retry — not a panel that never fills. */}
+        {payee.isError && (
+          <QueryError
+            compact
+            error={payee.error}
+            fallback="The payee's bank details could not be loaded."
+            onRetry={payee.refetch}
+          />
+        )}
         <PayeePanel
           raBillId={raBillId}
           payee={payee.data}
