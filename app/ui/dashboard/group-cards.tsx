@@ -20,7 +20,7 @@ import type {
   StatutoryDueItem,
 } from '@/app/lib/api/dashboard';
 import type { SelectableCompany } from '@/app/lib/api/company-selection';
-import { dateLabel, rupees, shortPeriodLabel } from '@/app/lib/format';
+import { dateLabel, quantity, rupees, shortPeriodLabel } from '@/app/lib/format';
 import { CompanyMark } from '@/app/ui/company-logo';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import {
@@ -69,7 +69,7 @@ function metricsFor(card: GroupCompanyCard | GroupTotal): Metric[] {
       key: 'headcount',
       label: 'Headcount',
       icon: UsersIcon,
-      value: card.headcount.toLocaleString('en-IN'),
+      value: quantity(card.headcount),
       hint: 'active employees',
     },
   ];
@@ -80,7 +80,7 @@ function metricsFor(card: GroupCompanyCard | GroupTotal): Metric[] {
         key: 'projects',
         label: 'Active projects',
         icon: BuildingOffice2Icon,
-        value: card.activeProjects.count.toLocaleString('en-IN'),
+        value: quantity(card.activeProjects.count),
         hint: 'ongoing',
       },
       {
