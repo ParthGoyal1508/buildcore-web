@@ -209,6 +209,13 @@ const notificationRowSchema = z.object({
   subtitle: z.string(),
   actionLink: z.string(),
   occurredAt: z.string(),
+  /**
+   * The inbox state (036 D6). `id` is what Mark as read names; `read` is whether this person has
+   * read it since it last changed. Optional/defaulted so a server predating the inbox still parses
+   * (every row then reads as unread and cannot be marked).
+   */
+  id: z.string().optional(),
+  read: z.boolean().default(false),
 });
 
 export type NotificationRow = z.infer<typeof notificationRowSchema>;
@@ -220,9 +227,25 @@ export async function getNotifications(): Promise<NotificationRow[]> {
   return z.array(notificationRowSchema).parse(raw);
 }
 
+/** The bell badge: **unread** notifications since 036 D6. */
 export async function getNotificationCount(): Promise<number> {
   const raw = await authFetch<unknown>('/notifications/count');
   return notificationCountSchema.parse(raw).count;
+}
+
+/** Marks one notification read (036 D6). In-app only — nothing is emailed. */
+export async function markNotificationRead(id: string): Promise<void> {
+  await authFetch<unknown>(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: 'POST',
+  });
+}
+
+/** Marks every current notification read (036 D6). */
+export async function markAllNotificationsRead(): Promise<{ updated: number }> {
+  const raw = await authFetch<unknown>('/notifications/read-all', {
+    method: 'POST',
+  });
+  return z.object({ updated: z.number() }).parse(raw);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

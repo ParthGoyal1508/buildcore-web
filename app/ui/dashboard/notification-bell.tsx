@@ -26,6 +26,9 @@ import NotificationPanel from '@/app/ui/dashboard/notification-panel';
  *
  * Gated on DASHBOARD so it never becomes a guaranteed 403 — and it renders nothing at
  * all without it, leaving the top bar empty rather than showing a dead control.
+ *
+ * Since 036 D6 the count is **unread** notifications: the API remembers what each person has read,
+ * so a director who has seen the same two items every morning no longer sees a red 2 for them.
  */
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -55,7 +58,7 @@ export default function NotificationBell() {
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={
-          total > 0 ? `Notifications, ${total} active` : 'Notifications'
+          total > 0 ? `Notifications, ${total} unread` : 'Notifications'
         }
         // 44px square: the top bar carries a Dashboard shortcut on a surface that is
         // visible on mobile, so it holds the minimum touch target Principle VI asks of

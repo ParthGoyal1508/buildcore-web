@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import Link from 'next/link';
 import {
   useCallback,
@@ -12,8 +13,16 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { getNotifications } from '@/app/lib/api/dashboard';
-import { LoadingText } from '@/app/ui/spinner';
+import { errorMessage } from '@/app/lib/api/client';
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type NotificationRow,
+} from '@/app/lib/api/dashboard';
+import QueryError from '@/app/ui/query-error';
+import { LoadingText, Spinner } from '@/app/ui/spinner';
+import { toast } from '@/app/ui/toast';
 
 /** The panel's own box, in pixels — the `w-72`/`max-h-96` it used to carry as classes.
  *  Needed as numbers because the placement below has to know how much room it wants
@@ -82,6 +91,10 @@ function place(anchor: HTMLElement): Placement {
  * itself server-side once its condition resolves. Closes on click-outside (of either
  * the bell or the panel) and on Escape (research.md §5).
  *
+ * 036 D6: each notification is read or unread. Unread ones carry a dot and bold text; opening one
+ * marks it read, "Mark as read" does so without leaving, and "Mark all read" clears the badge. A
+ * read notification comes back as unread only when something new arrives under it. In-app only.
+ *
  * Rendered through a portal into `document.body` and positioned `fixed` against the
  * bell's own rect, rather than `absolute` inside the bell. The dashboard shell is
  * `h-screen … md:overflow-hidden`, so an absolutely-positioned panel is clipped the
@@ -104,10 +117,36 @@ export default function NotificationPanel({
   // at the wrong coordinates in between.
   const [placement, setPlacement] = useState<Placement | null>(null);
 
+  const queryClient = useQueryClient();
   const notifications = useQuery({
     queryKey: ['notifications'],
     queryFn: getNotifications,
   });
+
+  /** Optimistic: the row stops looking unread at once, and the badge follows from the server. */
+  const markLocally = (match: (n: NotificationRow) => boolean) =>
+    queryClient.setQueryData<NotificationRow[]>(['notifications'], (rows) =>
+      rows?.map((n) => (match(n) ? { ...n, read: true } : n)),
+    );
+  const refreshCount = () =>
+    void queryClient.invalidateQueries({ queryKey: ['notificationCount'] });
+
+  const markOne = useMutation({
+    mutationFn: (id: string) => markNotificationRead(id),
+    onMutate: (id) => markLocally((n) => n.id === id),
+    onSettled: refreshCount,
+    onError: () => void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+  const markAll = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onMutate: () => markLocally(() => true),
+    onSettled: refreshCount,
+    onError: (e: unknown) => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.error(errorMessage(e, 'Could not mark the notifications read.'));
+    },
+  });
+  const unread = (notifications.data ?? []).filter((n) => !n.read && n.id);
 
   const reposition = useCallback(() => {
     if (anchorRef.current) setPlacement(place(anchorRef.current));
@@ -161,8 +200,19 @@ export default function NotificationPanel({
       }}
       className="fixed z-50 overflow-y-auto rounded-md border border-gray-200 bg-white text-left shadow-lg"
     >
-      <div className="border-b border-gray-100 px-3 py-2 text-sm font-medium text-gray-700">
-        Notifications
+      <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
+        <span className="text-sm font-medium text-gray-700">Notifications</span>
+        {unread.length > 0 && (
+          <button
+            type="button"
+            onClick={() => markAll.mutate()}
+            disabled={markAll.isPending}
+            className="inline-flex items-center gap-1 rounded text-xs font-medium text-blue-700 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50"
+          >
+            {markAll.isPending && <Spinner className="h-3 w-3" />}
+            Mark all read
+          </button>
+        )}
       </div>
       {notifications.isPending && (
         <p className="px-3 py-3 text-sm text-gray-500" role="status">
@@ -170,9 +220,13 @@ export default function NotificationPanel({
         </p>
       )}
       {notifications.isError && (
-        <p className="px-3 py-3 text-sm text-red-600" role="alert">
-          Could not load notifications.
-        </p>
+        <QueryError
+          compact
+          className="m-2"
+          error={notifications.error}
+          onRetry={notifications.refetch}
+          fallback="Could not load notifications."
+        />
       )}
       {notifications.data && notifications.data.length === 0 && (
         <p className="px-3 py-3 text-sm text-gray-500">You’re all caught up.</p>
@@ -180,15 +234,44 @@ export default function NotificationPanel({
       {notifications.data && notifications.data.length > 0 && (
         <ul className="divide-y divide-gray-100">
           {notifications.data.map((n, i) => (
-            <li key={`${n.type}-${i}`}>
+            <li
+              key={n.id ?? `${n.type}-${i}`}
+              className={clsx('relative', !n.read && 'bg-blue-50/40')}
+            >
               <Link
                 href={n.actionLink}
-                onClick={onClose}
-                className="block px-3 py-2 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                onClick={() => {
+                  if (n.id && !n.read) markOne.mutate(n.id);
+                  onClose();
+                }}
+                className="block py-2 pl-6 pr-3 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               >
-                <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                {!n.read && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-2.5 top-3.5 h-2 w-2 rounded-full bg-blue-600"
+                  />
+                )}
+                <p
+                  className={clsx(
+                    'text-sm text-gray-900',
+                    n.read ? 'font-normal' : 'font-semibold',
+                  )}
+                >
+                  <span className="sr-only">{n.read ? '' : 'Unread: '}</span>
+                  {n.title}
+                </p>
                 <p className="text-xs text-gray-500">{n.subtitle}</p>
               </Link>
+              {n.id && !n.read && (
+                <button
+                  type="button"
+                  onClick={() => markOne.mutate(n.id as string)}
+                  className="mb-2 ml-6 rounded text-xs text-blue-700 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                >
+                  Mark as read
+                </button>
+              )}
             </li>
           ))}
         </ul>
