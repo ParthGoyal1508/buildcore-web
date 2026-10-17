@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import { recordIssueReturn, type Issue } from '@/app/lib/api/inventory';
 import { Button } from '@/app/ui/button';
 import {
@@ -12,7 +12,8 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
-import { todayIso, dateLabel } from '@/app/lib/format';
+import { todayIso, dateLabel, quantity as qty } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
 
 const today = () => todayIso();
 
@@ -20,11 +21,11 @@ const today = () => todayIso();
  * Material coming back to the store against an issue (2026-10-15) — the Daily Issue Register's
  * "Received Qty", "Returned On" and "Received By".
  *
- * The quantity is the **total returned so far**, not this return alone, and it starts at the
- * figure already recorded: the register prints one received quantity per issue, so a second
- * return is a correction of that one number. The server refuses more than was issued or less
- * than was already returned (400), and the same two limits are checked here first so the user
- * learns it beside the field. Stock goes back on the server; nothing here touches it.
+ * The quantity is **what is coming back now** (036 M4). It used to be the total returned so far,
+ * prefilled with the last figure — which people read as "this return" and so double-counted or
+ * under-counted. The server adds it to what came back before and refuses more than is still out
+ * ("at most N more"); the same limit is checked here first so the person learns it beside the
+ * field. Stock goes back on the server; nothing here touches it.
  */
 export default function IssueReturnModal({
   issue,
@@ -34,44 +35,49 @@ export default function IssueReturnModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const already = issue.returnedQuantity ?? 0;
+  // In thousandths, the column's precision, so 10 − 9.7 is 0.3 and not 0.3000000000000007.
+  const outstanding = Math.max(
+    0,
+    (Math.round(issue.quantity * 1000) - Math.round(already * 1000)) / 1000,
+  );
 
-  const [quantity, setQuantity] = useState(already ? String(already) : '');
+  const [quantity, setQuantity] = useState('');
   const [returnedOn, setReturnedOn] = useState(today());
   const [receivedBy, setReceivedBy] = useState(issue.receivedBy ?? '');
   const [error, setError] = useState<string | null>(null);
 
-  const total = Number(quantity);
+  const now = Number(quantity);
   const quantityError =
     quantity === ''
       ? undefined
-      : total > issue.quantity
-        ? `More than the ${issue.quantity} ${issue.unit} issued.`
-        : total < already
-          ? `Less than the ${already} ${issue.unit} already returned.`
+      : now <= 0
+        ? 'Enter the quantity coming back.'
+        : Math.round(now * 1000) > Math.round(outstanding * 1000)
+          ? `At most ${qty(outstanding)} ${issue.unit} more can come back.`
           : undefined;
 
   const save = useMutation({
     mutationFn: () =>
       recordIssueReturn(issue.id, {
-        returnedQuantity: total,
+        returnedNow: now,
         returnedOn,
         receivedBy: receivedBy.trim(),
       }),
     onSuccess: () => {
       // The store's stock changed too, so everything inventory is stale.
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success(`${qty(now)} ${issue.unit} back in the store`);
       onClose();
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : 'Could not record this return.',
-      ),
+      setError(errorMessage(err, 'Could not record this return.')),
   });
 
   const ready =
     quantity !== '' &&
-    total > 0 &&
+    now > 0 &&
     !quantityError &&
     returnedOn &&
     receivedBy.trim();
@@ -80,19 +86,22 @@ export default function IssueReturnModal({
     <Modal
       title="Material returned"
       onClose={onClose}
+      isDirty={quantity !== '' || receivedBy !== (issue.receivedBy ?? '')}
+      pending={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
+        <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
           <Button
             type="submit"
             form="issue-return-form"
-            disabled={!ready || save.isPending}
+            disabled={!ready}
+            loading={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Record return'}
+            Record return
           </Button>
-        </div>
+        </>
       }
     >
       <form
@@ -112,25 +121,29 @@ export default function IssueReturnModal({
 
         <TextField
           id="return-quantity"
-          label={`Total returned so far (${issue.unit})`}
+          label={`Coming back now (${issue.unit}) *`}
           type="number"
-          min={already || 0}
-          max={issue.quantity}
+          inputMode="decimal"
+          required
+          min={0}
+          max={outstanding}
           step="any"
           value={quantity}
           onChange={(event) => setQuantity(event.target.value)}
           error={quantityError}
           hint={
             already
-              ? `${already} already recorded — enter the new total, not this return alone.`
-              : `Up to ${issue.quantity}.`
+              ? `${qty(already)} already returned; up to ${qty(outstanding)} more.`
+              : `Up to ${qty(issue.quantity)}.`
           }
         />
 
         <TextField
           id="return-date"
-          label="Returned on"
+          label="Returned on *"
           type="date"
+          required
+          max={todayIso()}
           value={returnedOn}
           onChange={(event) => setReturnedOn(event.target.value)}
         />
@@ -138,7 +151,8 @@ export default function IssueReturnModal({
         <div className="sm:col-span-2">
           <TextField
             id="return-received-by"
-            label="Received by"
+            label="Received by *"
+            required
             placeholder="Storekeeper who took it back"
             autoComplete="off"
             value={receivedBy}
