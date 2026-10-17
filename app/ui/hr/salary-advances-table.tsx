@@ -3,21 +3,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import {
   approveSalaryAdvance,
   createSalaryAdvance,
-  listEmployees,
   listSalaryAdvances,
   type SalaryAdvance,
 } from '@/app/lib/api/hr-payroll';
 import {
   HR_MESSAGES,
-  MESSAGES,
   SALARY_ADVANCE_STATUSES,
   hrLabel,
 } from '@/app/lib/constants';
-import { currentPeriod, money, periodLabel } from '@/app/lib/format';
+import { currentPeriod, money, periodLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import EmployeePicker from '@/app/ui/hr/employee-picker';
+import { useApproverSelf } from '@/app/ui/hr/use-approver-self';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -35,11 +38,6 @@ function RequestAdvanceModal({ onClose }: { onClose: () => void }) {
   const [reason, setReason] = useState('');
   const [recoveryMonth, setRecoveryMonth] = useState(currentPeriod());
   const [error, setError] = useState<string | null>(null);
-
-  const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 100 }],
-    queryFn: () => listEmployees({ pageSize: 100 }),
-  });
 
   const create = useMutation({
     mutationFn: () =>
@@ -86,20 +84,13 @@ function RequestAdvanceModal({ onClose }: { onClose: () => void }) {
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
           {HR_MESSAGES.advanceDistinctFromLoan}
         </p>
-        <SelectField
+        <EmployeePicker
           id="advance-employee"
           label="Employee"
           value={employeeId}
-          onChange={(event) => setEmployeeId(event.target.value)}
-        >
-          <option value="">Select an employee</option>
-          {employees?.items.map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName].filter(Boolean).join(' ')}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setEmployeeId(id)}
+          required
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             id="advance-amount"
@@ -135,7 +126,9 @@ export default function SalaryAdvancesTable() {
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading, isError } = useQuery({
+  const self = useApproverSelf();
+  const toast = useToast();
+  const advances = useQuery({
     queryKey: ['hr', 'advances', status],
     queryFn: () =>
       listSalaryAdvances(
@@ -143,10 +136,16 @@ export default function SalaryAdvancesTable() {
       ),
   });
 
+  const { data } = advances;
   const approve = useMutation({
     mutationFn: approveSalaryAdvance,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hr', 'advances'] }),
-    onError: (err: Error) => setError(err.message),
+    onSuccess: () => {
+      setError(null);
+      toast.success('Advance approved and disbursed.');
+      queryClient.invalidateQueries({ queryKey: ['hr', 'advances'] });
+    },
+    // 403 SELF_APPROVAL arrives with the server's own sentence.
+    onError: (err: Error) => setError(errorMessage(err, 'Could not approve the advance.')),
   });
 
   const columns: Column<SalaryAdvance>[] = [
@@ -206,12 +205,37 @@ export default function SalaryAdvancesTable() {
         columns={columns}
         rows={data ?? []}
         rowKey={(row) => row.id}
-        isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        isLoading={advances.isPending}
+        error={advances.isError ? advances.error : null}
+        onRetry={() => advances.refetch()}
         emptyMessage="No salary advances match this filter."
         actions={(row) =>
-          row.status === 'pending' ? (
-            <RowAction type="button" onClick={() => approve.mutate(row.id)}>
+          row.status === 'pending' && self.isSelf(row) ? (
+            // 036 F19: maker-checker. Whoever recorded the advance, or receives it, cannot approve.
+            <span className="text-xs text-gray-500">Another approver must approve</span>
+          ) : row.status === 'pending' ? (
+            <RowAction
+              type="button"
+              loading={approve.isPending && approve.variables === row.id}
+              disabled={approve.isPending}
+              onClick={async () => {
+                // Approving disburses money, so it names who gets how much (036 F19).
+                if (
+                  await confirmDialog({
+                    title: 'Approve this advance?',
+                    message: `${rupees(row.amount)} to ${
+                      row.employeeName ?? row.employeeCode ?? 'this employee'
+                    }, recovered from ${periodLabel(
+                      row.recoveryMonth,
+                    )} salary. Approving disburses it and cannot be undone.`,
+                    confirmLabel: 'Approve and disburse',
+                    tone: 'default',
+                  })
+                ) {
+                  approve.mutate(row.id);
+                }
+              }}
+            >
               Approve
             </RowAction>
           ) : (

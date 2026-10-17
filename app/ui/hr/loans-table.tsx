@@ -3,12 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import {
   approveLoan,
   closeLoan,
   createLoan,
   getLoan,
-  listEmployees,
   listLoans,
   type Loan,
 } from '@/app/lib/api/hr-payroll';
@@ -27,8 +27,11 @@ import {
   todayIso,
 } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import EmployeePicker from '@/app/ui/hr/employee-picker';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
+import { useApproverSelf } from '@/app/ui/hr/use-approver-self';
+import { useToast } from '@/app/ui/toast';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -50,10 +53,6 @@ function IssueLoanModal({ onClose }: { onClose: () => void }) {
     useState(currentPeriod());
   const [error, setError] = useState<string | null>(null);
 
-  const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 100 }],
-    queryFn: () => listEmployees({ pageSize: 100 }),
-  });
 
   const create = useMutation({
     mutationFn: () =>
@@ -113,22 +112,13 @@ function IssueLoanModal({ onClose }: { onClose: () => void }) {
         <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
           {HR_MESSAGES.advanceDistinctFromLoan}
         </p>
-        <SelectField
+        <EmployeePicker
           id="loan-employee"
           label="Employee"
           value={employeeId}
-          onChange={(event) => setEmployeeId(event.target.value)}
-        >
-          <option value="">Select an employee</option>
-          {employees?.items.map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName]
-                .filter(Boolean)
-                .join(' ')}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setEmployeeId(id)}
+          required
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             id="loan-amount"
@@ -253,7 +243,8 @@ function ScheduleModal({
 
 export default function LoansTable() {
   const queryClient = useQueryClient();
-  const employees = useEmployeeNames();
+  const self = useApproverSelf();
+  const toast = useToast();
   const [status, setStatus] = useState('');
   const [issuing, setIssuing] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -267,11 +258,18 @@ export default function LoansTable() {
       ),
   });
 
+  // The ids on screen, so a name past the roster's first 100 is still resolved (036 F13).
+  const employees = useEmployeeNames((data ?? []).map((loan) => loan.employeeId));
+
   const approve = useMutation({
     mutationFn: approveLoan,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] }),
-    onError: (err: Error) => setError(err.message),
+    onSuccess: () => {
+      setError(null);
+      toast.success('Loan approved; its repayment schedule is generated.');
+      queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] });
+    },
+    // 403 SELF_APPROVAL arrives with the server's own sentence.
+    onError: (err: Error) => setError(errorMessage(err, 'Could not approve the loan.')),
   });
 
   const close = useMutation({
@@ -358,16 +356,22 @@ export default function LoansTable() {
             <RowAction type="button" onClick={() => setViewing(row.id)}>
               Schedule
             </RowAction>
-            {row.status === 'pending' && (
+            {row.status === 'pending' && self.isSelf({ createdByUserId: row.createdByUserId, employeeCode: employees.code(row.employeeId) }) && (
+              // 036 F19: maker-checker. Whoever recorded the loan, or receives it, cannot approve.
+              <span className="text-xs text-gray-500">Another approver must approve</span>
+            )}
+            {row.status === 'pending' && !self.isSelf({ createdByUserId: row.createdByUserId, employeeCode: employees.code(row.employeeId) }) && (
               <RowAction
                 type="button"
+                loading={approve.isPending && approve.variables === row.id}
+                disabled={approve.isPending}
                 onClick={async () => {
                   if (
                     await confirmDialog({
                       title: 'Approve this loan?',
-                      message: HR_MESSAGES.confirmApproveLoan(
+                      message: `${employees.label(row.employeeId)}: ${HR_MESSAGES.confirmApproveLoan(
                         rupees(row.amount),
-                      ),
+                      )} EMI ${rupees(row.emiAmount)} a month.`,
                       confirmLabel: 'Approve',
                       tone: 'default',
                     })

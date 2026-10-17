@@ -1268,6 +1268,8 @@ export const loanSchema = z.object({
   totalRecovered: decimal.optional(),
   outstanding: decimal.optional(),
   instalments: z.number().optional(),
+  /** Who recorded it — who may therefore not approve it (036 F19). */
+  createdByUserId: z.string().nullable().optional(),
 });
 
 export type Loan = z.infer<typeof loanSchema>;
@@ -1353,6 +1355,8 @@ export const salaryAdvanceSchema = z.object({
   recoveryMonth: z.string(),
   outstandingBalance: nullableDecimal.optional(),
   status: enumOf(SALARY_ADVANCE_STATUSES),
+  /** Who recorded it — who may therefore not approve it (036 F19). */
+  createdByUserId: z.string().nullable().optional(),
 });
 
 export type SalaryAdvance = z.infer<typeof salaryAdvanceSchema>;

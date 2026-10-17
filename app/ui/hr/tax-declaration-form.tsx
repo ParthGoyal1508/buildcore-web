@@ -5,13 +5,13 @@ import { useState } from 'react';
 
 import {
   getTaxDeclaration,
-  listEmployees,
   saveTaxDeclaration,
   verifyDeclarationLine,
 } from '@/app/lib/api/hr-payroll';
 import { TDS_SECTIONS, TDS_SECTION_CEILINGS } from '@/app/lib/constants';
 import { financialYearOf, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import EmployeePicker from '@/app/ui/hr/employee-picker';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import {
   FormError,
@@ -45,10 +45,6 @@ export default function TaxDeclarationForm() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 100 }],
-    queryFn: () => listEmployees({ pageSize: 100 }),
-  });
 
   const { data: declaration, isLoading } = useQuery({
     queryKey: ['hr', 'taxDeclaration', employeeId, financialYear],
@@ -222,20 +218,14 @@ export default function TaxDeclarationForm() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <SelectField
+        <EmployeePicker
           id="declaration-employee"
           label="Employee"
           value={employeeId}
-          onChange={(event) => setEmployeeId(event.target.value)}
-        >
-          <option value="">Select an employee</option>
-          {employees?.items.map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName].filter(Boolean).join(' ')}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setEmployeeId(id)}
+          allowLeavers
+          required
+        />
         <TextField
           id="declaration-fy"
           label="Financial year"

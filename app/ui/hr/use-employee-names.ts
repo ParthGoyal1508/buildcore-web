@@ -1,8 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
-import { listEmployees } from '@/app/lib/api/hr-payroll';
+import { getEmployee, listEmployees } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES } from '@/app/lib/constants';
 
 /**
@@ -24,14 +24,33 @@ import { HR_MESSAGES } from '@/app/lib/constants';
  * not in it at all. Every endpoint that lists rows about people should send the name;
  * until each one does, this stands in — and says so rather than rendering an id.
  */
-export function useEmployeeNames() {
+export function useEmployeeNames(ids: readonly string[] = []) {
   const { data, isPending, isError } = useQuery({
     queryKey: ['hr', 'employees', { pageSize: 100 }],
     queryFn: () => listEmployees({ pageSize: 100 }),
   });
 
+  // 036 F13: the roster is the first 100 *active* employees, so employee 101 — and everyone who
+  // has left — read "Name unavailable". A caller that passes the ids it is about to render gets
+  // each one not in the roster fetched on its own (capped, and cached per id).
+  const inRoster = new Set((data?.items ?? []).map((e) => e.id));
+  const missingIds = data
+    ? [...new Set(ids)].filter((id) => id && !inRoster.has(id)).slice(0, 50)
+    : [];
+  const extra = useQueries({
+    queries: missingIds.map((id) => ({
+      queryKey: ['hr', 'employee', id],
+      queryFn: () => getEmployee(id),
+      staleTime: 5 * 60_000,
+      retry: false,
+    })),
+  });
+
   const byId = new Map(
-    (data?.items ?? []).map((employee) => {
+    [
+      ...(data?.items ?? []),
+      ...extra.flatMap((q) => (q.data ? [q.data] : [])),
+    ].map((employee) => {
       const name = [employee.firstName, employee.lastName]
         .filter(Boolean)
         .join(' ')
