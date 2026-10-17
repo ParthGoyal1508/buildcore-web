@@ -94,7 +94,7 @@ export default function DeploymentReportPage() {
           <option value="contractor">Contractor</option>
         </SelectField>
         <div className="flex items-end">
-          <Button
+          <Button intent="read"
             className="w-full justify-center"
             onClick={() => setSubmitted(true)}
             disabled={!projectId || !periodFrom || !periodTo}

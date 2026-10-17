@@ -184,7 +184,7 @@ export function LetterComposer({
 
       <div className="flex flex-wrap items-center gap-3">
         {onPreview && letter && (
-          <Button type="button" onClick={() => void preview()} disabled={busy}>
+          <Button intent="read" type="button" onClick={() => void preview()} disabled={busy}>
             Preview
           </Button>
         )}

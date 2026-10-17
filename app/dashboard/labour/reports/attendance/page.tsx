@@ -98,7 +98,7 @@ export default function AttendanceReportPage() {
           onChange={(e) => setPeriodTo(e.target.value)}
         />
         <div className="flex items-end">
-          <Button
+          <Button intent="read"
             className="w-full justify-center"
             onClick={() => setSubmitted(true)}
             disabled={!siteId || !periodFrom || !periodTo}

@@ -70,7 +70,7 @@ export default function JoinModal({
               Letters tab, not from here. */}
           <div className="flex gap-2">
             <Link href={ROUTES.recruitmentOnboarding(result.employeeId)}>
-              <Button>Open onboarding</Button>
+              <Button intent="read">Open onboarding</Button>
             </Link>
             <SecondaryButton onClick={onClose}>Close</SecondaryButton>
           </div>

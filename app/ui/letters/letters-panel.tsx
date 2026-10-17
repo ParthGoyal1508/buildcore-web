@@ -483,7 +483,7 @@ export function LetterTable({
                           >
                             View
                           </Button>
-                          <Button onClick={() => void download(letter)}>
+                          <Button intent="read" onClick={() => void download(letter)}>
                             Download
                           </Button>
                           {extraActions?.(letter)}

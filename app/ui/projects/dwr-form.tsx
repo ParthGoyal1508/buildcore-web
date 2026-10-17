@@ -729,7 +729,7 @@ export default function DwrForm({
             Saved — opening…
           </Button>
         ) : savedReportId ? (
-          <Button
+          <Button intent="read"
             type="button"
             onClick={() =>
               router.push(ROUTES.projectsDwrReport(projectId, savedReportId))
