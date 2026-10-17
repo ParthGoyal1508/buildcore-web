@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import type { StoredFile } from '@/app/lib/api/client';
-import { authFetch, authFetchFile } from '@/app/lib/session';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
 import { fileToBase64 } from '@/app/lib/files';
 
 /**
@@ -143,6 +143,8 @@ const attachmentSchema = z
      * distinction costs nothing here.
      */
     taskId: z.string().nullable().optional(),
+    /** 036 I8: a 320 px copy exists (photos uploaded from 2026-10-18). */
+    hasThumbnail: z.boolean().optional(),
   })
   .passthrough();
 
@@ -627,6 +629,30 @@ export async function repairReconciliation(
 
 export async function deleteDwr(dwrId: string): Promise<void> {
   await authFetch<unknown>(`/projects/dwr/${dwrId}`, { method: 'DELETE' });
+}
+
+/**
+ * Takes a wrong file off a report that is still a draft or returned (036 I9). The API refuses it
+ * once submitted (409 `DWR_WRONG_STATUS`) and on a locked project (423), and audits the removal.
+ */
+export async function removeDwrAttachment(
+  dwrId: string,
+  attachmentId: string,
+): Promise<void> {
+  await authFetch<unknown>(
+    `/projects/dwr/${dwrId}/attachments/${attachmentId}`,
+    { method: 'DELETE' },
+  );
+}
+
+/**
+ * A photo attachment's 320 px thumbnail (036 I8) — the file itself for one uploaded before
+ * thumbnails existed, so this always draws something for an image.
+ */
+export async function dwrAttachmentThumbnail(
+  attachmentId: string,
+): Promise<Blob> {
+  return authFetchBlob(`/projects/dwr/attachments/${attachmentId}/thumbnail`);
 }
 
 /** What a bill proposes its quantities from (022 FR-034 to FR-038). */

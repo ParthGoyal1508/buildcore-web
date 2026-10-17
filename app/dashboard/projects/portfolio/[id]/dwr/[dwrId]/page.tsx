@@ -360,6 +360,7 @@ export default function DwrReportPage() {
         <DwrAttachments
           dwrId={params.dwrId}
           sealed={report.status === 'approved'}
+          removable={report.status === 'draft' || report.status === 'returned'}
           attachments={(report.attachments ?? []).filter((a) => !a.taskId)}
         />
       </div>
