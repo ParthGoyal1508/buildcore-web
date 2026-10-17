@@ -31,6 +31,13 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
+import {
+  filterByNoc,
+  NocFilterField,
+  NocStatusBadge,
+  useNocStatuses,
+  type NocFilter,
+} from '@/app/ui/nocs/noc-status';
 
 /**
  * The labour registry (031). Registration happens on the field screen, because it needs the
@@ -61,6 +68,12 @@ export default function WorkersPage() {
         pageSize: 200,
       }),
   });
+  // Open until the labour's NOC is uploaded, then closed (2026-10-17).
+  const [nocFilter, setNocFilter] = useState<NocFilter>('');
+  const nocStatuses = useNocStatuses(
+    'labour_worker',
+    (workers.data?.items ?? []).map((w) => w.id),
+  );
 
   const siteName = (id: string) =>
     sites.data?.find((s) => s.id === id)?.name ?? '—';
@@ -108,6 +121,12 @@ export default function WorkersPage() {
       header: 'Status',
       render: (w) => <StatusBadge status={w.status} />,
     },
+    {
+      key: 'noc',
+      header: 'NOC',
+      sortValue: (w) => nocStatuses?.get(w.id)?.status ?? '',
+      render: (w) => <NocStatusBadge status={nocStatuses?.get(w.id)} />,
+    },
   ];
 
   return (
@@ -125,7 +144,7 @@ export default function WorkersPage() {
         </Link>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SelectField
           id="filter-site"
           label="Site"
@@ -146,11 +165,21 @@ export default function WorkersPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <NocFilterField
+          id="filter-noc"
+          value={nocFilter}
+          onChange={setNocFilter}
+        />
       </div>
 
       <ResponsiveList
         columns={columns}
-        rows={workers.data?.items ?? []}
+        rows={filterByNoc(
+          workers.data?.items ?? [],
+          nocFilter,
+          nocStatuses,
+          (w) => w.id,
+        )}
         rowKey={(w) => w.id}
         isLoading={workers.isPending}
         error={workers.isError ? 'Could not load labour.' : null}

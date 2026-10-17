@@ -66,3 +66,30 @@ export async function getNocFile(id: string): Promise<StoredFile> {
 export async function deleteNoc(id: string): Promise<void> {
   await authFetch<void>(`/nocs/${id}`, { method: 'DELETE' });
 }
+
+/**
+ * Open until a NOC is uploaded, closed from then on (2026-10-17). Derived on the server from the
+ * NOCs themselves; a work order closes on its NOC after the work order, not the LOI's.
+ */
+const nocStatusSchema = z.object({
+  subjectId: z.string(),
+  status: z.enum(['open', 'closed']),
+  closedAt: z.string().nullable(),
+});
+export type NocStatus = z.infer<typeof nocStatusSchema>;
+
+/** The server's ceiling per request. */
+export const NOC_STATUS_PAGE = 500;
+
+export async function getNocStatuses(
+  subjectType: NocSubject,
+  subjectIds: string[],
+): Promise<NocStatus[]> {
+  if (subjectIds.length === 0) return [];
+  const raw = await authFetch<unknown>(
+    `/nocs/status?subjectType=${subjectType}&subjectIds=${subjectIds
+      .map(encodeURIComponent)
+      .join(',')}`,
+  );
+  return z.array(nocStatusSchema).parse(raw);
+}

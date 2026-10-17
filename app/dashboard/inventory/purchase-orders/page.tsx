@@ -18,6 +18,13 @@ import PageHeader from '@/app/ui/page-header';
 import SearchableSelect from '@/app/ui/searchable-select';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
+import {
+  filterByNoc,
+  NocFilterField,
+  NocStatusBadge,
+  useNocStatuses,
+  type NocFilter,
+} from '@/app/ui/nocs/noc-status';
 
 /**
  * Purchase orders (2026-10-15).
@@ -56,6 +63,12 @@ export default function PurchaseOrdersPage() {
     queryKey: ['letters', 'kind', PURCHASE_ORDER],
     queryFn: () => getLetters({ letterKindKey: PURCHASE_ORDER }),
   });
+  // An issued order is open until the supplier's NOC is uploaded, then closed (2026-10-17).
+  const [nocFilter, setNocFilter] = useState<NocFilter>('');
+  const issuedIds = (orders.data ?? [])
+    .filter((letter) => letter.status !== 'composed')
+    .map((letter) => letter.id);
+  const nocStatuses = useNocStatuses('purchase_order', issuedIds);
 
   const chosen = (vendors.data ?? []).find((v) => v.id === vendorId);
 
@@ -174,24 +187,47 @@ export default function PurchaseOrdersPage() {
           The purchase orders could not be loaded.
         </p>
       ) : (
-        <LetterTable
-          letters={orders.data ?? []}
-          isLoading={orders.isLoading}
-          emptyMessage="No purchase order has been raised yet."
-          // The supplier's NOC against an issued purchase order (2026-10-15).
-          extraActions={(letter) => (
-            <Button
-              onClick={() =>
-                setNocFor({
-                  id: letter.id,
-                  label: letter.referenceNo ?? letter.letterKindLabel,
-                })
-              }
-            >
-              NOC
-            </Button>
+        <>
+          {issuedIds.length > 0 && (
+            <div className="w-full sm:max-w-xs">
+              <NocFilterField
+                id="po-filter-noc"
+                value={nocFilter}
+                onChange={setNocFilter}
+              />
+            </div>
           )}
-        />
+          <LetterTable
+            letters={
+              nocFilter
+                ? filterByNoc(
+                    (orders.data ?? []).filter((l) => l.status !== 'composed'),
+                    nocFilter,
+                    nocStatuses,
+                    (letter) => letter.id,
+                  )
+                : orders.data ?? []
+            }
+            statusExtra={(letter) => (
+              <NocStatusBadge status={nocStatuses?.get(letter.id)} labelled />
+            )}
+            isLoading={orders.isLoading}
+            emptyMessage="No purchase order has been raised yet."
+            // The supplier's NOC against an issued purchase order (2026-10-15).
+            extraActions={(letter) => (
+              <Button
+                onClick={() =>
+                  setNocFor({
+                    id: letter.id,
+                    label: letter.referenceNo ?? letter.letterKindLabel,
+                  })
+                }
+              >
+                NOC
+              </Button>
+            )}
+          />
+        </>
       )}
       {nocFor && (
         <NocModal
