@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
+import type { StoredFile } from '@/app/lib/api/client';
 import { API_URL } from '@/app/lib/config';
-import { getAccessToken, authFetch } from '@/app/lib/session';
+import { getAccessToken, authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * The `/my/*` client (contracts/my-workspace-ui.md).
@@ -563,10 +564,15 @@ export interface ClaimInput {
   /** `YYYY-MM-DD`. */
   expenseDate: string;
   description: string;
-  /** Base64 image data. Stored server-side in this same request, which is why no
-   * separate upload call exists — a two-step upload would orphan the blob of every
-   * claim the employee then abandons. */
+  /** Base64 photo (JPEG, PNG, WebP) or, since 036 G5, PDF. Stored server-side in this same
+   * request, which is why no separate upload call exists — a two-step upload would orphan the blob
+   * of every claim the employee then abandons. */
   receipt?: string;
+  /**
+   * Edit only: `null` removes the receipt on file; leave it out to keep it. 036 G5: a string is no
+   * longer accepted as a receipt (the server ignores it), so this client never sends one.
+   */
+  receiptRef?: null;
   status?: 'draft' | 'submitted';
 }
 
@@ -605,6 +611,13 @@ export async function withdrawReimbursementClaim(
 
 export async function deleteReimbursementClaim(id: string): Promise<void> {
   await authFetch(`/my/reimbursements/${id}`, { method: 'DELETE' });
+}
+
+/** The claim's receipt, photo or PDF, under the name the server gives it (036 G5). */
+export async function getMyReimbursementReceipt(
+  id: string,
+): Promise<StoredFile> {
+  return authFetchFile(`/my/reimbursements/${id}/receipt`);
 }
 
 // ------------------------------------------- Attendance exceptions (016 T042)
