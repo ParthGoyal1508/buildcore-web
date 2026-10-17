@@ -714,6 +714,19 @@ export interface BoqItemInput {
   perDayQty?: string;
 }
 
+/**
+ * The one cache key for a project's BOQ (036 I11).
+ *
+ * The same `getBOQ` answer was cached under two keys — `['boq', id]` by the daily work form and the
+ * letters line picker, `['projects', id, 'boq']` by the BOQ tree — so approving a DWR refreshed one
+ * and left the tree's done/pending figures stale, and an import refreshed the other and left the DWR
+ * line picker offering yesterday's schedule. Every reader and every invalidation uses this now.
+ * Under `['projects', id]`, so invalidating a whole project refreshes its BOQ too.
+ */
+export const boqKeys = {
+  project: (projectId: string) => ['projects', projectId, 'boq'] as const,
+};
+
 export async function getBOQ(projectId: string): Promise<BoqGroup[]> {
   const raw = await authFetch<unknown>(`/projects/${projectId}/boq`);
   return z.array(boqGroupSchema).parse(raw);

@@ -8,6 +8,7 @@ import {
   createBOQItem,
   getBOQ,
   type BoqGroup,
+  boqKeys,
 } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
@@ -36,7 +37,7 @@ export default function BoqEntry({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState<'section' | 'line' | null>(null);
 
   const { data: groups } = useQuery({
-    queryKey: ['projects', projectId, 'boq'],
+    queryKey: boqKeys.project(projectId),
     queryFn: () => getBOQ(projectId),
   });
 
@@ -72,7 +73,7 @@ export default function BoqEntry({ projectId }: { projectId: string }) {
 function useInvalidateBoq(projectId: string) {
   const queryClient = useQueryClient();
   return () => {
-    void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq'] });
+    void queryClient.invalidateQueries({ queryKey: boqKeys.project(projectId) });
     // The alerts read the same lines through a different endpoint, so they go stale together.
     void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq-alerts'] });
   };

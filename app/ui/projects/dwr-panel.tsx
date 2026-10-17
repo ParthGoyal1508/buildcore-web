@@ -26,6 +26,7 @@ import {
   type SortableColumn,
 } from '@/app/ui/table';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import { boqKeys } from '@/app/lib/api/projects';
 
 /**
  * Every daily work report on a project, and what can be done to each (024 Story 1, Story 2).
@@ -84,7 +85,7 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
   const refresh = () => {
     // Approval moved BOQ executed quantities, so anything reading them is now stale. Named
     // individually rather than clearing everything: a blanket reset re-fetches the whole project.
-    void queryClient.invalidateQueries({ queryKey: ['boq', projectId] });
+    void queryClient.invalidateQueries({ queryKey: boqKeys.project(projectId) });
     void queryClient.invalidateQueries({
       queryKey: ['billPackages', projectId],
     });

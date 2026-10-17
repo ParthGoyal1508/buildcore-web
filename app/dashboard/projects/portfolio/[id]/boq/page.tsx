@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getBOQ } from '@/app/lib/api/projects';
+import { getBOQ, boqKeys } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
 import BoqAlertTabs from '@/app/ui/projects/boq-alert-tabs';
 import BoqEntry from '@/app/ui/projects/boq-entry';
@@ -53,7 +53,7 @@ export default function ProjectBoqPage() {
   // The same query key the tree uses, so the counts on the tabs and the rows under them are one
   // response rather than two that can disagree. No second request.
   const { data } = useQuery({
-    queryKey: ['projects', project.id, 'boq'],
+    queryKey: boqKeys.project(project.id),
     queryFn: () => getBOQ(project.id),
   });
 

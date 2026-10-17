@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { useState } from 'react';
 
 import { getItems } from '@/app/lib/api/inventory';
-import { getBOQ } from '@/app/lib/api/projects';
+import { getBOQ, boqKeys } from '@/app/lib/api/projects';
 import { money, rupees, unitRate } from '@/app/lib/format';
 import SearchableSelect, {
   type SearchableOption,
@@ -122,7 +122,7 @@ export default function LineItemsEditor({
   const fromItems = source === 'items';
 
   const boq = useQuery({
-    queryKey: ['boq', projectId],
+    queryKey: boqKeys.project(projectId ?? ''),
     queryFn: () => getBOQ(projectId ?? ''),
     enabled: fromBoq,
   });

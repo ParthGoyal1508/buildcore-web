@@ -11,6 +11,7 @@ import {
   validateBOQImport,
   validateEstimateImport,
   type BoqImportReport,
+  boqKeys,
 } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
 import { rupees } from '@/app/lib/format';
@@ -80,7 +81,7 @@ export default function BoqImport({
       setReport(null);
       setRefusal(null);
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
       void queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'boq-alerts'],

@@ -19,7 +19,7 @@ import {
   quantityOf,
   updateDwr,
 } from '@/app/lib/api/dwr';
-import { getBOQ } from '@/app/lib/api/projects';
+import { getBOQ, boqKeys } from '@/app/lib/api/projects';
 import { ROUTES } from '@/app/lib/constants';
 import { todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
@@ -322,7 +322,7 @@ export default function DwrForm({
     isPending: boqLoading,
     isError: boqFailed,
   } = useQuery({
-    queryKey: ['boq', projectId],
+    queryKey: boqKeys.project(projectId),
     queryFn: () => getBOQ(projectId),
   });
   const boqState = boqLoading ? 'loading' : boqFailed ? 'failed' : 'ready';

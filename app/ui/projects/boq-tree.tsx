@@ -12,6 +12,7 @@ import {
   planBOQItem,
   type BoqGroup,
   type BoqItem,
+  boqKeys,
 } from '@/app/lib/api/projects';
 import { percentLabel, scheduleTotals } from '@/app/lib/bill-totals';
 import { BOQ_COPY } from '@/app/lib/constants';
@@ -75,7 +76,7 @@ export default function BoqTree({
   const [planning, setPlanning] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['projects', projectId, 'boq'],
+    queryKey: boqKeys.project(projectId),
     queryFn: () => getBOQ(projectId),
   });
 
@@ -97,7 +98,7 @@ export default function BoqTree({
     }) => planBOQItem(projectId, itemId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
       void queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'boq-alerts'],
@@ -114,7 +115,7 @@ export default function BoqTree({
     mutationFn: (itemId: string) => deleteBOQItem(projectId, itemId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
       // The alert tabs read the same lines through a different endpoint, so they go stale with it.
       void queryClient.invalidateQueries({
