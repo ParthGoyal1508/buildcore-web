@@ -11,7 +11,11 @@ import { BILL_DRAFT_STORE, openDb, promisify } from '@/app/lib/offline-queue';
  * Two measures, because either alone leaves a gap:
  * - drafts are stored under the owner's user id (`ownedKey`), so even data that survives — a tab
  *   that died before signing out — is never offered to anyone else;
- * - `clearLocalUserData` empties it all on sign-out and when a refused renewal ends the session.
+ * - `clearLocalUserData` empties it all on sign-out. When a refused renewal ends the session it
+ *   keeps the bill drafts: they are already keyed to their owner, so nobody else is ever offered
+ *   them, and wiping them would throw away a person's half-typed bill only because their session
+ *   expired. Everything not keyed to a person (the legacy punch queue, the remembered site) still
+ *   goes, since that is what could reach the next person.
  */
 
 let owner: string | null = null;
@@ -31,8 +35,13 @@ const LOCAL_STORAGE_KEYS = ['buildcore.labour.attendanceSite'];
 /** IndexedDB stores holding a person's work. The punch queue is the legacy one `drainQueue` reads. */
 const USER_STORES = [BILL_DRAFT_STORE, 'punch-queue'];
 
-/** Empties every per-person store on this device. Best effort: a sign-out never waits on, or fails because of, storage. */
-export async function clearLocalUserData(): Promise<void> {
+/**
+ * Empties every per-person store on this device. Best effort: a sign-out never waits on, or fails
+ * because of, storage. `keepOwnedDrafts` spares the user-keyed bill drafts (session expiry).
+ */
+export async function clearLocalUserData({
+  keepOwnedDrafts = false,
+}: { keepOwnedDrafts?: boolean } = {}): Promise<void> {
   owner = null;
   try {
     for (const key of LOCAL_STORAGE_KEYS) window.localStorage.removeItem(key);
@@ -42,7 +51,11 @@ export async function clearLocalUserData(): Promise<void> {
   try {
     const db = await openDb();
     if (!db) return;
-    const stores = USER_STORES.filter((name) => db.objectStoreNames.contains(name));
+    const stores = USER_STORES.filter(
+      (name) =>
+        db.objectStoreNames.contains(name) &&
+        !(keepOwnedDrafts && name === BILL_DRAFT_STORE),
+    );
     if (stores.length > 0) {
       const tx = db.transaction(stores, 'readwrite');
       await Promise.all(stores.map((name) => promisify(tx.objectStore(name).clear())));

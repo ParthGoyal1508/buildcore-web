@@ -279,7 +279,7 @@ async function withAuth<T>(
       abandonRefresh();
       void purgeRuntimeCaches();
       // Drafts and queued work belong to the person whose session this was (036 A26).
-      void clearLocalUserData();
+      void clearLocalUserData({ keepOwnedDrafts: true });
       if (typeof window !== 'undefined') {
         // Deliberately a full document navigation, not router.push(): the session
         // has just been invalidated, and a client-side transition would keep the
