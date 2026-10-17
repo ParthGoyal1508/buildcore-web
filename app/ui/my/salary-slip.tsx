@@ -8,7 +8,9 @@ import {
   getSalarySlip,
   type SalarySlip as Slip,
 } from '@/app/lib/api/my-workspace';
+import { errorMessage } from '@/app/lib/api/client';
 import { MESSAGES } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
 import { Button } from '@/app/ui/button';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import QueryError from '@/app/ui/query-error';
@@ -84,19 +86,14 @@ export default function SalarySlipPanel() {
     if (!period) return;
     setIsDownloading(true);
     try {
-      const blob = await downloadSalarySlipPdf(period);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `payslip-${period}.pdf`;
-      link.click();
-      // Released after the click, not before: revoking synchronously can cancel the
-      // download in some browsers before it has read the blob.
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      const file = await downloadSalarySlipPdf(period);
+      saveBlob(file.blob, file.filename ?? `payslip-${period}.pdf`);
     } catch (error) {
       // 036 G2: a toast rather than a banner above the month picker, which pushed the slip down
       // and stayed after the next successful download.
-      toast.error(error instanceof Error ? error.message : MESSAGES.loadFailed);
+      toast.error(
+        errorMessage(error, 'Could not download the payslip. Please try again.'),
+      );
     } finally {
       setIsDownloading(false);
     }

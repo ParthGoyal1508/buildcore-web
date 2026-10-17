@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import type { StoredFile } from '@/app/lib/api/client';
-import { API_URL } from '@/app/lib/config';
-import { getAccessToken, authFetch, authFetchFile } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * The `/my/*` client (contracts/my-workspace-ui.md).
@@ -522,24 +521,16 @@ export async function getSalarySlip(period: string): Promise<SalarySlip> {
 }
 
 /**
- * The payslip PDF (research.md §8).
+ * The payslip PDF (research.md §8), under the server's own name
+ * (`payslip-<code>-<period>.pdf`).
  *
- * Uses raw `fetch` rather than `authFetch`, which parses JSON and would choke on a
- * PDF body. The cost is that this one call does not get `authFetch`'s
- * refresh-on-401 retry — acceptable because it is always a deliberate tap on a
- * screen the user has already loaded through an authenticated request moments
- * earlier, so an expired token here is a re-tap rather than a lost session.
+ * Through `authFetchFile` since 036 (follow-up): it used a raw `fetch`, which skipped the
+ * refresh-on-401 retry, the timeout and the server's error message.
  */
-export async function downloadSalarySlipPdf(period: string): Promise<Blob> {
-  const token = getAccessToken();
-  const res = await fetch(`${API_URL}/my/salary/${period}/pdf`, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) {
-    throw new Error('Could not download the payslip. Please try again.');
-  }
-  return res.blob();
+export async function downloadSalarySlipPdf(
+  period: string,
+): Promise<StoredFile> {
+  return authFetchFile(`/my/salary/${period}/pdf`);
 }
 
 // ---------------------------------------------------------- Reimbursements
