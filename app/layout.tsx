@@ -7,6 +7,7 @@ import { DialogHost } from '@/app/ui/dialogs';
 import NativePickers from '@/app/ui/native-pickers';
 import RowLinks from '@/app/ui/row-links';
 import { ToastHost } from '@/app/ui/toast';
+import CompanyChangedBanner from '@/app/ui/company-changed-banner';
 import TopLoader from '@/app/ui/top-loader';
 
 export const metadata: Metadata = {
@@ -78,6 +79,7 @@ export default function RootLayout({
           <NativePickers />
           <DialogHost />
           <ToastHost />
+          <CompanyChangedBanner />
           <RowLinks />
           <TopLoader />
         </Providers>
