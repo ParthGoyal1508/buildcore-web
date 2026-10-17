@@ -3,10 +3,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import { uploadAssetDocument } from '@/app/lib/api/assets';
 import { MESSAGES } from '@/app/lib/constants';
+import { MAX_UPLOAD_BYTES } from '@/app/lib/files';
 import { Button } from '@/app/ui/button';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
+import { EQUIPMENT_DOCUMENT_ACCEPT } from '@/app/ui/plant/document-modal';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -14,20 +17,8 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 import { useAssetDocTypes } from './use-asset-refs';
-
-/** Strips the `data:...;base64,` prefix a FileReader result carries. */
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.readAsDataURL(file);
-  });
-}
 
 /**
  * Attach a document to an asset (spec FR-022).
@@ -40,6 +31,10 @@ function toBase64(file: File): Promise<string> {
  *
  * The type list comes from the Doc Types master rather than a hardcoded array: each
  * type carries its own alert window, and the expiry marker is computed from it.
+ *
+ * 036 L3: the file goes through `FileUpload`. The form said "up to 10MB" while about 7.5 MB was
+ * the real limit (base64 inside a 10 MB body); the API now takes a real 10 MB file, checks its
+ * type by its bytes, and this checks the type and size before reading anything.
  */
 export default function AssetDocumentModal({
   assetId,
@@ -49,10 +44,11 @@ export default function AssetDocumentModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const docTypes = useAssetDocTypes();
 
   const [docTypeId, setDocTypeId] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<PreparedFile | null>(null);
   const [documentNumber, setDocumentNumber] = useState('');
   const [issueDate, setIssueDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -65,9 +61,9 @@ export default function AssetDocumentModal({
       if (!file) throw new Error('Choose a file first.');
       return uploadAssetDocument(assetId, {
         docTypeId,
-        file: await toBase64(file),
-        fileName: file.name,
-        contentType: file.type || 'application/octet-stream',
+        file: file.base64,
+        fileName: file.fileName,
+        contentType: file.mimeType || 'application/octet-stream',
         ...(documentNumber.trim()
           ? { documentNumber: documentNumber.trim() }
           : {}),
@@ -77,22 +73,18 @@ export default function AssetDocumentModal({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
+      toast.success('Document attached.');
       onClose();
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : MESSAGES.saveFailed,
-      ),
+    onError: (err) => setError(errorMessage(err, MESSAGES.saveFailed)),
   });
 
   return (
     <Modal
       title="Attach a document"
       onClose={onClose}
+      isDirty={Boolean(file || docTypeId || documentNumber || expiryDate)}
+      pending={upload.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
@@ -101,9 +93,10 @@ export default function AssetDocumentModal({
           <Button
             type="submit"
             form="asset-document-form"
-            disabled={upload.isPending || !docTypeId || !file}
+            loading={upload.isPending}
+            disabled={!docTypeId || !file}
           >
-            {upload.isPending ? 'Uploading…' : 'Upload'}
+            Upload
           </Button>
         </>
       }
@@ -139,25 +132,14 @@ export default function AssetDocumentModal({
           ))}
         </SelectField>
 
-        <div>
-          <label
-            htmlFor="asset-document-file"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
-            File
-          </label>
-          <input
-            id="asset-document-file"
-            type="file"
-            accept="application/pdf,image/png,image/jpeg"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            required
-            className="block w-full text-sm text-gray-700"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            PDF or image, up to 10MB.
-          </p>
-        </div>
+        <FileUpload
+          id="asset-document-file"
+          label="File"
+          accept={EQUIPMENT_DOCUMENT_ACCEPT}
+          maxBytes={MAX_UPLOAD_BYTES}
+          hint="PDF, JPEG, PNG, WebP, Excel or Word, up to 10 MB."
+          onSelect={setFile}
+        />
 
         <TextField
           id="asset-document-number"
@@ -179,6 +161,7 @@ export default function AssetDocumentModal({
             id="asset-document-expiry"
             label="Expires on"
             type="date"
+            min={issueDate || undefined}
             value={expiryDate}
             onChange={(event) => setExpiryDate(event.target.value)}
             hint="Leave empty for a document that does not lapse."
