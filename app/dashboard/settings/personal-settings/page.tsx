@@ -13,13 +13,17 @@ export const metadata: Metadata = { title: 'Personal Settings' };
  * only, behind their own password — the settings layout refuses this route to anybody without
  * `CROSS_COMPANY_ACCESS`, the component shows only a password prompt until it is verified, and the
  * API refuses the change itself without that verification.
+ *
+ * 036 C16: the audit found "Personal" misleading for a company-wide switch. The name is the client's
+ * own choice (2026-10-15), so it stays; the description now says the settings apply to the whole
+ * company, and the switch itself names the company (036 C13).
  */
 export default function PersonalSettingsPage() {
   return (
     <main className="flex flex-col gap-6">
       <PageHeader
         title="Personal Settings"
-        description="Sensitive settings for this application. Super Admin only."
+        description="Sensitive settings that apply to the whole company, not only to you. Super Admin only."
       />
       <CashVisibility />
     </main>
