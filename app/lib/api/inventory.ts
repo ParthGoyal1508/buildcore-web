@@ -145,6 +145,14 @@ export async function getItems(query: ItemQuery = {}): Promise<ItemPage> {
   return itemPageSchema.parse(raw);
 }
 
+/** One item, for a form opened on a known id (036 M5: the pickers no longer hold every item). */
+export async function getItem(id: string): Promise<Item> {
+  const raw = await authFetch<unknown>(
+    `/inventory/items/${encodeURIComponent(id)}`,
+  );
+  return itemSchema.parse(raw);
+}
+
 export interface ItemInput {
   name: string;
   categoryId: string;
