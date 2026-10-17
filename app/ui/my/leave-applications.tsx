@@ -1,9 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import clsx from 'clsx';
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   cancelLeaveApplication,
   getLeaveApplications,
@@ -11,7 +10,9 @@ import {
   type LeaveApplication,
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
-import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { RowAction } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { LEAVE_TYPE_LABEL } from '@/app/ui/my/leave-balance';
 import { dateLabel } from '@/app/lib/format';
@@ -27,9 +28,9 @@ const shortDate = (value: string) => dateLabel(value.slice(0, 10));
 
 export default function LeaveApplications() {
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['my', 'leave-applications'],
     queryFn: getLeaveApplications,
   });
@@ -38,12 +39,27 @@ export default function LeaveApplications() {
     mutationFn: (id: string) => cancelLeaveApplication(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my', 'leave-applications'] });
-      setError(null);
+      // The balance a pending application held is released by the cancel.
+      queryClient.invalidateQueries({ queryKey: ['my', 'leave-balance'] });
+      toast.success('Leave application cancelled');
     },
     // A 409 means someone decided it between the page loading and the tap.
     onError: (err: unknown) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed),
+      toast.error(errorMessage(err, MESSAGES.saveFailed)),
   });
+
+  // 036 G4: one tap used to cancel at once, with no undo — a thumb brushing the row on a phone
+  // withdrew the application and the employee had to apply again from scratch.
+  async function confirmCancel(row: LeaveApplication) {
+    const ok = await confirmDialog({
+      title: 'Cancel this leave application?',
+      message: `${LEAVE_TYPE_LABEL[row.leaveType]}, ${shortDate(row.fromDate)} – ${shortDate(row.toDate)}. You would need to apply again.`,
+      confirmLabel: 'Cancel application',
+      cancelLabel: 'Keep it',
+      tone: 'danger',
+    });
+    if (ok) cancel.mutate(row.id);
+  }
 
   const columns: Column<LeaveApplication>[] = [
     {
@@ -108,14 +124,15 @@ export default function LeaveApplications() {
       <h2 className="mb-3 text-lg font-medium text-gray-900">
         My applications
       </h2>
-      <FormError message={error} />
 
       <ResponsiveList
         columns={columns}
         rows={data ?? []}
         rowKey={(row) => row.id}
         isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        error={error}
+        onRetry={refetch}
+        skeletonRows={3}
         emptyMessage="You have not applied for any leave yet."
         actions={(row) =>
           // Only a pending application can be cancelled (FR-012). Rendering a
@@ -124,7 +141,8 @@ export default function LeaveApplications() {
           row.status === 'pending' ? (
             <RowAction
               type="button"
-              onClick={() => cancel.mutate(row.id)}
+              onClick={() => void confirmCancel(row)}
+              loading={cancel.isPending && cancel.variables === row.id}
               disabled={cancel.isPending}
               className="text-red-600"
             >
