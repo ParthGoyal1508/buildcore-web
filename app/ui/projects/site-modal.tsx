@@ -8,11 +8,15 @@ import {
   Site,
   SiteInput,
   createSite,
-  getProjects,
+  getProjectDetail,
   updateSite,
 } from '@/app/lib/api/projects';
 import { MESSAGES, SITE_STATUSES, projectsLabel } from '@/app/lib/constants';
+import { resolvePosition } from '@/app/lib/location';
+import AsyncSelect from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
+import { searchProjects } from '@/app/ui/projects/pickers';
+import { useToast } from '@/app/ui/toast';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -30,6 +34,9 @@ import {
  * made them so was never written, and widening them now would push a null check into
  * the busiest read in the system.
  */
+/** The API's ceiling on a geofence radius (`site.dto.ts`, 036 I24). */
+const MAX_GEOFENCE_METRES = 5000;
+
 export default function SiteModal({
   site,
   onClose,
@@ -58,12 +65,58 @@ export default function SiteModal({
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Enough for a picker without pagination. A company with more projects than this
-  // needs a type-ahead, which is worth building when one exists rather than now.
-  const { data: projects } = useQuery({
-    queryKey: ['projects', 'portfolio', { pageSize: 200 }],
-    queryFn: () => getProjects({ pageSize: 200 }),
+  const toast = useToast();
+  // 036 I22: the project picker searches the server; it loaded the first 200 projects and the
+  // 201st did not exist. The linked project is read by id so its name shows on an edit.
+  const linkedProject = useQuery({
+    queryKey: ['projects', 'detail', site?.projectId],
+    queryFn: () => getProjectDetail(site!.projectId!),
+    enabled: Boolean(site?.projectId),
+    staleTime: 60_000,
   });
+
+  const isDirty =
+    name !== (site?.name ?? '') ||
+    projectId !== (site?.projectId ?? '') ||
+    address !== (site?.address ?? '') ||
+    latitude !== (site ? String(site.latitude) : '') ||
+    longitude !== (site ? String(site.longitude) : '') ||
+    radius !== (site ? String(site.geofenceRadiusMeters) : '') ||
+    weeklyOffDay !== (site ? String(site.weeklyOffDay) : '0') ||
+    status !== (site?.status ?? 'active');
+
+  // 036 I24: "Use my location" — coordinates were typed by hand, from a phone's map app, digit by
+  // digit. Standing on the site and pressing this is the reliable way to set them.
+  const [locating, setLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
+  const fillFromDevice = async () => {
+    setLocating(true);
+    setLocationNote(null);
+    try {
+      const position = await resolvePosition();
+      setLatitude(position.coords.latitude.toFixed(6));
+      setLongitude(position.coords.longitude.toFixed(6));
+      setLocationNote(
+        `Set from this device, accurate to about ${Math.round(position.coords.accuracy)} m.`,
+      );
+    } catch (error) {
+      setLocationNote(
+        error instanceof Error ? error.message : MESSAGES.locationUnavailable,
+      );
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  const hasPoint =
+    latitude !== '' &&
+    longitude !== '' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180;
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -83,6 +136,7 @@ export default function SiteModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects', 'sites'] });
+      toast.success(site ? 'Site saved.' : 'Site added.');
       onClose();
     },
     onError: (error: unknown) =>
@@ -107,8 +161,15 @@ export default function SiteModal({
       next.longitude = 'Longitude must be between -180 and 180.';
     }
     const metres = Number(radius);
-    if (radius === '' || !Number.isInteger(metres) || metres < 1) {
-      next.radius = 'Geofence radius must be a whole number of metres, at least 1.';
+    // 036 I24: the API caps the radius at 5,000 m (a typo of 5,000 km once made a geofence of
+    // half a country, where every punch anywhere counted as on site).
+    if (
+      radius === '' ||
+      !Number.isInteger(metres) ||
+      metres < 1 ||
+      metres > MAX_GEOFENCE_METRES
+    ) {
+      next.radius = `Geofence radius must be a whole number of metres, from 1 to 5,000.`;
     }
 
     setErrors(next);
@@ -120,12 +181,14 @@ export default function SiteModal({
     <Modal
       title={site ? 'Edit site' : 'Add site'}
       onClose={onClose}
+      isDirty={isDirty}
+      pending={mutation.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="site-form" disabled={mutation.isPending}>
+          <Button type="submit" form="site-form" loading={mutation.isPending}>
             {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
         </>
@@ -142,19 +205,32 @@ export default function SiteModal({
           error={errors.name}
           required
         />
-        <SelectField
-          id="site-project"
-          label="Project"
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">Not linked to a project</option>
-          {projects?.items.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.code} — {project.name}
-            </option>
-          ))}
-        </SelectField>
+        <div>
+          <label
+            htmlFor="site-project"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Project
+          </label>
+          <AsyncSelect
+            id="site-project"
+            value={projectId}
+            onChange={(id) => setProjectId(id)}
+            search={searchProjects}
+            cacheKey={['projects', 'picker']}
+            emptyLabel="Not linked to a project"
+            selectedOption={
+              linkedProject.data && linkedProject.data.project.id === projectId
+                ? {
+                    id: linkedProject.data.project.id,
+                    label: linkedProject.data.project.name,
+                    note: linkedProject.data.project.code,
+                  }
+                : null
+            }
+            placeholder="Type to search projects"
+          />
+        </div>
         <TextField
           id="site-address"
           label="Location address"
@@ -186,11 +262,43 @@ export default function SiteModal({
           />
         </div>
 
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <SecondaryButton
+              type="button"
+              onClick={() => void fillFromDevice()}
+              disabled={locating}
+              className="min-h-[44px]"
+            >
+              {locating ? 'Finding your location…' : 'Use my location'}
+            </SecondaryButton>
+            {locationNote && (
+              <span className="text-sm text-gray-600" role="status">
+                {locationNote}
+              </span>
+            )}
+          </div>
+          {/* A small map of the point, so a swapped latitude and longitude — or a pin in the sea —
+              is seen before Save. An OpenStreetMap embed: no new dependency and no API key. */}
+          {hasPoint && (
+            <div className="overflow-hidden rounded-md border border-gray-200">
+              <iframe
+                title="Map of the site's coordinates"
+                className="h-40 w-full"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.005},${lat - 0.003},${lng + 0.005},${lat + 0.003}&layer=mapnik&marker=${lat},${lng}`}
+              />
+            </div>
+          )}
+        </div>
+
         <TextField
           id="site-radius"
           label="Geofence radius (metres)"
           type="number"
           min={1}
+          max={MAX_GEOFENCE_METRES}
           step={1}
           value={radius}
           onChange={(e) => setRadius(e.target.value)}
