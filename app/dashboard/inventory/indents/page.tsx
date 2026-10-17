@@ -1,8 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 
 import {
   downloadStoreDocument,
@@ -17,27 +19,34 @@ import {
   inventoryLabel,
   overdueLabel,
 } from '@/app/lib/constants';
+import { dateLabel, quantity as formatQuantity } from '@/app/lib/format';
+import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
+import AsyncSelect from '@/app/ui/async-select';
+import { Button } from '@/app/ui/button';
 import IndentForm from '@/app/ui/inventory/indent-form';
+import { searchSites } from '@/app/ui/inventory/inventory-search';
 import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
-import { useSites } from '@/app/ui/inventory/use-inventory-refs';
-import {
-  FormError,
-  SecondaryButton,
-  SelectField,
-} from '@/app/ui/settings/form-fields';
+import { SelectField } from '@/app/ui/settings/form-fields';
 import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
-import { dateLabel } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
 
-export default function IndentsPage() {
-  const sites = useSites();
-  const [status, setStatus] = useState('');
-  const [siteId, setSiteId] = useState('');
-  const [page, setPage] = useState(1);
+/**
+ * 036 M5, M12 (2026-10-17): the filters live in the URL (Back from an indent keeps them), the
+ * store filter searches the server rather than one page of 200 stores, quantities are formatted,
+ * a failed load offers Retry, and Raise indent is the screen's primary button.
+ */
+function IndentsPageBody() {
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
+  const [filters, setFilters, query] = useUrlState(
+    { status: urlString(), site: urlString(), page: urlNumber(1) },
+    { resetPage: 'page' },
+  );
   const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -45,16 +54,19 @@ export default function IndentsPage() {
   });
   const canApprove = user?.permissions.includes('INVENTORY_APPROVE') ?? false;
 
-  const filters = {
-    page,
-    ...(status ? { status } : {}),
-    ...(siteId ? { siteId } : {}),
+  const params = {
+    page: query.page,
+    status: query.status || undefined,
+    siteId: query.site || undefined,
   };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['inventory', 'indents', filters],
-    queryFn: () => getIndents(filters),
+  const list = useQuery({
+    queryKey: ['inventory', 'indents', companyId, params],
+    queryFn: () => getIndents(params),
+    placeholderData: keepPreviousData,
   });
+  const data = list.data;
+  const siteRow = data?.indents.find((row) => row.siteId === query.site);
 
   const columns: Column<Indent>[] = [
     {
@@ -99,7 +111,7 @@ export default function IndentsPage() {
           (total, line) => total + (line.outstandingQuantity ?? 0),
           0,
         );
-        return outstanding > 0 ? outstanding : '—';
+        return outstanding > 0 ? formatQuantity(outstanding) : '—';
       },
     },
     {
@@ -124,9 +136,9 @@ export default function IndentsPage() {
               Procurement needed
             </Link>
           )}
-          <SecondaryButton type="button" onClick={() => setShowForm(true)}>
+          <Button type="button" onClick={() => setShowForm(true)}>
             Raise indent
-          </SecondaryButton>
+          </Button>
         </div>
       </div>
 
@@ -134,13 +146,8 @@ export default function IndentsPage() {
         <SelectField
           id="indents-status"
           label="Status"
-          value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
+          value={filters.status}
+          onChange={(event) => setFilters({ status: event.target.value })}
         >
           <option value="">Any status</option>
           {INDENT_STATUSES.map((value) => (
@@ -150,34 +157,33 @@ export default function IndentsPage() {
           ))}
         </SelectField>
 
-        <SelectField
-          id="indents-site"
-          label="Store"
-          value={siteId}
-          onChange={(event) => {
-            setSiteId(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
-        >
-          <option value="">All stores</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="indents-site" className="font-medium text-gray-700">
+            Store
+          </label>
+          <AsyncSelect
+            id="indents-site"
+            value={filters.site}
+            onChange={(id) => setFilters({ site: id })}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={
+              siteRow ? { id: siteRow.siteId, label: siteRow.siteName } : null
+            }
+            emptyLabel="All stores"
+          />
+        </div>
       </div>
-
-      <FormError message={error} />
 
       <ResponsiveList
         columns={columns}
         rows={data?.indents ?? []}
         rowKey={(row) => row.id}
-        isLoading={isPending}
-        error={isError ? MESSAGES.inventoryLoadFailed : undefined}
+        isLoading={list.isPending}
+        error={list.error}
+        onRetry={list.refetch}
+        serverPaged
+        isRefreshing={list.isPlaceholderData}
         emptyMessage={MESSAGES.indentsEmpty}
         // The client's Material Indent document (2026-10-15), without opening the indent first.
         actions={(row) => (
@@ -185,7 +191,7 @@ export default function IndentsPage() {
             label="Indent"
             fallbackName={`Indent ${row.indentNumber.replace(/\//g, '-')}`}
             load={(format) => downloadStoreDocument('indent', row.id, format)}
-            onError={setError}
+            onError={(message) => toast.error(message)}
           />
         )}
       />
@@ -194,11 +200,27 @@ export default function IndentsPage() {
         total={data?.total ?? 0}
         page={data?.page ?? 1}
         pageSize={data?.pageSize ?? 25}
-        onPageChange={setPage}
+        onPageChange={(page) => setFilters({ page })}
         noun="indent"
       />
 
       {showForm && <IndentForm onClose={() => setShowForm(false)} />}
     </div>
+  );
+}
+
+export default function IndentsPage() {
+  // `useUrlState` reads `useSearchParams`, which needs a Suspense boundary.
+  return (
+    <Suspense
+      fallback={
+        <ListSkeleton
+          headers={['Indent', 'Store', 'Required by', 'Items', 'Outstanding', 'Status']}
+          rows={8}
+        />
+      }
+    >
+      <IndentsPageBody />
+    </Suspense>
   );
 }
