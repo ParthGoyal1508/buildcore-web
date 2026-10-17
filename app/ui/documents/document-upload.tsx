@@ -53,6 +53,8 @@ interface DocumentUploadProps {
   /** The line under the button. Defaults to the supersede hint, which is a company-documents
    * rule: filing twice there supersedes, filing twice against a project files two documents. */
   hint?: string;
+  /** What the picker takes; defaults to images and PDF. Project documents also take xlsx/docx. */
+  accept?: string;
   onDone?: () => void;
 }
 
@@ -81,6 +83,7 @@ export function DocumentUpload({
   showDocumentNumber = true,
   showExpiry = true,
   hint = DOCUMENT_COPY.supersedeHint,
+  accept,
   onDone,
 }: DocumentUploadProps) {
   const [documentTypeId, setDocumentTypeId] = useState(
@@ -171,6 +174,7 @@ export function DocumentUpload({
         key={pickerKey}
         id="document-file"
         label="File"
+        {...(accept ? { accept } : {})}
         onSelect={setFile}
         disabled={busy}
       />

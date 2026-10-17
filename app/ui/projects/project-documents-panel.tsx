@@ -7,11 +7,13 @@ import { useState } from 'react';
 import {
   downloadProjectDocument,
   getDocumentRequirements,
-  getProjectDocuments,
+  getProjectDocumentPage,
+  removeProjectDocument,
   uploadProjectDocument,
   type ProjectDocument,
 } from '@/app/lib/api/project-documents';
-import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
+import { DOCUMENT_COPY } from '@/app/lib/constants';
+import { ACCEPT_IMAGES_AND_PDF } from '@/app/lib/files';
 import { dateLabel, dateTimeLabel, todayIso } from '@/app/lib/format';
 import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
@@ -20,8 +22,21 @@ import {
   DocumentUpload,
   type UploadKind,
 } from '@/app/ui/documents/document-upload';
+import { confirmDialog } from '@/app/ui/dialogs';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
+import QueryError from '@/app/ui/query-error';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
-import { LoadingText } from '@/app/ui/spinner';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
+
+/**
+ * What a project document may be: the API's document allow-list (036 B5) — PDF, the photo formats,
+ * and Office xlsx/docx. The bytes decide on the server; this only filters the picker.
+ */
+const PROJECT_DOCUMENT_ACCEPT = `${ACCEPT_IMAGES_AND_PDF},application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,.docx`;
 
 /**
  * What a project actually holds, and what it still owes (017 FR-024, web T077, T078).
@@ -114,7 +129,11 @@ export default function ProjectDocumentsPanel({
    * state that could disagree about whether the form is showing.
    */
   const [uploadFor, setUploadFor] = useState<string | null>(null);
+  /** 036 I25: the document the open upload form replaces, when it was opened by "Replace". */
+  const [replacing, setReplacing] = useState<ProjectDocument | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const { isLocked } = useProjectLock();
 
   /**
    * No `companyId` is passed, and that is deliberate.
@@ -124,10 +143,13 @@ export default function ProjectDocumentsPanel({
    * `/dashboard/projects` behaved; as of 019 Phase 4 it is how the whole application behaves, and the
    * provider that made it unusual here no longer exists.
    */
-  const documents = useQuery({
+  // 036 Wave 3: paged on the API now. The largest page (200) is asked for, because the outstanding
+  // kinds below are worked out from what is held; a project with more says so under the list.
+  const documentPage = useQuery({
     queryKey: ['project', projectId, 'documents'],
-    queryFn: () => getProjectDocuments(projectId),
+    queryFn: () => getProjectDocumentPage(projectId),
   });
+  const documents = { ...documentPage, data: documentPage.data?.items };
 
   /**
    * The required set, for naming what is outstanding.
@@ -149,9 +171,16 @@ export default function ProjectDocumentsPanel({
       fileName?: string;
       documentNumber?: string;
       expiresAt?: string;
+      supersedesDocumentId?: string;
     }) => uploadProjectDocument(projectId, input),
-    onSuccess: () => {
+    onSuccess: (_doc, input) => {
+      toast.success(
+        input.supersedesDocumentId
+          ? 'The document has been replaced.'
+          : 'The document has been filed.',
+      );
       setUploadFor(null);
+      setReplacing(null);
       void queryClient.invalidateQueries({
         queryKey: ['project', projectId, 'documents'],
       });
@@ -163,6 +192,40 @@ export default function ProjectDocumentsPanel({
       });
     },
   });
+
+  const remove = useMutation({
+    mutationFn: (document: ProjectDocument) =>
+      removeProjectDocument(projectId, document.id),
+    onSuccess: (_r, document) => {
+      toast.success(`${document.documentType} removed.`);
+      void queryClient.invalidateQueries({
+        queryKey: ['project', projectId, 'documents'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects', 'portfolio'],
+      });
+    },
+    onError: (err: unknown) =>
+      toast.error(projectErrorMessage(err, 'The document could not be removed.')),
+  });
+
+  const confirmRemove = async (document: ProjectDocument) => {
+    if (
+      await confirmDialog({
+        title: 'Remove this document?',
+        message: `Remove “${document.documentType}” from this project? If it answers a required kind, the project will show that kind as outstanding again. The removal is recorded.`,
+        confirmLabel: 'Remove',
+        tone: 'danger',
+      })
+    ) {
+      remove.mutate(document);
+    }
+  };
+
+  const openReplace = (document: ProjectDocument) => {
+    setReplacing(document);
+    setUploadFor(document.documentTypeId ?? '');
+  };
 
   const open = async (document: ProjectDocument) => {
     setDownloadError(null);
@@ -231,17 +294,15 @@ export default function ProjectDocumentsPanel({
   }));
 
   if (documents.isLoading) {
-    return (
-      <p className="text-sm text-gray-500" role="status">
-        <LoadingText />
-      </p>
-    );
+    return <ListSkeleton headers={['Document', 'Filed', '']} rows={4} />;
   }
   if (documents.isError) {
     return (
-      <p className="text-sm text-red-600" role="alert">
-        {MESSAGES.loadFailed}
-      </p>
+      <QueryError
+        error={documents.error}
+        onRetry={documentPage.refetch}
+        fallback="The project's documents could not be loaded."
+      />
     );
   }
 
@@ -359,6 +420,29 @@ export default function ProjectDocumentsPanel({
                           >
                             Download
                           </RowAction>
+                          {/* 036 I25: a wrong or lapsed document can be replaced or removed.
+                              Not offered on a locked project, which refuses both (423). */}
+                          {!isLocked && (
+                            <>
+                              <RowAction
+                                type="button"
+                                onClick={() => openReplace(document)}
+                              >
+                                Replace
+                              </RowAction>
+                              <RowAction
+                                type="button"
+                                loading={
+                                  remove.isPending &&
+                                  remove.variables?.id === document.id
+                                }
+                                disabled={remove.isPending}
+                                onClick={() => void confirmRemove(document)}
+                              >
+                                Remove
+                              </RowAction>
+                            </>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -412,7 +496,15 @@ export default function ProjectDocumentsPanel({
         </section>
       )}
 
-      {uploadKinds.length === 0 ? null : uploadFor === null ? (
+      {documentPage.data &&
+        documentPage.data.total > documentPage.data.items.length && (
+          <p className="text-xs text-gray-500">
+            Showing the latest {documentPage.data.items.length} of{' '}
+            {documentPage.data.total} documents.
+          </p>
+        )}
+
+      {isLocked || uploadKinds.length === 0 ? null : uploadFor === null ? (
         <div>
           <Button type="button" onClick={() => setUploadFor('')}>
             {DOCUMENT_COPY.projectDocumentAdd}
@@ -421,8 +513,16 @@ export default function ProjectDocumentsPanel({
       ) : (
         <section className="rounded-lg border border-gray-200 p-4">
           <h3 className="mb-3 text-sm font-medium text-gray-900">
-            {DOCUMENT_COPY.projectDocumentAddHeading}
+            {replacing
+              ? `Replace ${replacing.documentType}`
+              : DOCUMENT_COPY.projectDocumentAddHeading}
           </h3>
+          {replacing && (
+            <p className="mb-3 text-xs text-gray-600">
+              The new file is filed and the one filed{' '}
+              {dateTimeLabel(replacing.uploadedAt)} is removed, in one step.
+            </p>
+          )}
           <DocumentUpload
             /*
               Keyed on the preselected kind so opening the form from a different outstanding row
@@ -430,8 +530,9 @@ export default function ProjectDocumentsPanel({
               is right for a form that is opened and closed and wrong for one that stays mounted
               while the row it was opened from changes underneath it.
             */
-            key={uploadFor}
+            key={`${uploadFor}:${replacing?.id ?? ''}`}
             kinds={uploadKinds}
+            accept={PROJECT_DOCUMENT_ACCEPT}
             initialDocumentTypeId={uploadFor || undefined}
             ownerLabel={DOCUMENT_COPY.projectDocumentOwnerLabel}
             // Both are stored against a project document as of 2026-10-09, and the expiry is
@@ -453,11 +554,18 @@ export default function ProjectDocumentsPanel({
                 fileName: input.fileName,
                 documentNumber: input.documentNumber,
                 expiresAt: input.expiresAt,
+                ...(replacing ? { supersedesDocumentId: replacing.id } : {}),
               })
             }
           />
           <div className="mt-3">
-            <RowAction type="button" onClick={() => setUploadFor(null)}>
+            <RowAction
+              type="button"
+              onClick={() => {
+                setUploadFor(null);
+                setReplacing(null);
+              }}
+            >
               {DOCUMENT_COPY.projectDocumentCancel}
             </RowAction>
           </div>

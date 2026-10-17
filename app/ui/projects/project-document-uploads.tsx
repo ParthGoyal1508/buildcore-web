@@ -7,7 +7,15 @@ import {
   stageProjectDocument,
   type ProjectDocumentRequirement,
 } from '@/app/lib/api/project-documents';
+import { errorMessage } from '@/app/lib/api/client';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
+import {
+  ACCEPT_IMAGES_AND_PDF,
+  MAX_UPLOAD_BYTES,
+  compressImage,
+  formatBytes,
+  matchesAccept,
+} from '@/app/lib/files';
 import { dateLabel } from '@/app/lib/format';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
 
@@ -20,6 +28,9 @@ import { FormError, TextField } from '@/app/ui/settings/form-fields';
  * makes FR-023a's "preserve every file already supplied" true by construction rather than by
  * careful re-rendering (T073).
  */
+/** The API's document allow-list (036 B5): PDF, photos, Office xlsx/docx. */
+const STAGED_DOCUMENT_ACCEPT = `${ACCEPT_IMAGES_AND_PDF},application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,.docx`;
+
 export interface StagedUpload {
   fileName: string;
   stagedDocumentId: string;
@@ -139,8 +150,31 @@ export default function ProjectDocumentUploads({
     requirement: ProjectDocumentRequirement,
     input: Pending,
   ) => {
-    const file = input.file;
-    if (!file) return;
+    const original = input.file;
+    if (!original) return;
+
+    // 036 I25: checked against what the server accepts (its allow-list decides by the bytes) and
+    // the 10 MB limit before anything is read, and a photographed certificate is shrunk first —
+    // the server stores the type it detects, never the one claimed here.
+    if (!matchesAccept(original, STAGED_DOCUMENT_ACCEPT)) {
+      setState(requirement.documentTypeId, {
+        status: 'failed',
+        fileName: original.name,
+        message: 'Upload a PDF, a photo, or an Excel or Word file.',
+      });
+      return;
+    }
+    const file = original.type.startsWith('image/')
+      ? await compressImage(original)
+      : original;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setState(requirement.documentTypeId, {
+        status: 'failed',
+        fileName: original.name,
+        message: `It is ${formatBytes(file.size)}; the limit is ${formatBytes(MAX_UPLOAD_BYTES)}.`,
+      });
+      return;
+    }
 
     // Asked for rather than attempted. The server would refuse this with the same rule, and a
     // refusal the form could have prevented reads as the form's fault — which, until this field
@@ -190,10 +224,7 @@ export default function ProjectDocumentUploads({
       setState(requirement.documentTypeId, {
         status: 'failed',
         fileName: file.name,
-        message:
-          error instanceof Error
-            ? error.message
-            : DOCUMENT_COPY.uploadFailed,
+        message: errorMessage(error, DOCUMENT_COPY.uploadFailed),
       });
     }
   };
@@ -291,9 +322,13 @@ export default function ProjectDocumentUploads({
                         <input
                           id={`doc-${requirement.documentTypeId}`}
                           type="file"
+                          accept={STAGED_DOCUMENT_ACCEPT}
                           disabled={disabled || state.status === 'uploading'}
                           onChange={(event) => {
                             const file = event.target.files?.[0];
+                            // Cleared at once, so the same file picked again after a refusal
+                            // fires a change (036 I25).
+                            event.target.value = '';
                             if (file) record(requirement, { file }, true);
                           }}
                           className="text-xs text-gray-700"
