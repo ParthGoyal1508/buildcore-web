@@ -1,19 +1,41 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getStock, type StockRow } from '@/app/lib/api/inventory';
+import { errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import {
+  downloadInventoryExport,
+  getStock,
+  type StockRow,
+} from '@/app/lib/api/inventory';
 import { getCategories } from '@/app/lib/api/inventory';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
-import { quantity } from '@/app/lib/format';
-import { formatRupees } from '@/app/lib/utils';
-import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
+import { quantity, rupees, todayIso, unitRate } from '@/app/lib/format';
+import {
+  urlBoolean,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
+import AsyncSelect from '@/app/ui/async-select';
+import {
+  RowActionLink,
+  SecondaryButton,
+  fieldClass,
+} from '@/app/ui/settings/form-fields';
 import Pager from './pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
-import { useSites } from './use-inventory-refs';
+import { useToast } from '@/app/ui/toast';
+import { searchSites } from './inventory-search';
 import { selectClass } from '@/app/ui/settings/form-fields';
+
+/** The ledger of one item at one store (036 M13). */
+export const stockLedgerHref = (itemId: string, siteId: string) =>
+  `${ROUTES.inventoryStock}/ledger?${new URLSearchParams({ itemId, siteId })}`;
 
 /**
  * The stock position, and the four things you can do from it.
@@ -21,6 +43,13 @@ import { selectClass } from '@/app/ui/settings/form-fields';
  * `inStock`, `stockValue` and `belowReorderLevel` all arrive computed — the backend
  * refuses to store any of them (009 FR-014), so there is no arithmetic here to
  * disagree with it.
+ *
+ * 036 M5, M13 (2026-10-17): filters in the URL with the search debounced (it fired a request per
+ * keystroke), the store filter a server search, the valuation of the whole filter (not just this
+ * page) above the table, an Excel export, and a Ledger link per row to the item's movements at
+ * that store.
+ *
+ * Rendered under a `<Suspense>` boundary by the page: `useUrlState` reads the search params.
  */
 export default function StockTable({
   onNewPurchase,
@@ -33,13 +62,20 @@ export default function StockTable({
   onNewTransfer: () => void;
   onOpenMasters: () => void;
 }) {
-  const [siteId, setSiteId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [search, setSearch] = useState('');
-  const [belowOnly, setBelowOnly] = useState(false);
-  const [page, setPage] = useState(1);
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
+  const [filters, setFilters, query] = useUrlState(
+    {
+      site: urlString(),
+      category: urlString(),
+      q: urlString(),
+      below: urlBoolean(),
+      page: urlNumber(1),
+    },
+    { debounce: ['q'], resetPage: 'page' },
+  );
+  const [exporting, setExporting] = useState(false);
 
-  const sites = useSites();
   const categories = useQuery({
     queryKey: ['inventory', 'categories'],
     queryFn: getCategories,
@@ -53,20 +89,34 @@ export default function StockTable({
   // button without the permission would open a dialog whose every request 403s.
   const canEditMasters = user?.permissions.includes('SETTINGS') ?? false;
 
-  const filters = {
-    page,
-    ...(siteId ? { siteId } : {}),
-    ...(categoryId ? { categoryId } : {}),
-    ...(search ? { search } : {}),
-    ...(belowOnly ? { belowReorderLevel: true } : {}),
+  const stockFilters = {
+    siteId: query.site || undefined,
+    categoryId: query.category || undefined,
+    search: query.q.trim() || undefined,
+    belowReorderLevel: query.below || undefined,
   };
-  // `page` is always present, so it does not count as a filter.
-  const isFiltered = Object.keys(filters).length > 1;
+  const isFiltered = Object.values(stockFilters).some(Boolean);
+  const params = { ...stockFilters, page: query.page };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['inventory', 'stock', filters],
-    queryFn: () => getStock(filters),
+  const list = useQuery({
+    queryKey: ['inventory', 'stock', companyId, params],
+    queryFn: () => getStock(params),
+    placeholderData: keepPreviousData,
   });
+  const data = list.data;
+  const siteRow = data?.rows.find((row) => row.siteId === query.site);
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const blob = await downloadInventoryExport('stock', stockFilters);
+      saveBlob(blob, `Stock ${todayIso()}.xlsx`);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not produce the Excel file.'));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const columns: Column<StockRow>[] = [
     {
@@ -127,7 +177,7 @@ export default function StockTable({
             // who cannot distinguish it, and this is the one flag on the screen
             // that should prompt an action.
             <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-800">
-              Below reorder ({row.reorderLevel})
+              Below reorder ({quantity(row.reorderLevel)})
             </span>
           )}
         </span>
@@ -136,12 +186,14 @@ export default function StockTable({
     {
       key: 'avgRate',
       header: 'Avg rate',
-      render: (row) => formatRupees(row.avgRate),
+      className: 'text-right tabular-nums',
+      render: (row) => unitRate(row.avgRate),
     },
     {
       key: 'stockValue',
       header: 'Stock value',
-      render: (row) => formatRupees(row.stockValue),
+      className: 'text-right tabular-nums',
+      render: (row) => rupees(row.stockValue),
     },
   ];
 
@@ -162,6 +214,13 @@ export default function StockTable({
             Item masters
           </SecondaryButton>
         )}
+        <SecondaryButton
+          type="button"
+          onClick={() => void exportExcel()}
+          loading={exporting}
+        >
+          Excel
+        </SecondaryButton>
       </div>
 
       {/* A grid, not a flex row: as flex items these fields size to their labels
@@ -174,22 +233,17 @@ export default function StockTable({
           >
             Store
           </label>
-          <select
+          <AsyncSelect
             id="stock-site"
-            value={siteId}
-            onChange={(event) => {
-              setSiteId(event.target.value);
-              setPage(1);
-            }}
-            className={selectClass}
-          >
-            <option value="">All stores</option>
-            {(sites.data ?? []).map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.name}
-              </option>
-            ))}
-          </select>
+            value={filters.site}
+            onChange={(id) => setFilters({ site: id })}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={
+              siteRow ? { id: siteRow.siteId, label: siteRow.siteName } : null
+            }
+            emptyLabel="All stores"
+          />
         </div>
 
         <div>
@@ -201,11 +255,8 @@ export default function StockTable({
           </label>
           <select
             id="stock-category"
-            value={categoryId}
-            onChange={(event) => {
-              setCategoryId(event.target.value);
-              setPage(1);
-            }}
+            value={filters.category}
+            onChange={(event) => setFilters({ category: event.target.value })}
             className={selectClass}
           >
             <option value="">All categories</option>
@@ -226,13 +277,12 @@ export default function StockTable({
           </label>
           <input
             id="stock-search"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
+            type="search"
+            autoComplete="off"
+            value={filters.q}
+            onChange={(event) => setFilters({ q: event.target.value })}
             placeholder="Item name or code"
-            className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+            className={fieldClass}
           />
         </div>
 
@@ -240,11 +290,8 @@ export default function StockTable({
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
-              checked={belowOnly}
-              onChange={(event) => {
-                setBelowOnly(event.target.checked);
-                setPage(1);
-              }}
+              checked={filters.below}
+              onChange={(event) => setFilters({ below: event.target.checked })}
               className="h-4 w-4 rounded border-gray-300 text-blue-600"
             />
             Below reorder level only
@@ -252,12 +299,33 @@ export default function StockTable({
         </div>
       </div>
 
+      {data?.totals && (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          Stock value{isFiltered ? ' for this filter' : ''}:{' '}
+          <span className="font-medium tabular-nums">
+            {rupees(data.totals.stockValue)}
+          </span>
+          <span className="text-gray-500">
+            {' '}
+            across {data.total} {data.total === 1 ? 'row' : 'rows'}
+          </span>
+        </p>
+      )}
+
       <ResponsiveList
         columns={columns}
         rows={data?.rows ?? []}
         rowKey={(row) => `${row.itemId}:${row.siteId}`}
-        isLoading={isPending}
-        error={isError ? MESSAGES.inventoryLoadFailed : undefined}
+        isLoading={list.isPending}
+        error={list.error}
+        onRetry={list.refetch}
+        serverPaged
+        isRefreshing={list.isPlaceholderData}
+        actions={(row) => (
+          <RowActionLink href={stockLedgerHref(row.itemId, row.siteId)}>
+            Ledger
+          </RowActionLink>
+        )}
         emptyMessage={
           isFiltered ? MESSAGES.inventoryEmptyFiltered : MESSAGES.inventoryEmpty
         }
@@ -267,7 +335,7 @@ export default function StockTable({
         total={data?.total ?? 0}
         page={data?.page ?? 1}
         pageSize={data?.pageSize ?? 25}
-        onPageChange={setPage}
+        onPageChange={(page) => setFilters({ page })}
         noun="stock row"
       />
     </div>
