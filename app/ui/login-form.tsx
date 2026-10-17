@@ -22,6 +22,7 @@ import { ApiError } from '@/app/lib/api/client';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { homeRoute } from '@/app/lib/permissions';
+import { safeReturnPath } from '@/app/lib/return-path';
 import { markJustLoggedIn } from '@/app/lib/session';
 
 const loginSchema = z.object({
@@ -31,7 +32,12 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
-export default function LoginForm() {
+export default function LoginForm({
+  next,
+}: {
+  /** Where the session ended, from `?next=` — honoured only as a same-origin path (036 A24). */
+  next?: string;
+} = {}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -70,8 +76,13 @@ export default function LoginForm() {
       const user = await queryClient
         .fetchQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser })
         .catch(() => null);
-      router.replace((user && homeRoute(user)) ?? ROUTES.dashboard);
+      // Back to where the session ended, when it ended somewhere (036 A24). The module guards
+      // still decide whether this person may be there; a page they may not open sends them home.
+      router.replace(
+        safeReturnPath(next) ?? (user && homeRoute(user)) ?? ROUTES.dashboard,
+      );
     } catch (err) {
+      // A dropped connection is an `ApiError` with a readable message since 036 A2.
       setServerError(
         err instanceof ApiError ? err.message : 'Something went wrong.',
       );
@@ -169,7 +180,9 @@ export default function LoginForm() {
           {serverError && (
             <>
               <ExclamationCircleIcon className="h-5 w-5 shrink-0 text-red-600" />
-              <p className="text-sm text-red-600">{serverError}</p>
+              <p role="alert" className="text-sm text-red-600">
+                {serverError}
+              </p>
             </>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { ownedKey } from '@/app/lib/local-data';
 import {
   BILL_DRAFT_STORE,
   openDb,
@@ -28,6 +29,12 @@ import {
  * `readDraft` returns it and the sheet asks. Restoring silently over a server state the user has not
  * seen is the failure this would otherwise introduce: a bill composed yesterday, reopened today,
  * quietly showing yesterday's unsaved numbers as though they were the bill.
+ *
+ * ## Stored under the user (036 A26)
+ *
+ * The stored key is `<userId>|<sheet key>` (`ownedKey`), so on a shared machine a draft is only ever
+ * offered back to the person who typed it; sign-out clears the store as well (`local-data.ts`).
+ * Until the user is known nothing is read or written.
  */
 
 /** One sheet's unsaved entry. */
@@ -61,6 +68,8 @@ export const raDraftKey = (workOrderId: string): string => `ra:${workOrderId}`;
 export async function saveDraft(
   draft: Omit<BillDraft, 'savedAt'>,
 ): Promise<void> {
+  const key = ownedKey(draft.key);
+  if (!key) return;
   try {
     const db = await openDb();
     if (!db) return;
@@ -68,6 +77,7 @@ export async function saveDraft(
     await promisify(
       tx.objectStore(BILL_DRAFT_STORE).put({
         ...draft,
+        key,
         savedAt: new Date().toISOString(),
       } satisfies BillDraft),
     );
@@ -79,17 +89,19 @@ export async function saveDraft(
 
 /** The draft for a sheet, or `null` where there is none or storage is unavailable. */
 export async function readDraft(key: string): Promise<BillDraft | null> {
+  const stored = ownedKey(key);
+  if (!stored) return null;
   try {
     const db = await openDb();
     if (!db) return null;
     const tx = db.transaction(BILL_DRAFT_STORE, 'readonly');
     const row = await promisify(
-      tx.objectStore(BILL_DRAFT_STORE).get(key) as IDBRequest<
+      tx.objectStore(BILL_DRAFT_STORE).get(stored) as IDBRequest<
         BillDraft | undefined
       >,
     );
     db.close();
-    return row ?? null;
+    return row ? { ...row, key } : null;
   } catch {
     return null;
   }
@@ -103,11 +115,13 @@ export async function readDraft(key: string): Promise<BillDraft | null> {
  * closed by a dying tab is exactly the case this store exists for.
  */
 export async function clearDraft(key: string): Promise<void> {
+  const stored = ownedKey(key);
+  if (!stored) return;
   try {
     const db = await openDb();
     if (!db) return;
     const tx = db.transaction(BILL_DRAFT_STORE, 'readwrite');
-    await promisify(tx.objectStore(BILL_DRAFT_STORE).delete(key));
+    await promisify(tx.objectStore(BILL_DRAFT_STORE).delete(stored));
     db.close();
   } catch {
     // As above.

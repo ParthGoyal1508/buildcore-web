@@ -28,9 +28,14 @@ const SESSION_ENDED_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ activated?: string; reason?: string; reset?: string }>;
+  searchParams: Promise<{
+    activated?: string;
+    reason?: string;
+    reset?: string;
+    next?: string;
+  }>;
 }) {
-  const { activated, reason, reset } = await searchParams;
+  const { activated, reason, reset, next } = await searchParams;
   const sessionEnded = reason ? SESSION_ENDED_MESSAGES[reason] : undefined;
 
   return (
@@ -59,7 +64,7 @@ export default async function LoginPage({
             {sessionEnded}
           </p>
         )}
-        <LoginForm />
+        <LoginForm next={next} />
       </div>
     </main>
   );

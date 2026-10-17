@@ -7,6 +7,8 @@ import {
   type StoredFile,
 } from './api/client';
 import { expectedCompanyHeaders } from './company-tab';
+import { clearLocalUserData } from './local-data';
+import { returnPathQuery } from './return-path';
 import { SESSION_COOKIE_MISSING, SESSION_EXPIRED, SESSION_REVOKED } from './session-codes';
 import { ROUTES } from './constants';
 
@@ -276,6 +278,8 @@ async function withAuth<T>(
       clearSessionHint();
       abandonRefresh();
       void purgeRuntimeCaches();
+      // Drafts and queued work belong to the person whose session this was (036 A26).
+      void clearLocalUserData();
       if (typeof window !== 'undefined') {
         // Deliberately a full document navigation, not router.push(): the session
         // has just been invalidated, and a client-side transition would keep the
@@ -310,8 +314,10 @@ async function withAuth<T>(
         // keeps the next one from doing it again, since the reason is already on screen.
         if (window.location.pathname !== ROUTES.login && !sessionEnded) {
           sessionEnded = true;
+          // `next=` brings them back to this page after signing in (036 A24).
+          const next = returnPathQuery();
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-          window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
+          window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}${next ? `&${next}` : ''}`;
         }
       }
       throw refreshErr;
