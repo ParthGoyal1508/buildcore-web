@@ -3,22 +3,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
-import {
-  createTransfer,
-  getStock,
-  getStockHint,
-} from '@/app/lib/api/inventory';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { createTransfer, getStockHint } from '@/app/lib/api/inventory';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { MESSAGES } from '@/app/lib/constants';
 import { quantity as formatQuantity, todayIso } from '@/app/lib/format';
+import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
+import { Button } from '@/app/ui/button';
 import {
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
-import { useSites } from './use-inventory-refs';
+import { useToast } from '@/app/ui/toast';
+import { searchSites, searchStoreStock } from './inventory-search';
 
 const today = () => todayIso();
 
@@ -33,14 +32,22 @@ const today = () => todayIso();
  * The dispatch details (2026-10-15) are what the client's stock transfer slip and delivery
  * challan print — vehicle, transporter, the request and indent/PO it answers, when it should
  * arrive and why it moved. All optional: a handcart between two stores on one site has none.
+ *
+ * 036 M3, M5 (2026-10-17): the stores and the item are server-search pickers. They loaded one page
+ * of 200, so the 201st store or a store's 201st stocked item could not be moved at all. The item
+ * picker searches what the source store holds and shows the quantity in stock beside each name.
  */
 export default function TransferModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const sites = useSites();
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
 
-  const [fromSiteId, setFromSiteId] = useState('');
-  const [toSiteId, setToSiteId] = useState('');
-  const [itemId, setItemId] = useState('');
+  const [fromSite, setFromSite] = useState<SearchableOption | null>(null);
+  const [toSite, setToSite] = useState<SearchableOption | null>(null);
+  const [item, setItem] = useState<SearchableOption | null>(null);
+  const fromSiteId = fromSite?.id ?? '';
+  const toSiteId = toSite?.id ?? '';
+  const itemId = item?.id ?? '';
   const [date, setDate] = useState(today());
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -52,13 +59,6 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | null>(null);
-
-  const stock = useQuery({
-    queryKey: ['inventory', 'stock', { siteId: fromSiteId }],
-    queryFn: () => getStock({ siteId: fromSiteId, pageSize: 200 }),
-    enabled: Boolean(fromSiteId),
-    select: (page) => page.rows.filter((row) => row.inStock > 0),
-  });
 
   const hint = useQuery({
     queryKey: ['inventory', 'stock-hint', itemId, fromSiteId],
@@ -90,6 +90,7 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success(`Transfer of ${item?.label ?? 'material'} recorded`);
       onClose();
     },
     onError: (err) => {
@@ -97,11 +98,7 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
         setQuantityError(err.message);
         return;
       }
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not record this transfer.',
-      );
+      setError(errorMessage(err, 'Could not record this transfer.'));
     },
   });
 
@@ -117,19 +114,22 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
     <Modal
       title="Transfer material"
       onClose={onClose}
+      isDirty={Boolean(fromSiteId || toSiteId || itemId || quantity)}
+      pending={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
+        <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <SecondaryButton
+          <Button
             type="submit"
             form="transfer-form"
-            disabled={!ready || save.isPending}
+            disabled={!ready}
+            loading={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Transfer'}
-          </SecondaryButton>
-        </div>
+            Transfer
+          </Button>
+        </>
       }
     >
       <form
@@ -142,75 +142,83 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
           save.mutate();
         }}
       >
-        <SelectField
-          id="transfer-from"
-          label="From store"
-          value={fromSiteId}
-          onChange={(event) => {
-            setFromSiteId(event.target.value);
-            // Changing the store invalidates the item choice: the previous
-            // item may not exist at the new one (009 FR-005). Done here
-            // rather than in an effect, which would be a second render
-            // pass to undo state this one already knows is wrong.
-            setItemId('');
-          }}
-        >
-          <option value="">Select…</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="transfer-from" className="font-medium text-gray-700">
+            From store <span className="text-red-600">*</span>
+          </label>
+          <AsyncSelect
+            id="transfer-from"
+            value={fromSiteId}
+            onChange={(_, option) => {
+              setFromSite(option);
+              // Changing the store invalidates the item choice: the previous
+              // item may not exist at the new one (009 FR-005).
+              setItem(null);
+            }}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={fromSite}
+            placeholder="Search stores"
+          />
+        </div>
 
-        <SelectField
-          id="transfer-to"
-          label="To store"
-          value={toSiteId}
-          onChange={(event) => setToSiteId(event.target.value)}
-          error={sameSite ? MESSAGES.transferSameSite : undefined}
-        >
-          <option value="">Select…</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="transfer-to" className="font-medium text-gray-700">
+            To store <span className="text-red-600">*</span>
+          </label>
+          <AsyncSelect
+            id="transfer-to"
+            value={toSiteId}
+            onChange={(_, option) => setToSite(option)}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={toSite}
+            placeholder="Search stores"
+            invalid={sameSite}
+            aria-describedby={sameSite ? 'transfer-to-error' : undefined}
+          />
+          {sameSite && (
+            <p id="transfer-to-error" role="alert" className="text-xs text-red-600">
+              {MESSAGES.transferSameSite}
+            </p>
+          )}
+        </div>
 
-        <SelectField
-          id="transfer-item"
-          label="Item"
-          value={itemId}
-          onChange={(event) => setItemId(event.target.value)}
-          disabled={!fromSiteId || stock.isPending}
-        >
-          <option value="">
-            {!fromSiteId
-              ? 'Choose a source store first'
-              : stock.isPending
-                ? 'Loading…'
-                : 'Select…'}
-          </option>
-          {(stock.data ?? []).map((row) => (
-            <option key={row.itemId} value={row.itemId}>
-              {row.itemName} — {formatQuantity(row.inStock)} {row.unit}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="transfer-item" className="font-medium text-gray-700">
+            Item <span className="text-red-600">*</span>
+          </label>
+          <AsyncSelect
+            // Remounted per store so the search results are the new store's stock.
+            key={fromSiteId || 'none'}
+            id="transfer-item"
+            value={itemId}
+            onChange={(_, option) => setItem(option)}
+            search={searchStoreStock(fromSiteId)}
+            cacheKey={['inventory', 'stock', 'search', companyId, fromSiteId]}
+            selectedOption={item}
+            disabled={!fromSiteId}
+            placeholder={
+              fromSiteId ? 'Search this store’s stock' : 'Choose a source store first'
+            }
+          />
+        </div>
 
         <TextField
           id="transfer-date"
-          label="Date"
+          label="Date *"
           type="date"
+          required
           value={date}
           onChange={(event) => setDate(event.target.value)}
         />
 
         <TextField
           id="transfer-quantity"
-          label="Quantity"
+          label={unit ? `Quantity (${unit}) *` : 'Quantity *'}
           type="number"
+          inputMode="decimal"
+          required
           min={0}
           step="any"
           value={quantity}
@@ -221,7 +229,7 @@ export default function TransferModal({ onClose }: { onClose: () => void }) {
           error={quantityError ?? undefined}
           hint={
             available !== null
-              ? `Available at source: ${available} ${unit}`
+              ? `Available at source: ${formatQuantity(available)} ${unit}`
               : itemId
                 ? 'Checking available stock…'
                 : undefined
