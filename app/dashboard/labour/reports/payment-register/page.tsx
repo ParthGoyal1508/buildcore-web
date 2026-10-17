@@ -5,12 +5,12 @@ import { useState } from 'react';
 
 import { getPaymentRegister, type PaymentRegister } from '@/app/lib/api/labour';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
-import { getProjects } from '@/app/lib/api/projects';
+import { ProjectPicker } from '@/app/ui/plant/pickers';
 import { labourLabel } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
-import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import { TextField } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 
@@ -95,10 +95,6 @@ export default function PaymentRegisterPage() {
   } | null>(null);
   const companyId = useSelectedCompanyId();
 
-  const projects = useQuery({
-    queryKey: ['projects', 'all', companyId],
-    queryFn: () => getProjects({ pageSize: 200 }),
-  });
   const report = useQuery({
     queryKey: ['report-register', companyId, params],
     queryFn: () => getPaymentRegister(params!),
@@ -113,19 +109,13 @@ export default function PaymentRegisterPage() {
     <div className="space-y-4">
       <PageHeader title="Payment Register" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-        <SelectField
+        {/* Searched on the server: one page of 200 hid the 201st project (036 follow-up). */}
+        <ProjectPicker
           id="reg-project"
           label="Project"
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {projects.data?.items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setProjectId(id)}
+        />
         <TextField
           id="reg-from"
           label="From"

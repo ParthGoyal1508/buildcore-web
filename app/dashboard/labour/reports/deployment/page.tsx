@@ -9,7 +9,7 @@ import {
   type DeploymentReport,
 } from '@/app/lib/api/labour';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
-import { getProjects } from '@/app/lib/api/projects';
+import { ProjectPicker } from '@/app/ui/plant/pickers';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { TABLE } from '@/app/ui/table';
@@ -56,10 +56,6 @@ export default function DeploymentReportPage() {
   } | null>(null);
   const companyId = useSelectedCompanyId();
 
-  const projects = useQuery({
-    queryKey: ['projects', 'all', companyId],
-    queryFn: () => getProjects({ pageSize: 200 }),
-  });
   const report = useQuery({
     queryKey: ['report-deployment', companyId, params],
     queryFn: () => getDeploymentReport(params!),
@@ -74,19 +70,13 @@ export default function DeploymentReportPage() {
     <div className="space-y-4">
       <PageHeader title="Deployment Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-        <SelectField
+        {/* Searched on the server: one page of 200 hid the 201st project (036 follow-up). */}
+        <ProjectPicker
           id="dep-project"
           label="Project"
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {projects.data?.items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setProjectId(id)}
+        />
         <TextField
           id="dep-from"
           label="From"

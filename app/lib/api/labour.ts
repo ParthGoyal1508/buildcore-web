@@ -137,6 +137,8 @@ const wageRateSchema = z.object({
   effectiveFrom: z.string(),
   effectiveTo: z.string().nullable(),
   isCurrent: z.boolean(),
+  /** On the list (036 follow-up). Absent on a create/update answer. */
+  projectName: z.string().nullable().optional(),
 });
 export type WageRate = z.infer<typeof wageRateSchema>;
 

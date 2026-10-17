@@ -14,7 +14,6 @@ import {
   type SkillCategory,
   type WageRate,
 } from '@/app/lib/api/labour';
-import { getProjects } from '@/app/lib/api/projects';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
@@ -30,6 +29,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
+import { ProjectPicker } from '@/app/ui/plant/pickers';
 
 /** A daily rate the form accepts: above zero (036 O13 — negative and zero rates used to pass). */
 function rateError(value: string): string | undefined {
@@ -49,11 +49,8 @@ export default function WageRatesPage() {
   const [showMasters, setShowMasters] = useState(false);
 
   // `companyId` is in every key (036 O13 — the comment said so, the keys did not): without it
-  // react-query serves one company's cached list to the next company selected.
-  const projects = useQuery({
-    queryKey: ['projects', 'all', companyId],
-    queryFn: () => getProjects({ pageSize: 200 }),
-  });
+  // react-query serves one company's cached list to the next company selected. Projects are searched
+  // on the server by the pickers (036 follow-up) — one page of 200 hid the 201st.
   const skills = useQuery({
     queryKey: ['skill-categories', companyId],
     queryFn: () => getSkillCategories(),
@@ -70,14 +67,12 @@ export default function WageRatesPage() {
 
   const skillName = (id: string) =>
     skills.data?.find((s) => s.id === id)?.name ?? id;
-  const projectName = (id: string) =>
-    projects.data?.items.find((p) => p.id === id)?.name ?? id;
 
   const columns: Column<WageRate>[] = [
     {
       key: 'project',
       header: 'Project',
-      render: (r) => projectName(r.projectId),
+      render: (r) => r.projectName ?? 'Unknown project',
     },
     {
       key: 'skill',
@@ -119,19 +114,13 @@ export default function WageRatesPage() {
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SelectField
+        <ProjectPicker
           id="filter-project"
           label="Project"
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">All projects</option>
-          {projects.data?.items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectField>
+          emptyLabel="All projects"
+          onChange={(id) => setProjectId(id)}
+        />
         <SelectField
           id="filter-skill"
           label="Skill category"
@@ -166,7 +155,6 @@ export default function WageRatesPage() {
 
       {showRateForm && (
         <WageRateForm
-          projects={projects.data?.items ?? []}
           skills={skills.data ?? []}
           onClose={() => setShowRateForm(false)}
           onSaved={() => {
@@ -191,12 +179,10 @@ export default function WageRatesPage() {
 }
 
 function WageRateForm({
-  projects,
   skills,
   onClose,
   onSaved,
 }: {
-  projects: { id: string; name: string }[];
   skills: SkillCategory[];
   onClose: () => void;
   onSaved: () => void;
@@ -255,20 +241,13 @@ function WageRateForm({
     >
       <div className="space-y-3">
         <FormError message={error} />
-        <SelectField
+        <ProjectPicker
           id="rate-project"
-          label="Project *"
+          label="Project"
           required
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setProjectId(id)}
+        />
         <SelectField
           id="rate-skill"
           label="Skill category *"
