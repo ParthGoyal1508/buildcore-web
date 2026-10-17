@@ -11,6 +11,7 @@ import {
   uploadCompanyDocument,
   type CompanyDocument,
 } from '@/app/lib/api/company-documents';
+import { errorMessage } from '@/app/lib/api/client';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
@@ -26,6 +27,9 @@ import {
 } from '@/app/ui/documents/document-kind-form';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import { dateLabel } from '@/app/lib/format';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The company's statutory papers (017 US1).
@@ -36,8 +40,8 @@ import { dateLabel } from '@/app/lib/format';
  */
 export function CompanyDocumentsScreen() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [uploadFor, setUploadFor] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   // Preview opens a PDF or a photo in the page's own viewer (2026-10-14) rather than a new tab,
   // which most browsers block when it is opened after a fetch; Download always saves (2026-10-15).
   const { show, viewer } = useFileViewer();
@@ -53,7 +57,7 @@ export function CompanyDocumentsScreen() {
    */
   const queryKey = ['company-documents'];
 
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey,
     queryFn: () => getCompanyDocuments(),
   });
@@ -65,7 +69,10 @@ export function CompanyDocumentsScreen() {
     // Invalidated so the completeness panel cannot disagree with the list it sits above.
     // They are one answer from one request; refreshing half of it is how a screen ends up
     // asserting both that a document is on file and that it is missing.
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      await invalidate();
+      toast.success('The document has been filed.');
+    },
   });
 
   /**
@@ -102,11 +109,21 @@ export function CompanyDocumentsScreen() {
     onError: () => setDefineError(DOCUMENT_COPY.addKindFailed),
   });
 
+  // 036 J4 (2026-10-17): a skeleton while it loads, and a failed load says so with a Retry rather
+  // than a red line whose only way out was reloading the page.
   if (isPending) {
-    return <p className="text-sm text-gray-500">Loading documents…</p>;
+    return (
+      <ListSkeleton headers={['Document', 'Number', 'Expiry', 'Status']} rows={4} />
+    );
   }
   if (isError || !data) {
-    return <FormError message="The company's documents could not be loaded." />;
+    return (
+      <QueryError
+        error={error}
+        fallback="The company's documents could not be loaded."
+        onRetry={refetch}
+      />
+    );
   }
 
   /**
@@ -135,7 +152,6 @@ export function CompanyDocumentsScreen() {
     doc: CompanyDocument,
     action: 'preview' | 'download',
   ) => {
-    setDownloadError(null);
     try {
       const file = await downloadCompanyDocument(doc.id);
       const fallbackName = `${doc.code}-${doc.id}`;
@@ -143,12 +159,7 @@ export function CompanyDocumentsScreen() {
       if (action === 'preview') show(file, fallbackName, doc.name);
       else saveBlob(file.blob, file.filename || fallbackName);
     } catch (err) {
-      const code = (err as { code?: string } | null)?.code;
-      setDownloadError(
-        code && err instanceof Error
-          ? err.message
-          : 'The document could not be downloaded.',
-      );
+      toast.error(errorMessage(err, 'The document could not be downloaded.'));
     }
   };
 
@@ -175,7 +186,6 @@ export function CompanyDocumentsScreen() {
       {[...data.present, ...data.supplementary].some((d) => d.isRestricted) && (
         <RestrictedNotice />
       )}
-      <FormError message={downloadError} />
       {viewer}
       <FormError message={defineError} />
 
@@ -256,8 +266,13 @@ export function CompanyDocumentsScreen() {
         <h3 className="mb-3 text-sm font-medium text-gray-900">
           {uploadFor ? 'Upload document' : 'Upload a document'}
         </h3>
+        {/* Keyed on the kind asked for: the form reads `initialDocumentTypeId` once, so without a
+            remount "Replace" on a row left the picker on whatever kind it already showed (036 J4).
+            `hint` blank because the same line is printed just below. */}
         <DocumentUpload
+          key={uploadFor ?? 'any'}
           kinds={kinds}
+          hint=""
           ownerLabel="this company"
           initialDocumentTypeId={uploadFor ?? undefined}
           onUpload={(input) => upload.mutateAsync({ ...input })}

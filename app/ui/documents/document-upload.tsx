@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
 import { FormError, SelectField, TextField } from '@/app/ui/settings/form-fields';
 
 /** One kind this owner may upload against, WITH its label — from the server. */
@@ -54,20 +56,6 @@ interface DocumentUploadProps {
   onDone?: () => void;
 }
 
-/** Reads a File as base64, the transport 015 established for every upload here. */
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('The file could not be read.'));
-    reader.onload = () => {
-      const result = String(reader.result ?? '');
-      // `data:application/pdf;base64,XXXX` — the payload is after the comma.
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 /**
  * Uploading a document, shared by the company and project screens (017 US1, US2).
  *
@@ -98,7 +86,9 @@ export function DocumentUpload({
   const [documentTypeId, setDocumentTypeId] = useState(
     initialDocumentTypeId ?? kinds[0]?.documentTypeId ?? '',
   );
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<PreparedFile | null>(null);
+  // Bumped after a successful upload to remount the picker empty: it holds the chosen file itself.
+  const [pickerKey, setPickerKey] = useState(0);
   const [documentNumber, setDocumentNumber] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -129,23 +119,22 @@ export function DocumentUpload({
     try {
       await onUpload({
         documentTypeId,
-        data: await readAsBase64(file),
-        contentType: file.type || 'application/octet-stream',
-        fileName: file.name,
+        data: file.base64,
+        contentType: file.mimeType,
+        fileName: file.fileName,
         documentNumber: documentNumber.trim() || undefined,
         expiresAt: expiresAt || undefined,
       });
       setFile(null);
+      setPickerKey((key) => key + 1);
       setDocumentNumber('');
       setExpiresAt('');
       onDone?.();
     } catch (err) {
-      // The error's own message only when it carries a `code` — 016 shipped a control
-      // that showed "Internal Server Error" to somebody who had just typed a paragraph.
-      const code = (err as { code?: string } | null)?.code;
-      setError(
-        code && err instanceof Error ? err.message : DOCUMENT_COPY.uploadFailed,
-      );
+      // The server's own message when it sent one — 016 shipped a control that showed
+      // "Internal Server Error" to somebody who had just typed a paragraph. The chosen file and
+      // every typed value are kept, so a retry is one click.
+      setError(errorMessage(err, DOCUMENT_COPY.uploadFailed));
     } finally {
       setBusy(false);
     }
@@ -174,20 +163,17 @@ export function DocumentUpload({
         ))}
       </SelectField>
 
-      <div>
-        <label
-          htmlFor="document-file"
-          className="mb-1 block text-sm font-medium text-gray-900"
-        >
-          File
-        </label>
-        <input
-          id="document-file"
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-gray-700"
-        />
-      </div>
+      {/* 036 J4 (2026-10-17): the shared picker rather than a bare `<input type="file">` — it states
+          what it takes (PDF or image), refuses an oversized file before reading it, shrinks a
+          photographed certificate, and shows what was picked. Handed to this form on select and
+          sent on Upload, with the number and expiry beside it. */}
+      <FileUpload
+        key={pickerKey}
+        id="document-file"
+        label="File"
+        onSelect={setFile}
+        disabled={busy}
+      />
 
       {showDocumentNumber && (
         <TextField
@@ -213,7 +199,7 @@ export function DocumentUpload({
       <FormError message={error} />
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" loading={busy}>
           {busy ? 'Uploading…' : 'Upload'}
         </Button>
         {hint && <p className="text-xs text-gray-500">{hint}</p>}
