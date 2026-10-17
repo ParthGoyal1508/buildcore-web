@@ -1,20 +1,47 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+} from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense } from 'react';
 
 import {
+  exportApprovalHistory,
   getApprovalHistoryList,
   type ApprovalHistoryEntry,
   type ApprovalHistoryStatus,
   type ApprovalHistoryStep,
   type ApprovalStateName,
 } from '@/app/lib/api/approvals';
-import { MESSAGES, approvalActionTypeLabel } from '@/app/lib/constants';
+import { errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import { searchActivityUsers, triggerDownload } from '@/app/lib/api/dashboard';
+import { getCurrentUser } from '@/app/lib/api/users';
+import { approvalActionTypeLabel } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
-import { inlineSelectClass } from '@/app/ui/settings/form-fields';
+import {
+  urlEnum,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
+import AsyncSelect from '@/app/ui/async-select';
+import DateRangeFilter, {
+  RANGE_PRESETS,
+  rangeOf,
+} from '@/app/ui/dashboard/date-range-filter';
+import QueryError from '@/app/ui/query-error';
+import {
+  inlineSelectClass,
+  SecondaryButton,
+  TextField,
+} from '@/app/ui/settings/form-fields';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { toast } from '@/app/ui/toast';
 
 /**
  * Every approval the caller may read — decided, in progress or withdrawn — grouped by
@@ -48,47 +75,123 @@ const STATUS_TABS: { value: ApprovalHistoryStatus; label: string }[] = [
   { value: 'withdrawn', label: 'Withdrawn' },
   { value: 'all', label: 'All' },
 ];
+const STATUS_VALUES = STATUS_TABS.map((t) => t.value) as [
+  ApprovalHistoryStatus,
+  ...ApprovalHistoryStatus[],
+];
+const SCOPES = ['visible', 'mine'] as const;
 
 const PAGE_SIZE = 20;
 
 const focusRing =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
 
+/**
+ * 036 D1–D2: filters in the URL (status, scope, module, date, search, who raised it), a CSV export
+ * of what is filtered, and one list in the order the server sorts it — newest latest action first.
+ *
+ * The list used to be regrouped by module *within each page*, so page 1 could show a September
+ * decision under "Billing" above an October one under "Payroll" — newer below older, depending on
+ * which modules happened to share the page. The module is on each card now and the chips still
+ * filter, so the order on screen is the order of events.
+ */
 export default function ApprovalHistory() {
-  const [status, setStatus] = useState<ApprovalHistoryStatus>('decided');
-  const [scope, setScope] = useState<'visible' | 'mine'>('visible');
-  const [module, setModule] = useState('');
-  const [page, setPage] = useState(1);
+  return (
+    // Filters in the URL read `useSearchParams` (036 D1).
+    <Suspense>
+      <ApprovalHistoryInner />
+    </Suspense>
+  );
+}
+
+function ApprovalHistoryInner() {
+  const [filters, setFilters, query] = useUrlState(
+    {
+      status: urlEnum(STATUS_VALUES, 'decided'),
+      scope: urlEnum(SCOPES, 'visible'),
+      module: urlString(),
+      q: urlString(),
+      by: urlString(),
+      range: urlEnum(RANGE_PRESETS, 'all'),
+      month: urlString(),
+      from: urlString(),
+      to: urlString(),
+      page: urlNumber(1),
+    },
+    { debounce: ['q'], resetPage: 'page' },
+  );
+  const range = rangeOf({
+    preset: query.range,
+    month: query.month,
+    from: query.from,
+    to: query.to,
+  });
+  const filtersFor = {
+    status: query.status,
+    scope: query.scope,
+    module: query.module || undefined,
+    q: query.q.trim() || undefined,
+    requestedBy: query.by || undefined,
+    from: range.from,
+    to: range.to,
+  };
+
+  // A Super Admin with no company selected has no single company's approvals to list — the API
+  // answers empty — so the screen says why rather than "No approvals yet" (036 D2).
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  const selectedCompanyId = useSelectedCompanyId();
+  const noCompany =
+    (me?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false) &&
+    !selectedCompanyId;
 
   const history = useQuery({
-    queryKey: ['approvalHistoryList', status, scope, module, page],
+    queryKey: ['approvalHistoryList', filtersFor, query.page],
     queryFn: () =>
       getApprovalHistoryList({
-        status,
-        scope,
-        module: module || undefined,
-        page,
+        ...filtersFor,
+        page: query.page,
         pageSize: PAGE_SIZE,
       }),
+    enabled: !range.error && !noCompany,
     // Paging keeps the previous page on screen until the next arrives, so the list does
     // not collapse to "Loading…" and jump the reader back to the top.
     placeholderData: keepPreviousData,
   });
 
+  const download = useMutation({
+    mutationFn: async () => {
+      const blob = await exportApprovalHistory(filtersFor);
+      triggerDownload(blob, 'approval-history.csv');
+    },
+    onError: (e: unknown) =>
+      toast.error(errorMessage(e, 'The history could not be exported.')),
+  });
+
   const data = history.data;
   const modules = data?.modules ?? [];
   const allCount = modules.reduce((sum, m) => sum + m.count, 0);
-
-  // Group the page by module, in the order the API lists modules.
-  const groups = modules
-    .map((m) => ({
-      ...m,
-      items: (data?.items ?? []).filter((i) => i.module === m.key),
-    }))
-    .filter((g) => g.items.length > 0);
+  const items = data?.items ?? [];
+  const requester = items.find((i) => i.requestedById === query.by);
 
   const first = data && data.total > 0 ? (data.page - 1) * data.pageSize + 1 : 0;
   const last = data ? Math.min(data.page * data.pageSize, data.total) : 0;
+  const filtered =
+    Boolean(filtersFor.q) ||
+    Boolean(filtersFor.requestedBy) ||
+    Boolean(filtersFor.from || filtersFor.to) ||
+    Boolean(filtersFor.module);
+
+  if (noCompany) {
+    return (
+      <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+        Approvals belong to a company. Choose one in the company switcher at the
+        top to see its approval history.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -103,16 +206,12 @@ export default function ApprovalHistory() {
               key={tab.value}
               type="button"
               role="tab"
-              aria-selected={status === tab.value}
-              onClick={() => {
-                setStatus(tab.value);
-                setModule('');
-                setPage(1);
-              }}
+              aria-selected={filters.status === tab.value}
+              onClick={() => setFilters({ status: tab.value, module: '' })}
               className={clsx(
                 'min-h-9 rounded px-3 text-sm font-medium',
                 focusRing,
-                status === tab.value
+                filters.status === tab.value
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100',
               )}
@@ -126,17 +225,82 @@ export default function ApprovalHistory() {
           <span className="mb-1 block text-gray-700">Show</span>
           <select
             className={inlineSelectClass}
-            value={scope}
-            onChange={(e) => {
-              setScope(e.target.value as 'visible' | 'mine');
-              setModule('');
-              setPage(1);
-            }}
+            value={filters.scope}
+            onChange={(e) =>
+              setFilters({
+                scope: e.target.value as (typeof SCOPES)[number],
+                module: '',
+              })
+            }
           >
             <option value="visible">Everything I can see</option>
             <option value="mine">Only ones I raised or decided</option>
           </select>
         </label>
+
+        <SecondaryButton
+          type="button"
+          className="ml-auto"
+          loading={download.isPending}
+          disabled={Boolean(range.error)}
+          onClick={() => download.mutate()}
+        >
+          Export CSV
+        </SecondaryButton>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+        <TextField
+          id="approval-history-search"
+          label="Search"
+          type="search"
+          placeholder="Subject, or who raised or decided it"
+          value={filters.q}
+          onChange={(e) => setFilters({ q: e.target.value })}
+        />
+        <div>
+          <label
+            htmlFor="approval-history-by"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Raised by
+          </label>
+          <AsyncSelect
+            id="approval-history-by"
+            value={filters.by}
+            onChange={(id) => setFilters({ by: id })}
+            emptyLabel="Anyone"
+            placeholder="Anyone"
+            selectedOption={
+              filters.by && requester
+                ? { id: filters.by, label: requester.requestedByName }
+                : null
+            }
+            cacheKey={['activity-users']}
+            search={(term, page) =>
+              searchActivityUsers(term, page).then((r) => ({
+                items: r.items.map((u) => ({ id: u.id, label: u.name })),
+                total: r.total,
+              }))
+            }
+          />
+        </div>
+        <DateRangeFilter
+          idPrefix="approval-history"
+          preset={filters.range}
+          month={filters.month}
+          from={filters.from}
+          to={filters.to}
+          error={range.error}
+          onChange={(patch) =>
+            setFilters({
+              ...(patch.preset !== undefined ? { range: patch.preset } : {}),
+              ...(patch.month !== undefined ? { month: patch.month } : {}),
+              ...(patch.from !== undefined ? { from: patch.from } : {}),
+              ...(patch.to !== undefined ? { to: patch.to } : {}),
+            })
+          }
+        />
       </div>
 
       {modules.length > 0 && (
@@ -148,76 +312,62 @@ export default function ApprovalHistory() {
           <ModuleChip
             label="All modules"
             count={allCount}
-            active={module === ''}
-            onClick={() => {
-              setModule('');
-              setPage(1);
-            }}
+            active={filters.module === ''}
+            onClick={() => setFilters({ module: '' })}
           />
           {modules.map((m) => (
             <ModuleChip
               key={m.key}
               label={m.label}
               count={m.count}
-              active={module === m.key}
-              onClick={() => {
-                setModule(m.key);
-                setPage(1);
-              }}
+              active={filters.module === m.key}
+              onClick={() => setFilters({ module: m.key })}
             />
           ))}
         </div>
       )}
 
-      {history.isPending && (
-        <p className="text-sm text-gray-500" role="status">
-          Loading approvals…
-        </p>
+      {history.isPending && !range.error && (
+        <ListSkeleton headers={['Approval']} rows={3} cards />
       )}
       {history.isError && (
-        <p className="text-sm text-red-600" role="alert">
-          {MESSAGES.loadFailed}
-        </p>
+        <QueryError error={history.error} onRetry={history.refetch} />
       )}
       {data && data.total === 0 && (
         <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-          {scope === 'mine'
-            ? 'Nothing here that you raised or decided.'
-            : 'No approvals to show here yet.'}
+          {filtered
+            ? 'No approvals match these filters.'
+            : filters.scope === 'mine'
+              ? 'Nothing here that you raised or decided.'
+              : 'No approvals to show here yet.'}
         </p>
       )}
 
-      {groups.map((group) => (
-        <section
-          key={group.key}
-          aria-labelledby={`approval-group-${group.key}`}
-          className="space-y-2"
-        >
-          <h3
-            id={`approval-group-${group.key}`}
-            className="text-sm font-semibold text-gray-800"
+      {items.length > 0 && (
+        <>
+          <p className="text-xs text-gray-500">
+            Newest first, by the latest action on each item — its decision once
+            it is decided.
+          </p>
+          <ul
+            className={clsx('space-y-3', history.isPlaceholderData && 'opacity-60')}
+            aria-busy={history.isFetching || undefined}
           >
-            {group.label}{' '}
-            <span className="font-normal text-gray-500">
-              ({group.count})
-            </span>
-          </h3>
-          <ul className="space-y-3">
-            {group.items.map((item) => (
+            {items.map((item) => (
               <li key={item.instanceId}>
                 <HistoryCard item={item} />
               </li>
             ))}
           </ul>
-        </section>
-      ))}
+        </>
+      )}
 
       {data && data.total > data.pageSize && (
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1 || history.isFetching}
+            onClick={() => setFilters({ page: Math.max(1, query.page - 1) })}
+            disabled={query.page === 1 || history.isFetching}
             className={clsx(
               'min-h-9 rounded-md border border-gray-300 px-3 text-sm disabled:opacity-40',
               focusRing,
@@ -230,7 +380,7 @@ export default function ApprovalHistory() {
           </span>
           <button
             type="button"
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setFilters({ page: query.page + 1 })}
             disabled={last >= data.total || history.isFetching}
             className={clsx(
               'min-h-9 rounded-md border border-gray-300 px-3 text-sm disabled:opacity-40',
@@ -307,6 +457,7 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
             )}
           </p>
           <p className="text-xs text-gray-500">
+            <span className="font-medium text-gray-700">{item.moduleLabel}</span> ·{' '}
             {approvalActionTypeLabel(item.actionType)} · Raised by{' '}
             <span className="text-gray-700">{item.requestedByName}</span> ·{' '}
             {dateTimeLabel(item.requestedAt)}
@@ -321,9 +472,10 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
           >
             {badge.label}
           </span>
-          {item.closedAt && (
+          {(item.closedAt ?? item.lastActionAt) && (
             <span className="text-xs text-gray-500">
-              {dateTimeLabel(item.closedAt)}
+              {item.closedAt ? '' : 'Last action '}
+              {dateTimeLabel(item.closedAt ?? item.lastActionAt)}
             </span>
           )}
         </div>

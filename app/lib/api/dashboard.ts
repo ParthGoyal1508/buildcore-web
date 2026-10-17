@@ -255,7 +255,29 @@ export type ActivityLogFeed = z.infer<typeof activityLogFeedSchema>;
 export interface ActivityLogQuery {
   module?: string;
   timeRange?: string;
+  /** 036 E3: a custom inclusive `YYYY-MM-DD` range (overrides `timeRange`), one user, a search. */
+  from?: string;
+  to?: string;
+  userId?: string;
+  q?: string;
   page?: number;
+}
+
+/**
+ * Accounts for a User filter (036 E3, D1), searched by name or email, 25 a page — the people the
+ * Activity Log already names on its rows. Gated on DASHBOARD, which every employee holds.
+ */
+export async function searchActivityUsers(
+  q: string,
+  page: number,
+): Promise<{ items: { id: string; name: string }[]; total: number }> {
+  const raw = await authFetch<unknown>(`/activity-log/users${qs({ q, page })}`);
+  return z
+    .object({
+      items: z.array(z.object({ id: z.string(), name: z.string() })),
+      total: z.number(),
+    })
+    .parse(raw);
 }
 
 export async function getActivityLog(

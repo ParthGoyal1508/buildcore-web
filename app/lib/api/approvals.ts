@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchBlob } from '@/app/lib/session';
 
 /**
  * Every `/approvals/*` call to `buildcore-api` (feature 016).
@@ -350,6 +350,9 @@ const historyEntrySchema = z.object({
   requestedByName: z.string(),
   requestedAt: z.string(),
   closedAt: z.string().nullable(),
+  /** When anything last happened to it — the decision once decided (036 D2). The list is sorted
+   * and date-filtered by this. Optional so a server predating it still parses. */
+  lastActionAt: z.string().optional(),
   awaitingLabel: z.string().nullable(),
   delegatedToName: z.string().nullable(),
   steps: z.array(historyStepSchema),
@@ -390,6 +393,11 @@ export interface ApprovalHistoryQuery {
   /** `visible` — everything the caller may read; `mine` — only what they took part in. */
   scope?: 'visible' | 'mine';
   module?: string;
+  /** 036 D1: inclusive `YYYY-MM-DD` days on the latest action, a search, and who raised it. */
+  from?: string;
+  to?: string;
+  q?: string;
+  requestedBy?: string;
   page?: number;
   pageSize?: number;
 }
@@ -405,6 +413,13 @@ export async function getApprovalHistoryList(
 ): Promise<ApprovalHistoryPage> {
   const raw = await authFetch<unknown>(`/approvals/history${qs({ ...query })}`);
   return historyPageSchema.parse(raw);
+}
+
+/** The same filtered history as a CSV file (036 D1) — at most 5,000 rows, newest action first. */
+export async function exportApprovalHistory(
+  query: Omit<ApprovalHistoryQuery, 'page' | 'pageSize'> = {},
+): Promise<Blob> {
+  return authFetchBlob(`/approvals/history/export${qs({ ...query })}`);
 }
 
 export interface DecideInput {
