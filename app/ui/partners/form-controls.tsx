@@ -26,18 +26,27 @@ export function Field({
   label,
   error,
   hint,
+  required = false,
   children,
 }: {
   id: string;
   label: string;
   error?: string;
   hint?: string;
+  /** Shows the required marker (036 N2, A22). Put `aria-required` on the control as well. */
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
         {label}
+        {required && (
+          <span className="text-red-600" aria-hidden="true">
+            {' '}
+            *
+          </span>
+        )}
       </label>
       {children}
       {hint && !error && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
