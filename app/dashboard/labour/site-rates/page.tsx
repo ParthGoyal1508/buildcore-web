@@ -265,9 +265,14 @@ function SetRatesForm({
     <Modal
       title={`Rates — ${row.site.name}`}
       onClose={onClose}
+      isDirty={!nothingChanged}
+      pending={save.isPending}
+      // O15 (036): buttons passed straight to the footer, so a phone stacks them full width.
       footer={
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <>
+          <SecondaryButton onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
@@ -277,13 +282,13 @@ function SetRatesForm({
               !effectiveFrom ||
               nothingChanged ||
               !!invalid(male) ||
-              !!invalid(female) ||
-              save.isPending
+              !!invalid(female)
             }
+            loading={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Save'}
+            Save
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-3">
