@@ -187,7 +187,7 @@ function FunnelReport() {
                 </li>
               ))}
               {data.sourceBreakdown.length === 0 && (
-                <li className="text-gray-400">
+                <li className="text-gray-500">
                   {from || to
                     ? 'No candidates applied in this period.'
                     : 'No candidates yet.'}

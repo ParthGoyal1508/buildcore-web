@@ -268,7 +268,7 @@ export default function AttendanceTable() {
             />
           )}
           {!row.adminEdited && !row.hasException && !row.pendingCorrection && (
-            <span className="text-gray-400">—</span>
+            <span className="text-gray-500">—</span>
           )}
         </span>
       ),

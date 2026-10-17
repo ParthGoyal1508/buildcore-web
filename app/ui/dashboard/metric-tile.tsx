@@ -123,7 +123,7 @@ export function MetricTile({
         <dd
           className={clsx(
             'text-xs leading-snug',
-            inverted ? 'text-brand-100/80' : 'text-gray-400',
+            inverted ? 'text-brand-100/80' : 'text-gray-500',
           )}
         >
           {metric.hint}

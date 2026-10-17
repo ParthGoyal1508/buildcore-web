@@ -435,7 +435,7 @@ function DailyView({
             icon={ExclamationTriangleIcon}
           />
         ) : (
-          <span className="text-sm text-gray-400">—</span>
+          <span className="text-sm text-gray-500">—</span>
         ),
     },
   ];
@@ -529,7 +529,7 @@ function DailyView({
 }
 
 function PunchCell({ punch }: { punch: PunchFact | null }) {
-  if (!punch) return <span className="text-gray-400">—</span>;
+  if (!punch) return <span className="text-gray-500">—</span>;
   return (
     <span className="whitespace-nowrap" title={punch.recordedBy ? `Recorded by ${punch.recordedBy}` : undefined}>
       {timeOf(punch.at)}
@@ -707,7 +707,7 @@ const CELL_TONE: Record<string, string> = {
   short: 'bg-orange-100 text-orange-900 hover:bg-orange-200',
   on_site: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
   unresolved: 'bg-amber-300 text-amber-950 ring-1 ring-amber-500 hover:bg-amber-400',
-  absent: 'text-gray-400',
+  absent: 'text-gray-500',
 };
 
 function dayTitle(day: MusterDay): string {

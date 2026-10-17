@@ -439,7 +439,7 @@ function TemplateEditor({
                       <code className="block break-all text-gray-500">
                         {`{{${field.token}}}`}
                       </code>
-                      <span className="block truncate text-gray-400">
+                      <span className="block truncate text-gray-500">
                         {field.sourceType === "manual"
                           ? TEMPLATE_COPY.manualSource
                           : `${field.sourceType}.${field.sourcePath}`}

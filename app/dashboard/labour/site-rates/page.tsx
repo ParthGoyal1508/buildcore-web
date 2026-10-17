@@ -88,7 +88,7 @@ export default function SiteRatesPage() {
     r ? (
       <>
         {rupees(r.dailyRate)}
-        <span className="ml-1 text-xs text-gray-400">from {r.effectiveFrom}</span>
+        <span className="ml-1 text-xs text-gray-500">from {r.effectiveFrom}</span>
       </>
     ) : (
       <span className="text-amber-700">Not set</span>

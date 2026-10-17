@@ -80,7 +80,7 @@ export default function RouteError({
           : 'Try again. If it keeps happening, go back to the home page and let your administrator know what you were doing.'}
       </p>
       {error.digest && (
-        <p className="font-mono text-xs text-gray-400">Reference: {error.digest}</p>
+        <p className="font-mono text-xs text-gray-500">Reference: {error.digest}</p>
       )}
       <div className="mt-2 flex flex-wrap justify-center gap-2">
         <Button

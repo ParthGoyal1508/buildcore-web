@@ -444,8 +444,8 @@ export function ComingSoonCard({
   return (
     <div className={`${cardClass} border-dashed`}>
       <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-1 text-sm font-medium text-gray-400">Coming soon</p>
-      <p className="mt-1 text-xs text-gray-400">
+      <p className="mt-1 text-sm font-medium text-gray-500">Coming soon</p>
+      <p className="mt-1 text-xs text-gray-500">
         {note ?? `Waiting on the ${module} module.`}
       </p>
     </div>
@@ -463,7 +463,7 @@ export function UnsupportedWidgetCard({
   return (
     <div className={`${cardClass} border-dashed`}>
       <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-1 text-xs text-gray-400">
+      <p className="mt-1 text-xs text-gray-500">
         Unsupported widget type “{displayType}”.
       </p>
     </div>

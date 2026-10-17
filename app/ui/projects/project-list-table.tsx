@@ -117,7 +117,7 @@ export default function ProjectListTable({
        */
       render: (row) => {
         const readiness = row.documentReadiness;
-        if (!readiness) return <span className="text-gray-400">—</span>;
+        if (!readiness) return <span className="text-gray-500">—</span>;
         if (readiness.required === 0) {
           return <span className="text-xs text-gray-500">None required</span>;
         }

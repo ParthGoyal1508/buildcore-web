@@ -186,7 +186,7 @@ export function EquipmentPhotoGallery({
                       className="h-full w-full"
                     />
                     {photo.isMain && (
-                      <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-white/90 px-1 text-[11px] font-medium text-gray-800">
+                      <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-white/90 px-1 text-xs font-medium text-gray-800">
                         <StarSolidIcon className="h-3 w-3 text-amber-500" aria-hidden="true" />
                         Main
                       </span>

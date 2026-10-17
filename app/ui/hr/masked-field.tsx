@@ -75,7 +75,7 @@ export default function MaskedField({
   }
 
   if (!maskedValue) {
-    return <span className="text-sm text-gray-400">Not recorded</span>;
+    return <span className="text-sm text-gray-500">Not recorded</span>;
   }
 
   return (

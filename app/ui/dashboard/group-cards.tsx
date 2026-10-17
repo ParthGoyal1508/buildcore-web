@@ -197,7 +197,7 @@ export function CompanyCard({
           >
             {card.name}
           </h2>
-          <span className="mt-0.5 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-[11px] font-semibold tracking-wide text-brand-600">
+          <span className="mt-0.5 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-brand-600">
             {card.shortCode}
           </span>
         </div>
@@ -281,7 +281,7 @@ const SCHEME_LABEL: Record<string, string> = {
 
 function amountLabel(item: StatutoryDueItem): React.ReactNode {
   return item.amount === null ? (
-    <span className="text-gray-400">Run not processed</span>
+    <span className="text-gray-500">Run not processed</span>
   ) : (
     rupees(item.amount)
   );

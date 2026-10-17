@@ -227,7 +227,7 @@ function AttachmentThumb({
   });
   if (!isImage) {
     return (
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] font-medium text-gray-500">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-gray-100 text-xs font-medium text-gray-500">
         {attachment.mimeType === 'application/pdf' ? 'PDF' : 'FILE'}
       </span>
     );

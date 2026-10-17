@@ -170,7 +170,7 @@ export default function EquipmentDetailPage() {
         ) : row.expiring ? (
           <StatusBadge tone="warning" label={'Expiring soon'} />
         ) : (
-          <span className="text-sm text-gray-400">—</span>
+          <span className="text-sm text-gray-500">—</span>
         ),
     },
   ];

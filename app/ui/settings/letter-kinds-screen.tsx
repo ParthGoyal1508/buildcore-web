@@ -138,7 +138,7 @@ export function LetterKindsScreen() {
               {/* A shipped kind belongs to every company, so this company may not edit or
                   delete it. Saying so beats a button that always fails. */}
               {kind.isShipped ? (
-                <span className="text-xs text-gray-400">Not editable</span>
+                <span className="text-xs text-gray-500">Not editable</span>
               ) : (
                 <RowAction
                   type="button"

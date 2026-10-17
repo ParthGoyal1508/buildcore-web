@@ -444,7 +444,7 @@ export default function ProjectOverviewPage() {
                 >
                   {PROJECT_SHELL_COPY.billingOutstanding}
                 </th>
-                <td className={clsx(TABLE.td, 'text-right text-gray-400')}>
+                <td className={clsx(TABLE.td, 'text-right text-gray-500')}>
                   —
                 </td>
                 <Amount amount={tabs.billSummary.outstandingAmount} strong />

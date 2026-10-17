@@ -38,7 +38,7 @@ export default function SideNav() {
         {/* Not modules — shortcuts into the Dashboard module and the approvals queue — so they
             are not in NAV_MODULES and sit after the modules under a label of their own. The
             label is desktop-only: on a phone the icons speak for themselves. */}
-        <p className="mt-3 hidden px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 md:block">
+        <p className="mt-3 hidden px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500 md:block">
           Workflow
         </p>
         <ApprovalBadge />

@@ -147,7 +147,7 @@ export default function OnboardingPage() {
               </div>
             ))}
             {groups[type].length === 0 && (
-              <p className="text-sm text-gray-400">None.</p>
+              <p className="text-sm text-gray-500">None.</p>
             )}
           </div>
         </section>

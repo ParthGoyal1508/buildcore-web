@@ -508,7 +508,7 @@ function Steps({ pkg }: { pkg: BillPackage }) {
             {step.label}
           </span>
           {index < STEPS.length - 1 && (
-            <span className="text-gray-400" aria-hidden>
+            <span className="text-gray-500" aria-hidden>
               →
             </span>
           )}

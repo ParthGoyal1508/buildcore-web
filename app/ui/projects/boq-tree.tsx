@@ -521,7 +521,7 @@ function GroupRows({
             aria-expanded={!collapsed}
             className="sticky left-3 flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
-            <span aria-hidden="true" className="text-gray-400">
+            <span aria-hidden="true" className="text-gray-500">
               {collapsed ? '▸' : '▾'}
             </span>
             <span className="text-xs font-normal uppercase tracking-wide text-gray-500">
@@ -669,7 +669,7 @@ function Programme({ value }: { value: number | null }) {
  * screen teaches people to ignore its warnings.
  */
 function Unplanned() {
-  return <span className="text-xs text-gray-400">{BOQ_COPY.unplanned}</span>;
+  return <span className="text-xs text-gray-500">{BOQ_COPY.unplanned}</span>;
 }
 
 /**

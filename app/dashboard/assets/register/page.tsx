@@ -144,7 +144,7 @@ export default function AssetRegisterPage() {
         ].filter(Boolean) as { key: string; text: string; title: string }[];
 
         if (flags.length === 0) {
-          return <span className="text-sm text-gray-400">—</span>;
+          return <span className="text-sm text-gray-500">—</span>;
         }
         return (
           <span className="flex flex-wrap gap-1">

@@ -389,7 +389,7 @@ export default function DisposeModal({
                   className={clsx(
                     'min-h-10 rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium',
                     profitLoss === null
-                      ? 'text-gray-400'
+                      ? 'text-gray-600'
                       : profitLoss < 0
                       ? 'text-red-700'
                       : 'text-green-700',

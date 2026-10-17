@@ -168,7 +168,7 @@ function VendorsPageBody() {
       header: 'Deals in',
       render: (row) =>
         row.categoryIds.length === 0 ? (
-          <span className="text-gray-400">—</span>
+          <span className="text-gray-500">—</span>
         ) : (
           <span className="text-sm">
             {row.categoryIds.map(categoryName).join(', ')}
@@ -189,13 +189,13 @@ function VendorsPageBody() {
             )}
           </div>
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-gray-500">—</span>
         ),
     },
     {
       key: 'gstin',
       header: 'GSTIN',
-      render: (row) => row.gstin ?? <span className="text-gray-400">—</span>,
+      render: (row) => row.gstin ?? <span className="text-gray-500">—</span>,
     },
     {
       key: 'active',

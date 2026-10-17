@@ -54,7 +54,7 @@ export default function ContractorsPage() {
     {
       key: 'licence',
       header: 'Licence',
-      render: (row) => row.licenceNumber ?? <span className="text-gray-400">—</span>,
+      render: (row) => row.licenceNumber ?? <span className="text-gray-500">—</span>,
     },
     {
       key: 'documents',

@@ -121,7 +121,7 @@ export default function ReEnrolmentTable() {
               </RowAction>
             </>
           ) : (
-            <span className="text-xs text-gray-400">Decided</span>
+            <span className="text-xs text-gray-500">Decided</span>
           )
         }
       />

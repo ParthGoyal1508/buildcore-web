@@ -381,7 +381,7 @@ function SelectMenu({
           return (
             <li key={choice.index} role="presentation">
               {header && (
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   {header}
                 </p>
               )}
@@ -586,7 +586,7 @@ function Calendar({
 
       {mode === 'days' && (
         <div key={`${view.y}-${view.m}`} className="animate-fade-in">
-          <div className="grid grid-cols-7 text-center text-[11px] font-semibold uppercase text-gray-400">
+          <div className="grid grid-cols-7 text-center text-xs font-semibold uppercase text-gray-500">
             {WEEKDAYS.map((d) => (
               <span key={d} className="py-1">
                 {d}

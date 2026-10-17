@@ -605,7 +605,7 @@ function ChainCard({
                 key={level.id}
                 className="flex flex-wrap items-baseline gap-x-2"
               >
-                <span className="w-4 shrink-0 text-xs tabular-nums text-gray-400">
+                <span className="w-4 shrink-0 text-xs tabular-nums text-gray-500">
                   {level.position}
                 </span>
                 <span className="text-gray-800">

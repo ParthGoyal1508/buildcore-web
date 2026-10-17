@@ -77,7 +77,7 @@ export default function HolidayList() {
                 key={holiday.id}
                 className={clsx(
                   'flex items-center gap-4 px-4 py-3',
-                  past && 'text-gray-400',
+                  past && 'text-gray-500',
                   holiday.id === nextId && 'bg-green-50',
                 )}
               >

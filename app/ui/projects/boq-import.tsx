@@ -317,7 +317,7 @@ function Report({ report }: { report: BoqImportReport }) {
               {/* As typed (FR-030), with the count rather than the normalised form: the client is
                   reading this against their own sheet, not against our matching rule. */}
               {unit.asTyped}
-              <span className="ml-1 text-gray-400 tabular-nums">
+              <span className="ml-1 text-gray-500 tabular-nums">
                 ×{unit.lines}
               </span>
             </li>

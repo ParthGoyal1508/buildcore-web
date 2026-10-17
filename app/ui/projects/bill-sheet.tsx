@@ -688,7 +688,7 @@ function HeadingAndItems({
             aria-expanded={!collapsed}
             className="flex w-full flex-wrap items-baseline gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
-            <span aria-hidden="true" className="text-gray-400">
+            <span aria-hidden="true" className="text-gray-500">
               {collapsed ? '▸' : '▾'}
             </span>
             <span className="font-mono text-xs text-gray-600">{boqNo}</span>

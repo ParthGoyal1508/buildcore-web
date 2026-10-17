@@ -1135,7 +1135,7 @@ function LineEditor({
                           the one a reviewer checks against their own — so it is shown as the row
                           is typed rather than after a save. */}
                       <td className={clsx(DENSE_TD, TABLE.numeric)}>
-                        {quantity ?? <span className="text-gray-400">—</span>}
+                        {quantity ?? <span className="text-gray-500">—</span>}
                       </td>
                       <td className={DENSE_TD}>
                         <Cell
@@ -1619,7 +1619,7 @@ function PickedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
           className="h-10 w-10 shrink-0 rounded object-cover"
         />
       ) : (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] text-gray-500">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 text-xs text-gray-500">
           PDF
         </span>
       )}

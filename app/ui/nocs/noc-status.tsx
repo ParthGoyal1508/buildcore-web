@@ -57,7 +57,7 @@ export function NocStatusBadge({
   status: NocStatus | undefined;
   labelled?: boolean;
 }) {
-  if (!status) return <span className="text-sm text-gray-400">—</span>;
+  if (!status) return <span className="text-sm text-gray-500">—</span>;
   const badge =
     status.status === "closed" ? (
       <span

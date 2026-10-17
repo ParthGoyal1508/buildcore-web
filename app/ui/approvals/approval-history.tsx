@@ -583,7 +583,7 @@ function StepCard({ step }: { step: ApprovalHistoryStep }) {
           {step.position}. {step.label}
         </span>
         {step.isFinalAuthority && (
-          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600">
+          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-gray-600">
             Final
           </span>
         )}

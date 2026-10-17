@@ -380,7 +380,7 @@ function MonthChart({
                 <div className="bg-slate-500" style={{ height: `${(m.sold / max) * 100}%` }} />
                 <div className="rounded-t-sm bg-red-400" style={{ height: `${(m.scrapped / max) * 100}%` }} />
               </div>
-              <span className="text-[10px] text-gray-500">{label}</span>
+              <span className="text-xs text-gray-500">{label}</span>
             </div>
           );
         })}

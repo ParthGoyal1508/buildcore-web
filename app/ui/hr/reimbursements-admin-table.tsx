@@ -386,7 +386,7 @@ export default function ReimbursementsAdminTable() {
         emptyMessage="No claims match this filter."
         actions={(row) => {
           if (!canDecide || !['submitted', 'approved'].includes(row.status)) {
-            return <span className="text-xs text-gray-400">—</span>;
+            return <span className="text-xs text-gray-500">—</span>;
           }
           if (isOwn(row)) {
             return (

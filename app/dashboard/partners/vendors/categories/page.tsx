@@ -58,7 +58,7 @@ export default function VendorCategoriesPage() {
       key: 'description',
       header: 'Description',
       render: (row) =>
-        row.description ?? <span className="text-gray-400">—</span>,
+        row.description ?? <span className="text-gray-500">—</span>,
     },
     {
       key: 'vendorCount',

@@ -574,7 +574,7 @@ function LetterFields({
             {f.isRequired && <span className="sr-only"> (required)</span>}
           </span>
           {changed && (
-            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-normal text-amber-800">
+            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-normal text-amber-800">
               edited
             </span>
           )}

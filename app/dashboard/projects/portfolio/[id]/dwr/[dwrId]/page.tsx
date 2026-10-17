@@ -309,7 +309,7 @@ export default function DwrReportPage() {
                               .map(([label, value]) => `${label} ${value}`)
                               .join(' × ') ||
                               'nothing entered — counted as one'}
-                            <span className="block text-gray-400">
+                            <span className="block text-gray-500">
                               a blank factor counts as one
                             </span>
                           </>

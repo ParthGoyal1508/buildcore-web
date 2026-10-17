@@ -123,7 +123,7 @@ export default function ExceptionsModal({ onClose }: { onClose: () => void }) {
         ) : (
           // A punch flagged before this feature shipped, or one whose company has no
           // chain configured. Saying so beats an empty cell that reads as "nothing to do".
-          <span className="text-xs text-gray-400">Not in a chain</span>
+          <span className="text-xs text-gray-500">Not in a chain</span>
         ),
     },
     {

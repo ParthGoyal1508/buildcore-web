@@ -139,14 +139,14 @@ export default function ContractorDetailPage() {
         row.expiresAt ? (
           dateLabel(row.expiresAt)
         ) : (
-          <span className="text-gray-400">No expiry</span>
+          <span className="text-gray-500">No expiry</span>
         ),
     },
     {
       key: 'warning',
       header: 'Status',
       render: (row) => {
-        if (!row.expiresAt) return <span className="text-gray-400">—</span>;
+        if (!row.expiresAt) return <span className="text-gray-500">—</span>;
         if (!row.expiryWarning) return <StatusBadge status="active" />;
         // Past expiry is a different problem from imminent expiry, and the row
         // should say which — the API's single boolean does not distinguish them, so

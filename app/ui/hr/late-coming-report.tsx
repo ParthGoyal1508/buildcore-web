@@ -105,7 +105,7 @@ export default function LateComingReport() {
         row.repeatLateComer ? (
           <StatusBadge tone="danger" label={'Repeat late-comer'} />
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-gray-500">—</span>
         ),
     },
   ];

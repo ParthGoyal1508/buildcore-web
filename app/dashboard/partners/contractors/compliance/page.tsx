@@ -110,7 +110,7 @@ function CompliancePageBody() {
             </p>
           </div>
         ) : (
-          <span className="text-gray-400">Not filed</span>
+          <span className="text-gray-500">Not filed</span>
         ),
     },
     {
@@ -125,7 +125,7 @@ function CompliancePageBody() {
             </p>
           </div>
         ) : (
-          <span className="text-gray-400">Not filed</span>
+          <span className="text-gray-500">Not filed</span>
         ),
     },
     {
