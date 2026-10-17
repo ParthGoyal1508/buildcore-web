@@ -33,12 +33,81 @@
  * error grows with the project.
  */
 
-/** Two decimal places, the rounding every money figure in this product uses. */
-export const money = (value: number): number => Math.round(value * 100) / 100;
+/**
+ * A number's exact decimal digits, as written: `1.005` is `{ digits: 1005n, scale: 3 }`.
+ *
+ * **Copied verbatim from the API's `src/projects/billing/bill-totals.ts` (036 I5, Wave 3).** The
+ * screen used `Math.round(v * 100) / 100`, which rounds the *float*: `1.005 * 100` is `100.4999…`,
+ * so a line the API priced at ₹1.01 showed here as ₹1.00, and the sheet's total disagreed with the
+ * bill the server then composed by a paisa a line. Same digits, same rounding, now — and
+ * `scripts/check-bill-totals.ts` holds the shared vectors both must produce.
+ */
+// `BigInt(…)` rather than `10n` literals: this project's TypeScript target is ES2017, which has no
+// bigint literal syntax (the runtime has BigInt itself everywhere this app runs).
+const ZERO = BigInt(0);
+const ONE = BigInt(1);
+const TWO = BigInt(2);
+const TEN = BigInt(10);
+
+function decimalOf(value: number): { digits: bigint; scale: number } {
+  const [mantissa, exponent = '0'] = String(Math.abs(value)).split('e');
+  const [whole, fraction = ''] = mantissa.split('.');
+  let digits = BigInt(`${whole}${fraction}`);
+  let scale = fraction.length - Number(exponent);
+  if (scale < 0) {
+    digits *= TEN ** BigInt(-scale);
+    scale = 0;
+  }
+  return { digits: value < 0 ? -digits : digits, scale };
+}
+
+/** Exact digits rounded to `places`, half away from zero. `1.005 → 1.01`, `-1.005 → -1.01`. */
+function roundDecimal(
+  { digits, scale }: { digits: bigint; scale: number },
+  places: number,
+): number {
+  if (scale <= places) {
+    return Number(`${digits}e-${scale}`);
+  }
+  const divisor = TEN ** BigInt(scale - places);
+  const negative = digits < ZERO;
+  const magnitude = negative ? -digits : digits;
+  let quotient = magnitude / divisor;
+  if ((magnitude % divisor) * TWO >= divisor) quotient += ONE;
+  const rounded = Number(`${quotient}e-${places}`);
+  return negative && rounded !== 0 ? -rounded : rounded;
+}
+
+/** Half-up rounding to `places` on the number's written digits — the API's `roundHalfUp`. */
+export function roundHalfUp(value: number, places: number): number {
+  if (!Number.isFinite(value)) return value;
+  return roundDecimal(decimalOf(value), places);
+}
+
+/**
+ * `a × b × …` on exact decimal digits, rounded once to `places` — the API's `productRounded`.
+ * `10.05 × 0.5` is 5.025 here, not the float's `5.0249999…`.
+ */
+export function productRounded(places: number, ...factors: number[]): number {
+  if (!factors.every(Number.isFinite)) return NaN;
+  let digits = ONE;
+  let scale = 0;
+  for (const factor of factors) {
+    const d = decimalOf(factor);
+    digits *= d.digits;
+    scale += d.scale;
+  }
+  return roundDecimal({ digits, scale }, places);
+}
+
+/** Two decimal places, half-up on the written digits — the rounding every money figure uses. */
+export const money = (value: number): number => roundHalfUp(value, 2);
 
 /** Three, matching the schema's quantity columns — a BOQ measures to the millimetre. */
-export const quantity = (value: number): number =>
-  Math.round(value * 1000) / 1000;
+export const quantity = (value: number): number => roundHalfUp(value, 3);
+
+/** Six, for a rate the quote derives rather than one anybody typed — the API's `unitRate`. */
+export const unitRate = (value: number): number => roundHalfUp(value, 6);
 
 export interface BillLineInput {
   /** Measured on **this** bill. */
@@ -85,7 +154,14 @@ export function lineTotals(
   line: BillLineInput,
   quotedPercentage = 0,
 ): BillLineTotals {
-  const amount = money(line.quantity * line.rate * (1 + quotedPercentage));
+  // As the API does it (036 I5): one exact product, rounded once. `1 + quotedPercentage` is exact
+  // for any percentage a person typed once rounded to 12 places.
+  const amount = productRounded(
+    2,
+    line.quantity,
+    line.rate,
+    roundHalfUp(1 + quotedPercentage, 12),
+  );
   const cumulativeQty = quantity(
     (line.previouslyBilledQty ?? 0) + line.quantity,
   );
@@ -152,7 +228,7 @@ export function billTotals(
 
 /** Retention on a gross figure, from a fraction. `0.05` is 5%. */
 export function retentionOn(gross: number, fraction: number): number {
-  return money(gross * fraction);
+  return productRounded(2, gross, fraction);
 }
 
 export interface ScheduleTotals {
