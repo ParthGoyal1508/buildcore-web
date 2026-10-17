@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   FULL_DAY,
@@ -19,10 +19,27 @@ import {
   quantityOf,
   updateDwr,
 } from '@/app/lib/api/dwr';
+import { errorMessage } from '@/app/lib/api/client';
 import { getBOQ, boqKeys } from '@/app/lib/api/projects';
+import {
+  clearDraft,
+  dwrDraftKey,
+  dwrDraftPrefix,
+  readNewestFormDraft,
+  saveFormDraft,
+} from '@/app/lib/bill-drafts';
 import { ROUTES } from '@/app/lib/constants';
-import { todayIso } from '@/app/lib/format';
+import {
+  ACCEPT_IMAGES_AND_PDF,
+  MAX_UPLOAD_BYTES,
+  compressImage,
+  formatBytes,
+  matchesAccept,
+} from '@/app/lib/files';
+import { dateTimeLabel, todayIso } from '@/app/lib/format';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
@@ -300,6 +317,154 @@ export default function DwrForm({
   const [savedReportId, setSavedReportId] = useState<string | null>(null);
   /** Saved cleanly and on the way to the next screen — said, so the pause does not read as a stall. */
   const [leaving, setLeaving] = useState(false);
+  /** 036 I8: each picked file's upload after the save, with its own state and a retry. */
+  const [uploads, setUploads] = useState<UploadJob[]>([]);
+
+  // ── 036 I7: unsaved changes and the local draft ───────────────────────────
+  //
+  // The longest data entry in the product — a full site day — had no guard and no draft, so a
+  // refresh, a dead tab or a session that expired mid-entry lost all of it. Now: the browser warns
+  // before leaving with unsaved edits, the company switcher knows (`useUnsavedChanges`), and every
+  // edit is written (debounced) to this device under the user, project, report and work date. The
+  // draft is **offered**, never applied silently, when the form opens again.
+  const snapshot = formSnapshot({
+    workDate,
+    workerCount,
+    machineryCount,
+    description,
+    lines,
+  });
+  const [initialSnapshot] = useState(snapshot);
+  const isDirty = snapshot !== initialSnapshot && !savedReportId;
+  useUnsavedChanges('Daily work report', isDirty);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Older browsers need a string return; the text itself is never shown.
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty]);
+
+  const draftKey = dwrDraftKey(projectId, workDate, report?.id);
+  const [offeredDraft, setOfferedDraft] = useState<{
+    key: string;
+    form: DwrFormDraft;
+    savedAt: string;
+  } | null>(null);
+
+  // Looked for once, on opening. A new report's draft is found under any work date.
+  useEffect(() => {
+    let cancelled = false;
+    void readNewestFormDraft<DwrFormDraft>(
+      dwrDraftPrefix(projectId, report?.id),
+    ).then((draft) => {
+      if (!cancelled && draft && formSnapshot(draft.form) !== initialSnapshot) {
+        setOfferedDraft(draft);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Once per form: re-reading after every keystroke would offer back what is being typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, report?.id]);
+
+  // Written a second after typing pauses. A draft under an older work date is removed when the date
+  // changes, so one new report never leaves two drafts behind.
+  const writtenKey = useRef<string | null>(null);
+  useEffect(() => {
+    // Not over a draft still being offered: typing before answering must not overwrite it.
+    if (!isDirty || offeredDraft?.key === draftKey) return;
+    const timer = window.setTimeout(() => {
+      if (writtenKey.current && writtenKey.current !== draftKey) {
+        void clearDraft(writtenKey.current);
+      }
+      writtenKey.current = draftKey;
+      void saveFormDraft<DwrFormDraft>(draftKey, {
+        workDate,
+        workerCount,
+        machineryCount,
+        description,
+        lines,
+      });
+    }, 1000);
+    return () => window.clearTimeout(timer);
+    // `snapshot` stands for every field; the values are read from the render that scheduled it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, isDirty, offeredDraft, draftKey]);
+
+  const restoreDraft = () => {
+    if (!offeredDraft) return;
+    const form = offeredDraft.form;
+    // A saved report's date cannot move, so an edit's draft never changes it.
+    if (!editing) setWorkDate(form.workDate);
+    setWorkerCount(form.workerCount);
+    setMachineryCount(form.machineryCount);
+    setDescription(form.description);
+    setLines(form.lines);
+    writtenKey.current = offeredDraft.key;
+    setOfferedDraft(null);
+  };
+
+  const discardDraft = () => {
+    if (!offeredDraft) return;
+    void clearDraft(offeredDraft.key);
+    setOfferedDraft(null);
+  };
+
+  const cancel = async () => {
+    if (
+      isDirty &&
+      !(await confirmDialog({
+        title: 'Leave this day unsaved?',
+        message:
+          'Nothing has been saved to the project. What you typed stays on this device as a draft and is offered back when you record this day again.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+      }))
+    ) {
+      return;
+    }
+    router.push(ROUTES.projectsDwr(projectId));
+  };
+
+  /** Uploads one file and records how it went. Resolves to whether it attached. */
+  const runUpload = async (job: UploadJob): Promise<boolean> => {
+    const patch = (next: Partial<UploadJob>) =>
+      setUploads((all) =>
+        all.map((item) => (item.id === job.id ? { ...item, ...next } : item)),
+      );
+    if (!job.taskId) {
+      // The server answered without saying which row is which. Not guessed at: one position out
+      // files a photograph against a chainage it is not evidence of.
+      patch({
+        status: 'failed',
+        error: 'Its line could not be identified. Attach it on the report.',
+      });
+      return false;
+    }
+    patch({ status: 'uploading', error: undefined });
+    try {
+      await addDwrAttachment(job.dwrId, job.file, job.taskId);
+      patch({ status: 'done' });
+      return true;
+    } catch (err) {
+      patch({
+        status: 'failed',
+        error: errorMessage(err, 'The upload did not finish.'),
+      });
+      return false;
+    }
+  };
+
+  const retryUpload = async (job: UploadJob) => {
+    await runUpload(job);
+    void queryClient.invalidateQueries({ queryKey: ['dwr', job.dwrId] });
+  };
 
   /**
    * What is already filed against each stored line, so a correction shows it rather than looking
@@ -368,8 +533,8 @@ export default function DwrForm({
     }): Promise<{
       dwrId: string;
       warnings: DwrWarning[];
-      /** Files the save went through for and the upload did not. Never silently dropped. */
-      unattached: string[];
+      /** One upload per picked file, each paired with its line's id. */
+      jobs: UploadJob[];
     }> => {
       const saved = report
         ? await updateDwr(report.id, rest)
@@ -377,15 +542,29 @@ export default function DwrForm({
       const dwrId = report ? report.id : saved.id;
 
       // **After the save, never before.** A file belongs to a line and a line has no id until the
-      // day is on file, so this is the first moment the two can be put together.
-      const unattached = await attachAll(dwrId, saved.lineIds, pending);
+      // day is on file, so this is the first moment the two can be put together. The uploads
+      // themselves run in `onSuccess`, one file at a time with its own progress (036 I8).
+      const jobs = uploadJobs(dwrId, saved.lineIds, pending);
 
       // An edit answers with no warnings: the three 022 reports — a date before the project
       // started, a day already covered, a line past scope — are raised when the day is first
       // recorded, and the report is already on file by the time it is being corrected.
-      return { dwrId, warnings: report ? [] : saved.warnings, unattached };
+      return { dwrId, warnings: report ? [] : saved.warnings, jobs };
     },
     onSuccess: async (saved) => {
+      // The day is on file: the draft has become the report (036 I7).
+      void clearDraft(draftKey);
+      if (writtenKey.current && writtenKey.current !== draftKey) {
+        void clearDraft(writtenKey.current);
+      }
+      setSavedReportId(saved.dwrId);
+      setUploads(saved.jobs);
+      // One at a time: a site connection shared by six parallel photo uploads finishes none of
+      // them sooner, and a failure in the middle is easier to name.
+      const unattached: string[] = [];
+      for (const job of saved.jobs) {
+        if (!(await runUpload(job))) unattached.push(job.file.name);
+      }
       // Refetched before leaving, not merely marked stale: the list is where a new day lands, and
       // arriving on it from cache showed the list without the day just saved until a reload. The
       // list is keyed `['dwrs', projectId]`; `['dwr', id]` is the report screen an edit returns to.
@@ -400,16 +579,15 @@ export default function DwrForm({
           refetchType: 'all',
         }),
       ]);
-      // The day is on file from here on, whatever else is reported below. Remembering that turns
-      // the save button into a way onward, because pressing Save twice on a new report files the
-      // day twice.
-      setSavedReportId(saved.dwrId);
-      setUnattached(saved.unattached);
+      // The day is on file from here on, whatever else is reported below (`savedReportId`, set
+      // above). Remembering that turns the save button into a way onward, because pressing Save
+      // twice on a new report files the day twice.
+      setUnattached(unattached);
       // 022 reports three things rather than refusing them: a work date before the project started,
       // a second report for a day already covered, and a line past its BOQ scope. Shown, because a
       // 201 that quietly carried a warning is a 201 nobody reads.
       setWarnings(saved.warnings);
-      if (saved.warnings.length > 0 || saved.unattached.length > 0) return;
+      if (saved.warnings.length > 0 || unattached.length > 0) return;
       setLeaving(true);
       router.push(
         report
@@ -535,6 +713,30 @@ export default function DwrForm({
           )}
         </p>
       </header>
+
+      {offeredDraft && (
+        <div
+          className="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <p>
+            You have an unsaved draft of this day from{' '}
+            <strong>{dateTimeLabel(offeredDraft.savedAt)}</strong>
+            {!editing && offeredDraft.form.workDate !== workDate && (
+              <> (work date {offeredDraft.form.workDate.split('-').reverse().join('-')})</>
+            )}
+            . Restore it?
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" intent="read" onClick={restoreDraft}>
+              Restore draft
+            </Button>
+            <Button type="button" intent="read" onClick={discardDraft}>
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p
@@ -676,7 +878,15 @@ export default function DwrForm({
         ))}
       </section>
 
-      {unattached.length > 0 && (
+      {uploads.length > 0 && (
+        <UploadProgress
+          jobs={uploads}
+          onRetry={(job) => void retryUpload(job)}
+        />
+      )}
+
+      {unattached.length > 0 && uploads.every((job) => job.status !== 'uploading') &&
+        uploads.some((job) => job.status === 'failed') && (
         <div
           className="rounded-md bg-amber-50 p-3 text-sm text-amber-900"
           role="alert"
@@ -692,7 +902,8 @@ export default function DwrForm({
             ))}
           </ul>
           <p className="mt-1">
-            Nothing else was lost. Open the report and attach{' '}
+            Nothing else was lost. Retry {unattached.length === 1 ? 'it' : 'them'}{' '}
+            above, or open the report and attach{' '}
             {unattached.length === 1 ? 'it' : 'them'} there.
           </p>
         </div>
@@ -740,17 +951,13 @@ export default function DwrForm({
         ) : (
           <Button
             type="submit"
-            disabled={
-              save.isPending || shortDayWithoutRemark || fileWithoutMeasurement
-            }
+            loading={save.isPending}
+            disabled={shortDayWithoutRemark || fileWithoutMeasurement}
           >
             {save.isPending ? 'Saving…' : 'Save the day'}
           </Button>
         )}
-        <Button
-          type="button"
-          onClick={() => router.push(ROUTES.projectsDwr(projectId))}
-        >
+        <Button type="button" intent="read" onClick={() => void cancel()}>
           Cancel
         </Button>
       </div>
@@ -1145,27 +1352,115 @@ function Cell({
  * position out files a photograph against a chainage it is not evidence of, which is worse than
  * not filing it at all.
  */
-async function attachAll(
+function uploadJobs(
   dwrId: string,
   lineIds: string[],
   pending: File[][],
-): Promise<string[]> {
-  const unattached: string[] = [];
-  for (const [index, files] of pending.entries()) {
-    const taskId = lineIds[index];
-    for (const file of files) {
-      if (!taskId) {
-        unattached.push(file.name);
-        continue;
-      }
-      try {
-        await addDwrAttachment(dwrId, file, taskId);
-      } catch {
-        unattached.push(file.name);
-      }
-    }
-  }
-  return unattached;
+): UploadJob[] {
+  return pending.flatMap((files, index) =>
+    files.map((file, n) => ({
+      id: `${index}-${n}-${file.name}`,
+      file,
+      dwrId,
+      taskId: lineIds[index],
+      status: 'queued' as const,
+    })),
+  );
+}
+
+/** One file going up after the day is saved (036 I8). */
+interface UploadJob {
+  id: string;
+  file: File;
+  dwrId: string;
+  /** The line it is evidence for; missing when the server did not say which row is which. */
+  taskId: string | undefined;
+  status: 'queued' | 'uploading' | 'done' | 'failed';
+  error?: string;
+}
+
+/** What the form keeps on the device between visits (036 I7). `File`s included. */
+interface DwrFormDraft {
+  workDate: string;
+  workerCount: string;
+  machineryCount: string;
+  description: string;
+  lines: DraftLine[];
+}
+
+/**
+ * The form's state as one comparable string — files by name and size, since a `File` does not
+ * serialise — for "has anything changed".
+ */
+function formSnapshot(form: DwrFormDraft): string {
+  return JSON.stringify(form, (_key, value) =>
+    value instanceof File ? `${value.name}:${value.size}` : value,
+  );
+}
+
+/**
+ * Each file's upload, as it happens, with a retry for one that failed (036 I8).
+ *
+ * Uploads ran one after another after Save with nothing on screen, and a failure ended in a list of
+ * names to go and attach somewhere else. Now each file says where it is, and a failed one can be
+ * sent again from here — the report and its line already exist.
+ */
+function UploadProgress({
+  jobs,
+  onRetry,
+}: {
+  jobs: UploadJob[];
+  onRetry: (job: UploadJob) => void;
+}) {
+  const done = jobs.filter((job) => job.status === 'done').length;
+  return (
+    <section
+      className="rounded-md border border-gray-200 bg-white p-3 text-sm"
+      aria-live="polite"
+    >
+      <p className="font-medium text-gray-900">
+        Files: {done} of {jobs.length} attached
+      </p>
+      <ul className="mt-2 flex flex-col gap-1">
+        {jobs.map((job) => (
+          <li key={job.id} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 truncate" title={job.file.name}>
+              {job.file.name}{' '}
+              <span className="text-xs text-gray-500">
+                ({formatBytes(job.file.size)})
+              </span>
+            </span>
+            <span
+              className={clsx(
+                'text-xs',
+                job.status === 'done' && 'text-green-700',
+                job.status === 'failed' && 'text-red-700',
+                (job.status === 'queued' || job.status === 'uploading') &&
+                  'text-gray-600',
+              )}
+            >
+              {job.status === 'queued'
+                ? 'Waiting…'
+                : job.status === 'uploading'
+                  ? 'Uploading…'
+                  : job.status === 'done'
+                    ? 'Attached'
+                    : job.error ?? 'Failed'}
+            </span>
+            {job.status === 'failed' && job.taskId && (
+              <button
+                type="button"
+                onClick={() => onRetry(job)}
+                className="min-h-[44px] rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Retry
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /**
@@ -1187,8 +1482,70 @@ function LineFiles({
   attached: string[];
   onChange: (next: File[]) => void;
 }) {
+  const [preparing, setPreparing] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  // 036 I8: checked and shrunk as they are picked, not after Save. A 12-megapixel site photo goes up
+  // at ≤ 2048 px (the server compresses again and makes the thumbnail), a file of the wrong kind or
+  // too large is refused here by name rather than by the server a minute later.
+  const add = async (picked: File[]) => {
+    setProblem(null);
+    setPreparing(true);
+    const accepted: File[] = [];
+    const refused: string[] = [];
+    try {
+      for (const original of picked) {
+        if (!matchesAccept(original, ACCEPT_IMAGES_AND_PDF)) {
+          refused.push(`${original.name} is not a photo or a PDF`);
+          continue;
+        }
+        const file = original.type.startsWith('image/')
+          ? await compressImage(original)
+          : original;
+        if (file.size > MAX_UPLOAD_BYTES) {
+          refused.push(
+            `${original.name} is ${formatBytes(file.size)}; the limit is ${formatBytes(MAX_UPLOAD_BYTES)}`,
+          );
+          continue;
+        }
+        accepted.push(file);
+      }
+    } finally {
+      setPreparing(false);
+    }
+    if (accepted.length > 0) onChange([...files, ...accepted]);
+    if (refused.length > 0) setProblem(`${refused.join('. ')}.`);
+  };
+
+  const picker = (
+    label: string,
+    extra: { accept: string; capture?: 'environment' },
+  ) => (
+    // The input **covers the label** rather than being `sr-only`. A 1px absolutely-positioned
+    // input is a focus target the browser scrolls an ancestor to reveal, and in a table wider than
+    // the page that ancestor turned out to be the shell — which clips without a scrollbar, so the
+    // layout shifted and stayed shifted. 44 px tall (036 I8): this is tapped on a phone on site.
+    <label className="relative inline-flex min-h-[44px] cursor-pointer items-center rounded-md px-2 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
+      {label}
+      <input
+        type="file"
+        multiple={!extra.capture}
+        accept={extra.accept}
+        {...(extra.capture ? { capture: extra.capture } : {})}
+        disabled={preparing}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        onChange={(event) => {
+          const picked = Array.from(event.target.files ?? []);
+          // Cleared so picking the same file twice in a row still fires a change.
+          event.target.value = '';
+          if (picked.length > 0) void add(picked);
+        }}
+      />
+    </label>
+  );
+
   return (
-    <div className="flex w-44 flex-col gap-1">
+    <div className="flex w-48 flex-col gap-1">
       {attached.map((name) => (
         <span
           key={name}
@@ -1199,44 +1556,86 @@ function LineFiles({
         </span>
       ))}
       {files.map((file, index) => (
-        <span
-          key={`${file.name}-${index}`}
-          className="flex items-center gap-1 text-xs"
-        >
-          <span className="truncate" title={file.name}>
-            {file.name}
-          </span>
-          <button
-            type="button"
-            aria-label={`Remove ${file.name}`}
-            onClick={() => onChange(files.filter((_f, i) => i !== index))}
-            className="text-red-700 hover:underline"
-          >
-            &times;
-          </button>
-        </span>
-      ))}
-      {/* The input **covers the label** rather than being `sr-only`. A 1px absolutely-positioned
-          input is a focus target the browser scrolls an ancestor to reveal, and in a table wider
-          than the page that ancestor turned out to be the shell — which clips without a scrollbar,
-          so the layout shifted and stayed shifted. Sized to the label it is already in view, and
-          it is still a real focusable input named by the label; the ring is drawn on the label,
-          which is the part anybody can see. */}
-      <label className="relative cursor-pointer text-xs text-blue-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
-        + File
-        <input
-          type="file"
-          multiple
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          onChange={(event) => {
-            const picked = Array.from(event.target.files ?? []);
-            if (picked.length > 0) onChange([...files, ...picked]);
-            // Cleared so picking the same file twice in a row still fires a change.
-            event.target.value = '';
-          }}
+        <PickedFile
+          key={`${file.name}-${file.size}-${index}`}
+          file={file}
+          onRemove={() => onChange(files.filter((_f, i) => i !== index))}
         />
-      </label>
+      ))}
+      <div className="flex flex-wrap items-center">
+        {picker('+ Photo', { accept: 'image/*', capture: 'environment' })}
+        {picker('+ File', { accept: ACCEPT_IMAGES_AND_PDF })}
+        {preparing && (
+          <span className="text-xs text-gray-500" role="status">
+            Preparing…
+          </span>
+        )}
+      </div>
+      {problem && (
+        <p className="text-xs text-red-700" role="alert">
+          {problem}
+        </p>
+      )}
     </div>
+  );
+}
+
+/**
+ * One object URL per picked photo, made the first time it is drawn and kept with the `File`.
+ *
+ * Not made in an effect: React's development double-mount would revoke the URL the memoised value
+ * still points at, and the thumbnail would break. Released when the file is removed; the rest go
+ * with the page.
+ */
+const previews = new WeakMap<File, string>();
+function previewUrl(file: File): string | null {
+  if (!file.type.startsWith('image/')) return null;
+  let url = previews.get(file);
+  if (!url) {
+    url = URL.createObjectURL(file);
+    previews.set(file, url);
+  }
+  return url;
+}
+function releasePreview(file: File) {
+  const url = previews.get(file);
+  if (url) URL.revokeObjectURL(url);
+  previews.delete(file);
+}
+
+/** One file waiting to go up: a thumbnail for a photo, and a 44 px remove target (036 I8). */
+function PickedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const preview = previewUrl(file);
+
+  return (
+    <span className="flex items-center gap-1 text-xs">
+      {preview ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an asset.
+        <img
+          src={preview}
+          alt=""
+          className="h-10 w-10 shrink-0 rounded object-cover"
+        />
+      ) : (
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] text-gray-500">
+          PDF
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate" title={file.name}>
+        {file.name}
+      </span>
+      <button
+        type="button"
+        aria-label={`Remove ${file.name}`}
+        onClick={() => {
+          releasePreview(file);
+          onRemove();
+        }}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-lg text-red-700 hover:bg-red-50"
+      >
+        &times;
+      </button>
+    </span>
   );
 }
 
