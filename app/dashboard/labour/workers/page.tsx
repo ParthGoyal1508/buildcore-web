@@ -1,10 +1,16 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   deactivateWorker,
   enrolWorkerFace,
@@ -17,7 +23,12 @@ import {
   LABOUR_GENDER_LABELS,
   ROUTES,
 } from '@/app/lib/constants';
+import { dateLabel, todayIso } from '@/app/lib/format';
+import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
+import Pager from '@/app/ui/inventory/pager';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 import FacePhotoPicker from '@/app/ui/labour/face-photo-picker';
 import {
   FormError,
@@ -44,14 +55,22 @@ import {
  * camera for the 3–5 face photos; this list links there. Supervisors see only their assigned
  * sites' labour; the HR office sees everyone.
  */
-export default function WorkersPage() {
+const PAGE_SIZE = 25;
+
+function WorkersPageBody() {
   const queryClient = useQueryClient();
-  const [siteId, setSiteId] = useState('');
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
+  // 036 O11: paged on the server, search debounced, filters in the URL. The list loaded
+  // `pageSize: 200` with no pager, so the 201st worker silently did not exist.
+  const [filters, setFilters, query] = useUrlState(
+    { site: urlString(), q: urlString(), page: urlNumber(1) },
+    { debounce: ['q'], resetPage: 'page' },
+  );
   // The worker a NOC is being managed for (2026-10-15).
   const [nocFor, setNocFor] = useState<{ id: string; name: string } | null>(
     null,
   );
-  const [search, setSearch] = useState('');
   const [deactivating, setDeactivating] = useState<Worker | null>(null);
   const [photosFor, setPhotosFor] = useState<Worker | null>(null);
 
@@ -59,14 +78,16 @@ export default function WorkersPage() {
     queryKey: ['labour', 'my-sites'],
     queryFn: getMyLabourSites,
   });
+  const params = {
+    siteId: query.site || undefined,
+    search: query.q.trim() || undefined,
+    page: query.page,
+    pageSize: PAGE_SIZE,
+  };
   const workers = useQuery({
-    queryKey: ['workers', siteId, search],
-    queryFn: () =>
-      getWorkers({
-        siteId: siteId || undefined,
-        search: search || undefined,
-        pageSize: 200,
-      }),
+    queryKey: ['workers', companyId, params],
+    queryFn: () => getWorkers(params),
+    placeholderData: keepPreviousData,
   });
   // Open until the labour's NOC is uploaded, then closed (2026-10-17).
   const [nocFilter, setNocFilter] = useState<NocFilter>('');
@@ -148,8 +169,8 @@ export default function WorkersPage() {
         <SelectField
           id="filter-site"
           label="Site"
-          value={siteId}
-          onChange={(e) => setSiteId(e.target.value)}
+          value={filters.site}
+          onChange={(e) => setFilters({ site: e.target.value })}
         >
           <option value="">All sites</option>
           {sites.data?.map((s) => (
@@ -162,8 +183,9 @@ export default function WorkersPage() {
           id="filter-search"
           label="Search"
           placeholder="Name, code, father's name or mobile"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          type="search"
+          value={filters.q}
+          onChange={(e) => setFilters({ q: e.target.value })}
         />
         <NocFilterField
           id="filter-noc"
@@ -182,7 +204,10 @@ export default function WorkersPage() {
         )}
         rowKey={(w) => w.id}
         isLoading={workers.isPending}
-        error={workers.isError ? 'Could not load labour.' : null}
+        error={workers.error}
+        onRetry={workers.refetch}
+        serverPaged
+        isRefreshing={workers.isPlaceholderData && workers.isFetching}
         emptyMessage="No labour matches these filters."
         actions={(w) => (
           <>
@@ -206,6 +231,16 @@ export default function WorkersPage() {
         )}
       />
 
+      <div className="mt-4">
+        <Pager
+          total={workers.data?.total ?? 0}
+          page={query.page}
+          pageSize={PAGE_SIZE}
+          onPageChange={(page) => setFilters({ page })}
+          noun="worker"
+        />
+      </div>
+
       {nocFor && (
         <NocModal
           subjectType="labour_worker"
@@ -220,6 +255,7 @@ export default function WorkersPage() {
           worker={photosFor}
           onClose={() => setPhotosFor(null)}
           onSaved={() => {
+            toast.success('Face photos saved.');
             void queryClient.invalidateQueries({ queryKey: ['workers'] });
             setPhotosFor(null);
           }}
@@ -231,12 +267,29 @@ export default function WorkersPage() {
           worker={deactivating}
           onClose={() => setDeactivating(null)}
           onSaved={() => {
-            queryClient.invalidateQueries({ queryKey: ['workers'] });
+            toast.success(`${deactivating.fullName} deactivated.`);
+            void queryClient.invalidateQueries({ queryKey: ['workers'] });
             setDeactivating(null);
           }}
         />
       )}
     </div>
+  );
+}
+
+export default function WorkersPage() {
+  // `useUrlState` reads `useSearchParams`, which needs a Suspense boundary.
+  return (
+    <Suspense
+      fallback={
+        <ListSkeleton
+          headers={['Code', 'Name', 'Gender', 'Site', 'Face', 'Status']}
+          rows={8}
+        />
+      }
+    >
+      <WorkersPageBody />
+    </Suspense>
   );
 }
 
@@ -269,19 +322,25 @@ function FacePhotosForm({
     <Modal
       title={`Face photos — ${worker.fullName}`}
       onClose={onClose}
+      isDirty={photos.length > 0}
+      pending={save.isPending}
+      // O15: buttons passed straight to the footer, so a phone stacks them full width.
       footer={
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <>
+          <SecondaryButton onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
               save.mutate();
             }}
-            disabled={photos.length < LABOUR_ENROLMENT_PHOTOS.min || save.isPending}
+            disabled={photos.length < LABOUR_ENROLMENT_PHOTOS.min}
+            loading={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Save photos'}
+            Save photos
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-3">
@@ -311,31 +370,40 @@ function DeactivateForm({
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () => deactivateWorker(worker.id, { reason, lastWorkingDate }),
+    mutationFn: () =>
+      deactivateWorker(worker.id, { reason: reason.trim(), lastWorkingDate }),
     onSuccess: onSaved,
     onError: (e) =>
-      setError(
-        e instanceof ApiError ? e.message : 'Could not deactivate the worker.',
-      ),
+      setError(errorMessage(e, 'Could not deactivate the worker.')),
   });
+
+  // 036 O11: a last working day in the future was accepted.
+  const today = todayIso();
+  const futureDate = !!lastWorkingDate && lastWorkingDate > today;
 
   return (
     <Modal
       title={`Deactivate ${worker.fullName}`}
       onClose={onClose}
+      isDirty={!!reason || !!lastWorkingDate}
+      pending={mutation.isPending}
+      // O15: buttons passed straight to the footer, so a phone stacks them full width.
       footer={
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <>
+          <SecondaryButton onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
               mutation.mutate();
             }}
-            disabled={!reason || !lastWorkingDate}
+            disabled={!reason.trim() || !lastWorkingDate || futureDate}
+            loading={mutation.isPending}
           >
             Deactivate
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-3">
@@ -346,14 +414,20 @@ function DeactivateForm({
         </p>
         <TextField
           id="d-date"
-          label="Last working date"
+          label="Last working date *"
           type="date"
+          required
+          max={today}
           value={lastWorkingDate}
           onChange={(e) => setLastWorkingDate(e.target.value)}
+          error={
+            futureDate ? `Today (${dateLabel(today)}) at the latest.` : undefined
+          }
         />
         <TextField
           id="d-reason"
-          label="Reason"
+          label="Reason *"
+          required
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
