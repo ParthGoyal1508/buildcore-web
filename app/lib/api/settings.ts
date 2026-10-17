@@ -255,8 +255,8 @@ export async function deleteRole(
 
 /**
  * `roles` is an array, not a single `role`: an account can hold several roles at
- * once and its effective permissions are their union. The Users form still edits a
- * single role, which replaces the whole set — that is what the API's `roleId` means.
+ * once and its effective permissions are their union. Since 036 C1 the Users form edits the
+ * whole set (`roleIds`); it used to edit `roles[0]` alone, and saving removed the others.
  */
 export const userSummarySchema = z.object({
   id: z.string(),
@@ -276,9 +276,43 @@ export async function listUsers(): Promise<UserSummary[]> {
   return z.array(userSummarySchema).parse(await authFetch('/settings/users'));
 }
 
+export interface UserListParams {
+  q?: string;
+  status?: UserSummary['status'] | '';
+  roleId?: string;
+  companyId?: string;
+  /** `key:asc` / `key:desc` — name, email, status, lastLoginAt, createdAt. */
+  sort?: string;
+  page: number;
+  pageSize: number;
+}
+
+const userPageSchema = z.object({
+  items: z.array(userSummarySchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type UserPage = z.infer<typeof userPageSchema>;
+
+/** One page of accounts, searched and filtered on the server (036 C5). */
+export async function listUsersPage(params: UserListParams): Promise<UserPage> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  return userPageSchema.parse(
+    await authFetch(`/settings/users?${query.toString()}`),
+  );
+}
+
 export async function updateUser(
   id: string,
-  input: { roleId?: string; status?: 'active' | 'deactivated' },
+  input: {
+    /** The account's whole role set after the save — at least one (036 C1, C2). */
+    roleIds?: string[];
+    status?: 'active' | 'deactivated';
+  },
 ): Promise<UserSummary> {
   return userSummarySchema.parse(
     await authFetch(`/settings/users/${id}`, {

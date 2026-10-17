@@ -2210,9 +2210,6 @@ export const SETTINGS_PERMISSIONS = {
   'personal-settings': 'CROSS_COMPANY_ACCESS',
 } as const;
 
-/** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
- * matching `UsersAdminService.assertMayAdminister()` on the backend. */
-export const USER_ADMIN_ROLES = ['Super Admin', 'HO User'] as const;
 
 /**
  * The backend's 423 response bakes the unlock time into its message as a raw

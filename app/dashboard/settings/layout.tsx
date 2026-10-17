@@ -63,12 +63,12 @@ export default function SettingsLayout({
       return <AccessDenied />;
     }
 
-    // Users administration additionally requires one of two roles (spec FR-010),
-    // mirroring UsersAdminService.assertMayAdminister() on the backend.
+    // Users administration is the USER_MANAGEMENT permission, as the API checks it (036 C4) —
+    // no longer also one of two role names, which refused custom administrator roles.
     if (section === 'users') {
       if (!maySettingsAdministerUsers(user)) {
         return (
-          <AccessDenied detail="Only a Super Admin or HO User can administer accounts." />
+          <AccessDenied detail="Administering accounts needs the User Management permission." />
         );
       }
     }

@@ -15,7 +15,6 @@ import {
 import {
   ROUTES,
   SETTINGS_PERMISSIONS,
-  USER_ADMIN_ROLES,
 } from '@/app/lib/constants';
 
 /**
@@ -150,30 +149,23 @@ export const SETTINGS_SECTIONS: {
 /**
  * The sections this user may actually open.
  *
- * The `users` rule — a permission *and* one of two role names (FR-010, mirroring
- * `UsersAdminService.assertMayAdminister()`) — is the reason this is a function
- * rather than a filter written at each call site: it was already stated in the index
- * and the layout guard, and the tab strip would have been a third copy.
+ * Gated on the permission alone since 036 C4. The `users` section used to also require one of two
+ * role *names* ("Super Admin", "HO User"), which the backend dropped on 2026-08-31
+ * (`UsersAdminService`, "roles are data an administrator edits"): a custom administrator role
+ * granted `USER_MANAGEMENT` passed the API and was still refused here.
  */
 export function visibleSettingsSections(
-  user:
-    | { permissions: readonly string[]; roleNames: readonly string[] }
-    | undefined,
+  user: { permissions: readonly string[] } | undefined,
 ): typeof SETTINGS_SECTIONS {
   if (!user) return [];
-  return SETTINGS_SECTIONS.filter((section) => {
-    if (!user.permissions.includes(SETTINGS_PERMISSIONS[section.key]))
-      return false;
-    if (section.key === 'users') return maySettingsAdministerUsers(user);
-    return true;
-  });
+  return SETTINGS_SECTIONS.filter((section) =>
+    user.permissions.includes(SETTINGS_PERMISSIONS[section.key]),
+  );
 }
 
-/** Shared with `app/dashboard/settings/layout.tsx`, which refuses the section. */
+/** Shared with `app/dashboard/settings/layout.tsx`. The permission, as the API checks it (036 C4). */
 export function maySettingsAdministerUsers(user: {
-  roleNames: readonly string[];
+  permissions: readonly string[];
 }): boolean {
-  return user.roleNames.some((name) =>
-    (USER_ADMIN_ROLES as readonly string[]).includes(name),
-  );
+  return user.permissions.includes(SETTINGS_PERMISSIONS.users);
 }
