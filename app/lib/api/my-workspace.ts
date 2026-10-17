@@ -451,6 +451,35 @@ export async function getLeaveBalance(
     .parse(await authFetch(`/my/leave/balance${query}`));
 }
 
+/**
+ * How many days a leave range would charge, counted by the server exactly as an application is
+ * (036 G3): the employee's own site weekly off and the site's holidays are excluded, and each
+ * excluded date is listed with why. The apply form used to skip Saturday and Sunday itself, which
+ * on a six-day site week was wrong in both directions.
+ */
+export const leaveDayCountSchema = z.object({
+  days: z.number(),
+  /** 0 = Sunday … 6 = Saturday. */
+  weeklyOffDay: z.number(),
+  excluded: z.array(
+    z.object({
+      date: z.string(),
+      reason: z.enum(['weekly_off', 'holiday']),
+    }),
+  ),
+});
+export type LeaveDayCount = z.infer<typeof leaveDayCountSchema>;
+
+export async function getLeaveDayCount(
+  fromDate: string,
+  toDate: string,
+): Promise<LeaveDayCount> {
+  const query = new URLSearchParams({ fromDate, toDate });
+  return leaveDayCountSchema.parse(
+    await authFetch(`/my/leave/day-count?${query}`),
+  );
+}
+
 export async function getLeaveApplications(): Promise<LeaveApplication[]> {
   return z
     .array(leaveApplicationSchema)
