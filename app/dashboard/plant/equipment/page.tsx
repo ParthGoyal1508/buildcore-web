@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -23,6 +23,7 @@ import {
 import CategoryOptions from '@/app/ui/plant/category-options';
 import EquipmentImportModal from '@/app/ui/plant/equipment-import-modal';
 import EquipmentModal from '@/app/ui/plant/equipment-modal';
+import { EquipmentThumb } from '@/app/ui/plant/equipment-photos';
 import DisposeModal from '@/app/ui/plant/dispose-modal';
 import { getCurrentUser } from '@/app/lib/api/users';
 import Pager from '@/app/ui/inventory/pager';
@@ -75,9 +76,10 @@ export default function AssetRegisterPage() {
     ...(ownership ? { ownership } : {}),
   };
 
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['plant', 'equipment', filters],
     queryFn: () => getEquipment(filters),
+    placeholderData: keepPreviousData,
   });
 
   /**
@@ -116,6 +118,25 @@ export default function AssetRegisterPage() {
     ownership !== '';
 
   const columns: Column<Equipment>[] = [
+    {
+      // 036 K14: the main photo's 320 px thumbnail, or the placeholder icon.
+      key: 'photo',
+      header: 'Photo',
+      render: (row) => (
+        <Link
+          href={ROUTES.plantEquipmentDetail(row.id)}
+          aria-label={`${row.code} · ${row.name}`}
+          className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        >
+          <EquipmentThumb
+            equipmentId={row.id}
+            photoId={row.mainPhotoId}
+            alt={`${row.code} · ${row.name}`}
+            className="h-12 w-12"
+          />
+        </Link>
+      ),
+    },
     {
       key: 'code',
       header: 'Code',
@@ -334,7 +355,10 @@ export default function AssetRegisterPage() {
         rows={data?.items ?? []}
         rowKey={(row) => row.id}
         isLoading={isPending}
-        error={isError ? MESSAGES.plantLoadFailed : undefined}
+        isRefreshing={isFetching && !isPending}
+        error={isError ? error : undefined}
+        onRetry={refetch}
+        serverPaged
         emptyMessage={
           hasFilters
             ? MESSAGES.plantEquipmentEmptyFiltered

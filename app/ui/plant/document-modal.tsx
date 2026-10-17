@@ -3,11 +3,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import { uploadEquipmentDocument } from '@/app/lib/api/plant';
 import { MESSAGES } from '@/app/lib/constants';
+import { MAX_UPLOAD_BYTES } from '@/app/lib/files';
 import { Button } from '@/app/ui/button';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
 import Modal from '@/app/ui/settings/modal';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   SecondaryButton,
@@ -30,12 +33,25 @@ export function toBase64(file: File): Promise<string> {
 }
 
 /**
+ * What a machine's document may be — the API's document allow-list (036 K13): PDF, the three
+ * photo formats, and Excel/Word. The server checks the file's own bytes and refuses anything else
+ * (415), so this is the same list said early.
+ */
+export const EQUIPMENT_DOCUMENT_ACCEPT =
+  'application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp,' +
+  '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+  '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/**
  * Attach a document to a machine.
  *
  * The type list comes from the Doc Types master rather than a hardcoded array
  * (web FR-008): each type carries its own alert window, and the register's expiry
  * badge is computed from it. A hardcoded list here would offer types the backend
  * has never heard of.
+ *
+ * 036 K13: the file goes through `FileUpload` — the accepted types and the 10 MB limit are checked
+ * before anything is read, a photographed paper is shrunk, and an image shows a preview.
  */
 export default function DocumentModal({
   equipmentId,
@@ -45,10 +61,11 @@ export default function DocumentModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const docTypes = usePlantDocTypes();
 
   const [docTypeId, setDocTypeId] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<PreparedFile | null>(null);
   const [expiresAt, setExpiresAt] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -59,18 +76,18 @@ export default function DocumentModal({
       if (!file) throw new Error('Choose a file first.');
       return uploadEquipmentDocument(equipmentId, {
         docTypeId,
-        file: await toBase64(file),
-        fileName: file.name,
-        contentType: file.type || 'application/octet-stream',
+        file: file.base64,
+        fileName: file.fileName,
+        contentType: file.mimeType || 'application/octet-stream',
         ...(expiresAt ? { expiresAt } : {}),
       });
     },
-    onSuccess: () => {
+    onSuccess: (document) => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
+      toast.success(`${document.docTypeName} attached.`);
       onClose();
     },
-    onError: (err) =>
-      setError(err instanceof ApiError ? err.message : (err as Error).message),
+    onError: (err) => setError(errorMessage(err, MESSAGES.plantSaveFailed)),
   });
 
   const noDocTypes = docTypes.data?.length === 0;
@@ -79,6 +96,8 @@ export default function DocumentModal({
     <Modal
       title="Attach a document"
       onClose={onClose}
+      isDirty={Boolean(file || docTypeId || expiresAt)}
+      pending={upload.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
@@ -87,9 +106,10 @@ export default function DocumentModal({
           <Button
             type="submit"
             form="document-form"
-            disabled={upload.isPending || !file || !docTypeId || noDocTypes}
+            loading={upload.isPending}
+            disabled={!file || !docTypeId || noDocTypes}
           >
-            {upload.isPending ? 'Uploading…' : 'Upload'}
+            Upload
           </Button>
         </>
       }
@@ -126,21 +146,14 @@ export default function DocumentModal({
           ))}
         </SelectField>
 
-        <div>
-          <label
-            htmlFor="document-file"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
-            File
-          </label>
-          <input
-            id="document-file"
-            type="file"
-            required
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="block w-full rounded-md border border-gray-200 p-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          />
-        </div>
+        <FileUpload
+          id="document-file"
+          label="File"
+          accept={EQUIPMENT_DOCUMENT_ACCEPT}
+          maxBytes={MAX_UPLOAD_BYTES}
+          hint="PDF, JPEG, PNG, WebP, Excel or Word, up to 10 MB."
+          onSelect={setFile}
+        />
 
         <TextField
           id="document-expiry"
