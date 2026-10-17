@@ -2,7 +2,7 @@
 
 import { MapPinIcon } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Suspense } from 'react';
 
 import {
   getSiteWidgets,
@@ -16,16 +16,37 @@ import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import PageHeader from '@/app/ui/page-header';
 import type { Metric } from '@/app/ui/dashboard/metric-tile';
 import { SummaryBanner, widgetMetric } from '@/app/ui/dashboard/widget-metrics';
+import QueryError from '@/app/ui/query-error';
 import { LoadingText } from '@/app/ui/spinner';
 import { longDateLabel } from '@/app/lib/format';
+import { urlString, useUrlState } from '@/app/lib/use-url-state';
 
 export default function SiteDashboardPage() {
-  // The site chosen here; until somebody chooses, the first one the list offers (2026-10-15).
-  // An empty page asking for a choice is a wasted click when most users have one site.
-  const [chosenSiteId, setSiteId] = useState('');
+  return (
+    // The chosen site lives in the URL (`?site=`), which reads `useSearchParams` (036 E4).
+    <Suspense>
+      <SiteDashboard />
+    </Suspense>
+  );
+}
 
-  const sites = useQuery({ queryKey: ['sites'], queryFn: getSites });
-  const siteId = chosenSiteId || sites.data?.[0]?.id || '';
+function SiteDashboard() {
+  // The site chosen here; until somebody chooses, the first one the list offers (2026-10-15).
+  // An empty page asking for a choice is a wasted click when most users have one site. In the URL
+  // since 036 E4, so Back and a refresh keep it.
+  const [{ site: chosenSiteId }, setUrl] = useUrlState({ site: urlString() });
+  const setSiteId = (site: string) => setUrl({ site });
+
+  // Its own key (036 E4): `['sites']` is also HR's site list, a different endpoint with a
+  // different shape, and whichever loaded first answered the other from cache.
+  const sites = useQuery({
+    queryKey: ['site-dashboard', 'sites'],
+    queryFn: getSites,
+  });
+  const siteId =
+    (sites.data?.some((s) => s.id === chosenSiteId) ? chosenSiteId : '') ||
+    sites.data?.[0]?.id ||
+    '';
 
   const widgets = useQuery({
     queryKey: ['site-widgets', siteId],
@@ -58,6 +79,14 @@ export default function SiteDashboardPage() {
         <p className="text-sm text-gray-500" role="status">
           <LoadingText>Loading sites…</LoadingText>
         </p>
+      )}
+      {/* 036 E4: a failed list used to leave a blank page. */}
+      {sites.isError && (
+        <QueryError
+          error={sites.error}
+          onRetry={sites.refetch}
+          fallback="Could not load your sites."
+        />
       )}
       {sites.data && sites.data.length === 0 && (
         <p className="rounded-xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
@@ -94,9 +123,11 @@ export default function SiteDashboardPage() {
             </p>
           )}
           {widgets.isError && (
-            <p className="text-sm text-red-600" role="alert">
-              Could not load this site’s figures.
-            </p>
+            <QueryError
+              error={widgets.error}
+              onRetry={widgets.refetch}
+              fallback="Could not load this site’s figures."
+            />
           )}
 
           {cards.length > 0 && (
