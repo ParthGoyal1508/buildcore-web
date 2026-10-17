@@ -226,9 +226,12 @@ export default function AssetRegisterPage() {
         const alerts = row.alertDocumentTypes;
         return alerts.length > 0 ? (
           <span title={alerts.join(', ')}>
+            {/* A list of paperwork, not a one-word status: it wraps, or on a phone it pushed the
+                whole register wider than the screen (036 Wave 5). */}
             <StatusBadge
               tone="warning"
               label={alerts.join(', ')}
+              className="max-w-full !whitespace-normal"
             />
           </span>
         ) : (
