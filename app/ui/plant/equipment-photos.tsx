@@ -72,7 +72,7 @@ export function EquipmentThumb({
       role="img"
       aria-label={photoId ? `${alt} (loading)` : `${alt}: no photo`}
       className={clsx(
-        'flex items-center justify-center rounded-md bg-gray-100 text-gray-400',
+        'flex items-center justify-center rounded-md bg-gray-100 text-gray-500',
         photoId && image.isPending && 'animate-pulse',
         className,
       )}
