@@ -13,6 +13,7 @@ import {
   getLetterPrefill,
   getSignatories,
   letterFileName,
+  previewLetter,
   type IssuedLetter,
   type LetterKind,
   type PrefilledLetterField,
@@ -25,6 +26,8 @@ import {
 import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import QueryError from '@/app/ui/query-error';
 import {
   FormError,
   SecondaryButton,
@@ -138,6 +141,16 @@ export function useOfferableLetterKinds(
     );
   return { kinds: offerable, isPending: kinds.isPending || user.isPending };
 }
+
+/**
+ * 036 J3 (2026-10-17): the fields that hold a paragraph rather than a phrase — an address, the
+ * responsibilities of a post, a reason for leaving, the particulars of a settlement. Decided once
+ * when the form opens (by token, or by a pre-filled value already too long for one line), never
+ * while typing: the box used to turn from an input into a textarea at the 81st character, and the
+ * swap threw the cursor out of the field mid-word.
+ */
+const PARAGRAPH_TOKEN =
+  /address|responsibilit|reason|remark|detail|particulars|benefits|basis|scope|terms|duties|notes?$/i;
 
 /** What the employee record fills in when it holds no gender (2026-10-15). */
 const NEUTRAL_FORMS: Record<string, string> = {
@@ -345,17 +358,21 @@ function LetterForm({
     );
   }
   if (prefill.isError) {
-    const message =
-      prefill.error instanceof ApiError && prefill.error.code
-        ? prefill.error.message
-        : COPY.prefillFailed;
-    return <FormError message={message} />;
+    // 036 J1 (2026-10-17): with a Retry — the form could only be got back by closing the dialog.
+    return (
+      <QueryError
+        error={prefill.error}
+        fallback={COPY.prefillFailed}
+        onRetry={prefill.refetch}
+      />
+    );
   }
 
   return (
     <LetterFields
       kind={kind}
       submit={submit}
+      preview={(submission) => previewLetter({ ...submission, ...recipient })}
       fields={prefill.data.fields}
       signatories={activeSignatories}
       signatoriesPending={kind.requiresSignature && signatories.isPending}
@@ -376,6 +393,7 @@ function LetterForm({
 function LetterFields({
   kind,
   submit,
+  preview,
   fields,
   signatories,
   signatoriesPending,
@@ -385,6 +403,8 @@ function LetterFields({
 }: {
   kind: LetterKind;
   submit: LetterSubmit;
+  /** The letter as it would be issued, from what is in the form now — writes nothing. */
+  preview: (submission: LetterSubmission) => Promise<Blob>;
   fields: PrefilledLetterField[];
   signatories: { id: string; name: string; title: string }[];
   signatoriesPending: boolean;
@@ -401,6 +421,17 @@ function LetterFields({
   const [flagged, setFlagged] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [paragraphs] = useState(
+    () =>
+      new Set(
+        fields
+          .filter((f) => PARAGRAPH_TOKEN.test(f.token) || f.value.length > 80)
+          .map((f) => f.token),
+      ),
+  );
+  // 036 J2 (2026-10-17): the draft read before anything is issued, in the page's own viewer. There
+  // was no preview here at all — the first sight of the letter was the issued, numbered one.
+  const { view, viewer } = useFileViewer();
 
   const fromRecords = fields.filter(
     (f) => f.sourceType !== 'manual' && f.value.trim() !== '',
@@ -422,6 +453,19 @@ function LetterFields({
     }
     return out;
   };
+
+  const submission = (): LetterSubmission => ({
+    letterKindKey: kind.key,
+    variables: overrides(),
+    signatoryId: kind.requiresSignature ? effectiveSignatory : undefined,
+  });
+
+  const showDraft = () =>
+    void view({
+      title: `${kind.label} — draft`,
+      fileName: `${kind.label} (draft).pdf`,
+      load: () => preview(submission()),
+    });
 
   const issue = async () => {
     setError(null);
@@ -448,13 +492,21 @@ function LetterFields({
       return;
     }
     setFlagged([]);
+    // 036 J3 (2026-10-17): an ungated kind is issued by this call and numbered for good, so it asks
+    // first. One that goes for approval is numbered only when it is finally issued.
+    if (!kind.requiresApproval) {
+      const ok = await confirmDialog({
+        title: `Issue this ${kind.label.toLowerCase()}?`,
+        message:
+          'Issuing gives it a permanent reference number, and it cannot be edited afterwards — a correction means reissuing it as a new version. Preview it first if you have not.',
+        confirmLabel: COPY.issue,
+        tone: 'default',
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     try {
-      const letter = await submit({
-        letterKindKey: kind.key,
-        variables: overrides(),
-        signatoryId: kind.requiresSignature ? effectiveSignatory : undefined,
-      });
+      const letter = await submit(submission());
       onIssued(letter);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -484,7 +536,7 @@ function LetterFields({
       (values[f.token] ?? '').trim() !== f.value.trim() &&
       (values[f.token] ?? '').trim() !== '';
     const value = values[f.token] ?? '';
-    const long = value.length > 80;
+    const long = paragraphs.has(f.token);
     const common = {
       id,
       value,
@@ -603,10 +655,14 @@ function LetterFields({
         ))}
 
       <FormError message={error} />
+      {viewer}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <SecondaryButton type="button" onClick={onCancel}>
           Cancel
+        </SecondaryButton>
+        <SecondaryButton type="button" disabled={busy} onClick={showDraft}>
+          Preview
         </SecondaryButton>
         {/*
           `intent="read"` because the route's write permission is the wrong gate here: whether
@@ -616,9 +672,8 @@ function LetterFields({
         <Button
           intent="read"
           type="button"
-          disabled={
-            busy || (kind.requiresSignature && signatories.length === 0)
-          }
+          loading={busy}
+          disabled={kind.requiresSignature && signatories.length === 0}
           onClick={() => void issue()}
         >
           {busy

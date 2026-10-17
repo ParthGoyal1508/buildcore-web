@@ -10,11 +10,18 @@ import type { IssuedLetter, LetterKind, Signatory } from '@/app/lib/api/letters'
 import { LETTER_COPY } from '@/app/lib/constants';
 import ActionReview from '@/app/ui/approvals/action-review';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import {
   FormError,
   SelectField,
   TextField,
+  fieldClass,
 } from '@/app/ui/settings/form-fields';
+
+/** Fields that hold a paragraph rather than a phrase (036 J3) — by the variable's name. */
+const PARAGRAPH_FIELD =
+  /body|paragraph|address|responsibilit|reason|remark|detail|particulars|scope|terms|notes?$/i;
 
 /** One variable the template expects, resolved from the server (FR-011). */
 export interface LetterField {
@@ -38,7 +45,15 @@ interface LetterComposerProps {
     signatoryId?: string,
   ) => Promise<unknown>;
   onIssue: (values: Record<string, string>) => Promise<unknown>;
-  onPreview?: () => Promise<Blob>;
+  /**
+   * The letter as it would be issued from what is typed now — `POST /letters/preview` before it is
+   * composed, `GET /letters/:id/preview` after (036 J2). Offered before composing too: the first
+   * sight of a letter should not be the numbered one.
+   */
+  onPreview?: (
+    values: Record<string, string>,
+    signatoryId?: string,
+  ) => Promise<Blob>;
   entityLabel: string;
   onDecided?: () => void;
 }
@@ -111,15 +126,42 @@ export function LetterComposer({
     }
   };
 
-  const preview = async () => {
+  // 036 J2 (2026-10-17): in the page's own viewer. This opened a new tab after the fetch had
+  // finished, which Safari blocks as a pop-up — so on an iPad Preview did nothing at all.
+  const { view, viewer } = useFileViewer();
+  const preview = () => {
     if (!onPreview) return;
-    await run(async () => {
-      const blob = await onPreview();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    }, LETTER_COPY.previewFailed);
+    void view({
+      title: `${kind.label} — draft`,
+      fileName: `${kind.label} (draft).pdf`,
+      load: async () => {
+        try {
+          return await onPreview(
+            values,
+            kind.requiresSignature ? signatoryId : undefined,
+          );
+        } catch (err) {
+          const code = (err as { code?: string } | null)?.code;
+          throw new Error(
+            code && err instanceof Error ? err.message : LETTER_COPY.previewFailed,
+          );
+        }
+      },
+    });
   };
+
+  /**
+   * 036 J3 (2026-10-17): issuing gives the letter its permanent reference number, and an issued
+   * letter cannot be edited — so it is asked once, not done on one click.
+   */
+  const confirmIssue = () =>
+    confirmDialog({
+      title: `Issue this ${kind.label.toLowerCase()}?`,
+      message:
+        'Issuing gives it a permanent reference number, and it cannot be edited afterwards — a correction means reissuing it as a new version. Preview it first if you have not.',
+      confirmLabel: 'Issue',
+      tone: 'default',
+    });
 
   const missingRequired = fields
     .filter((f) => f.required && !(values[f.name] ?? '').trim())
@@ -128,15 +170,37 @@ export function LetterComposer({
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        {fields.map((field) => (
-          <TextField
-            key={field.name}
-            id={`letter-field-${field.name}`}
-            label={field.required ? `${field.label} (required)` : field.label}
-            value={values[field.name] ?? ''}
-            onChange={(e) => setValue(field.name, e.target.value)}
-          />
-        ))}
+        {fields.map((field) => {
+          const props = {
+            id: `letter-field-${field.name}`,
+            label: field.required ? `${field.label} (required)` : field.label,
+            value: values[field.name] ?? '',
+          };
+          // A paragraph gets a box that shows it (036 J3): a body, an address, the terms.
+          return PARAGRAPH_FIELD.test(field.name) ? (
+            <div key={field.name} className="sm:col-span-2">
+              <label
+                htmlFor={props.id}
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                {props.label}
+              </label>
+              <textarea
+                id={props.id}
+                rows={4}
+                value={props.value}
+                onChange={(e) => setValue(field.name, e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+          ) : (
+            <TextField
+              key={field.name}
+              {...props}
+              onChange={(e) => setValue(field.name, e.target.value)}
+            />
+          );
+        })}
       </div>
 
       {kind.requiresSignature && (
@@ -156,6 +220,7 @@ export function LetterComposer({
       )}
 
       <FormError message={error} />
+      {viewer}
 
       {/* The gated case. `ActionReview` says who is being waited on; there is no Issue
           control beside it, because the server would refuse one. */}
@@ -183,8 +248,8 @@ export function LetterComposer({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {onPreview && letter && (
-          <Button intent="read" type="button" onClick={() => void preview()} disabled={busy}>
+        {onPreview && (
+          <Button intent="read" type="button" onClick={preview} disabled={busy}>
             Preview
           </Button>
         )}
@@ -192,8 +257,11 @@ export function LetterComposer({
         {letter === null && (
           <Button
             type="button"
-            disabled={busy || missingRequired.length > 0}
-            onClick={() =>
+            loading={busy}
+            disabled={missingRequired.length > 0}
+            onClick={async () => {
+              // An ungated kind is issued by compose itself.
+              if (!kind.requiresApproval && !(await confirmIssue())) return;
               void run(
                 () =>
                   onCompose(
@@ -201,8 +269,8 @@ export function LetterComposer({
                     kind.requiresSignature ? signatoryId : undefined,
                   ),
                 LETTER_COPY.issueFailed,
-              )
-            }
+              );
+            }}
           >
             {kind.requiresApproval ? 'Submit for approval' : 'Issue'}
           </Button>
@@ -214,10 +282,11 @@ export function LetterComposer({
           chainIsComplete && (
             <Button
               type="button"
-              disabled={busy}
-              onClick={() =>
-                void run(() => onIssue(values), LETTER_COPY.issueFailed)
-              }
+              loading={busy}
+              onClick={async () => {
+                if (!(await confirmIssue())) return;
+                void run(() => onIssue(values), LETTER_COPY.issueFailed);
+              }}
             >
               Issue
             </Button>
