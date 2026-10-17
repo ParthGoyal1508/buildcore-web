@@ -11,6 +11,7 @@ import {
   getSalaryRegister,
   saveBlob,
   setPayrollRunStatus,
+  unsubmittedRunOf,
   type PayrollLineItem,
 } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES, MESSAGES } from '@/app/lib/constants';
@@ -21,6 +22,7 @@ import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
 import SlipDelivery from '@/app/ui/hr/slip-delivery';
+import SubmitRunApproval from '@/app/ui/hr/submit-run-approval';
 import TransactionReconciliation from '@/app/ui/hr/transaction-reconciliation';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
@@ -56,6 +58,8 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabId>('lines');
   const [error, setError] = useState<string | null>(null);
+  // A run never put into its approval chain: the bank sheet refusal offers to submit it.
+  const [unsubmittedRun, setUnsubmittedRun] = useState<string | null>(null);
 
   const {
     data: run,
@@ -93,7 +97,10 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
       const { blob, filename } = await downloadBankSheet(runId);
       saveBlob(blob, filename);
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      setError(err.message);
+      setUnsubmittedRun(unsubmittedRunOf(err));
+    },
   });
 
   const exportRegister = useMutation({
@@ -282,6 +289,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
       </div>
 
       <FormError message={error} />
+      {unsubmittedRun && <SubmitRunApproval runId={unsubmittedRun} />}
 
       {run.exceptions && run.exceptions.length > 0 && (
         <div

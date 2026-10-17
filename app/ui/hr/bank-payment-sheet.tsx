@@ -15,6 +15,7 @@ import {
   getSalaryBankSheetPreview,
   type BankSheetPreview,
   type SalaryBankSheetQuery,
+  unsubmittedRunOf,
 } from '@/app/lib/api/hr-payroll';
 import { ROUTES } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
@@ -25,6 +26,7 @@ import {
   thisMonth,
   yearMonthOf,
 } from '@/app/ui/hr/company-month-fields';
+import SubmitRunApproval from '@/app/ui/hr/submit-run-approval';
 import {
   FormError,
   SecondaryButton,
@@ -45,6 +47,7 @@ export default function BankPaymentSheet() {
   const [debitAccount, setDebitAccount] = useState('');
   const [preview, setPreview] = useState<BankSheetPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unsubmittedRun, setUnsubmittedRun] = useState<string | null>(null);
 
   const query = (): SalaryBankSheetQuery => ({
     ...yearMonthOf(month),
@@ -64,6 +67,7 @@ export default function BankPaymentSheet() {
     onError: (e) => {
       setPreview(null);
       setError(messageOf(e, 'Could not check the payroll for that month.'));
+      setUnsubmittedRun(unsubmittedRunOf(e));
     },
   });
 
@@ -77,6 +81,7 @@ export default function BankPaymentSheet() {
   const reset = () => {
     setPreview(null);
     setError(null);
+    setUnsubmittedRun(null);
   };
 
   const debitInvalid =
@@ -99,6 +104,11 @@ export default function BankPaymentSheet() {
         Finalised payroll only, net pay above zero, in the bank&rsquo;s upload format.
       </p>
       <FormError message={error} />
+      {unsubmittedRun && (
+        <div className="mt-2">
+          <SubmitRunApproval runId={unsubmittedRun} />
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <CompanyMonthFields
           idPrefix="bps"
@@ -137,6 +147,7 @@ export default function BankPaymentSheet() {
             disabled={!month || !!debitInvalid || check.isPending}
             onClick={() => {
               setError(null);
+              setUnsubmittedRun(null);
               check.mutate();
             }}
           >
