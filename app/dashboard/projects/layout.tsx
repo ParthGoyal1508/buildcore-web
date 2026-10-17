@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
 import {
-  MESSAGES,
   PROJECTS_PERMISSIONS,
   ROUTES,
   type ProjectsSection,
 } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import ProjectsNav from '@/app/ui/projects/projects-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -62,7 +62,7 @@ export default function ProjectsLayout({
   // Can't confirm who this is, so can't confirm they may be here. The API would
   // refuse them anyway; this just avoids rendering the page first.
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   // The Projects index lists only the sections the user can reach, so it needs no

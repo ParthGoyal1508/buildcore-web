@@ -3,8 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
-import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import RedirectHome from '@/app/ui/redirect-home';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -47,7 +46,7 @@ export default function DashboardPermissionGuard({
   }
 
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   // Refused by URL: home rather than a dead end (2026-10-16 access-control audit, M1).

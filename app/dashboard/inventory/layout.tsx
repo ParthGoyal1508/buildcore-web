@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import InventoryNav from '@/app/ui/inventory/inventory-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -58,7 +59,7 @@ export default function InventoryLayout({
   }
 
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   if (needsApprove && !user.permissions.includes('INVENTORY_APPROVE')) {

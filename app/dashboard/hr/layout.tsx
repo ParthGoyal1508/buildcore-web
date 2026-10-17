@@ -6,11 +6,10 @@ import { usePathname } from 'next/navigation';
 import { getCurrentUser } from '@/app/lib/api/users';
 import {
   HR_PERMISSIONS,
-  MESSAGES,
   ROUTES,
   type HrSection,
 } from '@/app/lib/constants';
-import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import RedirectHome from '@/app/ui/redirect-home';
 import HrNav from '@/app/ui/hr/hr-nav';
 import { LoadingText } from '@/app/ui/spinner';
@@ -47,7 +46,7 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   // The HR index lists only the areas the user can reach, so it needs no

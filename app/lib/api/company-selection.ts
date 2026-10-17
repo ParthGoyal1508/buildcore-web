@@ -3,6 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import {
+  abandonOwnSwitch,
+  beginOwnSwitch,
+  noteCompanyList,
+} from '@/app/lib/company-tab';
 import { authFetch } from '@/app/lib/session';
 
 /**
@@ -59,9 +64,13 @@ const selectableResponseSchema = z.array(selectableCompanySchema);
 
 /** The companies the caller may work in. One element means no switcher (FR-001). */
 export async function listSelectableCompanies(): Promise<SelectableCompany[]> {
-  return selectableResponseSchema.parse(
+  const companies = selectableResponseSchema.parse(
     await authFetch<unknown>('/settings/companies/selectable'),
   );
+  // The first answer is what this tab believes; a later one naming another company means another
+  // tab switched, and raises the banner rather than being adopted silently (036 B17).
+  noteCompanyList(companies);
+  return companies;
 }
 
 /**
@@ -90,13 +99,23 @@ export async function setCompanySelection(
    * the response is not the second source of truth the note above warns about: it is the very
    * list the switcher renders from, returned by the call that changed it.
    */
-  return selectableResponseSchema.parse(
-    await authFetch<unknown>('/my/company-selection', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId }),
-    }),
-  );
+  // This tab's own switch: responses racing it are not another tab's doing, and the answer becomes
+  // what this tab believes and is broadcast to the others (036 B17).
+  beginOwnSwitch();
+  try {
+    const companies = selectableResponseSchema.parse(
+      await authFetch<unknown>('/my/company-selection', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId }),
+      }),
+    );
+    noteCompanyList(companies, true);
+    return companies;
+  } catch (err) {
+    abandonOwnSwitch();
+    throw err;
+  }
 }
 
 /**

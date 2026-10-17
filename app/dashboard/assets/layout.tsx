@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { ASSETS_PERMISSIONS, MESSAGES, ROUTES } from '@/app/lib/constants';
+import { ASSETS_PERMISSIONS, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import AssetsNav from '@/app/ui/assets/assets-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -63,7 +64,7 @@ export default function AssetsLayout({
   }
 
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   if (required && !user.permissions.includes(required.permission as never)) {

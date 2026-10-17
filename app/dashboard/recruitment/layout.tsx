@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import RecruitmentNav from '@/app/ui/recruitment/recruitment-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -40,7 +41,7 @@ export default function RecruitmentLayout({
     );
   }
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   const canSeeReports = user.permissions.includes('REPORTS');

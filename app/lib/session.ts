@@ -3,8 +3,10 @@ import {
   apiFetchBlob,
   apiFetchFile,
   ApiError,
+  type ApiInit,
   type StoredFile,
 } from './api/client';
+import { expectedCompanyHeaders } from './company-tab';
 import { SESSION_COOKIE_MISSING, SESSION_EXPIRED, SESSION_REVOKED } from './session-codes';
 import { ROUTES } from './constants';
 
@@ -131,7 +133,7 @@ export function consumeJustLoggedIn(): boolean {
  * failure, clears the session and sends the user back to /login (spec edge
  * cases: expired access token mid-session, revoked/expired refresh token).
  */
-export async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function authFetch<T>(path: string, init?: ApiInit): Promise<T> {
   return withAuth(path, init, apiFetch<T>);
 }
 
@@ -143,7 +145,7 @@ export async function authFetch<T>(path: string, init?: RequestInit): Promise<T>
  */
 export async function authFetchBlob(
   path: string,
-  init?: RequestInit,
+  init?: ApiInit,
 ): Promise<Blob> {
   return withAuth(path, init, apiFetchBlob);
 }
@@ -156,7 +158,7 @@ export async function authFetchBlob(
  */
 export async function authFetchFile(
   path: string,
-  init?: RequestInit,
+  init?: ApiInit,
 ): Promise<StoredFile> {
   return withAuth(path, init, apiFetchFile);
 }
@@ -220,16 +222,19 @@ let sessionEnded = false;
 
 async function withAuth<T>(
   path: string,
-  init: RequestInit | undefined,
-  run: (path: string, init?: RequestInit) => Promise<T>,
+  init: ApiInit | undefined,
+  run: (path: string, init?: ApiInit) => Promise<T>,
 ): Promise<T> {
   if (sessionEnded) {
     throw new ApiError('Your session has ended.', 401, SESSION_EXPIRED);
   }
-  const withAuthHeader = (token: string | null): RequestInit => ({
+  const withAuthHeader = (token: string | null): ApiInit => ({
     ...init,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // The company this tab believes it is in, so the server can refuse a save from a tab that
+      // another tab has since switched (036 B17). Absent until the company list has loaded.
+      ...expectedCompanyHeaders(),
       ...init?.headers,
     },
   });

@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import LabourNav from '@/app/ui/labour/labour-nav';
 import { FullPageLoader } from '@/app/ui/shell-gate';
@@ -50,7 +51,7 @@ export default function LabourFieldLayout({
     return <FullPageLoader />;
   }
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
   if (!user.permissions.includes('DAILY_WORKER_REGISTRY')) {
     return (

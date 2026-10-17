@@ -3,8 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import { LoadingText } from '@/app/ui/spinner';
 
 /**
@@ -42,7 +42,7 @@ export default function SectionGuard({
     );
   }
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
   if (!user.permissions.includes(permission)) {
     return <AccessDenied />;

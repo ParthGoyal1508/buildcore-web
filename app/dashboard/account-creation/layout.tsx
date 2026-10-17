@@ -3,8 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
-import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import RedirectHome from '@/app/ui/redirect-home';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -33,7 +32,7 @@ export default function AccountCreationLayout({
       </p>
     );
   }
-  if (isError || !user) return <AccessDenied detail={MESSAGES.loadFailed} />;
+  if (isError || !user) return <WorkspaceLoadError />;
   if (!user.permissions.includes('USER_MANAGEMENT')) return <RedirectHome />;
   return <>{children}</>;
 }

@@ -3,8 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { SETTINGS_PERMISSIONS, MESSAGES, ROUTES } from '@/app/lib/constants';
+import { SETTINGS_PERMISSIONS, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import SettingsNav from '@/app/ui/settings/settings-nav';
 import { maySettingsAdministerUsers } from '@/app/ui/settings/sections';
 import { LoadingText } from '@/app/ui/spinner';
@@ -51,7 +52,7 @@ export default function SettingsLayout({
   // Can't confirm who this is, so can't confirm they may be here. The API would
   // refuse them anyway; this just avoids rendering the page first.
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   // The Settings index itself lists only the sections the user can reach, so it
