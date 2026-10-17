@@ -13,6 +13,8 @@ import {
   setBillAdjustments,
 } from '@/app/lib/api/bill-packages';
 import { Button } from '@/app/ui/button';
+import { projectErrorMessage } from '@/app/ui/projects/project-lock-context';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The month's recoveries, deductions and withholdings (025 FR-044).
@@ -67,28 +69,34 @@ export default function BillAdjustments({
     {},
   );
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const save = useMutation({
     mutationFn: () => setBillAdjustments(packageId, edits),
     onSuccess: () => {
       setError(null);
       setEdits({});
+      toast.success('Figures saved.');
       onSaved();
     },
+    // `edits` is left alone on a refusal, so what was typed is still there to correct (036 Wave 3).
     onError: (err: unknown) =>
       setError(
-        (err as { message?: string })?.message ??
+        projectErrorMessage(
+          err,
           'Those figures were refused and the server gave no reason.',
+        ),
       ),
   });
 
   const field = (key: BillAdjustmentKey, label: string) => (
     <label key={key} className="flex items-center justify-between gap-3 text-sm">
       <span className="text-gray-700">{label}</span>
+      {/* Text with a decimal keypad (036 Wave 3): the box shows exactly what was typed. */}
       <input
-        type="number"
-        step="0.01"
+        type="text"
         inputMode="decimal"
+        autoComplete="off"
         value={edits[key] ?? stored(key)}
         onChange={(event) =>
           setEdits((current) => ({ ...current, [key]: event.target.value }))
@@ -191,7 +199,8 @@ export default function BillAdjustments({
       <div className="mt-4 flex items-center gap-3">
         <Button
           type="button"
-          disabled={save.isPending || Object.keys(edits).length === 0}
+          loading={save.isPending}
+          disabled={Object.keys(edits).length === 0}
           onClick={() => save.mutate()}
         >
           {save.isPending ? 'Saving…' : 'Save figures'}

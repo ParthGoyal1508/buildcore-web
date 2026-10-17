@@ -190,7 +190,7 @@ export default function BillDeductionLines({
           Add a line
         </SecondaryButton>
         {dirty && (
-          <Button onClick={() => void save()} disabled={saving}>
+          <Button onClick={() => void save()} loading={saving}>
             {saving ? 'Saving…' : 'Save lines'}
           </Button>
         )}

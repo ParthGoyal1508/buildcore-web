@@ -9,6 +9,8 @@ import {
   removeNonBoqItem,
   updateNonBoqItem,
 } from '@/app/lib/api/bill-packages';
+import { productRounded } from '@/app/lib/bill-totals';
+import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
 import {
@@ -81,8 +83,8 @@ export function AddNonBoqItem({
       <div className="flex gap-2">
         <Button
           type="submit"
+          loading={saving}
           disabled={
-            saving ||
             !draft.description.trim() ||
             !draft.unit.trim() ||
             !isNumber(draft.quantity) ||
@@ -153,8 +155,8 @@ export function NonBoqItemEditor({
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
+          loading={busy}
           disabled={
-            busy ||
             !draft.description.trim() ||
             !draft.unit.trim() ||
             !isNumber(draft.rate)
@@ -218,12 +220,11 @@ function ItemFields({
   onChange: (next: NonBoqItemInput) => void;
   withQuantity?: boolean;
 }) {
+  // On `bill-totals.ts`'s decimal product (036 Wave 3, 2026-10-18), the rounding the server prices
+  // the line with — the float product showed 10.05 × 0.5 as 5.02 against the bill's 5.03.
   const preview =
     isNumber(draft.quantity) && isNumber(draft.rate)
-      ? (Number(draft.quantity) * Number(draft.rate)).toLocaleString('en-IN', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
+      ? rupees(productRounded(2, Number(draft.quantity), Number(draft.rate)))
       : '—';
   return (
     <div className="grid gap-3 sm:grid-cols-6">
@@ -267,7 +268,7 @@ function ItemFields({
       {withQuantity && (
         <div className="flex flex-col justify-end sm:col-span-6">
           <p className="text-sm text-gray-700">
-            Amount: <strong className="tabular-nums">₹{preview}</strong>
+            Amount: <strong className="tabular-nums">{preview}</strong>
           </p>
         </div>
       )}
