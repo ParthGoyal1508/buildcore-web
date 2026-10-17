@@ -34,6 +34,38 @@ const config: Config = {
         'pop-up': 'pop-up 140ms ease-out',
         'fade-in': 'fade-in 160ms ease-out',
         'top-loader': 'top-loader 1.1s ease-in-out infinite',
+        shimmer: 'shimmer 1.6s ease-in-out infinite',
+      },
+      /**
+       * Under `extend` since 036 A21. It used to sit beside `extend`, which *replaces* Tailwind's
+       * keyframes rather than adding to them — `animate-spin`, `animate-pulse`, `animate-ping` and
+       * `animate-bounce` lost theirs, and two had been patched back by hand. Extending keeps the
+       * built-ins and adds ours.
+       */
+      keyframes: {
+        // The popups' entrance (2026-10-15): a short drop and fade from the edge they open on.
+        'pop-down': {
+          from: { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'pop-up': {
+          from: { opacity: '0', transform: 'translateY(4px) scale(0.98)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        // The top loading bar: a third of the width sweeping across, again and again.
+        'top-loader': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(300%)' },
+        },
+        // A highlight sweeping across a placeholder (`animate-shimmer`, 036 A21). The keyframes
+        // had been defined since the tutorial with no utility to use them.
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
       },
       gridTemplateColumns: {
         '13': 'repeat(13, minmax(0, 1fr))',
@@ -59,8 +91,18 @@ const config: Config = {
          * ring on white 9.4:1, 800 text on a 100 badge 14.0:1 — all well past WCAG AA,
          * which the old vivid #0070F3 focus ring (3.4:1) barely cleared.
          */
+        //
+        // **Transitional since 036 A21.** Every `blue-*` class in the app was rewritten to
+        // `brand-*` (the same colours, so nothing moved), apart from the files another stream owned
+        // at the time. Once those are migrated this line goes, `blue` becomes Tailwind's own blue
+        // again, and the lint rule in `eslint.config.mjs` keeps `blue-*`-as-brand from returning.
         blue: brand,
-        brand,
+        brand: {
+          ...brand,
+          /** brand-50 at 60% over white, made opaque — a sticky table cell's hover, which must not
+           * let the row beneath show through (was the one-off `bg-[#f5fafd]`). */
+          wash: '#f5fafd',
+        },
         /**
          * The colour pass (2026-10-14 — "Use a more colourful palette; the current look feels
          * washed out").
@@ -86,38 +128,11 @@ const config: Config = {
         success: colors.emerald,
         warning: colors.amber,
         danger: colors.rose,
-      },
-    },
-    keyframes: {
-      // The popups' entrance (2026-10-15): a short drop and fade from the edge they open on.
-      'pop-down': {
-        from: { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
-        to: { opacity: '1', transform: 'none' },
-      },
-      'pop-up': {
-        from: { opacity: '0', transform: 'translateY(4px) scale(0.98)' },
-        to: { opacity: '1', transform: 'none' },
-      },
-      'fade-in': {
-        from: { opacity: '0' },
-        to: { opacity: '1' },
-      },
-      // The top loading bar: a third of the width sweeping across, again and again.
-      'top-loader': {
-        from: { transform: 'translateX(-100%)' },
-        to: { transform: 'translateX(300%)' },
-      },
-      spin: {
-        to: { transform: 'rotate(360deg)' },
-      },
-      // `theme.keyframes` replaces Tailwind's defaults, so `animate-pulse` needs its own.
-      pulse: {
-        '50%': { opacity: '0.5' },
-      },
-      shimmer: {
-        '100%': {
-          transform: 'translateX(100%)',
-        },
+        // The fourth state (036 A21): "known about, nothing wrong" — a submitted indent, a
+        // verified bill. The brand ramp itself, so an informational badge reads as the app's own
+        // colour rather than as a fifth hue.
+        info: brand,
+        neutral: colors.slate,
       },
     },
   },
