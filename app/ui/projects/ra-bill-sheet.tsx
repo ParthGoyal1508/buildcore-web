@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
@@ -13,8 +13,17 @@ import {
 } from '@/app/lib/api/billing';
 import { billTotals, lineTotals, retentionOn } from '@/app/lib/bill-totals';
 import { BILLING_COPY } from '@/app/lib/constants';
-import { rupees, todayIso } from '@/app/lib/format';
+import { quantity3, rupees, todayIso, unitRate } from '@/app/lib/format';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import { Button } from '@/app/ui/button';
+import {
+  isProjectLockedError,
+  PROJECT_LOCKED_MESSAGE,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   SecondaryButton,
@@ -28,6 +37,20 @@ import { TABLE } from '@/app/ui/table';
  */
 const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
 const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
+
+/**
+ * A this-period quantity as typed: digits, at most one point, at most three decimals (036 I14).
+ * Empty is allowed and means "not measured". The API stores these at 3dp, so a fourth decimal
+ * would be rounded away silently — refused here instead, where the person can see it.
+ */
+const QUANTITY_PATTERN = /^\d*(\.\d{0,3})?$/;
+
+/** The number a typed quantity stands for; 0 for empty or unparseable (never NaN in a total). */
+function parseQuantity(raw: string | undefined): number {
+  if (!raw || !QUANTITY_PATTERN.test(raw)) return 0;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
 
 /**
  * The subcontractor RA bill sheet (018 US2, FR-007 to FR-009 — `bugs.md` item 12).
@@ -80,17 +103,23 @@ export default function RaBillSheet({
     queryFn: () => getAward(workOrderId, revising?.id),
   });
 
-  const [quantities, setQuantities] = useState<Record<string, number>>(() =>
+  /**
+   * 036 I14 (2026-10-18): the quantity **as typed**, one string per line, parsed only for the
+   * arithmetic. It was a number rendered back into a `type="number"` box, so typing 10.05 was
+   * impossible: "10.0" parsed to 10, re-rendered as "10", and the next keystroke made it 105. The
+   * bill-package sheet's `bill-line-row.tsx` keeps a raw string for the same reason.
+   */
+  const [initialRaw, setInitialRaw] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      (revising?.lines ?? []).map((line) => [
-        line.workOrderBoqItemId,
-        line.thisPeriodQty,
-      ]),
+      (revising?.lines ?? [])
+        .filter((line) => line.thisPeriodQty > 0)
+        .map((line) => [line.workOrderBoqItemId, String(line.thisPeriodQty)]),
     ),
   );
-  const [billingDate, setBillingDate] = useState(
-    revising ? revising.billingDate.slice(0, 10) : todayIso(),
-  );
+  const [rawQuantities, setRawQuantities] =
+    useState<Record<string, string>>(initialRaw);
+  const initialDate = revising ? revising.billingDate.slice(0, 10) : todayIso();
+  const [billingDate, setBillingDate] = useState(initialDate);
   // Read from the bill being revised, never typed. 028 FR-004 closed these as inputs; a bill that
   // already carries them keeps them, and the server carries them forward across a revision rather
   // than recomputing them from an input that no longer exists.
@@ -102,14 +131,48 @@ export default function RaBillSheet({
   /** A rejected save caused by somebody else's change (FR-014). Nothing typed is discarded. */
   const [conflict, setConflict] = useState(false);
 
-  const setQuantity = useCallback((id: string, value: number) => {
-    setQuantities((previous) => {
+  const { isLocked } = useProjectLock();
+  const toast = useToast();
+
+  const setQuantity = useCallback((id: string, value: string) => {
+    setRawQuantities((previous) => {
       const next = { ...previous };
-      if (value > 0) next[id] = value;
+      if (value.trim() !== '') next[id] = value.trim();
       else delete next[id];
       return next;
     });
   }, []);
+
+  // The parsed figures, for the arithmetic and the payload. A line whose text is not a valid
+  // quantity counts as 0 here and blocks the save below, so a half-typed "1.2.3" is never sent.
+  const quantities: Record<string, number> = Object.fromEntries(
+    Object.entries(rawQuantities)
+      .map(([id, raw]) => [id, parseQuantity(raw)] as const)
+      .filter(([, value]) => value > 0),
+  );
+  const invalidLines = Object.values(rawQuantities).filter(
+    (raw) => !QUANTITY_PATTERN.test(raw),
+  ).length;
+
+  /**
+   * 036 I14: an unsaved-changes guard. A sheet of typed quantities was lost to a reload or a closed
+   * tab without a word. Dirty = any line's figure, the date or the reason differs from what the
+   * sheet opened with; compared as numbers, so "10" → "10.0" is not a change.
+   */
+  const isDirty =
+    Object.keys({ ...initialRaw, ...rawQuantities }).some(
+      (id) => parseQuantity(rawQuantities[id]) !== parseQuantity(initialRaw[id]),
+    ) ||
+    invalidLines > 0 ||
+    billingDate !== initialDate ||
+    reason.trim() !== '';
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty]);
+  useUnsavedChanges('RA bill sheet', isDirty);
 
   const lines = award.data?.lines ?? [];
   const measured = lines.filter(
@@ -170,9 +233,26 @@ export default function RaBillSheet({
             ? BILLING_COPY.editDone
             : BILLING_COPY.reviseDone,
       );
-      if (!revising) setQuantities({});
+      toast.success(
+        !revising
+          ? 'The bill was composed as a draft.'
+          : isDraftEdit
+            ? BILLING_COPY.editDone
+            : BILLING_COPY.reviseDone,
+      );
+      if (!revising) {
+        setRawQuantities({});
+      } else {
+        // What was saved is the new baseline: the guard must stop warning about it.
+        setInitialRaw(rawQuantities);
+        setReason('');
+      }
     },
     onError: (err) => {
+      if (isProjectLockedError(err)) {
+        setError(PROJECT_LOCKED_MESSAGE);
+        return;
+      }
       if (err instanceof ApiError && err.status === 409) {
         setConflict(true);
         setError(err.message);
@@ -190,13 +270,28 @@ export default function RaBillSheet({
 
   if (award.isLoading) {
     return (
-      <p className="text-sm text-gray-500" role="status">
-        {BILLING_COPY.boqLoading}
-      </p>
+      <div role="status" aria-label={BILLING_COPY.boqLoading}>
+        <ListSkeleton
+          headers={[
+            BILLING_COPY.raColumns.description,
+            BILLING_COPY.raColumns.unit,
+            BILLING_COPY.raColumns.awardedQty,
+            BILLING_COPY.raColumns.thisPeriodQty,
+          ]}
+          rows={4}
+        />
+      </div>
     );
   }
   if (award.isError || !award.data) {
-    return <FormError message={BILLING_COPY.boqLoadFailed} />;
+    return (
+      <QueryError
+        compact
+        error={award.error}
+        fallback={BILLING_COPY.boqLoadFailed}
+        onRetry={award.refetch}
+      />
+    );
   }
   if (lines.length === 0) {
     return <p className="text-sm text-gray-600">{BILLING_COPY.raEmpty}</p>;
@@ -267,6 +362,8 @@ export default function RaBillSheet({
           <tbody>
             {lines.map((line) => {
               const entered = quantities[line.workOrderBoqItemId] ?? 0;
+              const typed = rawQuantities[line.workOrderBoqItemId] ?? '';
+              const typedInvalid = !QUANTITY_PATTERN.test(typed);
               const totalsForLine = lineTotals({
                 quantity: entered,
                 rate: line.rate,
@@ -290,12 +387,12 @@ export default function RaBillSheet({
                   <td
                     className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-600')}
                   >
-                    {line.awardedQty}
+                    {quantity3(line.awardedQty)}
                   </td>
                   <td
                     className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-600')}
                   >
-                    {line.toDateQty}
+                    {quantity3(line.toDateQty)}
                   </td>
                   <td
                     className={clsx(
@@ -306,28 +403,40 @@ export default function RaBillSheet({
                         : 'text-gray-600',
                     )}
                   >
-                    {totalsForLine.remainingQty}
+                    {quantity3(totalsForLine.remainingQty)}
                   </td>
                   <td
                     className={clsx(DENSE_TD, TABLE.numeric, 'text-gray-600')}
                   >
-                    {rupees(line.rate)}
+                    {/* A rate, not money: up to four decimals (`unitRate`), so it multiplies out to
+                        the amount beside it. */}
+                    {unitRate(line.rate)}
                   </td>
                   <td className={clsx(DENSE_TD, 'text-right')}>
+                    {/* 036 I14: text, not `type="number"` — the box shows exactly what was typed. */}
                     <input
-                      type="number"
-                      step="0.001"
-                      min="0"
+                      type="text"
                       inputMode="decimal"
+                      pattern="\d*(\.\d{0,3})?"
+                      autoComplete="off"
+                      disabled={isLocked}
                       aria-label={`${BILLING_COPY.raColumns.thisPeriodQty} — ${line.description}`}
-                      value={entered === 0 ? '' : String(entered)}
-                      onChange={(event) =>
-                        setQuantity(
-                          line.workOrderBoqItemId,
-                          Number(event.target.value) || 0,
-                        )
+                      aria-invalid={typedInvalid || undefined}
+                      title={
+                        typedInvalid
+                          ? 'A quantity, with up to three decimals — for example 10.05'
+                          : undefined
                       }
-                      className="w-24 rounded border border-gray-300 px-2 py-1 text-right text-sm tabular-nums"
+                      value={typed}
+                      onChange={(event) =>
+                        setQuantity(line.workOrderBoqItemId, event.target.value)
+                      }
+                      className={clsx(
+                        'w-24 rounded border px-2 py-1 text-right text-sm tabular-nums',
+                        typedInvalid
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-300',
+                      )}
                     />
                   </td>
                   <td
@@ -464,6 +573,13 @@ export default function RaBillSheet({
         </div>
       )}
 
+      {invalidLines > 0 && (
+        <p className="text-sm text-red-700" role="alert">
+          {invalidLines === 1
+            ? 'One quantity is not a number with up to three decimals. Correct it to save.'
+            : `${invalidLines} quantities are not numbers with up to three decimals. Correct them to save.`}
+        </p>
+      )}
       <FormError message={error} />
       {done && (
         <p className="text-sm text-green-800" role="status">
@@ -474,9 +590,11 @@ export default function RaBillSheet({
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button
           type="button"
+          loading={save.isPending}
           disabled={
+            isLocked ||
             measured.length === 0 ||
-            save.isPending ||
+            invalidLines > 0 ||
             (revising && !isDraftEdit ? reason.trim().length < 3 : false)
           }
           onClick={() => {
