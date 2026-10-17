@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
+  getEquipmentDetail,
   deleteServiceSchedule,
   getServiceSchedules,
   type ServiceSchedule,
@@ -16,9 +17,9 @@ import {
   plantLabel,
 } from '@/app/lib/constants';
 import Pager from '@/app/ui/inventory/pager';
+import { EquipmentPicker, equipmentOption } from '@/app/ui/plant/pickers';
 import ServiceScheduleModal from '@/app/ui/plant/service-schedule-modal';
 import {
-  usePlantEquipment,
   usePlantCompanyId,
 } from '@/app/ui/plant/use-plant-refs';
 import {
@@ -34,7 +35,7 @@ import { confirmDialog } from '@/app/ui/dialogs';
 
 export default function ServiceSchedulesPage() {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
+  // 036 K15: the filter is a server-searched picker; the chosen machine is named from its record.
 
   const searchParams = useSearchParams();
   // Seeded from the URL so the machine detail page can link straight to this list
@@ -44,6 +45,11 @@ export default function ServiceSchedulesPage() {
   const [equipmentId, setEquipmentId] = useState(
     searchParams.get('equipmentId') ?? '',
   );
+  const filterMachine = useQuery({
+    queryKey: ['plant', 'equipment', equipmentId],
+    queryFn: () => getEquipmentDetail(equipmentId),
+    enabled: Boolean(equipmentId),
+  });
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<ServiceSchedule | null>(null);
@@ -143,24 +149,21 @@ export default function ServiceSchedulesPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <SelectField
+        <EquipmentPicker
           id="services-filter-equipment"
           label="Machine"
+          emptyLabel="All machines"
           value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
+          selectedOption={
+            filterMachine.data ? equipmentOption(filterMachine.data) : null
+          }
+          onChange={(id) => {
+            setEquipmentId(id);
             // Back to the first page: narrowing the list while on page three
             // would show an empty screen for a filter that matches.
             setPage(1);
           }}
-        >
-          <option value="">All machines</option>
-          {(equipment.data ?? []).map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+        />
         <SelectField
           id="services-filter-status"
           label="Status"

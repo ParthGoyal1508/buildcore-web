@@ -4,7 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { getMaintenanceJobs, type MaintenanceJob } from '@/app/lib/api/plant';
+import {
+  getEquipmentDetail,
+  getMaintenanceJobs,
+  type MaintenanceJob,
+} from '@/app/lib/api/plant';
 import {
   MAINTENANCE_STATUSES,
   MAINTENANCE_TYPES,
@@ -13,12 +17,12 @@ import {
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import Pager from '@/app/ui/inventory/pager';
+import { EquipmentPicker, equipmentOption } from '@/app/ui/plant/pickers';
 import JobCardModal from '@/app/ui/plant/job-card-modal';
 import JobPartsPanel from '@/app/ui/plant/job-parts-panel';
 import { CloseJobModal, OpenJobModal } from '@/app/ui/plant/maintenance-modal';
 import ServiceBillPanel from '@/app/ui/plant/service-bill-panel';
 import {
-  usePlantEquipment,
   usePlantCompanyId,
 } from '@/app/ui/plant/use-plant-refs';
 import {
@@ -31,7 +35,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 
 export default function MaintenancePage() {
-  const equipment = usePlantEquipment();
+  // 036 K15: the filter is a server-searched picker; the chosen machine is named from its record.
 
   const searchParams = useSearchParams();
   // Seeded from the URL so the machine detail page can link straight to this list
@@ -41,6 +45,11 @@ export default function MaintenancePage() {
   const [equipmentId, setEquipmentId] = useState(
     searchParams.get('equipmentId') ?? '',
   );
+  const filterMachine = useQuery({
+    queryKey: ['plant', 'equipment', equipmentId],
+    queryFn: () => getEquipmentDetail(equipmentId),
+    enabled: Boolean(equipmentId),
+  });
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
   const [page, setPage] = useState(1);
@@ -149,24 +158,21 @@ export default function MaintenancePage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <SelectField
+        <EquipmentPicker
           id="maintenance-filter-equipment"
           label="Machine"
+          emptyLabel="All machines"
           value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
+          selectedOption={
+            filterMachine.data ? equipmentOption(filterMachine.data) : null
+          }
+          onChange={(id) => {
+            setEquipmentId(id);
             // Back to the first page: narrowing the list while on page three
             // would show an empty screen for a filter that matches.
             setPage(1);
           }}
-        >
-          <option value="">All machines</option>
-          {(equipment.data ?? []).map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+        />
         <SelectField
           id="maintenance-filter-status"
           label="Status"
