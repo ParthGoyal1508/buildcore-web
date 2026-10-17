@@ -195,6 +195,9 @@ export const roleSchema = z.object({
   /** Where holders land after signing in — a module key (029 FR-020). Null: their first module. */
   homeModule: z.string().nullable().default(null),
   assignedUserCount: z.number(),
+  /** Active accounts holding the role in the caller's company (036 C11). Optional: a server
+   * predating it still parses, and the screens then say nothing rather than "0 holders". */
+  activeHolderCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

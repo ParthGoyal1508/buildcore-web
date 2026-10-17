@@ -508,6 +508,36 @@ export async function putSlotMapping(input: {
   });
 }
 
+/** A chain's levels as the editor saves them (036 C11). */
+export interface ChainLevelInput {
+  position: number;
+  slotKey: string;
+  isFinalAuthority?: boolean;
+  label?: string;
+}
+
+/**
+ * Replaces one chain's levels (036 C11). Requires `SETTINGS`.
+ *
+ * The API supersedes rather than edits: the chain is deactivated and a new one written, so an
+ * item part-way through keeps the levels it entered with. Refused when positions are not
+ * contiguous, when more than one level is the final authority, or when the levels would resolve
+ * to the same role twice (`APPROVAL_CHAIN_UNSATISFIABLE`) — shown verbatim.
+ */
+export async function replaceApprovalChain(
+  chain: Pick<ApprovalChain, 'id' | 'actionType' | 'isFinalAuthorityRequired'>,
+  levels: ChainLevelInput[],
+): Promise<unknown> {
+  return authFetch<unknown>(`/approvals/chains/${chain.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      actionType: chain.actionType,
+      isFinalAuthorityRequired: chain.isFinalAuthorityRequired,
+      levels,
+    }),
+  });
+}
+
 /**
  * Records one decision and returns the item's updated state.
  *
