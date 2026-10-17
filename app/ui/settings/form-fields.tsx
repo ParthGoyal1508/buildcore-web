@@ -99,25 +99,41 @@ export function TextField({
   label,
   error,
   hint,
+  trailing,
   ...rest
 }: React.InputHTMLAttributes<HTMLInputElement> & {
   id: string;
   label: string;
   error?: string;
   hint?: string;
+  /**
+   * A control inside the field's right edge — the sign-in form's show-password toggle (036 A29).
+   * The input keeps clear of it with right padding sized for a 32px `IconButton`.
+   */
+  trailing?: React.ReactNode;
 }) {
   const required = isRequired(rest);
+  const input = (
+    <input
+      id={id}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy(id, error, hint)}
+      aria-required={required || undefined}
+      {...rest}
+      className={clsx(fieldClass, error && 'border-red-500', trailing && 'pr-11')}
+    />
+  );
   return (
     <div>
       <FieldLabel htmlFor={id} label={label} required={required} />
-      <input
-        id={id}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy(id, error, hint)}
-        aria-required={required || undefined}
-        {...rest}
-        className={clsx(fieldClass, error && 'border-red-500')}
-      />
+      {trailing ? (
+        <div className="relative">
+          {input}
+          <div className="absolute inset-y-0 right-1 flex items-center">{trailing}</div>
+        </div>
+      ) : (
+        input
+      )}
       <FieldMessages id={id} error={error} hint={hint} />
     </div>
   );

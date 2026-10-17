@@ -8,17 +8,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { lusitana } from '@/app/ui/fonts';
-import {
-  UserIcon,
-  KeyIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  ExclamationCircleIcon,
-} from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
-import { Button } from './button';
+import { Button, IconButton } from '@/app/ui/button';
+import { FormError, TextField } from '@/app/ui/settings/form-fields';
 import { login } from '@/app/lib/api/auth';
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, NETWORK_ERROR, TIMEOUT_ERROR } from '@/app/lib/api/client';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { homeRoute } from '@/app/lib/permissions';
@@ -82,88 +77,71 @@ export default function LoginForm({
         safeReturnPath(next) ?? (user && homeRoute(user)) ?? ROUTES.dashboard,
       );
     } catch (err) {
-      // A dropped connection is an `ApiError` with a readable message since 036 A2.
-      setServerError(
-        err instanceof ApiError ? err.message : 'Something went wrong.',
-      );
+      setServerError(signInFailure(err));
     }
   }
 
   return (
+    // Built from the same `TextField`, `Button` and `FormError` as the reset and set-password
+    // forms (036 A29), so the three screens a locked-out user moves between look like one app —
+    // this one still wore the Next.js tutorial's inputs. Each field's error now sits on the field,
+    // linked by `aria-describedby`; a refusal from the server is the `role="alert"` banner above.
     <form className="space-y-3" onSubmit={handleSubmit(onSubmit)} noValidate>
-      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
+      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-6 pt-8">
         <h1 className={`${lusitana.className} mb-3 text-2xl`}>
           Please log in to continue.
         </h1>
-        <div className="w-full">
-          <div>
-            <label
-              className="mb-3 mt-5 block text-xs font-medium text-gray-900"
-              htmlFor="identifier"
-            >
-              Email or Username
-            </label>
-            <div className="relative">
-              <input
-                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
-                id="identifier"
-                type="text"
-                autoComplete="username"
-                // A phone would otherwise capitalise and "correct" an email or username.
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                inputMode="email"
-                enterKeyHint="next"
-                placeholder="Enter your email or username"
-                {...register('identifier')}
-              />
-              <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
-            </div>
-            {errors.identifier && (
-              <p className="mt-1 text-xs text-red-600">{errors.identifier.message}</p>
-            )}
-          </div>
-          <div className="mt-4">
-            <label
-              className="mb-3 mt-5 block text-xs font-medium text-gray-900"
-              htmlFor="password"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <input
-                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 pr-10 text-sm outline-2 placeholder:text-gray-500"
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder="Enter password"
-                {...register('password')}
-              />
-              <KeyIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
-              <button
-                type="button"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+        <div className="space-y-4">
+          <FormError message={serverError} />
+          <TextField
+            id="identifier"
+            label="Email or Username"
+            type="text"
+            autoComplete="username"
+            // A phone would otherwise capitalise and "correct" an email or username.
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="email"
+            enterKeyHint="next"
+            placeholder="Enter your email or username"
+            aria-required
+            error={errors.identifier?.message}
+            {...register('identifier')}
+          />
+          <TextField
+            id="password"
+            label="Password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            placeholder="Enter password"
+            aria-required
+            error={errors.password?.message}
+            {...register('password')}
+            trailing={
+              <IconButton
+                size="sm"
+                label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900"
               >
                 {showPassword ? (
-                  <EyeSlashIcon className="h-[18px] w-[18px]" />
+                  <EyeSlashIcon aria-hidden="true" className="h-[18px] w-[18px]" />
                 ) : (
-                  <EyeIcon className="h-[18px] w-[18px]" />
+                  <EyeIcon aria-hidden="true" className="h-[18px] w-[18px]" />
                 )}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
-            )}
-          </div>
+              </IconButton>
+            }
+          />
           {/* "Remember me" is gone (015 FR-005). It was unexplained, defaulted to
               unticked, and 74 of 89 sign-ins left it that way — which bought them a
               session that ended when they closed the browser. Every session now lasts
               the same 90 days, so there is nothing left to ask. */}
-          <div className="mt-4 flex items-center justify-end">
-            <Link href={ROUTES.forgotPassword} className="text-xs text-brand-600 hover:underline">
+          <div className="flex items-center justify-end">
+            <Link
+              href={ROUTES.forgotPassword}
+              className="rounded text-sm text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+            >
               Forgot Password?
             </Link>
           </div>
@@ -172,21 +150,41 @@ export default function LoginForm({
             but doesn't block the click, so a double-click fired two logins —
             burning two of the five lockout attempts on one wrong password
             (spec.md edge case: only one attempt should be counted). */}
-        <Button className="mt-4 w-full" disabled={isSubmitting} aria-disabled={isSubmitting}>
-          {isSubmitting ? 'Logging in…' : 'Log in'}{' '}
-          <ArrowRightIcon className="ml-auto h-5 w-5 text-gray-50" />
+        <Button
+          type="submit"
+          intent="read"
+          className="mt-6 w-full"
+          loading={isSubmitting}
+        >
+          {isSubmitting ? 'Logging in…' : 'Log in'}
+          <ArrowRightIcon aria-hidden="true" className="ml-auto h-5 w-5 text-gray-50" />
         </Button>
-        <div className="flex min-h-8 items-start space-x-1 pt-1">
-          {serverError && (
-            <>
-              <ExclamationCircleIcon className="h-5 w-5 shrink-0 text-red-600" />
-              <p role="alert" className="text-sm text-red-600">
-                {serverError}
-              </p>
-            </>
-          )}
-        </div>
       </div>
     </form>
   );
+}
+
+/**
+ * What a failed sign-in says (036 A29), by what actually went wrong — it used to be "Something went
+ * wrong." for everything that was not an API refusal, which told somebody on a site with one bar
+ * of signal nothing about whether to retry, move, or call the office.
+ *
+ * - Refusals (wrong password, locked, rate-limited) already carry this app's copy from `login()`.
+ * - No connection or a timeout carry theirs from the API client (036 A2), and an offline browser is
+ *   named as such before the request is even blamed.
+ * - A 5xx is the server's fault, not the person's, and says so.
+ * - Anything else — an answer the app could not read — is the one generic case left.
+ */
+function signInFailure(err: unknown): string {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'You are offline. Connect to the internet and try again.';
+  }
+  if (err instanceof ApiError) {
+    if (err.code === NETWORK_ERROR || err.code === TIMEOUT_ERROR) return err.message;
+    if (err.status >= 500) {
+      return 'BuildCore could not sign you in just now — the problem is on our side. Try again in a minute.';
+    }
+    return err.message;
+  }
+  return 'BuildCore sent an answer this page could not read. Refresh the page and try again; if it keeps happening, tell your administrator.';
 }
