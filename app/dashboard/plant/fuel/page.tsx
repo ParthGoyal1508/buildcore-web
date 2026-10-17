@@ -1,91 +1,145 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import {
+  downloadFuelExport,
+  getEquipmentDetail,
   getFuelEntries,
   getFuelSummary,
   type FuelEntry,
 } from '@/app/lib/api/plant';
 import { MESSAGES, formatVariance } from '@/app/lib/constants';
-import { formatRupees } from '@/app/lib/utils';
+import { saveBlob } from '@/app/lib/download-file';
+import {
+  currentPeriod,
+  dateLabel,
+  quantity3,
+  rupees,
+  todayIso,
+} from '@/app/lib/format';
+import {
+  urlBoolean,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
 import Pager from '@/app/ui/inventory/pager';
+import PageHeader from '@/app/ui/page-header';
 import FuelExceptions from '@/app/ui/plant/fuel-exceptions';
 import FuelModal from '@/app/ui/plant/fuel-modal';
-import {
-  usePlantEquipment,
-  usePlantCompanyId,
-} from '@/app/ui/plant/use-plant-refs';
+import MonthSelect from '@/app/ui/plant/month-select';
+import { EquipmentPicker, equipmentOption } from '@/app/ui/plant/pickers';
+import { usePlantCompanyId } from '@/app/ui/plant/use-plant-refs';
+import QueryError from '@/app/ui/query-error';
 import {
   CheckboxField,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
-import PageHeader from '@/app/ui/page-header';
-import { LoadingText } from '@/app/ui/spinner';
-import { currentPeriod } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
 
+const litres = (value: number) => `${quantity3(value)} litres`;
+
+/**
+ * The fuel register.
+ *
+ * 036: filters (and the summary month) live in the URL; the machine filter is a server-searched
+ * picker; litres and rupees are formatted; the filtered list downloads as Excel (K16); the summary
+ * month is two selects rather than `type="month"`; and a summary that fails to load says so with
+ * Retry rather than spinning forever (K12).
+ */
 export default function FuelPage() {
-  const equipment = usePlantEquipment();
-
-  const searchParams = useSearchParams();
-  // Seeded from the URL so the machine detail page can link straight to this list
-  // already filtered. Read once as the initial value rather than kept in sync: the
-  // dropdown below owns the filter after first render, and re-syncing would fight
-  // a user who changed it.
-  const [equipmentId, setEquipmentId] = useState(
-    searchParams.get('equipmentId') ?? '',
+  const toast = useToast();
+  const [filters, setFilters, query] = useUrlState(
+    {
+      equipmentId: urlString(),
+      dateFrom: urlString(),
+      dateTo: urlString(),
+      varianceOnly: urlBoolean(),
+      month: urlString(currentPeriod()),
+      page: urlNumber(1),
+    },
+    { resetPage: 'page' },
   );
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [varianceOnly, setVarianceOnly] = useState(false);
-  const [month, setMonth] = useState(currentPeriod());
-  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const companyId = usePlantCompanyId();
 
-  const filters = {
-    page,
+  const filterQuery = {
     ...(companyId ? { companyId } : {}),
-    ...(equipmentId ? { equipmentId } : {}),
-    ...(dateFrom ? { dateFrom } : {}),
-    ...(dateTo ? { dateTo } : {}),
-    ...(varianceOnly ? { varianceOnly: 'true' } : {}),
+    ...(query.equipmentId ? { equipmentId: query.equipmentId } : {}),
+    ...(query.dateFrom ? { dateFrom: query.dateFrom } : {}),
+    ...(query.dateTo ? { dateTo: query.dateTo } : {}),
+    ...(query.varianceOnly ? { varianceOnly: 'true' } : {}),
   };
+  const listQuery = { ...filterQuery, page: query.page };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['plant', 'fuel', filters],
-    queryFn: () => getFuelEntries(filters),
+  const list = useQuery({
+    queryKey: ['plant', 'fuel', listQuery],
+    queryFn: () => getFuelEntries(listQuery),
+    placeholderData: keepPreviousData,
   });
 
   const summary = useQuery({
-    queryKey: ['plant', 'fuel', 'summary', month, companyId],
-    queryFn: () => getFuelSummary(month, companyId ?? undefined),
+    queryKey: ['plant', 'fuel', 'summary', query.month, companyId],
+    queryFn: () => getFuelSummary(query.month, companyId ?? undefined),
+    placeholderData: keepPreviousData,
   });
 
+  const machine = useQuery({
+    queryKey: ['plant', 'equipment', query.equipmentId],
+    queryFn: () => getEquipmentDetail(query.equipmentId),
+    enabled: Boolean(query.equipmentId),
+  });
+
+  async function exportList() {
+    setExporting(true);
+    try {
+      const { blob, filename } = await downloadFuelExport(filterQuery);
+      saveBlob(blob, filename);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not download the fuel entries.'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const columns: Column<FuelEntry>[] = [
-    { key: 'date', header: 'Date', render: (row) => row.date.slice(0, 10) },
+    { key: 'date', header: 'Date', render: (row) => dateLabel(row.date) },
     {
       key: 'equipment',
       header: 'Machine',
       render: (row) => `${row.equipmentCode} · ${row.equipmentName}`,
     },
-    { key: 'quantity', header: 'Litres', render: (row) => row.quantity },
+    {
+      key: 'quantity',
+      header: 'Litres',
+      className: 'text-right tabular-nums',
+      render: (row) => litres(row.quantity),
+    },
     {
       key: 'rate',
       header: 'Rate',
       hideOnCard: true,
-      render: (row) => formatRupees(row.rate),
+      className: 'text-right tabular-nums',
+      render: (row) => `${rupees(row.rate)}/litre`,
     },
     {
       key: 'amount',
       header: 'Amount',
-      render: (row) => formatRupees(row.amount),
+      className: 'text-right tabular-nums',
+      render: (row) => rupees(row.amount),
+    },
+    {
+      key: 'site',
+      header: 'Site',
+      hideOnCard: true,
+      render: (row) => row.siteName ?? '—',
     },
     {
       key: 'vendor',
@@ -112,13 +166,24 @@ export default function FuelPage() {
     },
   ];
 
+  type SummaryRow = NonNullable<typeof summary.data>['items'][number];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Fuel" />
-        <SecondaryButton type="button" onClick={() => setShowModal(true)}>
-          Record fuel
-        </SecondaryButton>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryButton
+            type="button"
+            loading={exporting}
+            onClick={() => void exportList()}
+          >
+            Excel
+          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => setShowModal(true)}>
+            Record fuel
+          </SecondaryButton>
+        </div>
       </div>
 
       <section className="rounded-lg border border-gray-200 bg-white p-4">
@@ -126,109 +191,103 @@ export default function FuelPage() {
           <h2 className="text-sm font-semibold text-gray-900">
             Monthly summary
           </h2>
-          <TextField
-            id="fuel-summary-month"
-            label="Month"
-            type="month"
-            value={month}
-            onChange={(event) => setMonth(event.target.value)}
-          />
+          <div className="w-full sm:w-72">
+            <MonthSelect
+              id="fuel-summary-month"
+              label="Month"
+              value={filters.month}
+              onChange={(month) => setFilters({ month })}
+            />
+          </div>
         </div>
-        {summary.data ? (
+        {summary.isError ? (
+          <QueryError
+            compact
+            className="mt-3"
+            error={summary.error}
+            fallback="The monthly summary could not be loaded."
+            onRetry={summary.refetch}
+          />
+        ) : (
           <>
-            <p className="mt-3 text-sm text-gray-700">
-              {summary.data.totalQuantity} litres ·{' '}
-              {formatRupees(summary.data.totalAmount)} across{' '}
-              {summary.data.items.length}{' '}
-              {summary.data.items.length === 1 ? 'machine' : 'machines'}
-            </p>
+            {summary.data && (
+              <p className="mt-3 text-sm text-gray-700">
+                {litres(summary.data.totalQuantity)} ·{' '}
+                {rupees(summary.data.totalAmount)} across{' '}
+                {summary.data.items.length}{' '}
+                {summary.data.items.length === 1 ? 'machine' : 'machines'}
+              </p>
+            )}
             <ResponsiveList
               columns={[
                 {
                   key: 'machine',
                   header: 'Machine',
-                  render: (row: (typeof summary.data.items)[number]) =>
+                  render: (row: SummaryRow) =>
                     `${row.equipmentCode} · ${row.equipmentName}`,
                 },
                 {
                   key: 'litres',
                   header: 'Litres',
-                  render: (row: (typeof summary.data.items)[number]) =>
-                    row.totalQuantity,
+                  className: 'text-right tabular-nums',
+                  render: (row: SummaryRow) => litres(row.totalQuantity),
                 },
                 {
                   key: 'amount',
                   header: 'Amount',
-                  render: (row: (typeof summary.data.items)[number]) =>
-                    formatRupees(row.totalAmount),
+                  className: 'text-right tabular-nums',
+                  render: (row: SummaryRow) => rupees(row.totalAmount),
                 },
                 {
                   key: 'alerts',
                   header: 'Flagged days',
-                  render: (row: (typeof summary.data.items)[number]) =>
+                  render: (row: SummaryRow) =>
                     row.alertCount === 0 ? '—' : row.alertCount,
                 },
               ]}
-              rows={summary.data.items}
+              rows={summary.data?.items ?? []}
               rowKey={(row) => row.equipmentId}
+              isLoading={summary.isPending}
+              skeletonRows={3}
               emptyMessage="No fuel was drawn this month."
             />
           </>
-        ) : (
-          <p className="mt-2 text-sm text-gray-500">
-            <LoadingText />
-          </p>
         )}
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SelectField
+        <EquipmentPicker
           id="fuel-filter-equipment"
           label="Machine"
-          value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
-            // Back to the first page: narrowing the list while on page three
-            // would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
-        >
-          <option value="">All machines</option>
-          {(equipment.data ?? []).map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+          emptyLabel="All machines"
+          value={filters.equipmentId}
+          selectedOption={machine.data ? equipmentOption(machine.data) : null}
+          onChange={(id) => setFilters({ equipmentId: id })}
+        />
         <TextField
           id="fuel-filter-from"
           label="From"
           type="date"
-          value={dateFrom}
-          onChange={(event) => {
-            setDateFrom(event.target.value);
-            setPage(1);
-          }}
+          max={filters.dateTo || todayIso()}
+          value={filters.dateFrom}
+          onChange={(event) => setFilters({ dateFrom: event.target.value })}
         />
         <TextField
           id="fuel-filter-to"
           label="To"
           type="date"
-          value={dateTo}
-          onChange={(event) => {
-            setDateTo(event.target.value);
-            setPage(1);
-          }}
+          min={filters.dateFrom || undefined}
+          value={filters.dateTo}
+          onChange={(event) => setFilters({ dateTo: event.target.value })}
         />
         <div className="flex items-end pb-2">
           <CheckboxField
             id="fuel-filter-variance"
             label="Flagged entries only"
-            checked={varianceOnly}
-            onChange={(event) => {
-              setVarianceOnly(event.target.checked);
-              setPage(1);
-            }}
+            checked={filters.varianceOnly}
+            onChange={(event) =>
+              setFilters({ varianceOnly: event.target.checked })
+            }
           />
         </div>
       </div>
@@ -242,18 +301,21 @@ export default function FuelPage() {
 
       <ResponsiveList
         columns={columns}
-        rows={data?.items ?? []}
+        rows={list.data?.items ?? []}
         rowKey={(row) => row.id}
-        isLoading={isPending}
-        error={isError ? MESSAGES.plantLoadFailed : undefined}
+        isLoading={list.isPending}
+        isRefreshing={list.isFetching && !list.isPending}
+        error={list.isError ? list.error : undefined}
+        onRetry={list.refetch}
+        serverPaged
         emptyMessage={MESSAGES.plantFuelEmpty}
       />
 
       <Pager
-        total={data?.total ?? 0}
-        page={data?.page ?? 1}
-        pageSize={data?.pageSize ?? 25}
-        onPageChange={setPage}
+        total={list.data?.total ?? 0}
+        page={list.data?.page ?? 1}
+        pageSize={list.data?.pageSize ?? 25}
+        onPageChange={(page) => setFilters({ page })}
         noun="entry"
         plural="entries"
       />

@@ -3,24 +3,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
-import { createFuelEntry } from '@/app/lib/api/plant';
+import { errorMessage } from '@/app/lib/api/client';
+import { createFuelEntry, type Equipment } from '@/app/lib/api/plant';
 import { MESSAGES } from '@/app/lib/constants';
-import { formatRupees } from '@/app/lib/utils';
+import { rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import {
-  usePlantEquipment,
-  usePlantSites,
-  usePlantVendors,
-} from './use-plant-refs';
-import { todayIso } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
+import { EquipmentPicker, SitePicker, VendorPicker } from './pickers';
 
 /**
  * Record fuel drawn.
@@ -34,14 +29,17 @@ import { todayIso } from '@/app/lib/format';
  * logbook entry and the machine category's own threshold, neither of which this form
  * has — showing a guess and then contradicting it on save would be worse than
  * showing nothing.
+ *
+ * 036: machine, supplier and site are server-searched pickers (K15); the date cannot be in the
+ * future and the quantity must be above zero (the API refuses both, K10); the form keeps what was
+ * typed when a save fails, and asks before discarding it.
  */
 export default function FuelModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
-  const vendors = usePlantVendors();
-  const sites = usePlantSites();
+  const toast = useToast();
 
-  const [equipmentId, setEquipmentId] = useState('');
+  const [machine, setMachine] = useState<Equipment | null>(null);
+  const equipmentId = machine?.id ?? '';
   /**
    * Where the fuel was drawn, blank until the machine is chosen.
    *
@@ -71,9 +69,11 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
 
   // Named in the default option, so "leave it alone" is a visible choice rather than a
   // blank that hides which site the entry will actually land against.
-  const deployedSiteName =
-    (equipment.data ?? []).find((machine) => machine.id === equipmentId)
-      ?.siteName ?? null;
+  const deployedSiteName = machine?.siteName ?? null;
+  const quantityInvalid = quantity !== '' && !(Number(quantity) > 0);
+  const isDirty = Boolean(
+    machine || quantity || rate || amountPaid || cardNo || vendorId || siteId,
+  );
 
   const save = useMutation({
     mutationFn: () =>
@@ -88,27 +88,36 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
         ...(vendorId ? { vendorId } : {}),
         ...(siteId ? { siteId } : {}),
       }),
-    onSuccess: () => {
+    onSuccess: (entry) => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
+      toast.success(
+        `Recorded ${entry.quantity.toLocaleString('en-IN', {
+          maximumFractionDigits: 3,
+        })} litres for ${entry.equipmentCode}.`,
+      );
       onClose();
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
-      ),
+    onError: (err) => setError(errorMessage(err, MESSAGES.plantSaveFailed)),
   });
 
   return (
     <Modal
       title="Record fuel"
       onClose={onClose}
+      isDirty={isDirty}
+      pending={save.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="fuel-form" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Save'}
+          <Button
+            type="submit"
+            form="fuel-form"
+            loading={save.isPending}
+            disabled={!equipmentId || quantityInvalid}
+          >
+            Save
           </Button>
         </>
       }
@@ -124,26 +133,20 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
       >
         <FormError message={error} />
 
-        <SelectField
+        <EquipmentPicker
           id="fuel-equipment"
           label="Machine"
           required
           value={equipmentId}
-          onChange={(event) => setEquipmentId(event.target.value)}
-        >
-          <option value="">Select a machine</option>
-          {(equipment.data ?? []).map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(_, row) => setMachine(row)}
+        />
 
         <TextField
           id="fuel-date"
           label="Date"
           type="date"
           required
+          max={todayIso()}
           value={date}
           onChange={(event) => setDate(event.target.value)}
           hint="Variance is measured against this day's logbook entry."
@@ -154,17 +157,20 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
             id="fuel-quantity"
             label="Quantity (litres)"
             type="number"
+            inputMode="decimal"
             required
-            min={0}
+            min={0.001}
             step="0.001"
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}
+            error={quantityInvalid ? 'Enter more than 0 litres.' : undefined}
           />
           {priceBy === 'rate' ? (
             <TextField
               id="fuel-rate"
               label="Rate (₹ per litre)"
               type="number"
+              inputMode="decimal"
               required
               min={0}
               step="0.01"
@@ -176,6 +182,7 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
               id="fuel-amount"
               label="Amount paid (₹)"
               type="number"
+              inputMode="decimal"
               required
               min={0}
               step="0.01"
@@ -220,10 +227,10 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
             {priceBy === 'rate'
               ? amount === null
                 ? '—'
-                : formatRupees(amount)
+                : rupees(amount)
               : derivedRate === null
                 ? '—'
-                : formatRupees(derivedRate)}
+                : `${rupees(derivedRate)}/litre`}
           </p>
         </div>
 
@@ -236,38 +243,26 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
           hint="The fuel card it was drawn on, if any."
         />
 
-        <SelectField
+        <VendorPicker
           id="fuel-vendor"
           label="Supplier"
+          emptyLabel="Not recorded"
           value={vendorId}
-          onChange={(event) => setVendorId(event.target.value)}
-        >
-          <option value="">Not recorded</option>
-          {(vendors.data ?? []).map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setVendorId(id)}
+        />
 
-        <SelectField
+        <SitePicker
           id="fuel-site"
           label="Site"
           hint="Where the fuel was drawn. Left alone it follows the machine's deployment, which is what the Site Dashboard's fuel cards read."
-          value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
-        >
-          <option value="">
-            {deployedSiteName
+          emptyLabel={
+            deployedSiteName
               ? `Where the machine is deployed — ${deployedSiteName}`
-              : 'Where the machine is deployed'}
-          </option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+              : 'Where the machine is deployed'
+          }
+          value={siteId}
+          onChange={(id) => setSiteId(id)}
+        />
       </form>
     </Modal>
   );
