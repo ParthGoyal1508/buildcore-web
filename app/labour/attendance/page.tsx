@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  CameraIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
@@ -13,6 +14,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
+  addSitePhoto,
   blobToBase64,
   getLabourRefusals,
   getLabourToday,
@@ -24,6 +26,7 @@ import {
 import {
   DEV_FALLBACK_POSITION,
   LABOUR_ATTENDANCE_COPY,
+  LABOUR_DAY_STATUS_LABELS,
   LABOUR_PUNCH_MESSAGES,
   LABOUR_REFUSAL_REASON_LABELS,
   MESSAGES,
@@ -83,6 +86,14 @@ const timeOf = (iso: string) =>
     minute: '2-digit',
   });
 
+/** "9.5 h, full day (+1.5 h overtime)" — what the hours between the punches made of the day. */
+function dayText(day: { status: string; hours: number | null; overtimeHours: number }) {
+  const label = (LABOUR_DAY_STATUS_LABELS[day.status] ?? day.status).toLowerCase();
+  const hours = day.hours === null ? '' : `${day.hours} h, `;
+  const ot = day.overtimeHours > 0 ? ` (+${day.overtimeHours} h overtime)` : '';
+  return `${hours}${label}${ot}`;
+}
+
 /** The user-facing sentence for a failed punch, by the API's code — never the server's prose. */
 function punchErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -96,8 +107,9 @@ function punchErrorMessage(error: unknown): string {
 
 /**
  * Labour attendance (031): the supervisor picks a labour, photographs them, and the photo is
- * matched against the face registered for them. Punch-in alone counts as a half day; punch-in
- * and punch-out as a full day. A face that does not match is refused.
+ * matched against the face registered for them. A face that does not match is refused. Since 034
+ * the day counts from the hours between punch in and out — full, half or short by the company's
+ * day rules — and every punch is one labour at a time. The group photo is for reference only.
  *
  * **Online only.** The face match happens on the server, so a queued photo would be a promise of
  * attendance nobody could check until later — and a refusal discovered hours after the labour has
@@ -110,6 +122,7 @@ export default function LabourAttendancePage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('todo');
   const [target, setTarget] = useState<Target | null>(null);
+  const [groupPhoto, setGroupPhoto] = useState(false);
   const online = useSyncExternalStore(
     subscribeOnline,
     () => navigator.onLine,
@@ -178,7 +191,7 @@ export default function LabourAttendancePage() {
             tone: 'ok',
             text: `${worker.fullName} punched ${result.type} at ${timeOf(
               result.punchedAt,
-            )} — ${result.attendance === 'full_day' ? 'full day' : 'half day so far'}.`,
+            )}${result.type === 'out' ? ` — ${dayText(result)}` : ''}.`,
           },
     );
     void queryClient.invalidateQueries({ queryKey: ['labour', 'today', siteId] });
@@ -202,13 +215,27 @@ export default function LabourAttendancePage() {
         description="Pick a labour, take their photo, and the face match marks them in or out."
         actions={
           siteId ? (
-            <Link
-              href={`${ROUTES.labourRegister}?siteId=${encodeURIComponent(siteId)}`}
-              className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 sm:h-10"
-            >
-              <UserPlusIcon className="w-5" aria-hidden="true" />
-              Register labour
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!online}
+                onClick={() => {
+                  setNotice(null);
+                  setGroupPhoto(true);
+                }}
+                className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50 sm:h-10"
+              >
+                <CameraIcon className="w-5" aria-hidden="true" />
+                Group photo
+              </button>
+              <Link
+                href={`${ROUTES.labourRegister}?siteId=${encodeURIComponent(siteId)}`}
+                className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 sm:h-10"
+              >
+                <UserPlusIcon className="w-5" aria-hidden="true" />
+                Register labour
+              </Link>
+            </div>
           ) : null
         }
       />
@@ -378,6 +405,17 @@ export default function LabourAttendancePage() {
         </>
       )}
 
+      {groupPhoto && (
+        <GroupPhotoDialog
+          siteId={siteId}
+          onClose={() => setGroupPhoto(false)}
+          onDone={() => {
+            setGroupPhoto(false);
+            setNotice({ tone: 'ok', text: LABOUR_ATTENDANCE_COPY.groupPhotoSaved });
+          }}
+        />
+      )}
+
       {target && (
         <PunchDialog
           siteId={siteId}
@@ -446,9 +484,14 @@ function LabourRow({
           Punch {next}
         </button>
       ) : (
-        <span className="flex flex-none items-center gap-1 text-xs font-medium text-green-700">
+        <span
+          className={clsx(
+            'flex flex-none items-center gap-1 text-xs font-medium',
+            worker.status === 'short' ? 'text-amber-700' : 'text-green-700',
+          )}
+        >
           <CheckCircleIcon className="w-5" aria-hidden="true" />
-          Full day
+          {dayText(worker)}
         </span>
       )}
     </li>
@@ -558,6 +601,97 @@ function PunchDialog({
                 : LABOUR_ATTENDANCE_COPY.matching}
             </LoadingText>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A group photo of the site for reference (034). It marks nobody: attendance is one labour at a
+ * time with a face match, and this only records who was standing there.
+ */
+function GroupPhotoDialog({
+  siteId,
+  onClose,
+  onDone,
+}: {
+  siteId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: async (photo: Blob) => {
+      let coords: { latitude: number; longitude: number } | null = null;
+      try {
+        coords = (await resolvePosition()).coords;
+      } catch {
+        // Location is a nice-to-have on a reference photo; it is kept without one.
+      }
+      return addSitePhoto({
+        siteId,
+        photo: await blobToBase64(photo),
+        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(coords ? { latitude: coords.latitude, longitude: coords.longitude } : {}),
+      });
+    },
+    onSuccess: onDone,
+    onError: (e) => setError(punchErrorMessage(e)),
+  });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !save.isPending) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, save.isPending]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="group-photo-title"
+    >
+      <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-2xl">
+        <h2 id="group-photo-title" className="text-base font-semibold text-gray-900">
+          Group photo
+        </h2>
+        <p className="mb-3 text-xs text-gray-500">{LABOUR_ATTENDANCE_COPY.groupPhotoHint}</p>
+        {error && (
+          <p role="alert" className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+            {error}
+          </p>
+        )}
+        <label htmlFor="group-photo-note" className="mb-1 block text-sm font-medium text-gray-700">
+          Note (optional)
+        </label>
+        <input
+          id="group-photo-note"
+          type="text"
+          maxLength={300}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Morning gang at block C"
+          className="mb-3 block min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
+        {save.isPending ? (
+          <div className="flex flex-col items-center gap-3 py-10" role="status">
+            <LoadingText>Saving the photo…</LoadingText>
+          </div>
+        ) : (
+          <CameraCapture
+            captureLabel={error ? 'Retake photo' : 'Take photo'}
+            onCancel={onClose}
+            onCapture={(blob) => {
+              setError(null);
+              save.mutate(blob);
+            }}
+          />
         )}
       </div>
     </div>

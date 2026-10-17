@@ -250,6 +250,8 @@ export const ROUTES = {
   labourSupervisors: '/dashboard/labour/supervisors',
   /** 031: the month-end consolidated attendance sheet. */
   labourAttendanceSheet: '/dashboard/labour/attendance-sheet',
+  /** 034: daily and monthly muster from punch times, corrections, day rules and export. */
+  labourMusterAttendance: '/dashboard/labour/muster-attendance',
   /** Field screens, outside /dashboard (spec FR-001): face punch in/out and registration. */
   labourAttendance: '/labour/attendance',
   labourRegister: '/labour/register',
@@ -3280,6 +3282,22 @@ export const LABOUR_PUNCH_MESSAGES = {
     'This labour is already on a muster for today that was entered another way.',
 } as const;
 
+/** 034: how a labour day counts, from the hours between punch in and out. */
+export const LABOUR_DAY_STATUS_LABELS: Record<string, string> = {
+  full_day: 'Full day',
+  half_day: 'Half day',
+  short: 'Short',
+  on_site: 'On site',
+  unresolved: 'Unresolved',
+  absent: 'Absent',
+};
+
+export const LABOUR_DAY_FLAG_LABELS: Record<string, string> = {
+  missing_punch_out: 'Missing punch out',
+  missing_punch_in: 'Missing punch in',
+  out_before_in: 'Out before in',
+};
+
 export const LABOUR_REFUSAL_REASON_LABELS: Record<string, string> = {
   face_mismatch: 'Face did not match',
   no_face_detected: 'No face in photo',
@@ -3298,6 +3316,9 @@ export const LABOUR_ATTENDANCE_COPY = {
     'Marked — but your location could not be confirmed inside the site, so the HR office will see it flagged.',
   registerHelp:
     'Take 3 to 5 clear photos of the face: straight on, in good light, nothing covering the face. A slight turn left and right in two of them helps matching later.',
+  groupPhotoHint:
+    'For reference only — it does not mark anyone in or out. Punch each labour separately.',
+  groupPhotoSaved: 'Group photo saved for reference. Nobody was marked by it.',
 } as const;
 
 /** Indian currency note denominations, descending — the client renders the

@@ -53,8 +53,8 @@ export default function LabourNav({
         ]
       : []),
     {
-      name: 'Attendance Sheet',
-      href: ROUTES.labourAttendanceSheet,
+      name: 'Muster Attendance',
+      href: ROUTES.labourMusterAttendance,
       icon: TableCellsIcon,
     },
     {

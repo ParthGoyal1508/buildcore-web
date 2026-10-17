@@ -53,10 +53,11 @@ const tilesFor = (canManage: boolean): Tile[] => [
       ]
     : []),
   {
-    name: 'Attendance Sheet',
-    href: ROUTES.labourAttendanceSheet,
+    name: 'Muster Attendance',
+    href: ROUTES.labourMusterAttendance,
     icon: TableCellsIcon,
-    description: 'The month’s consolidated attendance as an Excel sheet.',
+    description:
+      'Punch in and out times, hours, missing punches and corrections — by day or month, with the Excel.',
   },
   {
     name: 'Payment Sheets',
