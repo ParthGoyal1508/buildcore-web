@@ -79,6 +79,51 @@ function renderable(file: ViewableFile): { blob: Blob; isImage: boolean } {
   };
 }
 
+/**
+ * 036 A28 (2026-10-17): Print, for the viewer's own chrome. An iPad or an Android phone shows a PDF
+ * with no toolbar at all, so the browser's own print icon — the only way to print it on a desktop —
+ * is not there. The file is loaded into a hidden frame and that frame is printed: the PDF itself,
+ * or for an image a one-line page holding it. Where the browser will not print a frame (it throws),
+ * the file opens in a new tab instead, whose own Share/Print sheet can.
+ */
+function printFile(file: ViewableFile) {
+  const { blob, isImage } = renderable(file);
+  const url = URL.createObjectURL(blob);
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText =
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  let done = false;
+  const cleanup = () => {
+    if (done) return;
+    done = true;
+    frame.remove();
+    URL.revokeObjectURL(url);
+  };
+  frame.onload = () => {
+    try {
+      const win = frame.contentWindow;
+      if (!win) throw new Error('no frame window');
+      win.addEventListener('afterprint', () => setTimeout(cleanup, 1000));
+      win.focus();
+      win.print();
+      // Some browsers never send `afterprint` for a frame; release it eventually regardless.
+      setTimeout(cleanup, 5 * 60_000);
+    } catch {
+      window.open(url, '_blank', 'noopener');
+      frame.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      done = true;
+    }
+  };
+  if (isImage) {
+    frame.srcdoc = `<!doctype html><title>Print</title><style>@page{margin:10mm}body{margin:0}img{display:block;max-width:100%;margin:0 auto}</style><img src="${url}" alt="">`;
+  } else {
+    frame.src = url;
+  }
+  document.body.appendChild(frame);
+}
+
 /** A file name the viewer can put in a URL path: no separators, and ending `.pdf`. */
 function pdfName(name: string): string {
   const base = name.replace(/[\\/]+/g, '-').trim() || 'document';
@@ -338,6 +383,15 @@ export function FileViewer({
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Download
+              </button>
+            )}
+            {state.status === 'ready' && (
+              <button
+                type="button"
+                onClick={() => printFile(state.file)}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Print
               </button>
             )}
             <button
