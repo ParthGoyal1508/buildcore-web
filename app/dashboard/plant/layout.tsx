@@ -38,6 +38,9 @@ const SECTION_PERMISSIONS: { prefix: string; permission: string }[] = [
   { prefix: ROUTES.plantHireBills, permission: PLANT_PERMISSIONS.hireBills },
   { prefix: ROUTES.plantMasters, permission: PLANT_PERMISSIONS.masters },
   { prefix: ROUTES.plantDisposals, permission: PLANT_PERMISSIONS.equipment },
+  // 036 K17: the hire orders API is gated by MACHINERY; without this entry a role lacking it
+  // reached the screen and met a raw 403 on the first request instead of this page's message.
+  { prefix: ROUTES.plantHireOrders, permission: PLANT_PERMISSIONS.equipment },
 ];
 
 export default function PlantLayout({

@@ -1,32 +1,32 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   deleteHireOrder,
   downloadHireOrder,
-  getHireOrders,
+  getHireOrdersPage,
   type HireOrder,
 } from '@/app/lib/api/plant-hire';
-import { getProjects } from '@/app/lib/api/projects';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { formatRupees } from '@/app/lib/utils';
+import { ROUTES } from '@/app/lib/constants';
+import { rupees } from '@/app/lib/format';
+import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
 import { confirmDialog } from '@/app/ui/dialogs';
+import Pager from '@/app/ui/inventory/pager';
 import PageHeader from '@/app/ui/page-header';
 import DocumentDownloads from '@/app/ui/plant/document-downloads';
 import HireOrderModal from '@/app/ui/plant/hire-order-modal';
-import {
-  usePlantCompanyId,
-  usePlantVendors,
-} from '@/app/ui/plant/use-plant-refs';
-import {
-  FormError,
-  RowAction,
-  SecondaryButton,
-  SelectField,
-} from '@/app/ui/settings/form-fields';
+import { ProjectPicker, VendorPicker } from '@/app/ui/plant/pickers';
+import { usePlantCompanyId } from '@/app/ui/plant/use-plant-refs';
+import { RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
 import {
@@ -43,38 +43,38 @@ import { dateLabel } from '@/app/lib/format';
  * format. Hire bills are raised against these, which is why a billed order cannot be
  * deleted — the server refuses and its reason is shown as it stands.
  *
- * Not paginated: the API returns the company's orders whole, and a company raises a handful
- * a month.
+ * 036 K17: paged. The API used to return the orders whole and silently stopped at 200; it now
+ * pages when asked, and this screen asks. Supplier and project are server-searched pickers, and
+ * the filters and page live in the URL. (The NOC filter narrows the page shown.)
  */
 export default function HireOrdersPage() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const companyId = usePlantCompanyId();
-  const vendors = usePlantVendors();
-  const projects = useQuery({
-    queryKey: ['plant', 'projects'],
-    queryFn: () => getProjects({ pageSize: 200 }),
-    select: (page) => page.items,
-  });
+  const [filters, setFilters, query] = useUrlState(
+    { vendorId: urlString(), projectId: urlString(), page: urlNumber(1) },
+    { resetPage: 'page' },
+  );
 
-  const [vendorId, setVendorId] = useState('');
   // The order a NOC is being managed for (2026-10-15).
   const [nocFor, setNocFor] = useState<{ id: string; code: string } | null>(
     null,
   );
-  const [projectId, setProjectId] = useState('');
   const [editing, setEditing] = useState<HireOrder | 'new' | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const filters = {
+  const listQuery = {
     ...(companyId ? { companyId } : {}),
-    ...(vendorId ? { vendorId } : {}),
-    ...(projectId ? { projectId } : {}),
+    ...(query.vendorId ? { vendorId: query.vendorId } : {}),
+    ...(query.projectId ? { projectId: query.projectId } : {}),
+    page: query.page,
   };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['plant', 'hire-orders', filters],
-    queryFn: () => getHireOrders(filters),
+  const list = useQuery({
+    queryKey: ['plant', 'hire-orders', listQuery],
+    queryFn: () => getHireOrdersPage(listQuery),
+    placeholderData: keepPreviousData,
   });
+  const data = list.data?.items;
   // Open until the order's NOC is uploaded, then closed (2026-10-17).
   const [nocFilter, setNocFilter] = useState<NocFilter>('');
   const nocStatuses = useNocStatuses(
@@ -85,15 +85,13 @@ export default function HireOrdersPage() {
   const remove = useMutation({
     mutationFn: (id: string) => deleteHireOrder(id),
     onSuccess: () => {
-      setError(null);
+      toast.success('Work order deleted.');
       void queryClient.invalidateQueries({
         queryKey: ['plant', 'hire-orders'],
       });
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : 'Could not delete that order.',
-      ),
+      toast.error(errorMessage(err, 'Could not delete that order.')),
   });
 
   const columns: Column<HireOrder>[] = [
@@ -133,7 +131,7 @@ export default function HireOrdersPage() {
     {
       key: 'total',
       header: 'Total incl. GST',
-      render: (row) => formatRupees(row.totalAmount),
+      render: (row) => rupees(row.totalAmount),
     },
     {
       key: 'noc',
@@ -153,32 +151,20 @@ export default function HireOrdersPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <SelectField
+        <VendorPicker
           id="ho-filter-vendor"
           label="Supplier"
-          value={vendorId}
-          onChange={(event) => setVendorId(event.target.value)}
-        >
-          <option value="">All suppliers</option>
-          {(vendors.data ?? []).map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
+          emptyLabel="All suppliers"
+          value={filters.vendorId}
+          onChange={(id) => setFilters({ vendorId: id })}
+        />
+        <ProjectPicker
           id="ho-filter-project"
           label="Project"
-          value={projectId}
-          onChange={(event) => setProjectId(event.target.value)}
-        >
-          <option value="">All projects</option>
-          {(projects.data ?? []).map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </SelectField>
+          emptyLabel="All projects"
+          value={filters.projectId}
+          onChange={(id) => setFilters({ projectId: id })}
+        />
         <NocFilterField
           id="ho-filter-noc"
           value={nocFilter}
@@ -186,16 +172,17 @@ export default function HireOrdersPage() {
         />
       </div>
 
-      <FormError message={error} />
-
       <ResponsiveList
         columns={columns}
         rows={filterByNoc(data ?? [], nocFilter, nocStatuses, (row) => row.id)}
         rowKey={(row) => row.id}
         // The whole row opens the order (2026-10-15).
         rowHref={(row) => `${ROUTES.plantHireOrders}/${row.id}`}
-        isLoading={isPending}
-        error={isError ? MESSAGES.plantLoadFailed : undefined}
+        isLoading={list.isPending}
+        isRefreshing={list.isFetching && !list.isPending}
+        error={list.isError ? list.error : undefined}
+        onRetry={list.refetch}
+        serverPaged
         emptyMessage="No work orders yet."
         actions={(row) => (
           // Wrapping, so the three downloads and the row's own actions fit a phone card —
@@ -203,7 +190,7 @@ export default function HireOrdersPage() {
           <div className="flex flex-wrap justify-end gap-2">
             <DocumentDownloads
               load={(format) => downloadHireOrder(row, format)}
-              onError={setError}
+              onError={(message) => toast.error(message)}
             />
             <RowAction
               intent="read"
@@ -213,13 +200,14 @@ export default function HireOrdersPage() {
             </RowAction>
             <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
             <RowAction
-              disabled={remove.isPending}
+              loading={remove.isPending && remove.variables === row.id}
               onClick={async () => {
                 const confirmed = await confirmDialog({
                   title: `Delete work order ${row.code}?`,
                   message:
                     'An order a hire bill has been raised against cannot be deleted.',
                   confirmLabel: 'Delete',
+                  tone: 'danger',
                 });
                 if (confirmed) remove.mutate(row.id);
               }}
@@ -228,6 +216,14 @@ export default function HireOrdersPage() {
             </RowAction>
           </div>
         )}
+      />
+
+      <Pager
+        total={list.data?.total ?? 0}
+        page={list.data?.page ?? 1}
+        pageSize={list.data?.pageSize ?? 25}
+        onPageChange={(page) => setFilters({ page })}
+        noun="order"
       />
 
       {nocFor && (
