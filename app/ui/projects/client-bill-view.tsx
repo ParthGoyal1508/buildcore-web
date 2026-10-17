@@ -42,6 +42,8 @@ import { TABLE } from '@/app/ui/table';
  */
 const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
 const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
+/** A certified quantity as typed: digits, at most one point, at most three decimals. */
+const CERTIFIED_QTY_PATTERN = /^\d*(\.\d{0,3})?$/;
 
 /**
  * One client bill, read, with the two acts it still accepts (027).
@@ -93,6 +95,19 @@ export default function ClientBillView({
   const [certifiedQtys, setCertifiedQtys] = useState<Record<string, string>>(
     {},
   );
+  /**
+   * Kept exactly as typed (036 follow-up, as I14 did for the RA sheet): a `type="number"` field
+   * hands back `''` for "10." mid-typing, and some locales' keyboards cannot type the point at all.
+   * Digits, one point and at most three decimals — the API stores 3dp.
+   */
+  const qtyInvalid = (raw: string | undefined) => {
+    const value = raw?.trim() ?? '';
+    // A lone "." matches the pattern but is not a number.
+    return (
+      value !== '' && (!CERTIFIED_QTY_PATTERN.test(value) || value === '.')
+    );
+  };
+  const anyQtyInvalid = Object.values(certifiedQtys).some(qtyInvalid);
   /** Line by line, or a single figure. Line by line is what frees uncertified scope. */
   const [perLine, setPerLine] = useState(true);
   const [certificate, setCertificate] = useState<File | null>(null);
@@ -138,7 +153,7 @@ export default function ClientBillView({
                 .filter(([, value]) => value.trim() !== '')
                 .map(([lineId, value]) => ({
                   lineId,
-                  certifiedQty: Number(value),
+                  certifiedQty: Number(value.trim()),
                 })),
             }
           : { certifiedAmount: Number(certifiedAmount) }),
@@ -526,10 +541,18 @@ export default function ClientBillView({
                           </td>
                           <td className={clsx(DENSE_TD, 'text-right')}>
                             <input
-                              type="number"
-                              step="0.001"
-                              min="0"
+                              type="text"
                               inputMode="decimal"
+                              pattern="\d*(\.\d{0,3})?"
+                              autoComplete="off"
+                              aria-invalid={
+                                qtyInvalid(certifiedQtys[line.id]) || undefined
+                              }
+                              title={
+                                qtyInvalid(certifiedQtys[line.id])
+                                  ? 'A quantity, with up to three decimals — for example 10.05'
+                                  : undefined
+                              }
                               aria-label={`${BILLING_COPY.certifyCertifiedQty} — ${line.boqNo}`}
                               // Blank, never pre-filled with the billed quantity: a
                               // prefilled field is one somebody accepts, and accepting
@@ -542,7 +565,12 @@ export default function ClientBillView({
                                   [line.id]: event.target.value,
                                 }))
                               }
-                              className="w-28 rounded border border-gray-300 px-2 py-1 text-right tabular-nums"
+                              className={clsx(
+                                'w-28 rounded border px-2 py-1 text-right tabular-nums',
+                                qtyInvalid(certifiedQtys[line.id])
+                                  ? 'border-red-500 bg-red-50'
+                                  : 'border-gray-300',
+                              )}
                             />
                           </td>
                         </tr>
@@ -601,7 +629,8 @@ export default function ClientBillView({
                   // Line by line needs at least one figure; a single amount needs the
                   // amount. Neither path should post an empty certification.
                   (perLine
-                    ? !Object.values(certifiedQtys).some(
+                    ? anyQtyInvalid ||
+                      !Object.values(certifiedQtys).some(
                         (value) => value.trim() !== '',
                       )
                     : certifiedAmount === '')
