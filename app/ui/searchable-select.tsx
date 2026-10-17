@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
+import { useLayer } from '@/app/lib/layers';
+
 export interface SearchableOption {
   id: string;
   /** What identifies the row — a BOQ number, a code. Shown first and matched first. */
@@ -110,8 +112,15 @@ export default function SearchableSelect({
     setOpen(false);
   };
 
+  // Open, the list is a layer (036 A8): Escape closes it, not the modal around the field.
+  useLayer(() => {
+    setOpen(false);
+    setTerm('');
+  }, open);
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
+      if (open) event.preventDefault();
       setOpen(false);
       setTerm('');
       return;

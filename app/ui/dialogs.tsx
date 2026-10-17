@@ -14,6 +14,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useLayer } from '@/app/lib/layers';
+
 /**
  * The app's own confirm and prompt (2026-10-15), in place of `window.confirm` and `window.prompt`.
  *
@@ -161,6 +163,10 @@ function Dialog({ request }: { request: Request }) {
     settle();
     (restoreFocus.current as HTMLElement | null)?.focus?.();
   };
+
+  // A layer of its own (036 A8), so Escape here never reaches a modal underneath — whether or not
+  // focus is inside this dialog when it is pressed.
+  useLayer(() => close(false));
 
   useEffect(() => {
     restoreFocus.current = document.activeElement;

@@ -15,6 +15,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useLayer } from '@/app/lib/layers';
+
 /**
  * The app's own popups for every native `<select>` and date field (2026-10-15).
  *
@@ -266,6 +268,8 @@ function SelectMenu({
   const [active, setActive] = useState(() => Math.max(0, el.selectedIndex));
   const { style, above } = usePlacement(el, panel, onClose, true);
   const typed = useRef({ text: '', at: 0 });
+  // A layer (036 A8): Escape closes this menu, never the modal the field sits in.
+  useLayer(onClose);
 
   const choose = useCallback(
     (choice: Choice) => {
@@ -464,6 +468,8 @@ function Calendar({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const { style, above } = usePlacement(el, panel, onClose);
+  // A layer (036 A8): Escape closes this calendar, never the modal the field sits in.
+  useLayer(onClose);
   // A month field (`type="month"`, 2026-10-15) gets the same panel opened on its month grid, and
   // a month chosen there is the answer rather than a step towards a day.
   const monthOnly = el.type === 'month';

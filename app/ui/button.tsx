@@ -14,6 +14,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
    * Everything else is a write, which is why that is the default.
    */
   intent?: 'write' | 'read';
+  /**
+   * The action this button starts is in flight (036 A7): disabled, a spinner, `aria-busy`.
+   * Pass the mutation's `isPending`. A second click on a Save that has not answered yet used to
+   * send a second request — 33 money and approval actions had no lock at all.
+   */
+  loading?: boolean;
 }
 
 /**
@@ -34,13 +40,17 @@ export function Button({
   children,
   className,
   intent = 'write',
+  loading = false,
   ...rest
 }: ButtonProps) {
   const canWrite = useCanWrite();
   if (intent === 'write' && !canWrite) return null;
+  const disabled = rest.disabled || loading;
   return (
     <button
       {...rest}
+      disabled={disabled}
+      aria-busy={loading || rest['aria-busy'] || undefined}
       className={clsx(
         // Base is the brand navy itself, and hover goes *lighter* rather than the
         // usual darker: at #002d4e the shades below it are nearly black, so darkening
@@ -62,7 +72,7 @@ export function Button({
     >
       {/* A button that says it is working — "Saving…", "Deleting…" — while disabled turns its
           spinner on, so every pending save looks the same without each screen adding one. */}
-      {rest.disabled && labelText(children).trim().endsWith('…') ? (
+      {loading || (rest.disabled && labelText(children).trim().endsWith('…')) ? (
         <Spinner />
       ) : (
         // "Excel", "PDF", "Word" on a button get their format's mark (2026-10-15).

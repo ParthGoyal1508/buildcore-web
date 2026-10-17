@@ -6,6 +6,7 @@ import InstallPrompt from '@/app/install-prompt';
 import { DialogHost } from '@/app/ui/dialogs';
 import NativePickers from '@/app/ui/native-pickers';
 import RowLinks from '@/app/ui/row-links';
+import { ToastHost } from '@/app/ui/toast';
 import TopLoader from '@/app/ui/top-loader';
 
 export const metadata: Metadata = {
@@ -76,6 +77,7 @@ export default function RootLayout({
           <InstallPrompt />
           <NativePickers />
           <DialogHost />
+          <ToastHost />
           <RowLinks />
           <TopLoader />
         </Providers>
