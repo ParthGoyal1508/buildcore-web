@@ -429,10 +429,38 @@ export interface CreateDwrInput {
 // Calls
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function listDwrs(projectId?: string): Promise<DwrSummary[]> {
-  const search = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  const raw = await authFetch<unknown>(`/projects/dwr${search}`);
-  return dwrListSchema.parse(raw).items;
+export interface DwrListQuery {
+  projectId?: string;
+  status?: DwrStatus;
+  /** Inclusive work-date bounds, `YYYY-MM-DD`. */
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export type DwrPage = z.infer<typeof dwrListSchema>;
+
+/** Rows per page on the DWR list (the API allows up to 200, `DWR_PAGE_SIZE_MAX`). */
+export const DWR_PAGE_SIZE = 50;
+
+/**
+ * One page of a project's reports, with the total (036 I6).
+ *
+ * The list was fetched with no page size, so the API's default of 25 applied and every older
+ * report silently did not exist on screen — a project with 300 days showed its last 25 and no hint
+ * of the rest. The status and date filters are the API's own (`ListDwrDto`).
+ */
+export async function listDwrPage(query: DwrListQuery): Promise<DwrPage> {
+  const params = new URLSearchParams();
+  if (query.projectId) params.set('projectId', query.projectId);
+  if (query.status) params.set('status', query.status);
+  if (query.from) params.set('from', query.from);
+  if (query.to) params.set('to', query.to);
+  params.set('page', String(query.page ?? 1));
+  params.set('pageSize', String(query.pageSize ?? DWR_PAGE_SIZE));
+  const raw = await authFetch<unknown>(`/projects/dwr?${params.toString()}`);
+  return dwrListSchema.parse(raw);
 }
 
 export async function getDwr(dwrId: string): Promise<Dwr> {
