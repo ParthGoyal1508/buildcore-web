@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { z } from 'zod';
 
+import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   createEmployee,
   listSites,
@@ -61,6 +62,21 @@ const optionalText = z
   .optional()
   .transform((value) => (value ? value : undefined));
 
+/**
+ * An optional text field the server checks against a pattern (036 F16). Mirrors the regex in
+ * `create-employee.dto.ts` so the mistake is shown on its own field, in words, before saving —
+ * the server's class-validator sentence ("pan must match /^[A-Z]{5}…/") used to arrive at the top
+ * of the form, often while another tab was open. `upper` uppercases first, as PAN and IFSC are
+ * typed in either case and stored in capitals.
+ */
+const pattern = (re: RegExp, message: string, upper = false) =>
+  optionalText
+    .transform((value) => (upper && value ? value.toUpperCase() : value))
+    .refine((value) => value === undefined || re.test(value), { message });
+
+const DIGITS_10 = /^\d{10}$/;
+const DIGITS_6 = /^\d{6}$/;
+
 const optionalNumber = z
   .union([z.string(), z.number()])
   .optional()
@@ -83,7 +99,8 @@ const optionalNumber = z
 const employeeFormSchema = z
   .object({
     // Identity
-    firstName: optionalText,
+    // Required on the server (CreateEmployeeDto); optional here let the save reach a 400.
+    firstName: z.string().trim().min(1, 'First name is required.'),
     lastName: optionalText,
     fatherName: optionalText,
     title: optionalText,
@@ -113,11 +130,15 @@ const employeeFormSchema = z
     pfUpperLimit: z.boolean().optional(),
     esicApplicable: z.boolean().optional(),
     esicUpperLimit: z.boolean().optional(),
-    uan: optionalText,
+    uan: pattern(/^\d{12}$/, 'UAN must be exactly 12 digits.'),
     pfNumber: optionalText,
     esicNumber: optionalText,
-    aadhaar: optionalText,
-    pan: optionalText,
+    aadhaar: pattern(/^\d{12}$/, 'Aadhaar must be exactly 12 digits.'),
+    pan: pattern(
+      /^[A-Z]{5}\d{4}[A-Z]$/,
+      'PAN must be 5 letters, 4 digits and a letter, e.g. ABCDE1234F.',
+      true,
+    ),
 
     // Pay & bank
     basic: optionalNumber,
@@ -129,24 +150,28 @@ const employeeFormSchema = z
     bankName: optionalText,
     bankBranch: optionalText,
     bankAccountNumber: optionalText,
-    ifscCode: optionalText,
+    ifscCode: pattern(
+      /^[A-Z]{4}0[A-Z0-9]{6}$/,
+      'IFSC must be 4 letters, a zero, then 6 letters or digits, e.g. SBIN0001234.',
+      true,
+    ),
     bankAccountHolderName: optionalText,
 
     // Contact
-    mobile: optionalText,
-    alternateMobile: optionalText,
-    email: optionalText,
+    mobile: pattern(DIGITS_10, 'Mobile must be exactly 10 digits.'),
+    alternateMobile: pattern(DIGITS_10, 'Alternate mobile must be exactly 10 digits.'),
+    email: pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email address.'),
     presentAddress: optionalText,
     presentCity: optionalText,
     presentState: optionalText,
-    presentPinCode: optionalText,
+    presentPinCode: pattern(DIGITS_6, 'PIN code must be exactly 6 digits.'),
     permanentAddress: optionalText,
     permanentCity: optionalText,
     permanentState: optionalText,
-    permanentPinCode: optionalText,
+    permanentPinCode: pattern(DIGITS_6, 'PIN code must be exactly 6 digits.'),
     emergencyContactName: optionalText,
     emergencyContactRelation: optionalText,
-    emergencyContactPhone: optionalText,
+    emergencyContactPhone: pattern(DIGITS_10, 'Phone must be exactly 10 digits.'),
 
     // Letters
     offerLetterIssued: z.boolean().optional(),
@@ -214,6 +239,7 @@ const dateValue = (value: string | null | undefined) =>
 function defaultsFrom(employee?: Employee): EmployeeFormValues {
   if (!employee) {
     return {
+      firstName: '',
       siteId: '',
       shiftId: '',
       employmentType: 'full_time',
@@ -312,6 +338,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
     register,
     handleSubmit,
     control,
+    setError,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema) as Resolver<EmployeeFormValues>,
@@ -374,7 +401,31 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
       queryClient.invalidateQueries({ queryKey: ['hr', 'employees'] });
       router.push(ROUTES.hrEmployee(saved.id));
     },
-    onError: (error: Error) => setServerError(error.message),
+    onError: (error: Error) => {
+      // 036 F16: a validation refusal names its fields (`errors`: "pan must match …"). Each is put
+      // on its own field — so the tab list above points at it — instead of one raw sentence at the
+      // top. Anything that is not a field error stays at the top. Every entered value is kept.
+      const parts =
+        error instanceof ApiError && Array.isArray(error.details?.errors)
+          ? (error.details.errors as unknown[]).filter(
+              (part): part is string => typeof part === 'string',
+            )
+          : [];
+      const fields = Object.keys(employeeFormSchema.innerType().shape);
+      let placed = 0;
+      for (const part of parts) {
+        const field = part.split(/\s/)[0];
+        if (fields.includes(field)) {
+          setError(field as keyof EmployeeFormValues, { type: 'server', message: part });
+          placed += 1;
+        }
+      }
+      setServerError(
+        placed === parts.length && placed > 0
+          ? null
+          : errorMessage(error, 'Could not save the employee.'),
+      );
+    },
   });
 
   async function cancel() {
@@ -412,7 +463,14 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
       'bankAccountNumber',
       'bankAccountHolderName',
     ],
-    contact: ['mobile', 'email'],
+    contact: [
+      'mobile',
+      'alternateMobile',
+      'email',
+      'presentPinCode',
+      'permanentPinCode',
+      'emergencyContactPhone',
+    ],
     documents: [],
     letters: [],
     onboarding: [],
@@ -462,7 +520,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           <TextField id="title" label="Title" {...register('title')} />
           <TextField
             id="firstName"
-            label="First name"
+            label="First name (required)"
             error={errorFor('firstName')}
             {...register('firstName')}
           />
@@ -518,7 +576,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <SelectField
             id="siteId"
-            label="Site"
+            label="Site (required)"
             error={errorFor('siteId')}
             {...register('siteId')}
           >
@@ -531,7 +589,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           </SelectField>
           <SelectField
             id="shiftId"
-            label="Shift"
+            label="Shift (required)"
             error={errorFor('shiftId')}
             {...register('shiftId')}
           >
@@ -794,7 +852,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             }
             {...register('bankAccountNumber')}
           />
-          <TextField id="ifscCode" label="IFSC" {...register('ifscCode')} />
+          <TextField id="ifscCode" label="IFSC" error={errorFor('ifscCode')} {...register('ifscCode')} />
           <TextField
             id="bankAccountHolderName"
             label="Account holder name (as the bank has it)"
@@ -806,17 +864,17 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
 
       <TabPanel id="contact" idPrefix="employee" active={tab}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField id="mobile" label="Mobile" {...register('mobile')} />
+          <TextField id="mobile" label="Mobile" error={errorFor('mobile')} {...register('mobile')} />
           <TextField
             id="alternateMobile"
             label="Alternate mobile"
-            {...register('alternateMobile')}
+            error={errorFor('alternateMobile')} {...register('alternateMobile')}
           />
           <TextField
             id="email"
             label="Email"
             type="email"
-            {...register('email')}
+            error={errorFor('email')} {...register('email')}
           />
         </div>
         <h3 className="mt-6 text-sm font-medium text-gray-900">
@@ -842,7 +900,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           <TextField
             id="presentPinCode"
             label="PIN code"
-            {...register('presentPinCode')}
+            error={errorFor('presentPinCode')} {...register('presentPinCode')}
           />
         </div>
         <h3 className="mt-6 text-sm font-medium text-gray-900">
@@ -867,7 +925,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           <TextField
             id="permanentPinCode"
             label="PIN code"
-            {...register('permanentPinCode')}
+            error={errorFor('permanentPinCode')} {...register('permanentPinCode')}
           />
         </div>
         <h3 className="mt-6 text-sm font-medium text-gray-900">
@@ -887,7 +945,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           <TextField
             id="emergencyContactPhone"
             label="Phone"
-            {...register('emergencyContactPhone')}
+            error={errorFor('emergencyContactPhone')} {...register('emergencyContactPhone')}
           />
         </div>
       </TabPanel>
