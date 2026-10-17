@@ -10,6 +10,7 @@ import {
 } from '@/app/lib/api/bill-packages';
 import { projectsLabel } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
+import QueryError from '@/app/ui/query-error';
 import { TABLE } from '@/app/ui/table';
 
 /**
@@ -59,10 +60,18 @@ export default function BillPackageReports({
           </p>
         </header>
 
+        {/* 036 I17 (2026-10-18): a failed read offers a Retry, rather than a red line and a reload. */}
         {understatement.isLoading ? (
-          <p className="text-sm text-gray-500">Comparing…</p>
+          <p className="text-sm text-gray-500" role="status">
+            Comparing…
+          </p>
         ) : !understatement.data ? (
-          <p className="text-sm text-red-700">The report could not be read.</p>
+          <QueryError
+            compact
+            error={understatement.error}
+            fallback="The report could not be read."
+            onRetry={understatement.refetch}
+          />
         ) : understatement.data.rows.length === 0 ? (
           <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
             Every issued bill still matches the measurement approved for its
@@ -121,9 +130,16 @@ export default function BillPackageReports({
         </header>
 
         {overClaims.isLoading ? (
-          <p className="text-sm text-gray-500">Counting…</p>
+          <p className="text-sm text-gray-500" role="status">
+            Counting…
+          </p>
         ) : !overClaims.data ? (
-          <p className="text-sm text-red-700">The report could not be read.</p>
+          <QueryError
+            compact
+            error={overClaims.error}
+            fallback="The report could not be read."
+            onRetry={overClaims.refetch}
+          />
         ) : (
           <OverClaims report={overClaims.data} />
         )}
