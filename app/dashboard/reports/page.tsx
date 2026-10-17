@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   downloadExport,
   exportReport,
@@ -15,7 +15,9 @@ import {
   type ReportResult,
   type ReportType,
 } from '@/app/lib/api/dashboard';
+import { Button } from '@/app/ui/button';
 import FilterField from '@/app/ui/dashboard/filter-field';
+import QueryError from '@/app/ui/query-error';
 import ReportResultTable from '@/app/ui/dashboard/report-result-table';
 import ReportTypeList from '@/app/ui/dashboard/report-type-list';
 import PageHeader from '@/app/ui/page-header';
@@ -38,6 +40,23 @@ function buildBody(values: Record<string, string>) {
 }
 
 const extFor = (format: 'pdf' | 'excel') => (format === 'pdf' ? 'pdf' : 'xlsx');
+
+/**
+ * Why these filters cannot be run, or null (036 E2): a required filter left empty, or a From after
+ * its To. The server refuses both too; asking first saves the round trip and says which field.
+ */
+function filterProblem(
+  type: ReportType,
+  values: Record<string, string>,
+): string | null {
+  const missing = type.filters.find((f) => f.required && !values[f.key]);
+  if (missing) return `${missing.label} is required.`;
+  const { fromDate, toDate } = values;
+  if (fromDate && toDate && fromDate > toDate) {
+    return 'The From date must not be after the To date.';
+  }
+  return null;
+}
 
 export default function ReportsPage() {
   const [selected, setSelected] = useState<ReportType | null>(null);
@@ -75,9 +94,9 @@ export default function ReportsPage() {
       setResult(res);
       setError(null);
     },
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not run the report.'),
+    onError: (e) => setError(errorMessage(e, 'Could not run the report.')),
   });
+  const problem = selected ? filterProblem(selected, values) : null;
 
   const exportMut = useMutation({
     mutationFn: (view: boolean) => {
@@ -101,8 +120,7 @@ export default function ReportsPage() {
         setMessage(`Not available — waiting on the ${outcome.module} module.`);
       }
     },
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not export.'),
+    onError: (e) => setError(errorMessage(e, 'Could not export.')),
   });
 
   const jobStatus = useQuery({
@@ -174,9 +192,11 @@ export default function ReportsPage() {
             </p>
           )}
           {types.isError && (
-            <p className="text-sm text-red-600" role="alert">
-              Could not load report types.
-            </p>
+            <QueryError
+              error={types.error}
+              onRetry={types.refetch}
+              fallback="Could not load report types."
+            />
           )}
           {types.data && (
             <ReportTypeList
@@ -202,21 +222,27 @@ export default function ReportsPage() {
                     key={spec.key}
                     spec={spec}
                     value={values[spec.key] ?? ''}
-                    onChange={(v) =>
-                      setValues((prev) => ({ ...prev, [spec.key]: v }))
-                    }
+                    onChange={(v) => {
+                      setValues((prev) => ({ ...prev, [spec.key]: v }));
+                      // 036 E1: the result on screen belonged to the old filters, while Export
+                      // already used the new ones — the table and the file disagreed. It goes.
+                      setResult(null);
+                      setMessage(null);
+                    }}
                   />
                 ))}
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
+                <Button
+                  type="button"
+                  intent="read"
                   onClick={() => run.mutate()}
-                  disabled={run.isPending}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  loading={run.isPending}
+                  disabled={problem !== null}
                 >
-                  {run.isPending ? 'Running…' : 'Run report'}
-                </button>
+                  Run report
+                </Button>
 
                 <label className="text-sm">
                   <span className="sr-only">Export format</span>
@@ -235,7 +261,7 @@ export default function ReportsPage() {
                 {format === 'pdf' && (
                   <SecondaryButton
                     onClick={() => exportMut.mutate(true)}
-                    disabled={exportMut.isPending || jobId !== null}
+                    disabled={exportMut.isPending || jobId !== null || problem !== null}
                   >
                     View PDF
                   </SecondaryButton>
@@ -243,7 +269,7 @@ export default function ReportsPage() {
 
                 <SecondaryButton
                   onClick={() => exportMut.mutate(false)}
-                  disabled={exportMut.isPending || jobId !== null}
+                  disabled={exportMut.isPending || jobId !== null || problem !== null}
                 >
                   {jobId !== null
                     ? 'Processing…'
@@ -253,6 +279,11 @@ export default function ReportsPage() {
                 </SecondaryButton>
               </div>
 
+              {problem && (
+                <p className="text-sm text-amber-800" role="status">
+                  {problem}
+                </p>
+              )}
               {viewer}
               {message && (
                 <p className="text-sm text-gray-600" role="status">

@@ -512,8 +512,29 @@ const reportTypeSchema = z.object({
 });
 export type ReportType = z.infer<typeof reportTypeSchema>;
 
+/**
+ * How a report column's values are shown (036 E1). Absent, or a type this client does not know, is
+ * text — so a server adding a new type cannot break parsing.
+ */
+export const REPORT_COLUMN_TYPES = [
+  'text',
+  'number',
+  'money',
+  'quantity',
+  'percent',
+  'date',
+  'boolean',
+] as const;
+export type ReportColumnType = (typeof REPORT_COLUMN_TYPES)[number];
+
 const reportDataSchema = z.object({
-  columns: z.array(z.object({ key: z.string(), label: z.string() })),
+  columns: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+      type: z.enum(REPORT_COLUMN_TYPES).optional().catch(undefined),
+    }),
+  ),
   rows: z.array(z.record(z.string(), z.unknown())),
   /**
    * Why there is nothing to show, or what is missing from what is.
