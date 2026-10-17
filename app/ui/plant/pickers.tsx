@@ -97,10 +97,16 @@ export function equipmentOption(row: {
 export function EquipmentPicker({
   onChange,
   filters = {},
+  filterRow,
   ...props
 }: PickerProps & {
   onChange: (id: string, machine: Equipment | null) => void;
   filters?: { ownership?: string; siteId?: string; status?: string };
+  /**
+   * Drops rows the server filters cannot express ("anything not owned"). The count shown is then
+   * the server's, which can be a little high — acceptable for a narrowing the API cannot do.
+   */
+  filterRow?: (machine: Equipment) => boolean;
 }) {
   const companyId = useSelectedCompanyId();
   const seen = useRef(new Map<string, Equipment>());
@@ -123,9 +129,10 @@ export function EquipmentPicker({
             ...filters,
           });
           for (const row of result.items) seen.current.set(row.id, row);
+          const rows = filterRow ? result.items.filter(filterRow) : result.items;
           return {
-            total: result.total,
-            items: result.items.map((row) => ({
+            total: result.total - (result.items.length - rows.length),
+            items: rows.map((row) => ({
               ...equipmentOption(row),
               note: readingWithUnit(row.currentReading, row.meterType),
             })),

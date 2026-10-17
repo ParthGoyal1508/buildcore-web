@@ -4,8 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
-import { getHireRates } from '@/app/lib/api/plant';
+import { errorMessage } from '@/app/lib/api/client';
+import {
+  getHireBillLogbookSummary,
+  getHireRates,
+  type Equipment,
+} from '@/app/lib/api/plant';
 import {
   createHireBillFull,
   getHireOrders,
@@ -14,7 +18,7 @@ import {
   type HireBillFull,
 } from '@/app/lib/api/plant-hire';
 import { MESSAGES } from '@/app/lib/constants';
-import { formatRupees } from '@/app/lib/utils';
+import { quantity3, rupees as formatRupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -23,12 +27,9 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import {
-  usePlantCompanyId,
-  usePlantEquipment,
-  usePlantVendors,
-} from './use-plant-refs';
-import VendorOptions from './vendor-options';
+import { useToast } from '@/app/ui/toast';
+import { EquipmentPicker, VendorPicker, readingWithUnit } from './pickers';
+import { usePlantCompanyId } from './use-plant-refs';
 import { dateLabel } from '@/app/lib/format';
 
 /** A number field's value as the API wants it: absent when blank, so the server's default holds. */
@@ -101,11 +102,13 @@ function ReadOnlyFigure({
  */
 export default function HireBillModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const companyId = usePlantCompanyId();
-  const equipment = usePlantEquipment();
-  const vendors = usePlantVendors();
 
-  const [equipmentId, setEquipmentId] = useState('');
+  const [machine, setMachine] = useState<Equipment | null>(null);
+  const equipmentId = machine?.id ?? '';
+  /** Whether the person has typed billed hours — until then they follow the logbook (036 K9). */
+  const [billedTouched, setBilledTouched] = useState(false);
   const [chosenVendorId, setChosenVendorId] = useState('');
   const [basis, setBasis] = useState<HireBillBasis>('hours');
   const [hireOrderId, setHireOrderId] = useState('');
@@ -127,10 +130,6 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
   const [holdAmount, setHoldAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const billable = (equipment.data ?? []).filter(
-    (row) => row.ownership !== 'owned',
-  );
-  const machine = billable.find((row) => row.id === equipmentId);
   const machineVendorId = machine?.vendorId ?? null;
   const vendorId = machineVendorId ?? chosenVendorId;
   const monthly = basis === 'monthly';
@@ -142,8 +141,45 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
   const rates = useQuery({
     queryKey: ['plant', 'rates', machine?.categoryId],
     queryFn: () => getHireRates(machine?.categoryId),
-    enabled: machine !== undefined,
+    enabled: machine !== null,
   });
+
+  // 036 K9: what the logbook says over the period, before saving — the figure the bill will
+  // snapshot, so billed hours are no longer typed blind. Billed hours follow it until typed over.
+  const periodValid =
+    billingPeriodFrom !== '' &&
+    billingPeriodTo !== '' &&
+    billingPeriodTo >= billingPeriodFrom;
+  const logbook = useQuery({
+    queryKey: [
+      'plant',
+      'hire-bill-logbook',
+      equipmentId,
+      billingPeriodFrom,
+      billingPeriodTo,
+    ],
+    queryFn: () =>
+      getHireBillLogbookSummary(
+        equipmentId,
+        billingPeriodFrom,
+        billingPeriodTo,
+      ),
+    enabled: Boolean(equipmentId) && periodValid,
+  });
+  const unit = km ? 'km' : 'h';
+  const billedValue =
+    !billedTouched && billedHours === '' && logbook.data && !monthly
+      ? String(logbook.data.logbookHours)
+      : billedHours;
+  const variance =
+    logbook.data && billedValue !== ''
+      ? Math.round((Number(billedValue) - logbook.data.logbookHours) * 1000) /
+        1000
+      : null;
+  const periodBackwards =
+    billingPeriodFrom !== '' &&
+    billingPeriodTo !== '' &&
+    billingPeriodTo < billingPeriodFrom;
 
   // Only this vendor's orders: the server refuses a bill under another vendor's order.
   const orders = useQuery({
@@ -188,8 +224,8 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
     ? monthlyRate !== '' && days && daysInMonth
       ? Math.round(((Number(monthlyRate) * days) / daysInMonth) * 100) / 100
       : null
-    : appliedRate !== null && billedHours !== ''
-      ? Math.round(Number(billedHours) * appliedRate * 100) / 100
+    : appliedRate !== null && billedValue !== ''
+      ? Math.round(Number(billedValue) * appliedRate * 100) / 100
       : null;
 
   const save = useMutation({
@@ -207,7 +243,7 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
               periodDays: optionalNumber(periodDays),
             }
           : {
-              billedHours: Number(billedHours),
+              billedHours: Number(billedValue),
               rate: optionalNumber(rate),
             }),
         hireOrderId: optionalText(hireOrderId),
@@ -222,20 +258,30 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
         deductionAmount: optionalNumber(deductionAmount),
         holdAmount: optionalNumber(holdAmount),
       }),
-    onSuccess: () => {
+    onSuccess: (bill) => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
+      toast.success(`Hire bill raised for ${bill.equipmentCode}.`);
       onClose();
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
-      ),
+    // Everything typed stays; only the message changes.
+    onError: (err) => setError(errorMessage(err, MESSAGES.plantSaveFailed)),
   });
+
+  const isDirty = Boolean(
+    machine ||
+      billedHours ||
+      rate ||
+      monthlyRate ||
+      billingPeriodFrom ||
+      billingPeriodTo ||
+      invoiceNo ||
+      description,
+  );
 
   // A monthly bill names its own rent, so the category's hire rate does not come into it.
   const noRate =
     !monthly &&
-    machine !== undefined &&
+    machine !== null &&
     billingPeriodFrom !== '' &&
     rate === '' &&
     rates.isSuccess &&
@@ -246,6 +292,8 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
       title="Raise a hire bill"
       onClose={onClose}
       wide
+      isDirty={isDirty}
+      pending={save.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
@@ -254,9 +302,10 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
           <Button
             type="submit"
             form="hire-bill-form"
-            disabled={save.isPending || noRate || !vendorId}
+            loading={save.isPending}
+            disabled={noRate || !vendorId || periodBackwards}
           >
-            {save.isPending ? 'Saving…' : 'Save'}
+            Save
           </Button>
         </>
       }
@@ -273,13 +322,14 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
         <FormError message={error} />
         {noRate && <FormError message={MESSAGES.plantNoHireRate} />}
 
-        <SelectField
+        <EquipmentPicker
           id="hire-equipment"
           label="Hired machine"
           required
           value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
+          filterRow={(row) => row.ownership !== 'owned'}
+          onChange={(_, row) => {
+            setMachine(row);
             // An order belongs to a vendor; a different machine may be billed by another.
             setHireOrderId('');
           }}
@@ -290,30 +340,20 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
                 ? undefined
                 : MESSAGES.plantHireBillOwned
           }
-        >
-          <option value="">Select a machine</option>
-          {billable.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+        />
 
         {machine && !machineVendorId && (
-          <SelectField
+          <VendorPicker
             id="hire-vendor"
             label="Vendor"
             required
             value={chosenVendorId}
-            onChange={(event) => {
-              setChosenVendorId(event.target.value);
+            onChange={(id) => {
+              setChosenVendorId(id);
               setHireOrderId('');
             }}
             hint="This machine's record names no vendor — choose who is billing. Recording it on the machine saves asking next time."
-          >
-            <option value="">Select the hire vendor</option>
-            <VendorOptions vendors={vendors.data ?? []} />
-          </SelectField>
+          />
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -388,9 +428,47 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
             label="Billing period to"
             type="date"
             required
+            min={billingPeriodFrom || undefined}
             value={billingPeriodTo}
             onChange={(event) => setBillingPeriodTo(event.target.value)}
+            error={
+              periodBackwards
+                ? 'The period cannot end before it starts.'
+                : undefined
+            }
           />
+          {machine && periodValid && (
+            <div className="sm:col-span-2">
+              <ReadOnlyFigure label="Logbook for this period">
+                {logbook.isPending ? (
+                  'Reading the logbook…'
+                ) : logbook.isError ? (
+                  <span className="text-red-700">
+                    {errorMessage(logbook.error, 'The logbook could not be read.')}{' '}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => void logbook.refetch()}
+                    >
+                      Retry
+                    </button>
+                  </span>
+                ) : logbook.data.entryCount === 0 ? (
+                  'No logbook entries in this period.'
+                ) : (
+                  <>
+                    {quantity3(logbook.data.logbookHours)} {unit} over{' '}
+                    {logbook.data.entryCount}{' '}
+                    {logbook.data.entryCount === 1 ? 'day' : 'days'} · readings{' '}
+                    {readingWithUnit(logbook.data.startReading, machine.meterType)} →{' '}
+                    {readingWithUnit(logbook.data.endReading, machine.meterType)}
+                    {logbook.data.dieselGiven > 0 &&
+                      ` · ${quantity3(logbook.data.dieselGiven)} litres of diesel`}
+                  </>
+                )}
+              </ReadOnlyFigure>
+            </div>
+          )}
           {monthly ? (
             <>
               <TextField
@@ -435,11 +513,22 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
                 id="hire-hours"
                 label={km ? 'Billed km' : 'Billed hours'}
                 type="number"
+                inputMode="decimal"
                 required
                 min={0}
                 step="0.001"
-                value={billedHours}
-                onChange={(event) => setBilledHours(event.target.value)}
+                value={billedValue}
+                onChange={(event) => {
+                  setBilledTouched(true);
+                  setBilledHours(event.target.value);
+                }}
+                hint={
+                  variance === null
+                    ? 'Filled from the logbook once the machine and period are chosen.'
+                    : variance === 0
+                      ? 'Matches the logbook.'
+                      : `${variance > 0 ? '+' : '−'}${quantity3(Math.abs(variance))} ${unit} against the logbook.`
+                }
               />
               <TextField
                 id="hire-rate"
@@ -638,7 +727,7 @@ export function HireBillCorrectionModal({
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+        errorMessage(err, MESSAGES.plantSaveFailed),
       ),
   });
 
