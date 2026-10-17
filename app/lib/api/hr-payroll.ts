@@ -1906,6 +1906,31 @@ export async function listSites() {
 
 export type SiteOption = z.infer<typeof siteOptionSchema>;
 
+/**
+ * Sites narrowed to a company or a project (036 F21), for a filter that sits beside those two
+ * pickers. A project's sites come from the paged site list; a company's from the options list.
+ */
+export async function listSitesFor(filter: {
+  companyId?: string;
+  projectId?: string;
+}): Promise<SiteOption[]> {
+  if (filter.projectId) {
+    const page = z
+      .object({ items: z.array(siteOptionSchema) })
+      .parse(
+        await authFetch<unknown>(
+          `/projects/sites/list${qs({ projectId: filter.projectId, pageSize: 200 })}`,
+        ),
+      );
+    return page.items;
+  }
+  return z
+    .array(siteOptionSchema)
+    .parse(
+      await authFetch<unknown>(`/projects/sites${qs({ companyId: filter.companyId })}`),
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Slip delivery (021 FR-005 to FR-007 — `bugs.md` item 8)
 // ─────────────────────────────────────────────────────────────────────────────

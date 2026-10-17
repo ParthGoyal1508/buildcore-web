@@ -4,7 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { downloadMonthlyAttendance, listSites } from '@/app/lib/api/hr-payroll';
+import { downloadMonthlyAttendance, listSitesFor } from '@/app/lib/api/hr-payroll';
 import { getProjects } from '@/app/lib/api/projects';
 import { listDepartments } from '@/app/lib/api/settings';
 import { saveBlob } from '@/app/lib/download-file';
@@ -32,7 +32,16 @@ export default function MonthlyAttendanceDownload() {
   const [departmentId, setDepartmentId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const sites = useQuery({ queryKey: ['hr', 'sites'], queryFn: listSites });
+  // 036 F21: the sites offered follow the company and project chosen, so a site of another company
+  // (which would yield an empty sheet) cannot be picked.
+  const sites = useQuery({
+    queryKey: ['hr', 'sites', companyId, projectId],
+    queryFn: () =>
+      listSitesFor({
+        companyId: companyId || undefined,
+        projectId: projectId || undefined,
+      }),
+  });
   const departments = useQuery({
     queryKey: ['departments'],
     queryFn: () => listDepartments(),
@@ -83,6 +92,7 @@ export default function MonthlyAttendanceDownload() {
             setCompanyId(v);
             setSiteId('');
             setProjectId('');
+            setDepartmentId('');
           }}
         />
         {projects.isSuccess && (
@@ -96,7 +106,9 @@ export default function MonthlyAttendanceDownload() {
             }}
           >
             <option value="">All projects</option>
-            {projects.data.items.map((p) => (
+            {projects.data.items
+              .filter((p) => !companyId || !('companyId' in p) || p.companyId === companyId)
+              .map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -132,13 +144,14 @@ export default function MonthlyAttendanceDownload() {
         <div className="flex items-end">
           <SecondaryButton
             className="w-full justify-center"
-            disabled={!month || download.isPending}
+            disabled={!month}
+            loading={download.isPending}
             onClick={() => {
               setError(null);
               download.mutate();
             }}
           >
-            {download.isPending ? 'Excel…' : 'Excel'}
+            Excel
           </SecondaryButton>
         </div>
       </div>
