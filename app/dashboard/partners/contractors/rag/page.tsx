@@ -1,27 +1,38 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import clsx from 'clsx';
 
-import { getRagMatrix, type RagMatrix } from '@/app/lib/api/partners';
+import { errorMessage } from '@/app/lib/api/client';
 import {
-  MESSAGES,
+  exportRagMatrix,
+  getRagMatrix,
+  type RagMatrix,
+} from '@/app/lib/api/partners';
+import {
   ROUTES,
   partnersLabel,
+  RAG_CELL_STATUSES,
   type RagCellStatus,
 } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
 import { financialYearOf, periodLabel } from '@/app/lib/format';
-import { Field, SelectInput } from '@/app/ui/partners/form-controls';
+import { urlEnum, urlString, useUrlState } from '@/app/lib/use-url-state';
+import { Button } from '@/app/ui/button';
+import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import PageHeader from '@/app/ui/page-header';
+import QueryError from '@/app/ui/query-error';
+import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 import {
   SortHeader,
   TABLE,
   useSortedRows,
   type SortableColumn,
 } from '@/app/ui/table';
-import { LoadingText } from '@/app/ui/spinner';
 
 /** Dot colours. Distinct from `StatusBadge` because a dot has no text to carry the
  * meaning, so each one gets a `title` and an accessible label instead. */
@@ -141,14 +152,44 @@ function RagTable({ data }: { data: RagMatrix }) {
   );
 }
 
-function RagMatrixBody() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const fy = searchParams.get('fy') ?? financialYearOf();
+/** Statuses a row can be filtered to: rows with at least one month in that state. */
+const ROW_FILTERS = RAG_CELL_STATUSES.filter((status) => status !== 'gray');
 
-  const { data, isPending, isError } = useQuery({
+function RagMatrixBody() {
+  const toast = useToast();
+  // The year, a contractor search and a status filter, all in the URL (036 N6, 2026-10-17) —
+  // the year always was; the other two are new, and so is a way to clear them. Filtering is
+  // done here: the matrix is one request for the whole year either way.
+  const [filters, setFilters, query] = useUrlState({
+    fy: urlString(financialYearOf()),
+    q: urlString(),
+    status: urlEnum(['', ...ROW_FILTERS] as const, ''),
+  });
+  const fy = query.fy;
+  const filtered = Boolean(query.q.trim() || query.status);
+
+  const { data, isPending, error, refetch } = useQuery({
     queryKey: ['partners', 'rag', fy],
     queryFn: () => getRagMatrix(fy),
+    placeholderData: keepPreviousData,
+  });
+
+  const needle = filters.q.trim().toLowerCase();
+  const visible = data && {
+    ...data,
+    rows: data.rows.filter(
+      (row) =>
+        (!needle || row.contractorName.toLowerCase().includes(needle)) &&
+        (!query.status || row.cells.some((cell) => cell.status === query.status)),
+    ),
+  };
+
+  // The regulator-facing copy (036 N6): built by the API from the same matrix.
+  const download = useMutation({
+    mutationFn: () => exportRagMatrix(fy),
+    onSuccess: (blob) => saveBlob(blob, `RAG_Matrix_${fy}.xlsx`),
+    onError: (err: unknown) =>
+      toast.error(errorMessage(err, 'The export could not be prepared.')),
   });
 
   return (
@@ -158,43 +199,74 @@ function RagMatrixBody() {
           title="RAG matrix"
           description="One financial year of filings for every active contractor. A month that is not yet due is grey rather than red — a filing that is not due has not been missed."
         />
-        <div className="w-48">
-          <Field id="rag-fy" label="Financial year">
-            <SelectInput
-              id="rag-fy"
-              value={fy}
-              onChange={(event) =>
-                // The year goes in the URL so the view is linkable and survives a
-                // reload — a component-state selector would lose it on both.
-                router.push(`${ROUTES.partnersRag}?fy=${event.target.value}`)
-              }
+        <Button
+          intent="read"
+          loading={download.isPending}
+          disabled={!data || data.rows.length === 0}
+          onClick={() => download.mutate()}
+        >
+          Export to Excel
+        </Button>
+      </div>
+
+      <div className="mb-4 grid items-end gap-3 sm:grid-cols-4">
+        <Field id="rag-fy" label="Financial year">
+          <SelectInput
+            id="rag-fy"
+            value={filters.fy}
+            onChange={(event) => setFilters({ fy: event.target.value })}
+          >
+            {recentFinancialYears().map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field id="rag-search" label="Contractor">
+          <TextInput
+            id="rag-search"
+            type="search"
+            placeholder="Search by name"
+            value={filters.q}
+            onChange={(event) => setFilters({ q: event.target.value })}
+          />
+        </Field>
+        <Field id="rag-status" label="Has a month that is">
+          <SelectInput
+            id="rag-status"
+            value={filters.status}
+            onChange={(event) =>
+              setFilters({ status: event.target.value as typeof filters.status })
+            }
+          >
+            <option value="">Any status</option>
+            {ROW_FILTERS.map((value) => (
+              <option key={value} value={value}>
+                {partnersLabel(value)}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <div>
+          {filtered && (
+            <SecondaryButton
+              type="button"
+              onClick={() => setFilters({ q: '', status: '' })}
             >
-              {recentFinancialYears().map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
+              Clear filters
+            </SecondaryButton>
+          )}
         </div>
       </div>
 
       {isPending && (
-        <p
-          className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500"
-          role="status"
-        >
-          <LoadingText />
-        </p>
+        <div role="status">
+          <span className="sr-only">Loading…</span>
+          <ListSkeleton headers={['Contractor', ...Array(6).fill('')]} rows={6} />
+        </div>
       )}
-      {isError && (
-        <p
-          className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
-          role="alert"
-        >
-          {MESSAGES.loadFailed}
-        </p>
-      )}
+      {error && !data && <QueryError error={error} onRetry={() => refetch()} />}
 
       {data && data.rows.length === 0 && (
         <p className="rounded-lg bg-gray-50 p-6 text-sm text-gray-500">
@@ -202,9 +274,15 @@ function RagMatrixBody() {
         </p>
       )}
 
-      {data && data.rows.length > 0 && (
+      {visible && data && data.rows.length > 0 && visible.rows.length === 0 && (
+        <p className="rounded-lg bg-gray-50 p-6 text-sm text-gray-500">
+          No contractors match these filters.
+        </p>
+      )}
+
+      {visible && visible.rows.length > 0 && (
         <>
-          <RagTable data={data} />
+          <RagTable data={visible} />
 
           <ul className="mt-4 flex flex-wrap gap-4 text-xs text-gray-600">
             {(Object.keys(DOT_CLASSES) as RagCellStatus[]).map((status) => (
@@ -228,13 +306,7 @@ function RagMatrixBody() {
 
 export default function RagMatrixPage() {
   return (
-    <Suspense
-      fallback={
-        <p className="p-4 text-sm text-gray-500">
-          <LoadingText />
-        </p>
-      }
-    >
+    <Suspense fallback={<ListSkeleton headers={['Contractor']} rows={6} />}>
       <RagMatrixBody />
     </Suspense>
   );
