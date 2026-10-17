@@ -14,6 +14,9 @@ const config = [
       'next-env.d.ts',
       'tsconfig.tsbuildinfo',
       'public/**',
+      // Agent worktrees each hold a full checkout and its build output; linting them buried
+      // this repo's own 11 warnings under 57,000 problems from other branches (036 A31).
+      '.claude/**',
     ],
   },
   ...coreWebVitals,
