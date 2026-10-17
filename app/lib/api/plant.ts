@@ -13,7 +13,7 @@ import {
   SPARE_PART_MOVEMENT_TYPES,
 } from '@/app/lib/constants';
 import type { StoredFile } from '@/app/lib/api/client';
-import { authFetch, authFetchFile } from '@/app/lib/session';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/dashboard/plant/*` call to `buildcore-api` (feature 006).
@@ -338,8 +338,22 @@ export const equipmentSchema = z.object({
    * response itself, with no second call. */
   expiryAlert: z.boolean(),
   alertDocumentTypes: z.array(z.string()),
+  /** The main photo (036 K14), or null for the placeholder icon. */
+  mainPhotoId: z.string().nullable().optional().default(null),
 });
 export type Equipment = z.infer<typeof equipmentSchema>;
+
+/** One photo in a machine's gallery (036 K14). */
+export const equipmentPhotoSchema = z.object({
+  id: z.string(),
+  isMain: z.boolean(),
+  fileName: z.string().nullable(),
+  width: z.number(),
+  height: z.number(),
+  sizeBytes: z.number(),
+  uploadedAt: isoDate,
+});
+export type EquipmentPhoto = z.infer<typeof equipmentPhotoSchema>;
 
 export const equipmentDocumentSchema = z.object({
   id: z.string(),
@@ -355,6 +369,8 @@ export type EquipmentDocument = z.infer<typeof equipmentDocumentSchema>;
 
 export const equipmentDetailSchema = equipmentSchema.extend({
   documents: z.array(equipmentDocumentSchema),
+  /** Main photo first, then newest first (036 K14). */
+  photos: z.array(equipmentPhotoSchema).optional().default([]),
   serviceSchedules: z.array(
     z.object({
       id: z.string(),
@@ -560,6 +576,69 @@ export async function getEquipmentDocumentFile(
   );
 }
 
+// ── Photos (036 K14) ────────────────────────────────────────────────────────
+
+/** `file` is base64 (the browser already compressed it); the server re-encodes and thumbnails it. */
+export async function uploadEquipmentPhoto(
+  equipmentId: string,
+  input: { file: string; fileName?: string; makeMain?: boolean },
+): Promise<EquipmentPhoto> {
+  const raw = await authFetch<unknown>(
+    `/plant/equipment/${equipmentId}/photos`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return equipmentPhotoSchema.parse(raw);
+}
+
+/**
+ * A photo (or its 320 px thumbnail) as a data URL, for an `<img>`.
+ *
+ * Fetched with the session rather than put in `src`: the access token never appears in a URL
+ * (see `company-logo.tsx`). A photo is immutable, so callers cache it by id for the session.
+ */
+export async function getEquipmentPhotoDataUrl(
+  equipmentId: string,
+  photoId: string,
+  size: 'thumb' | 'full',
+): Promise<string> {
+  const blob = await authFetchBlob(
+    `/plant/equipment/${equipmentId}/photos/${photoId}${qs({ size })}`,
+  );
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('The photo could not be read.'));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function getEquipmentPhotoFile(
+  equipmentId: string,
+  photoId: string,
+): Promise<StoredFile> {
+  return authFetchFile(`/plant/equipment/${equipmentId}/photos/${photoId}`);
+}
+
+export async function setMainEquipmentPhoto(
+  equipmentId: string,
+  photoId: string,
+): Promise<EquipmentPhoto> {
+  const raw = await authFetch<unknown>(
+    `/plant/equipment/${equipmentId}/photos/${photoId}/main`,
+    { method: 'PATCH' },
+  );
+  return equipmentPhotoSchema.parse(raw);
+}
+
+export async function deleteEquipmentPhoto(
+  equipmentId: string,
+  photoId: string,
+): Promise<void> {
+  await authFetch<void>(`/plant/equipment/${equipmentId}/photos/${photoId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function deleteEquipmentDocument(
   equipmentId: string,
   documentId: string,
@@ -589,6 +668,8 @@ export const logbookEntrySchema = z.object({
   operatorName: z.string().nullable(),
   projectId: z.string().nullable(),
   remarks: z.string().nullable(),
+  /** Why the opening reading does not follow the previous closing one (036 K4). */
+  readingGapReason: z.string().nullable().optional().default(null),
 });
 export type LogbookEntry = z.infer<typeof logbookEntrySchema>;
 
@@ -618,6 +699,8 @@ export interface LogbookInput {
   operatorId?: string;
   projectId?: string;
   remarks?: string;
+  /** Required when the opening reading is not the previous closing one (036 K4). */
+  readingGapReason?: string;
 }
 
 export async function createLogbookEntry(
@@ -632,6 +715,33 @@ export async function createLogbookEntry(
 
 export async function deleteLogbookEntry(id: string): Promise<void> {
   await authFetch<void>(`/plant/logbook/${id}`, { method: 'DELETE' });
+}
+
+/** Corrects a day's readings with a required reason; audited (036 K6). 409 inside a billed period. */
+export async function correctLogbookReadings(
+  id: string,
+  input: {
+    openingReading: number;
+    closingReading: number;
+    reason: string;
+    readingGapReason?: string;
+  },
+): Promise<LogbookEntry> {
+  const raw = await authFetch<unknown>(`/plant/logbook/${id}/readings`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  return logbookEntrySchema.parse(raw);
+}
+
+/** The filtered logbook as Excel (036 K16). */
+export async function downloadLogbookExport(
+  query: Omit<LogbookQuery, 'page' | 'pageSize'>,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/plant/logbook/export.xlsx${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? 'Logbook.xlsx' };
 }
 
 /**
@@ -689,6 +799,8 @@ export interface LogbookSheetRowInput {
   cardNo?: string;
   dieselAmount?: number;
   dieselQuantity?: number;
+  /** Required when the opening reading is not the previous closing one (036 K4). */
+  readingGapReason?: string;
 }
 
 /** Saves the days entered and returns the refreshed sheet; a day already read is a 409. */
@@ -752,6 +864,16 @@ export interface FuelQuery extends PageQuery {
 export async function getFuelEntries(query: FuelQuery = {}): Promise<FuelPage> {
   const raw = await authFetch<unknown>(`/plant/fuel${qs({ ...query })}`);
   return fuelPageSchema.parse(raw);
+}
+
+/** The filtered fuel entries as Excel (036 K16). */
+export async function downloadFuelExport(
+  query: Omit<FuelQuery, 'page' | 'pageSize'>,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/plant/fuel/export.xlsx${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? 'Fuel.xlsx' };
 }
 
 export interface FuelInput {
@@ -965,6 +1087,8 @@ export async function closeMaintenanceJob(
 export const hireBillSchema = z.object({
   id: z.string(),
   companyId: z.string(),
+  /** Who raised it (036 K8): the screen hides Verify for them. Null on older bills. */
+  createdByUserId: z.string().nullable().optional().default(null),
   equipmentId: z.string(),
   equipmentCode: z.string(),
   equipmentName: z.string(),
@@ -998,6 +1122,47 @@ export interface HireBillQuery extends PageQuery {
   equipmentId?: string;
   vendorId?: string;
   status?: string;
+  /** 036 K9: bills whose period overlaps periodFrom..periodTo. */
+  periodFrom?: string;
+  periodTo?: string;
+}
+
+/** The filtered hire bills as Excel (036 K9). */
+export async function downloadHireBillsExport(
+  query: Omit<HireBillQuery, 'page' | 'pageSize'>,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/plant/hire-bills/export.xlsx${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? 'Hire bills.xlsx' };
+}
+
+export const hireBillLogbookSummarySchema = z.object({
+  equipmentId: z.string(),
+  meterType: z.string(),
+  unit: z.enum(['h', 'km']),
+  from: z.string(),
+  to: z.string(),
+  logbookHours: decimal,
+  entryCount: z.number(),
+  startReading: nullableDecimal,
+  endReading: nullableDecimal,
+  dieselGiven: decimal,
+});
+export type HireBillLogbookSummary = z.infer<
+  typeof hireBillLogbookSummarySchema
+>;
+
+/** What the logbook says over a prospective bill's period — what the bill will snapshot (036 K9). */
+export async function getHireBillLogbookSummary(
+  equipmentId: string,
+  from: string,
+  to: string,
+): Promise<HireBillLogbookSummary> {
+  const raw = await authFetch<unknown>(
+    `/plant/hire-bills/logbook-summary${qs({ equipmentId, from, to })}`,
+  );
+  return hireBillLogbookSummarySchema.parse(raw);
 }
 
 export async function getHireBills(

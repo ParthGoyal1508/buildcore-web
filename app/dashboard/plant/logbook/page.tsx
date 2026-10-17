@@ -1,81 +1,112 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   deleteLogbookEntry,
+  downloadLogbookExport,
+  getEquipmentDetail,
   getLogbook,
   type LogbookEntry,
 } from '@/app/lib/api/plant';
 import { MESSAGES } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
+import { dateLabel, quantity3, todayIso } from '@/app/lib/format';
+import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
+import { confirmDialog } from '@/app/ui/dialogs';
 import Pager from '@/app/ui/inventory/pager';
+import PageHeader from '@/app/ui/page-header';
+import CorrectReadingsModal from '@/app/ui/plant/correct-readings-modal';
 import LogbookModal from '@/app/ui/plant/logbook-modal';
 import LogbookViews from '@/app/ui/plant/logbook-views';
+import { EquipmentPicker, equipmentOption } from '@/app/ui/plant/pickers';
 import {
-  usePlantEquipment,
-  usePlantCompanyId,
-} from '@/app/ui/plant/use-plant-refs';
-import {
-  FormError,
   RowAction,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
-import PageHeader from '@/app/ui/page-header';
-import { confirmDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 
+/**
+ * The daily logbook entries.
+ *
+ * 036: filters live in the URL (the machine page links here filtered, Back keeps them, a filtered
+ * list can be sent as a link); the machine filter is a server-searched picker; readings and fuel
+ * are formatted with units; the filtered list downloads as Excel (K16); a read day can be
+ * corrected with a reason (K6) instead of only deleted.
+ */
 export default function LogbookPage() {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
-
-  const searchParams = useSearchParams();
-  // Seeded from the URL so the machine detail page can link straight to this list
-  // already filtered. Read once as the initial value rather than kept in sync: the
-  // dropdown below owns the filter after first render, and re-syncing would fight
-  // a user who changed it.
-  const [equipmentId, setEquipmentId] = useState(
-    searchParams.get('equipmentId') ?? '',
+  const toast = useToast();
+  const [filters, setFilters, query] = useUrlState(
+    {
+      equipmentId: urlString(),
+      dateFrom: urlString(),
+      dateTo: urlString(),
+      page: urlNumber(1),
+    },
+    { resetPage: 'page' },
   );
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [correcting, setCorrecting] = useState<LogbookEntry | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const companyId = usePlantCompanyId();
-
-  const filters = {
-    page,
-    ...(companyId ? { companyId } : {}),
-    ...(equipmentId ? { equipmentId } : {}),
-    ...(dateFrom ? { dateFrom } : {}),
-    ...(dateTo ? { dateTo } : {}),
+  const filterQuery = {
+    ...(query.equipmentId ? { equipmentId: query.equipmentId } : {}),
+    ...(query.dateFrom ? { dateFrom: query.dateFrom } : {}),
+    ...(query.dateTo ? { dateTo: query.dateTo } : {}),
   };
+  const listQuery = { ...filterQuery, page: query.page };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['plant', 'logbook', filters],
-    queryFn: () => getLogbook(filters),
+  const list = useQuery({
+    queryKey: ['plant', 'logbook', listQuery],
+    queryFn: () => getLogbook(listQuery),
+    placeholderData: keepPreviousData,
   });
+
+  // The filtered machine, named for the picker and used for the units.
+  const machine = useQuery({
+    queryKey: ['plant', 'equipment', query.equipmentId],
+    queryFn: () => getEquipmentDetail(query.equipmentId),
+    enabled: Boolean(query.equipmentId),
+  });
+  const unitOf = (row: LogbookEntry) =>
+    machine.data?.id === row.equipmentId && machine.data.meterType === 'km'
+      ? 'km'
+      : 'h';
 
   const remove = useMutation({
     mutationFn: (id: string) => deleteLogbookEntry(id),
     onSuccess: () => {
-      setError(null);
+      toast.success('Logbook entry deleted.');
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : 'Could not delete this entry.',
-      ),
+      toast.error(errorMessage(err, 'Could not delete this entry.')),
   });
 
+  async function exportList() {
+    setExporting(true);
+    try {
+      const { blob, filename } = await downloadLogbookExport(filterQuery);
+      saveBlob(blob, filename);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not download the logbook.'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const columns: Column<LogbookEntry>[] = [
-    { key: 'date', header: 'Date', render: (row) => row.date.slice(0, 10) },
+    { key: 'date', header: 'Date', render: (row) => dateLabel(row.date) },
     {
       key: 'equipment',
       header: 'Machine',
@@ -85,20 +116,30 @@ export default function LogbookPage() {
       key: 'opening',
       header: 'Opening',
       hideOnCard: true,
-      render: (row) => row.openingReading,
+      className: 'text-right tabular-nums',
+      render: (row) => quantity3(row.openingReading),
     },
     {
       key: 'closing',
       header: 'Closing',
       hideOnCard: true,
-      render: (row) => row.closingReading,
+      className: 'text-right tabular-nums',
+      render: (row) => quantity3(row.closingReading),
     },
-    { key: 'hours', header: 'Hours run', render: (row) => row.totalHours },
+    {
+      key: 'hours',
+      header: 'Run',
+      className: 'text-right tabular-nums',
+      render: (row) => `${quantity3(row.totalHours)} ${unitOf(row)}`,
+    },
     {
       key: 'fuel',
       header: 'Fuel',
+      className: 'text-right tabular-nums',
       render: (row) =>
-        row.fuelConsumed === null ? '—' : `${row.fuelConsumed} L`,
+        row.fuelConsumed === null
+          ? '—'
+          : `${quantity3(row.fuelConsumed)} litres`,
     },
     {
       key: 'operator',
@@ -109,7 +150,10 @@ export default function LogbookPage() {
       key: 'remarks',
       header: 'Remarks',
       hideOnCard: true,
-      render: (row) => row.remarks ?? '—',
+      render: (row) =>
+        row.readingGapReason
+          ? `${row.remarks ? `${row.remarks} · ` : ''}Gap: ${row.readingGapReason}`
+          : (row.remarks ?? '—'),
     },
   ];
 
@@ -119,6 +163,13 @@ export default function LogbookPage() {
         <PageHeader title="Logbook" />
         <div className="flex flex-wrap items-center gap-3">
           <LogbookViews current="entries" />
+          <SecondaryButton
+            type="button"
+            loading={exporting}
+            onClick={() => void exportList()}
+          >
+            Excel
+          </SecondaryButton>
           <SecondaryButton type="button" onClick={() => setShowModal(true)}>
             Record a day
           </SecondaryButton>
@@ -126,85 +177,85 @@ export default function LogbookPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SelectField
+        <EquipmentPicker
           id="logbook-filter-equipment"
           label="Machine"
-          value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
-            // Back to the first page: narrowing the list while on page three
-            // would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
-        >
-          <option value="">All machines</option>
-          {(equipment.data ?? []).map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+          emptyLabel="All machines"
+          value={filters.equipmentId}
+          selectedOption={machine.data ? equipmentOption(machine.data) : null}
+          onChange={(id) => setFilters({ equipmentId: id })}
+        />
         <TextField
           id="logbook-filter-from"
           label="From"
           type="date"
-          value={dateFrom}
-          onChange={(event) => {
-            setDateFrom(event.target.value);
-            setPage(1);
-          }}
+          max={filters.dateTo || todayIso()}
+          value={filters.dateFrom}
+          onChange={(event) => setFilters({ dateFrom: event.target.value })}
         />
         <TextField
           id="logbook-filter-to"
           label="To"
           type="date"
-          value={dateTo}
-          onChange={(event) => {
-            setDateTo(event.target.value);
-            setPage(1);
-          }}
+          min={filters.dateFrom || undefined}
+          value={filters.dateTo}
+          onChange={(event) => setFilters({ dateTo: event.target.value })}
         />
       </div>
 
-      <FormError message={error} />
-
       <ResponsiveList
         columns={columns}
-        rows={data?.items ?? []}
+        rows={list.data?.items ?? []}
         rowKey={(row) => row.id}
-        isLoading={isPending}
-        error={isError ? MESSAGES.plantLoadFailed : undefined}
+        isLoading={list.isPending}
+        isRefreshing={list.isFetching && !list.isPending}
+        error={list.isError ? list.error : undefined}
+        onRetry={list.refetch}
+        serverPaged
         emptyMessage={MESSAGES.plantLogbookEmpty}
         actions={(row) => (
-          <RowAction
-            onClick={async () => {
-              if (
-                await confirmDialog({
-                  title: 'Delete this logbook entry?',
-                  message: MESSAGES.plantConfirmDeleteLogbook,
-                  confirmLabel: 'Delete',
-                  tone: 'danger',
-                })
-              ) {
-                remove.mutate(row.id);
-              }
-            }}
-          >
-            Delete
-          </RowAction>
+          <div className="flex flex-wrap justify-end gap-1">
+            <RowAction onClick={() => setCorrecting(row)}>
+              Correct readings
+            </RowAction>
+            <RowAction
+              loading={remove.isPending && remove.variables === row.id}
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this logbook entry?',
+                    message: MESSAGES.plantConfirmDeleteLogbook,
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                ) {
+                  remove.mutate(row.id);
+                }
+              }}
+            >
+              Delete
+            </RowAction>
+          </div>
         )}
       />
 
       <Pager
-        total={data?.total ?? 0}
-        page={data?.page ?? 1}
-        pageSize={data?.pageSize ?? 25}
-        onPageChange={setPage}
+        total={list.data?.total ?? 0}
+        page={list.data?.page ?? 1}
+        pageSize={list.data?.pageSize ?? 25}
+        onPageChange={(page) => setFilters({ page })}
         noun="entry"
         plural="entries"
       />
 
       {showModal && <LogbookModal onClose={() => setShowModal(false)} />}
+      {correcting && (
+        <CorrectReadingsModal
+          entry={correcting}
+          meterType={unitOf(correcting) === 'km' ? 'km' : 'hours'}
+          onClose={() => setCorrecting(null)}
+        />
+      )}
     </div>
   );
 }
