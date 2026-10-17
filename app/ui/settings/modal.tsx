@@ -141,7 +141,7 @@ export default function Modal({
             // 44×44px below `sm` (016 FR-021). `p-1` around a 20px icon is a 28px target: reachable
             // with a mouse, missed with a thumb — and the close control being the one somebody stabs
             // at repeatedly makes it the worst one to leave small.
-            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0 sm:p-1"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0 sm:p-1"
           >
             <XMarkIcon className="w-5" aria-hidden="true" />
           </button>

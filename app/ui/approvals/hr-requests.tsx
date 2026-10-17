@@ -133,7 +133,7 @@ function LeaveRequests() {
         </h2>
         <Link
           href="/dashboard/hr/leave"
-          className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+          className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           Open leave
         </Link>
@@ -258,7 +258,7 @@ function ClaimRequests({ mayDecide }: { mayDecide: boolean }) {
         </h2>
         <Link
           href="/dashboard/hr/reimbursements"
-          className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+          className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           Open reimbursements
         </Link>

@@ -34,7 +34,7 @@ export default function ContractorsPage() {
       render: (row) => (
         <Link
           href={ROUTES.partnersContractor(row.id)}
-          className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {row.vendorName ?? row.vendorId}
         </Link>

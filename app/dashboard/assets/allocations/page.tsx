@@ -80,7 +80,7 @@ export default function AllocationsPage() {
       render: (row) => (
         <Link
           href={ROUTES.assetsAsset(row.assetId)}
-          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {row.assetCode}
         </Link>

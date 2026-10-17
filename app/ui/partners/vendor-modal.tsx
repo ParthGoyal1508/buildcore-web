@@ -242,7 +242,7 @@ export default function VendorModal({
                 aria-selected={tab === name}
                 onClick={() => setTab(name)}
                 className={clsx(
-                  '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+                  '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
                   tab === name
                     ? 'border-brand-600 text-brand-700'
                     : errorCount > 0
@@ -334,7 +334,7 @@ export default function VendorModal({
                     type="checkbox"
                     value={category.id}
                     {...register('categoryIds')}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                   />
                   {category.name}
                 </label>
@@ -350,7 +350,7 @@ export default function VendorModal({
             <input
               type="checkbox"
               {...register('active')}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             />
             Active
           </label>
@@ -450,7 +450,7 @@ export default function VendorModal({
                 <button
                   type="button"
                   onClick={() => remove(index)}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   Remove
                 </button>

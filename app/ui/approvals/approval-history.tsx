@@ -84,7 +84,7 @@ const SCOPES = ['visible', 'mine'] as const;
 const PAGE_SIZE = 20;
 
 const focusRing =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500';
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
 
 /**
  * 036 D1–D2: filters in the URL (status, scope, module, date, search, who raised it), a CSV export

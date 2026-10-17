@@ -237,7 +237,7 @@ function AttachmentThumb({
       type="button"
       onClick={onOpen}
       aria-label={`Open ${attachment.fileName}`}
-      className="h-11 w-11 shrink-0 overflow-hidden rounded bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+      className="h-11 w-11 shrink-0 overflow-hidden rounded bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
     >
       {thumb.data && (
         // eslint-disable-next-line @next/next/no-img-element -- an authenticated blob URL, not an asset.
@@ -329,7 +329,7 @@ export function DwrLinePhotos({
           back. Sized to the label, the input is already where the person just clicked, so there
           is nothing to scroll to. It stays a real focusable input with its name from the label.
         */
-        <label className="relative inline-flex min-h-[44px] cursor-pointer items-center text-xs text-brand-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500">
+        <label className="relative inline-flex min-h-[44px] cursor-pointer items-center text-xs text-brand-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-500">
           {upload.isPending ? 'Attaching…' : '+ Photo'}
           <input
             ref={input}

@@ -178,7 +178,7 @@ export default function ContractorDetailPage() {
           <StatusBadge status={data.complianceStatus} />
           <Link
             href={`${ROUTES.partnersCompliance}?contractorId=${data.id}`}
-            className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             View compliance history
           </Link>

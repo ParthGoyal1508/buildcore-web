@@ -67,7 +67,7 @@ export default function BoqAlertTabs({ projectId }: { projectId: string }) {
             aria-selected={active === tab.key}
             aria-controls={`boq-panel-${tab.key}`}
             onClick={() => setActive(tab.key)}
-            className={`rounded-t-md border-b-2 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+            className={`rounded-t-md border-b-2 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
               active === tab.key
                 ? 'border-brand-600 font-semibold text-brand-700'
                 : 'border-transparent text-gray-600 hover:text-gray-900'

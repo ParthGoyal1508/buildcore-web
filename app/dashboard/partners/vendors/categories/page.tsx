@@ -110,7 +110,7 @@ export default function VendorCategoriesPage() {
           <>
             <button
               type="button"
-              className="text-sm font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              className="text-sm font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               onClick={() => {
                 setEditing(row);
                 setModalOpen(true);
@@ -120,7 +120,7 @@ export default function VendorCategoriesPage() {
             </button>
             <button
               type="button"
-              className="text-sm font-medium text-red-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:text-gray-400 disabled:no-underline"
+              className="text-sm font-medium text-red-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:text-gray-400 disabled:no-underline"
               disabled={remove.isPending}
               onClick={async () => {
                 if (

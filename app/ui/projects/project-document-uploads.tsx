@@ -313,7 +313,7 @@ export default function ProjectDocumentUploads({
                             type="button"
                             onClick={() => remove(requirement.documentTypeId)}
                             disabled={disabled}
-                            className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                            className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                           >
                             {DOCUMENT_COPY.creationReplace}
                           </button>

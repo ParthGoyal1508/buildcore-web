@@ -207,7 +207,7 @@ export default function NotificationPanel({
             type="button"
             onClick={() => markAll.mutate()}
             disabled={markAll.isPending}
-            className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-700 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-700 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-50"
           >
             {markAll.isPending && <Spinner className="h-3 w-3" />}
             Mark all read
@@ -244,7 +244,7 @@ export default function NotificationPanel({
                   if (n.id && !n.read) markOne.mutate(n.id);
                   onClose();
                 }}
-                className="block py-2 pl-6 pr-3 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                className="block py-2 pl-6 pr-3 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 {!n.read && (
                   <span
@@ -267,7 +267,7 @@ export default function NotificationPanel({
                 <button
                   type="button"
                   onClick={() => markOne.mutate(n.id as string)}
-                  className="mb-2 ml-6 rounded text-xs text-brand-700 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                  className="mb-2 ml-6 rounded text-xs text-brand-700 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   Mark as read
                 </button>

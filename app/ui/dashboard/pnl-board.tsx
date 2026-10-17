@@ -104,7 +104,7 @@ export default function PnlBoard() {
                 <div className="flex items-baseline justify-between gap-3">
                   <Link
                     href={ROUTES.projectsSummary(row.projectId)}
-                    className="min-h-11 text-sm font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                    className="min-h-11 text-sm font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                   >
                     {row.projectName}
                   </Link>
@@ -235,7 +235,7 @@ function PnlTable({ board }: { board: PnlGroup }) {
               <td className={clsx(TABLE.td, 'text-right')}>
                 <Link
                   href={ROUTES.projectsSummary(row.projectId)}
-                  className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                  className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   {PNL_COPY.boardOpen}
                 </Link>

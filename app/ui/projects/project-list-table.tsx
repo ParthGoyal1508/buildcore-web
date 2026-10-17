@@ -66,7 +66,7 @@ export default function ProjectListTable({
           */}
           <Link
             href={ROUTES.projectsProject(row.id)}
-            className="text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {row.name}
           </Link>

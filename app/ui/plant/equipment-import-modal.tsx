@@ -158,7 +158,7 @@ export default function EquipmentImportModal({
               required
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              className="block w-full rounded-md border border-gray-200 p-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              className="block w-full rounded-md border border-gray-200 p-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             />
           </div>
         </form>

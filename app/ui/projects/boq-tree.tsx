@@ -519,7 +519,7 @@ function GroupRows({
             type="button"
             onClick={onToggle}
             aria-expanded={!collapsed}
-            className="sticky left-3 flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="sticky left-3 flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             <span aria-hidden="true" className="text-gray-400">
               {collapsed ? '▸' : '▾'}

@@ -194,7 +194,7 @@ export default function MyWorkspaceLayout({
                       <button
                         type="button"
                         onClick={() => setSyncNotice(null)}
-                        className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                        className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                       >
                         Dismiss
                       </button>
@@ -235,7 +235,7 @@ function NoEmployeeRecord() {
         The{' '}
         <Link
           href={ROUTES.myHolidays}
-          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           holiday list
         </Link>{' '}

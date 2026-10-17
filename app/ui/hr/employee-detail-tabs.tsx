@@ -212,7 +212,7 @@ export default function EmployeeDetailTabs({
         <div className="flex flex-wrap gap-2">
           <Link
             href={`${ROUTES.hrEmployee(employee.id)}/edit`}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             <PencilSquareIcon className="w-4" aria-hidden="true" />
             Edit

@@ -35,7 +35,7 @@ export default function HolidayList() {
           type="button"
           aria-label="Previous year"
           onClick={() => setYear((y) => y - 1)}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           ‹
         </button>
@@ -46,7 +46,7 @@ export default function HolidayList() {
           type="button"
           aria-label="Next year"
           onClick={() => setYear((y) => y + 1)}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           ›
         </button>

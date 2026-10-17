@@ -183,7 +183,7 @@ export default function FaceEnrolmentStatusPanel() {
                     );
                   }}
                   aria-label={`Remove photo ${index + 1}`}
-                  className="absolute -right-1 -top-1 rounded-full bg-gray-800 px-1.5 text-xs text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                  className="absolute -right-1 -top-1 rounded-full bg-gray-800 px-1.5 text-xs text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   ×
                 </button>

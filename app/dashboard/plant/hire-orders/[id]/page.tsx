@@ -91,7 +91,7 @@ export default function HireOrderPage() {
         </div>
         <Link
           href={ROUTES.plantHireOrders}
-          className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           Back to hire orders
         </Link>

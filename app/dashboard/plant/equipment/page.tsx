@@ -126,7 +126,7 @@ export default function AssetRegisterPage() {
         <Link
           href={ROUTES.plantEquipmentDetail(row.id)}
           aria-label={`${row.code} · ${row.name}`}
-          className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           <EquipmentThumb
             equipmentId={row.id}
@@ -146,7 +146,7 @@ export default function AssetRegisterPage() {
         <span>
           <Link
             href={ROUTES.plantEquipmentDetail(row.id)}
-            className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {row.code}
           </Link>

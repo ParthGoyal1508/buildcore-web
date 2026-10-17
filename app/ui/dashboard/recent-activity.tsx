@@ -46,14 +46,14 @@ export default function RecentActivity() {
         >
           <Link
             href={ROUTES.activityLog}
-            className="rounded hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="rounded hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             Activity Log
           </Link>
         </h2>
         <Link
           href={ROUTES.activityLog}
-          className="shrink-0 rounded text-xs font-medium text-brand-700 hover:text-brand-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+          className="shrink-0 rounded text-xs font-medium text-brand-700 hover:text-brand-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           View full log →
         </Link>

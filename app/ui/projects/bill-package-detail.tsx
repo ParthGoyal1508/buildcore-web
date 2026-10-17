@@ -355,7 +355,7 @@ export default function BillPackageDetail({
             <button
               type="button"
               onClick={() => setShowEveryLine(true)}
-              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               Show every schedule line
             </button>
@@ -366,7 +366,7 @@ export default function BillPackageDetail({
             <button
               type="button"
               onClick={() => setShowEveryLine(false)}
-              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               Show only what was claimed
             </button>
@@ -384,7 +384,7 @@ export default function BillPackageDetail({
               <button
                 type="button"
                 onClick={() => setShowEveryLine(true)}
-                className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 Show every schedule line
               </button>

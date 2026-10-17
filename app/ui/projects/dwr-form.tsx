@@ -1169,7 +1169,7 @@ function LineEditor({
                                 ),
                               })
                             }
-                            className="min-h-11 px-2 text-sm text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                            className="min-h-11 px-2 text-sm text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                             aria-label={`Remove measurement ${rowIndex + 1}`}
                           >
                             Remove
@@ -1525,7 +1525,7 @@ function LineFiles({
     // input is a focus target the browser scrolls an ancestor to reveal, and in a table wider than
     // the page that ancestor turned out to be the shell — which clips without a scrollbar, so the
     // layout shifted and stayed shifted. 44 px tall (036 I8): this is tapped on a phone on site.
-    <label className="relative inline-flex min-h-[44px] cursor-pointer items-center rounded-md px-2 text-xs font-medium text-brand-700 hover:bg-brand-50 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500">
+    <label className="relative inline-flex min-h-[44px] cursor-pointer items-center rounded-md px-2 text-xs font-medium text-brand-700 hover:bg-brand-50 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-500">
       {label}
       <input
         type="file"

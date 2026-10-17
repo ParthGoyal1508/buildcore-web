@@ -133,7 +133,7 @@ function RagTable({ data }: { data: RagMatrix }) {
                           )
                         }
                         className={clsx(
-                          'inline-block h-4 w-4 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+                          'inline-block h-4 w-4 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
                           DOT_CLASSES[cell.status],
                           clickable
                             ? 'cursor-pointer hover:ring-2 hover:ring-brand-300'

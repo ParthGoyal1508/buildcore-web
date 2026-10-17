@@ -734,7 +734,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
           {DOCUMENT_COPY.editFiledElsewhere}{' '}
           <Link
             href={ROUTES.projectsProjectDocuments(project.id)}
-            className="font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {DOCUMENT_COPY.editFiledElsewhereLink}
           </Link>

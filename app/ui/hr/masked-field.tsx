@@ -92,7 +92,7 @@ export default function MaskedField({
           revealed ? `Hide ${fieldLabel}` : `Reveal full ${fieldLabel}`
         }
         title={revealed ? undefined : HR_MESSAGES.revealPiiHint(fieldLabel)}
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 px-2 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50"
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 px-2 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-50"
       >
         {revealed ? (
           <EyeSlashIcon className="w-4" aria-hidden="true" />

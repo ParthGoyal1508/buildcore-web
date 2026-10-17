@@ -86,7 +86,7 @@ const cardClass = 'rounded-xl border border-gray-200 bg-white p-4 shadow-sm';
 
 /** The focus ring every link on the dashboard carries — keyboard users must see where they are. */
 const focusRing =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500';
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
 
 /**
  * A headline card that is itself the link (2026-10-15).

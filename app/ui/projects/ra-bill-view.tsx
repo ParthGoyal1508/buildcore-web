@@ -125,7 +125,7 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
           <button
             type="button"
             onClick={() => setShowAllLines((current) => !current)}
-            className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {showAllLines
               ? BILLING_COPY.showBilledLines

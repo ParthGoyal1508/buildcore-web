@@ -115,7 +115,7 @@ export default function ApprovalQueue() {
             {row.href ? (
               <Link
                 href={row.href}
-                className="text-brand-700 hover:text-brand-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                className="text-brand-700 hover:text-brand-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 {row.subject}
               </Link>

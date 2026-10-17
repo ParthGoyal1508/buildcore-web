@@ -249,7 +249,7 @@ export default function PurchaseOrdersPage() {
                   // Ordered → received (GRNs) → billed → paid, line by line (036 M9).
                   <Link
                     href={`/dashboard/inventory/purchase-orders/${letter.id}`}
-                    className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                    className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                   >
                     Trace
                   </Link>

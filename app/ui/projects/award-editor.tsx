@@ -564,7 +564,7 @@ export default function AwardEditor({
                               current.filter((other) => other.key !== row.key),
                             )
                           }
-                          className="rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                          className="rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                         >
                           ✕
                         </button>
