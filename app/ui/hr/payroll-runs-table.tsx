@@ -4,42 +4,75 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
+
 import {
   generatePayrollRun,
   listPayrollRuns,
   type PayrollRun,
 } from '@/app/lib/api/hr-payroll';
-import { HR_MESSAGES, MESSAGES, ROUTES } from '@/app/lib/constants';
+import { HR_MESSAGES, ROUTES } from '@/app/lib/constants';
 import { currentPeriod, dateTimeLabel, periodLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
+import { confirmDialog } from '@/app/ui/dialogs';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The payroll run list, and the one place a run is created.
  *
- * Generating a run is not destructive — it produces a draft — so it is a plain
- * button rather than a confirmed action. The irreversible steps (process, mark
- * paid) live on the run's own page, where the figures being frozen are visible.
+ * Generating a new period is not destructive — it produces a draft — so it is a plain button. Over
+ * an **existing draft** it asks first (036 F10): regenerating silently replaced the draft somebody
+ * may have been checking. A draft moves no balances (036 F1/F2), so the replacement costs only the
+ * lines. The irreversible steps (process, mark paid) live on the run's own page.
  */
 export default function PayrollRunsTable() {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState(currentPeriod());
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading, isError } = useQuery({
+  const toast = useToast();
+  const runs = useQuery({
     queryKey: ['hr', 'payrollRuns'],
     queryFn: listPayrollRuns,
   });
+  const { data } = runs;
 
   const generate = useMutation({
     mutationFn: () => generatePayrollRun(period),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setError(null);
+      const flagged = result.exceptions?.length ?? 0;
+      toast.success(
+        `Draft for ${periodLabel(result.period)} generated${
+          result.lineCount !== undefined ? ` with ${result.lineCount} employees` : ''
+        }.${flagged ? ` ${flagged} need attention — see the run.` : ''}`,
+      );
       queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRuns'] });
+      queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRun', result.runId] });
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) =>
+      setError(errorMessage(err, 'Could not generate the run.')),
   });
+
+  const submit = async () => {
+    const existing = (data ?? []).find(
+      (run) => run.period === period && !run.isFnf,
+    );
+    if (existing?.status === 'draft') {
+      const ok = await confirmDialog({
+        title: 'Replace the existing draft?',
+        message: `This replaces the existing draft for ${periodLabel(
+          period,
+        )} with freshly computed figures. Nothing has been paid or recovered from the draft, so nothing else changes.`,
+        confirmLabel: 'Regenerate draft',
+        tone: 'default',
+      });
+      if (!ok) return;
+    }
+    generate.mutate();
+  };
 
   const columns: Column<PayrollRun>[] = [
     {
@@ -77,7 +110,7 @@ export default function PayrollRunsTable() {
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          generate.mutate();
+          void submit();
         }}
         className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 p-4"
       >
@@ -90,12 +123,12 @@ export default function PayrollRunsTable() {
             onChange={(event) => setPeriod(event.target.value)}
           />
         </div>
-        <Button type="submit" disabled={!period || generate.isPending}>
-          {generate.isPending ? 'Generating…' : 'Generate run'}
+        <Button type="submit" disabled={!period} loading={generate.isPending}>
+          Generate run
         </Button>
         <p className="w-full text-xs text-gray-600">
-          A generated run starts as a draft. Its figures are only frozen when it is
-          processed.
+          A generated run starts as a draft. Regenerating a draft replaces its figures; nothing is
+          recovered, settled or paid until the run is processed.
         </p>
       </form>
 
@@ -106,8 +139,9 @@ export default function PayrollRunsTable() {
         columns={columns}
         rows={data ?? []}
         rowKey={(row) => row.id}
-        isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        isLoading={runs.isPending}
+        error={runs.isError ? runs.error : null}
+        onRetry={() => runs.refetch()}
         emptyMessage="No payroll runs yet."
       />
 

@@ -250,7 +250,7 @@ export default function BankPaymentSheet() {
           </div>
         </div>
       )}
-      <BankSheetHistory companyId={companyId} />
+      <BankSheetHistory key={`${companyId}|${month}`} companyId={companyId} month={month} />
     </section>
   );
 }

@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 import { ApiError } from '@/app/lib/api/client';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
-import { API_URL } from '@/app/lib/config';
-import { authFetch, authFetchFile, getAccessToken } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 import {
   reimbursementCategorySchema,
   type ReimbursementCategory,
@@ -107,33 +106,21 @@ const paginated = <T extends z.ZodTypeAny>(item: T) =>
 /**
  * Downloads a generated file (register, challan, bank sheet) as a Blob.
  *
- * A raw `fetch` rather than `authFetch`, for the same reason My Workspace's
- * payslip download uses one: `authFetch` parses the response as JSON, which
- * destroys a spreadsheet body. The cost is that these calls do not get the
- * refresh-on-401 retry — acceptable, because an export is always a deliberate
- * click on a screen the user loaded through an authenticated request moments
- * earlier, so an expired token is a re-click rather than a lost session.
+ * Through `authFetchFile` since 036 stream 3b. It used to be a raw `fetch` that threw one fixed
+ * sentence for every failure, so "this run is not approved yet" (409 `PAYROLL_RUN_NOT_APPROVED`)
+ * and "too many exports" (429) both read as "Could not produce that export" — and an expired token
+ * was a failed click rather than a silent renewal. Now the server's own message and code arrive as
+ * an `ApiError`. `init` carries the method and body for the exports that are POSTs.
  *
  * The filename comes from the response's own `Content-Disposition`, so the
  * backend stays the single authority on what a downloaded register is called.
  */
 export async function downloadFile(
   path: string,
+  init?: RequestInit,
 ): Promise<{ blob: Blob; filename: string }> {
-  const token = getAccessToken();
-  const res = await fetch(`${API_URL}${path}`, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) {
-    throw new Error('Could not produce that export. Please try again.');
-  }
-  const disposition = res.headers.get('content-disposition') ?? '';
-  const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-  return {
-    blob: await res.blob(),
-    filename: match ? decodeURIComponent(match[1]) : 'export',
-  };
+  const { blob, filename } = await authFetchFile(path, init);
+  return { blob, filename: filename ?? 'export' };
 }
 
 export { saveBlob } from '@/app/lib/download-file';
@@ -996,6 +983,13 @@ export const payrollLineItemSchema = z.object({
   professionalTax: decimal,
   tds: decimal,
   loanEmiDeduction: decimal,
+  // 036 F8: what the run deducted and paid beyond the statutory heads, and the server's own totals.
+  // Optional so a response from before those columns still parses; the screen falls back to 0.
+  fuelRecoveryDeduction: decimal.optional(),
+  advanceRecovered: decimal.optional(),
+  reimbursementTotal: decimal.optional(),
+  gross: decimal.optional(),
+  totalDeductions: decimal.optional(),
   netPay: decimal,
   employerPf: decimal,
   employerEps: decimal,
@@ -1008,9 +1002,21 @@ export const payrollLineItemSchema = z.object({
 
 export type PayrollLineItem = z.infer<typeof payrollLineItemSchema>;
 
+/**
+ * An employee the run could not compute correctly — no PAN, no tax slabs (036 F7). Saved on the run
+ * since Wave 1, as objects; this schema used to expect strings, so the warning could never appear.
+ */
+const runExceptionSchema = z.object({
+  employeeId: z.string(),
+  reason: z.string(),
+  employeeCode: z.string().optional(),
+  name: z.string().optional(),
+});
+export type PayrollRunException = z.infer<typeof runExceptionSchema>;
+
 const payrollRunDetailSchema = payrollRunSchema.extend({
   lineItems: z.array(payrollLineItemSchema).optional(),
-  exceptions: z.array(z.string()).optional(),
+  exceptions: z.array(runExceptionSchema).nullable().optional(),
 });
 
 export async function listPayrollRuns() {
@@ -1030,13 +1036,39 @@ export async function getPayrollRun(id: string) {
   );
 }
 
+/**
+ * Generates (or regenerates) the draft for a period. The API answers with a summary, not the run —
+ * `runId`, the line count and the exceptions — which is what this parses (it used to parse the
+ * answer as a whole run and fail on the missing `id`).
+ */
 export async function generatePayrollRun(period: string) {
-  return payrollRunDetailSchema.parse(
-    await authFetch<unknown>('/hr/payroll/runs', {
-      method: 'POST',
-      body: JSON.stringify({ period }),
-    }),
-  );
+  return z
+    .object({
+      runId: z.string(),
+      period: z.string(),
+      status: enumOf(PAYROLL_RUN_STATUSES),
+      lineCount: z.number().optional(),
+      exceptions: z.array(runExceptionSchema).optional(),
+    })
+    .parse(
+      await authFetch<unknown>('/hr/payroll/runs', {
+        method: 'POST',
+        body: JSON.stringify({ period }),
+      }),
+    );
+}
+
+/**
+ * Discards a draft run (036 F9) — one generated for the wrong period, or before attendance was in.
+ * A draft moves no balances, so nothing else needs undoing. 409 `PAYROLL_RUN_NOT_DRAFT` otherwise.
+ */
+export async function discardPayrollRun(id: string): Promise<void> {
+  await authFetch<unknown>(`/hr/payroll/runs/${id}`, { method: 'DELETE' });
+}
+
+/** A draft whose recoveries or claims moved since it was generated: process refuses it (036). */
+export function isStaleDraftError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'PAYROLL_DRAFT_STALE';
 }
 
 /**
@@ -1088,9 +1120,14 @@ export function unsubmittedRunOf(error: unknown): string | null {
   return null;
 }
 
-/** The bank salary sheet for a run, as a file. */
+/**
+ * Generates the bank salary sheet for a run, as a file.
+ *
+ * A POST since 036 F11: generating records the advance recoveries the transfer nets off and a
+ * history entry, so it is a write. Re-download a past sheet from the history instead.
+ */
 export async function downloadBankSheet(id: string) {
-  return downloadFile(`/hr/payroll/runs/${id}/bank-sheet`);
+  return downloadFile(`/hr/payroll/runs/${id}/bank-sheet`, { method: 'POST' });
 }
 
 // --- Registers (US16) ---
@@ -2344,13 +2381,22 @@ export async function getSalaryBankSheetPreview(
   );
 }
 
-/** `Salary_Bank_Sheet_<Company>_<Month>_<Year>.xlsx` in the bank's upload format. */
+/**
+ * Generates `Salary_Bank_Sheet_<Company>_<Month>_<Year>.xlsx` in the bank's upload format.
+ *
+ * A POST with the parameters in the body since 036 F11 (it records recoveries and a history entry).
+ */
 export async function downloadSalaryBankSheet(
   query: SalaryBankSheetQuery,
 ): Promise<{ blob: Blob; filename: string }> {
-  const { blob, filename } = await authFetchFile(
-    `/hr/payroll/bank-sheet${qs({ ...query })}`,
+  const body = Object.fromEntries(
+    Object.entries(query).filter(([, v]) => v !== undefined && v !== ''),
   );
+  const { blob, filename } = await authFetchFile(`/hr/payroll/bank-sheet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   return { blob, filename: filename ?? `Salary_Bank_Sheet_${query.year}_${query.month}.xlsx` };
 }
 
@@ -2367,11 +2413,17 @@ const bankSheetExportSchema = z.object({
 });
 export type BankSheetExport = z.infer<typeof bankSheetExportSchema>;
 
-/** Bank sheets generated for a company, newest first (2026-10-17). */
+/**
+ * Bank sheets generated for a company, newest first (2026-10-17). Paged since 036 F11 (it was capped
+ * at 100); the server's total is in a header the shared client cannot read, so a screen offers Next
+ * while a page comes back full.
+ */
 export async function getBankSheetHistory(query: {
   companyId?: string;
   year?: number;
   month?: number;
+  page?: number;
+  pageSize?: number;
 }): Promise<BankSheetExport[]> {
   const data = await authFetch<unknown>(
     `/hr/payroll/bank-sheet/history${qs({ ...query })}`,

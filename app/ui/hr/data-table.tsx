@@ -70,6 +70,7 @@ export default function DataTable<T>({
   onSortChange,
   serverPaged = false,
   isRefreshing = false,
+  stickyHeader = false,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -94,6 +95,12 @@ export default function DataTable<T>({
   onSortChange?: (sort: TableSort) => void;
   serverPaged?: boolean;
   isRefreshing?: boolean;
+  /**
+   * Keeps the header row in view while a long table scrolls (036 F9, F20). The table gets its own
+   * vertical scroll — capped at most of the viewport — because a sticky header inside a container
+   * that scrolls sideways can only stick to that container, never to the page.
+   */
+  stickyHeader?: boolean;
 }) {
   const {
     sorted,
@@ -134,6 +141,7 @@ export default function DataTable<T>({
         TABLE.wrap,
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
         isRefreshing && 'opacity-60 transition-opacity',
+        stickyHeader && 'max-h-[70vh] overflow-y-auto',
       )}
       aria-busy={isRefreshing || undefined}
       tabIndex={0}
@@ -142,7 +150,9 @@ export default function DataTable<T>({
     >
       <table className={TABLE.table}>
         {caption && <caption className="sr-only">{caption}</caption>}
-        <thead className={TABLE.thead}>
+        <thead
+          className={clsx(TABLE.thead, stickyHeader && 'sticky top-0 z-20')}
+        >
           <tr>
             {columns.map((column) => (
               <SortHeader
