@@ -65,7 +65,7 @@ export default function LabourFieldLayout({
       <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
         {/* Desktop only, and the same component `/dashboard` mounts, so a supervisor
             who is also an admin keeps every module they can reach. */}
-        <div className="hidden flex-none md:block md:w-64">
+        <div className="hidden flex-none md:block">
           <SideNav />
         </div>
 

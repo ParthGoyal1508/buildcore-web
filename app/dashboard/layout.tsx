@@ -72,8 +72,9 @@ export default function DashboardLayout({
             <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
               {/* Desktop only (2026-10-15). On a phone this was a grid of unlabelled module icons
             stacked above every page; the modules now sit, by name, behind Menu in the bottom
-            bar (`mobile-nav.tsx`), with the module's own sections beside it. */}
-              <div className="hidden flex-none md:block md:w-64">
+            bar (`mobile-nav.tsx`), with the module's own sections beside it. The sidebar sets
+            its own width: a 64px rail from `md`, the 256px column from `lg` (036 A23). */}
+              <div className="hidden flex-none md:block">
                 <SideNav />
               </div>
               {/* The content column scrolls on its own beneath the bar. `min-w-0` because a flex child defaults to `min-width: auto`

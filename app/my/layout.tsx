@@ -156,7 +156,7 @@ export default function MyWorkspaceLayout({
             <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
               {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
             keeps every module they can reach instead of being stranded in this one. */}
-              <div className="hidden flex-none md:block md:w-64">
+              <div className="hidden flex-none md:block">
                 <SideNav />
               </div>
 
