@@ -283,17 +283,5 @@ export async function stageProjectDocument(
   return { stagedDocumentId };
 }
 
-/** Reads a File as base64 without the data-URL prefix the API does not want. */
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      const comma = result.indexOf(',');
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = () =>
-      reject(new Error('The file could not be read.'));
-    reader.readAsDataURL(file);
-  });
-}
+// One copy, in `app/lib/files.ts` (036 A27); re-exported so existing imports keep working.
+export { fileToBase64 } from '@/app/lib/files';

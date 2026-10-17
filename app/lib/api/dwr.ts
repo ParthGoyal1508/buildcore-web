@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { StoredFile } from '@/app/lib/api/client';
 import { authFetch, authFetchFile } from '@/app/lib/session';
+import { fileToBase64 } from '@/app/lib/files';
 
 /**
  * Every daily-work-report call to `buildcore-api` — the fourteen routes under `projects/dwr` (feature 022, 024 FR-001).
@@ -542,14 +543,6 @@ export async function downloadDwrAttachment(
   attachmentId: string,
 ): Promise<StoredFile> {
   return authFetchFile(`/projects/dwr/attachments/${attachmentId}`);
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
 }
 
 const reconciliationSchema = z

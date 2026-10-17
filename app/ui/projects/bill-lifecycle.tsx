@@ -34,6 +34,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import { fileToBase64 } from '@/app/lib/files';
 
 /**
  * The shared table look at sheet density for the certification grid (2026-10-15): a line per BOQ
@@ -685,7 +686,7 @@ function CertifyForm({
     try {
       const result = await readCertifiedCopy(
         pkg.id,
-        file ? { data: await toBase64(file), fileName: file.name } : undefined,
+        file ? { data: await fileToBase64(file), fileName: file.name } : undefined,
       );
       // An earlier line-by-line certificate, where this is an amendment — the starting point for
       // manual entry, before the billed quantity.
@@ -765,7 +766,7 @@ function CertifyForm({
           remarks: remarks.trim() || undefined,
           ...(certificate
             ? {
-                certificateData: await toBase64(certificate),
+                certificateData: await fileToBase64(certificate),
                 certificateFileName: certificate.name,
               }
             : {}),
@@ -1079,14 +1080,6 @@ function ReviseForm({
       </div>
     </form>
   );
-}
-
-async function toBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 1)
-    binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
 }
 
 export function describe(err: unknown): string {

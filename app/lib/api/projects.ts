@@ -9,6 +9,7 @@ import {
 } from '@/app/lib/constants';
 import { authFetch } from '@/app/lib/session';
 import { projectReadinessSchema } from '@/app/lib/api/project-documents';
+import { fileToBase64 } from '@/app/lib/files';
 
 /**
  * Every `/dashboard/projects/*` call to `buildcore-api` (feature 008).
@@ -839,16 +840,3 @@ export async function confirmBOQImport(
   });
 }
 
-/** The data portion only — the API decodes bytes, not a data URL. */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('The file could not be read.'));
-    reader.onload = () => {
-      const result = String(reader.result);
-      const comma = result.indexOf(',');
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.readAsDataURL(file);
-  });
-}
