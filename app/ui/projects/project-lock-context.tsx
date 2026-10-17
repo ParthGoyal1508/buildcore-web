@@ -2,6 +2,8 @@
 
 import { createContext, useContext } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
+
 /**
  * Whether the project currently on screen is locked (spec FR-003).
  *
@@ -44,4 +46,37 @@ export function ProjectLockProvider({
 
 export function useProjectLock(): ProjectLockState {
   return useContext(ProjectLockContext);
+}
+
+/** HTTP 423 — the API's refusal of a write to a locked project (`ProjectLockGuard`). */
+export const HTTP_PROJECT_LOCKED = 423;
+
+/**
+ * What a locked project's refusal says, everywhere (036 Wave 3, stream 3c).
+ *
+ * Since 036 I1/I2 the lock is enforced on every DWR, bill-package, RA bill, client bill, work order,
+ * project-document and project-delete write. Several screens rendered the 423 as "something went
+ * wrong", which sends a person to an administrator about a permission they already have.
+ */
+export const PROJECT_LOCKED_MESSAGE =
+  'This project is locked, so nothing can be changed on it. Unlock it first — this is not a permission problem.';
+
+export function isProjectLockedError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { status?: unknown }).status === HTTP_PROJECT_LOCKED
+  );
+}
+
+/**
+ * The text for a refused project write: the lock sentence for a 423, otherwise the server's own
+ * message (`errorMessage`), otherwise `fallback`.
+ */
+export function projectErrorMessage(
+  error: unknown,
+  fallback = 'The change could not be saved. Please try again.',
+): string {
+  if (isProjectLockedError(error)) return PROJECT_LOCKED_MESSAGE;
+  return errorMessage(error, fallback);
 }
