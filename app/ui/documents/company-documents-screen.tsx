@@ -25,6 +25,7 @@ import {
   type DocumentKindInput,
 } from '@/app/ui/documents/document-kind-form';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { dateLabel } from '@/app/lib/format';
 
 /**
  * The company's statutory papers (017 US1).
@@ -227,7 +228,7 @@ export function CompanyDocumentsScreen() {
                   <p className="text-xs text-gray-500">
                     {doc.documentNumber ? `${doc.documentNumber} · ` : ''}
                     {doc.expiresAt
-                      ? `Expires ${doc.expiresAt.toISOString().slice(0, 10)}`
+                      ? `Expires ${dateLabel(doc.expiresAt)}`
                       : 'No expiry'}
                   </p>
                 </div>

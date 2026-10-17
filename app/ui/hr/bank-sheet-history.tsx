@@ -10,7 +10,7 @@ import {
   type BankSheetExport,
 } from '@/app/lib/api/hr-payroll';
 import { saveBlob } from '@/app/lib/download-file';
-import { periodLabel } from '@/app/lib/format';
+import { periodLabel, dateTimeLabel } from '@/app/lib/format';
 import { formatRupees } from '@/app/lib/utils';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
@@ -42,10 +42,7 @@ export default function BankSheetHistory({ companyId }: { companyId: string }) {
       header: 'Generated',
       render: (r) => (
         <span className="whitespace-nowrap">
-          {new Date(r.generatedAt).toLocaleString('en-IN', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          })}
+          {dateTimeLabel(r.generatedAt)}
           {r.generatedBy && (
             <span className="block text-xs text-gray-500">{r.generatedBy}</span>
           )}

@@ -29,6 +29,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { dateLabel } from '@/app/lib/format';
 
 export default function AssetRegisterPage() {
   const categories = useAssetCategories();
@@ -128,7 +129,7 @@ export default function AssetRegisterPage() {
             ? {
                 key: 'inspection',
                 text: 'Inspection due',
-                title: `Due ${row.nextInspectionDue?.slice(0, 10)}`,
+                title: `Due ${dateLabel(row.nextInspectionDue)}`,
               }
             : null,
           // Names *which* paperwork: "something is expiring" sends someone to open

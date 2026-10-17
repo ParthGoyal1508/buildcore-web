@@ -14,6 +14,7 @@ import { MESSAGES } from '@/app/lib/constants';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { LEAVE_TYPE_LABEL } from '@/app/ui/my/leave-balance';
+import { dateLabel } from '@/app/lib/format';
 
 const STATUS_CLASS: Record<LeaveApplication['status'], string> = {
   pending: 'bg-amber-100 text-amber-800',
@@ -22,12 +23,7 @@ const STATUS_CLASS: Record<LeaveApplication['status'], string> = {
   cancelled: 'bg-gray-100 text-gray-600',
 };
 
-const shortDate = (value: string) =>
-  new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: '2-digit',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+const shortDate = (value: string) => dateLabel(value.slice(0, 10));
 
 export default function LeaveApplications() {
   const queryClient = useQueryClient();

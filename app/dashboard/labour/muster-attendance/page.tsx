@@ -43,6 +43,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { LoadingText } from '@/app/ui/spinner';
+import { clockTime, dateTimeLabel } from '@/app/lib/format';
 
 /** The badge colour for each day status: a missing punch reads as a warning, not as absent. */
 const STATUS_TONE: Record<string, string> = {
@@ -69,8 +70,7 @@ const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
-const timeOf = (iso: string) =>
-  new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+const timeOf = (iso: string) => clockTime(iso);
 /** `HH:mm` in the browser's zone — the site's zone, for the office that runs it. */
 const hhmmOf = (iso: string) => {
   const d = new Date(iso);
@@ -783,10 +783,7 @@ function CorrectionModal({
                   <p className="text-gray-700">“{h.reason}”</p>
                   <p className="text-xs text-gray-500">
                     {h.correctedBy ?? 'Someone'} ·{' '}
-                    {new Date(h.correctedAt).toLocaleString('en-IN', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                    {dateTimeLabel(h.correctedAt)}
                   </p>
                 </li>
               ))}

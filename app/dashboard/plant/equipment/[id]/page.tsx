@@ -40,7 +40,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, dateLabel } from '@/app/lib/format';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -232,16 +232,16 @@ export default function EquipmentDetailPage() {
     { label: 'Utilisation this month', value: `${data.utilizationPercent}%` },
     {
       label: 'Last service',
-      value: data.lastServiceDate?.slice(0, 10) ?? '—',
+      value: dateLabel(data.lastServiceDate),
     },
     data.ownership === 'owned'
       ? {
           label: 'Purchase',
           value: data.purchaseCost
-            ? `${formatRupees(data.purchaseCost)} on ${data.purchaseDate?.slice(0, 10) ?? '—'}`
-            : (data.purchaseDate?.slice(0, 10) ?? '—'),
+            ? `${formatRupees(data.purchaseCost)} on ${dateLabel(data.purchaseDate)}`
+            : (dateLabel(data.purchaseDate)),
         }
-      : { label: 'Hire date', value: data.purchaseDate?.slice(0, 10) ?? '—' },
+      : { label: 'Hire date', value: dateLabel(data.purchaseDate) },
     {
       label: 'Depreciation',
       value:

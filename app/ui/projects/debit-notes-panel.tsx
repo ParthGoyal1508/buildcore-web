@@ -14,7 +14,7 @@ import {
 } from '@/app/lib/api/bill-packages';
 import { downloadDebitNote } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
-import { dateLabel, todayIso } from '@/app/lib/format';
+import { dateLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
 import Modal from '@/app/ui/settings/modal';
@@ -39,11 +39,8 @@ type Viewer = (file: {
 const fileStem = (note: DebitNote) =>
   `Debit Note ${(note.noteNumber ?? 'draft').replace(/\//g, '-')}`;
 
-const rupees = (value: string) =>
-  Number(value).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+/** The API sends Decimals as strings. The shared `rupees` puts the ₹ on (036 A20). */
+const amount = (value: string) => rupees(Number(value));
 
 /**
  * The debit notes on a subcontractor's bill (2026-10-15), in the client's DV-04 format.
@@ -107,8 +104,8 @@ export default function DebitNotesPanel({
             note here to deduct it on this bill.
           </>
         )}{' '}
-        Recovered on this bill: ₹{rupees(register.recoveredOnThisPackage)} of ₹
-        {rupees(register.total)}.
+        Recovered on this bill: {amount(register.recoveredOnThisPackage)} of{' '}
+        {amount(register.total)}.
       </p>
 
       {register.notes.length === 0 ? (
@@ -141,7 +138,7 @@ export default function DebitNotesPanel({
                     {note.lines.map((line) => line.description).join(', ')}
                   </td>
                   <td className={clsx(DENSE_TD, 'text-right')}>
-                    ₹{rupees(note.netAmount)}
+                    {amount(note.netAmount)}
                   </td>
                   <td className={clsx(DENSE_TD, 'text-xs text-gray-500')}>
                     {note.recoveredOn

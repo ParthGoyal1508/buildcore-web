@@ -28,6 +28,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 type View = 'allocations' | 'custody';
 
@@ -108,7 +109,7 @@ export default function AllocationsPage() {
       header: 'Due back',
       render: (row) => (
         <span className={row.overdue ? 'font-medium text-red-700' : undefined}>
-          {row.expectedReturnDate.slice(0, 10)}
+          {dateLabel(row.expectedReturnDate)}
           {row.overdue ? ` — ${row.daysOverdue}d overdue` : ''}
         </span>
       ),
@@ -292,7 +293,7 @@ export default function AllocationsPage() {
                       <span
                         className={`text-sm ${entry.overdue ? 'text-red-700' : 'text-gray-600'}`}
                       >
-                        due {entry.expectedReturnDate.slice(0, 10)}
+                        due {dateLabel(entry.expectedReturnDate)}
                         {entry.overdue ? ` (${entry.daysOverdue}d over)` : ''}
                       </span>
                       <RowAction onClick={() => setReturning(entry)}>

@@ -29,6 +29,7 @@ import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { dateLabel } from '@/app/lib/format';
 
 export default function IndentsPage() {
   const sites = useSites();
@@ -74,7 +75,7 @@ export default function IndentsPage() {
       header: 'Required by',
       render: (row) => (
         <span>
-          {row.requiredByDate.slice(0, 10)}
+          {dateLabel(row.requiredByDate)}
           {row.overdue && (
             <span className="block text-xs font-medium text-red-700">
               {overdueLabel(row.overdueByDays)}

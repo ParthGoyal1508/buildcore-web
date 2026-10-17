@@ -26,6 +26,7 @@ import Modal from '@/app/ui/settings/modal';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 type Item = Onboarding['items'][number];
 
@@ -92,7 +93,7 @@ export default function OnboardingPage() {
             <>
               {data.completedCount} of {data.totalCount} items complete
               {data.onboardingComplete && data.completedAt
-                ? ` · completed ${data.completedAt.slice(0, 10)}`
+                ? ` · completed ${dateLabel(data.completedAt)}`
                 : ''}
             </>
           }

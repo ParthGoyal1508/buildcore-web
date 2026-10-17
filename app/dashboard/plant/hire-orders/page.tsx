@@ -36,6 +36,7 @@ import {
   useNocStatuses,
   type NocFilter,
 } from '@/app/ui/nocs/noc-status';
+import { dateLabel } from '@/app/lib/format';
 
 /**
  * Vehicle work/hire orders (2026-10-15), each downloadable in the client's WORK/HIRE ORDER
@@ -112,7 +113,7 @@ export default function HireOrdersPage() {
       key: 'date',
       header: 'Date',
       render: (row) => (
-        <span className="whitespace-nowrap">{row.date.slice(0, 10)}</span>
+        <span className="whitespace-nowrap">{dateLabel(row.date)}</span>
       ),
     },
     { key: 'vendor', header: 'Supplier', render: (row) => row.vendorName },

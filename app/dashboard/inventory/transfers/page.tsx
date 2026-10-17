@@ -33,6 +33,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 export default function TransfersPage() {
   const queryClient = useQueryClient();
@@ -113,7 +114,7 @@ export default function TransfersPage() {
       header: 'Date',
       // Kept on one line: a narrow column broke the date at its hyphen.
       render: (row) => (
-        <span className="whitespace-nowrap">{row.date.slice(0, 10)}</span>
+        <span className="whitespace-nowrap">{dateLabel(row.date)}</span>
       ),
     },
     { key: 'from', header: 'From', render: (row) => row.fromSiteName },

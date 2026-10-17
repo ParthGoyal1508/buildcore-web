@@ -62,6 +62,13 @@ function fromText(text: string): number | string | null {
   if (!t || t === '—' || t === '-') return null;
   const figure = /^[₹Rs.\s]*[-−]?[\d,]+(\.\d+)?\s*%?$/.exec(t);
   if (figure) return Number(t.replace(/[^\d.\-−]/g, '').replace('−', '-'));
+  // DD-MM-YYYY (and DD-MM-YYYY HH:mm), the app’s one date format since 036 A18 — read as a date
+  // rather than compared as text, which would order it by day of month.
+  const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/.exec(t);
+  if (ddmmyyyy) {
+    const [, d, m, y, hh = '0', mm = '0'] = ddmmyyyy;
+    return Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm));
+  }
   const fraction = /^(\d+)\s*\/\s*(\d+)/.exec(t);
   if (fraction) return Number(fraction[1]) / Math.max(1, Number(fraction[2]));
   if (/^\d{4}-\d{2}-\d{2}/.test(t) || (MONTH.test(t) && /\d{4}/.test(t))) {

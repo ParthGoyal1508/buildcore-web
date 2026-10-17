@@ -16,7 +16,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import { useConditionGrades } from './use-asset-refs';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, dateLabel } from '@/app/lib/format';
 
 /**
  * Record the return of an allocated asset (spec US4, FR-012).
@@ -113,7 +113,7 @@ export default function ReturnModal({
 
         <p className="text-sm text-gray-600">
           {allocation.assetName} — out at {allocation.siteName} since{' '}
-          {allocation.allocatedFrom.slice(0, 10)}
+          {dateLabel(allocation.allocatedFrom)}
           {allocation.custodianName ? `, held by ${allocation.custodianName}` : ''}.
         </p>
 

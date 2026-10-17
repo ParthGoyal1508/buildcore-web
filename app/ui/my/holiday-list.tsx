@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { useState } from 'react';
 
 import { getMyHolidays } from '@/app/lib/api/my-workspace';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, datePart } from '@/app/lib/format';
 import { LoadingText } from '@/app/ui/spinner';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -83,7 +83,7 @@ export default function HolidayList() {
               >
                 <div className="w-14 shrink-0 text-center">
                   <div className="text-xs uppercase tracking-wide">
-                    {date.toLocaleDateString('en-IN', { month: 'short' })}
+                    {datePart(holiday.date, 'monthShort')}
                   </div>
                   <div className="text-xl font-semibold leading-tight">
                     {date.getDate()}
@@ -99,7 +99,7 @@ export default function HolidayList() {
                     {holiday.name}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {date.toLocaleDateString('en-IN', { weekday: 'long' })} ·{' '}
+                    {datePart(holiday.date, 'weekday')} ·{' '}
                     {TYPE_LABELS[holiday.type] ?? holiday.type}
                     {!holiday.appliesToAllSites && ' · Your site'}
                   </div>

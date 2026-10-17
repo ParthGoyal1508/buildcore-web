@@ -31,7 +31,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { useEmployees } from '@/app/ui/recruitment/use-employees';
 import { LoadingText } from '@/app/ui/spinner';
-import { todayIso, businessDate } from '@/app/lib/format';
+import { todayIso, businessDate, dateTimeLabel } from '@/app/lib/format';
 
 export default function InterviewsPage() {
   const queryClient = useQueryClient();
@@ -106,7 +106,7 @@ export default function InterviewsPage() {
                           {recruitmentLabel(i.roundType)})
                         </p>
                         <p className="text-xs text-gray-500">
-                          {new Date(i.scheduledAt).toLocaleString()} ·{' '}
+                          {dateTimeLabel(i.scheduledAt)} ·{' '}
                           {recruitmentLabel(i.mode)}
                           {i.location ? ` · ${i.location}` : ''}
                         </p>

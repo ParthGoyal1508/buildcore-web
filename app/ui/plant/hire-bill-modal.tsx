@@ -29,6 +29,7 @@ import {
   usePlantVendors,
 } from './use-plant-refs';
 import VendorOptions from './vendor-options';
+import { dateLabel } from '@/app/lib/format';
 
 /** A number field's value as the API wants it: absent when blank, so the server's default holds. */
 const optionalNumber = (value: string) =>
@@ -366,7 +367,7 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
             <option value="">Not under a work order</option>
             {(orders.data ?? []).map((order) => (
               <option key={order.id} value={order.id}>
-                {order.code} · {order.date.slice(0, 10)}
+                {order.code} · {dateLabel(order.date)}
                 {order.lines[0] ? ` · ${order.lines[0].title}` : ''}
               </option>
             ))}
@@ -672,8 +673,8 @@ export function HireBillCorrectionModal({
       >
         <FormError message={error} />
         <p className="text-sm text-gray-600">
-          {bill.vendorName} · {bill.billingPeriodFrom.slice(0, 10)} →{' '}
-          {bill.billingPeriodTo.slice(0, 10)} ·{' '}
+          {bill.vendorName} · {dateLabel(bill.billingPeriodFrom)} →{' '}
+          {dateLabel(bill.billingPeriodTo)} ·{' '}
           {bill.basis === 'monthly' ? 'Monthly rent' : 'By hours'}
           {bill.hireOrderCode ? ` · Work order ${bill.hireOrderCode}` : ''}
         </p>

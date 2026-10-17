@@ -2,6 +2,7 @@ import clsx from 'clsx';
 
 import type { IssuedLetter } from '@/app/lib/api/letters';
 import { LETTER_STATUS_LABELS } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
 
 interface LetterListProps {
   letters: IssuedLetter[];
@@ -18,7 +19,7 @@ const STATUS_STYLES: Record<IssuedLetter['status'], string> = {
 };
 
 const dateText = (value: Date | null) =>
-  value ? value.toISOString().slice(0, 10) : '—';
+  dateLabel(value);
 
 /**
  * Letters for one subject (017 US6, FR-012).

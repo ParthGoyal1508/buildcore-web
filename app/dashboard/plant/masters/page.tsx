@@ -30,6 +30,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 type Tab = 'categories' | 'doc-types' | 'rates';
 
@@ -187,7 +188,7 @@ export default function MastersPage() {
         row.effectiveTo === null ? (
           <span className="font-medium text-green-800">Current</span>
         ) : (
-          row.effectiveTo.slice(0, 10)
+          dateLabel(row.effectiveTo)
         ),
     },
   ];

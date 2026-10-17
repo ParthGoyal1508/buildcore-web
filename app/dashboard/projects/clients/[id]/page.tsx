@@ -7,13 +7,14 @@ import { useState } from 'react';
 
 import { getClient, getProjects } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES, projectsLabel } from '@/app/lib/constants';
-import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
+import { formatRupees } from '@/app/lib/utils';
 import { Button } from '@/app/ui/button';
 import PageHeader from '@/app/ui/page-header';
 import ClientModal from '@/app/ui/projects/client-modal';
 import StatusBadge from '@/app/ui/status-badge';
 import { Fact, DetailCard, OpenLink } from '@/app/ui/projects/detail-card';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 /**
  * One client — what is on file about them, and what they have given us (2026-10-09).
@@ -149,7 +150,7 @@ export default function ClientDetailPage() {
                   <p className="mt-0.5 text-xs text-gray-600">
                     {projectsLabel(project.status)}
                     {project.startDate
-                      ? ` · from ${formatDateToLocal(project.startDate)}`
+                      ? ` · from ${dateLabel(project.startDate)}`
                       : ''}
                     {project.contractValue != null
                       ? ` · ${formatRupees(Number(project.contractValue))}`

@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { getEmployeeAttendanceMonth } from '@/app/lib/api/hr-payroll';
 import { MESSAGES, STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
-import { timeLabel } from '@/app/lib/format';
+import { timeLabel, periodLabel } from '@/app/lib/format';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -48,10 +48,7 @@ export default function AttendanceCalendar({
     setYear(next.getUTCFullYear());
   }
 
-  const label = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(
-    undefined,
-    { month: 'long', year: 'numeric', timeZone: 'UTC' },
-  );
+  const label = periodLabel(`${year}-${String(month).padStart(2, '0')}`);
 
   const days = data?.days ?? [];
   // Blank cells so the 1st lands under the right weekday.

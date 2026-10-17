@@ -37,6 +37,7 @@ import CameraCapture from '@/app/ui/my/camera-capture';
 import PageHeader from '@/app/ui/page-header';
 import { FormError, SelectField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import { clockTime } from '@/app/lib/format';
 
 /** The last site picked on this phone, so a supervisor with several opens where they left off. */
 const SITE_STORAGE_KEY = 'buildcore.labour.attendanceSite';
@@ -80,11 +81,7 @@ function subscribeOnline(onChange: () => void) {
   };
 }
 
-const timeOf = (iso: string) =>
-  new Date(iso).toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+const timeOf = (iso: string) => clockTime(iso);
 
 /** "9.5 h, full day (+1.5 h overtime)" — what the hours between the punches made of the day. */
 function dayText(day: { status: string; hours: number | null; overtimeHours: number }) {

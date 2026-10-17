@@ -11,6 +11,7 @@ import {
   approvalActionTypeLabel,
 } from '@/app/lib/constants';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateTimeLabel } from '@/app/lib/format';
 
 /** How many waiting items the Overview shows before "View all". */
 const SHOWN = 5;
@@ -97,7 +98,7 @@ export default function ApprovalsCard() {
                         ? 'font-medium text-amber-700'
                         : 'text-gray-500'
                     }`}
-                    title={`Waiting since ${new Date(item.requestedAt).toLocaleString()}`}
+                    title={`Waiting since ${dateTimeLabel(item.requestedAt)}`}
                   >
                     <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
                     {waited(item.ageHours)}

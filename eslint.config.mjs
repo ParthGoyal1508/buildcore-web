@@ -44,6 +44,31 @@ const config = [
       ],
     },
   },
+  {
+    // One date format (036 A18, decision 7: DD-MM-YYYY everywhere). Inline `toLocaleDateString` was
+    // in 18 places with five locales between them, and each followed the browser, so one date read
+    // differently on two laptops. Use `dateLabel`, `dateTimeLabel`, `clockTime`, `periodLabel` or
+    // `longDateLabel` from `app/lib/format.ts`. A warning for now; an error once Wave 3 lands.
+    files: ['app/**/*.{ts,tsx}'],
+    ignores: ['app/lib/format.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            "CallExpression[callee.property.name=/^toLocale(Date|Time)String$/]",
+          message:
+            'Format dates with the helpers in @/app/lib/format (dateLabel, dateTimeLabel, clockTime, periodLabel, longDateLabel).',
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='toLocaleString'][callee.object.type='NewExpression'][callee.object.callee.name='Date']",
+          message:
+            'Format dates with the helpers in @/app/lib/format (dateLabel, dateTimeLabel, clockTime).',
+        },
+      ],
+    },
+  },
 ];
 
 export default config;

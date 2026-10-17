@@ -7,9 +7,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getClients } from '@/app/lib/api/projects';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
-import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
+import { formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 import { TABLE } from '@/app/ui/table';
+import { dateLabel } from '@/app/lib/format';
 
 /** One labelled fact. A definition list, because that is what this is. */
 function Fact({
@@ -246,10 +247,10 @@ export default function ProjectOverviewPage() {
               </span>
             </Fact>
             <Fact term="Status">{projectsLabel(project.status)}</Fact>
-            <Fact term="Start">{formatDateToLocal(project.startDate)}</Fact>
+            <Fact term="Start">{dateLabel(project.startDate)}</Fact>
             <Fact term="Expected end">
               {project.expectedEndDate
-                ? formatDateToLocal(project.expectedEndDate)
+                ? dateLabel(project.expectedEndDate)
                 : '—'}
             </Fact>
             <Fact term="Division">{projectsLabel(project.division)}</Fact>
@@ -276,7 +277,7 @@ export default function ProjectOverviewPage() {
               {tabs.dwrSummary.latestDate && (
                 <span className="block text-xs text-gray-500">
                   {PROJECT_SHELL_COPY.dwrLatest(
-                    formatDateToLocal(tabs.dwrSummary.latestDate),
+                    dateLabel(tabs.dwrSummary.latestDate),
                   )}
                 </span>
               )}
@@ -495,7 +496,7 @@ export default function ProjectOverviewPage() {
             </Fact>
             <Fact term={PROJECT_SHELL_COPY.siteStartLabel}>
               {project.siteStartDate
-                ? formatDateToLocal(project.siteStartDate)
+                ? dateLabel(project.siteStartDate)
                 : PROJECT_SHELL_COPY.notRecorded}
             </Fact>
             <Fact term={PROJECT_SHELL_COPY.cgstLabel}>

@@ -9,6 +9,7 @@ import {
 } from '@/app/lib/api/recruitment';
 import { recruitmentLabel } from '@/app/lib/constants';
 import { useEmployees } from '@/app/ui/recruitment/use-employees';
+import { dateTimeLabel } from '@/app/lib/format';
 
 /**
  * How a candidate got where they are (2026-10-14) — every stage change and every interview round,
@@ -205,11 +206,5 @@ function dotColour(event: {
 }
 
 function when(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return dateTimeLabel(iso);
 }

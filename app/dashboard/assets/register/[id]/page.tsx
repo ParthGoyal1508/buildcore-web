@@ -36,6 +36,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 type Tab = 'documents' | 'allocations' | 'stock';
 
@@ -146,7 +147,7 @@ export default function AssetDetailPage() {
                   : undefined
             }
           >
-            {doc.expiryDate.slice(0, 10)}
+            {dateLabel(doc.expiryDate)}
             {doc.expired ? ' — expired' : doc.expiring ? ' — expiring' : ''}
           </span>
         ) : (
@@ -183,7 +184,7 @@ export default function AssetDetailPage() {
       header: 'Due back',
       render: (entry) => (
         <span className={entry.overdue ? 'text-red-700' : undefined}>
-          {entry.expectedReturnDate.slice(0, 10)}
+          {dateLabel(entry.expectedReturnDate)}
           {entry.overdue ? ` — ${entry.daysOverdue}d overdue` : ''}
         </span>
       ),
@@ -193,7 +194,7 @@ export default function AssetDetailPage() {
       header: 'Returned',
       render: (entry) =>
         entry.actualReturnDate
-          ? `${entry.actualReturnDate.slice(0, 10)}${
+          ? `${dateLabel(entry.actualReturnDate)}${
               entry.conditionOnReturnName
                 ? ` — ${entry.conditionOnReturnName}`
                 : ''
@@ -268,7 +269,7 @@ export default function AssetDetailPage() {
                   openAllocation.custodianName
                     ? `, held by ${openAllocation.custodianName}`
                     : ''
-                }, due back ${openAllocation.expectedReturnDate.slice(0, 10)}.`}
+                }, due back ${dateLabel(openAllocation.expectedReturnDate)}.`}
               >
                 Allocate
               </SecondaryButton>
@@ -328,7 +329,7 @@ export default function AssetDetailPage() {
           { label: 'Supplier', value: row.vendorName ?? '—' },
           {
             label: 'Purchased',
-            value: row.purchaseDate?.slice(0, 10) ?? '—',
+            value: dateLabel(row.purchaseDate),
           },
           { label: 'Cost', value: formatRupees(row.purchaseCost) },
           // The register speaks in what the asset is worth, not in accounting terms
@@ -337,7 +338,7 @@ export default function AssetDetailPage() {
           {
             label: 'Next inspection',
             value: row.nextInspectionDue
-              ? `${row.nextInspectionDue.slice(0, 10)}${row.inspectionDue ? ' — due' : ''}`
+              ? `${dateLabel(row.nextInspectionDue)}${row.inspectionDue ? ' — due' : ''}`
               : '—',
           },
         ].map((entry) => (

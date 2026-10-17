@@ -17,6 +17,7 @@ import PageHeader from '@/app/ui/page-header';
 import type { Metric } from '@/app/ui/dashboard/metric-tile';
 import { SummaryBanner, widgetMetric } from '@/app/ui/dashboard/widget-metrics';
 import { LoadingText } from '@/app/ui/spinner';
+import { longDateLabel } from '@/app/lib/format';
 
 export default function SiteDashboardPage() {
   // The site chosen here; until somebody chooses, the first one the list offers (2026-10-15).
@@ -71,11 +72,7 @@ export default function SiteDashboardPage() {
               banner itself so changing site and reading it are one place. */}
           <SummaryBanner
             title={site?.name ?? 'Site'}
-            subtitle={`Today · ${new Date().toLocaleDateString('en-IN', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}`}
+            subtitle={`Today · ${longDateLabel(new Date(), { year: false })}`}
             mark={
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15">
                 <MapPinIcon className="h-5 w-5 text-white" aria-hidden />

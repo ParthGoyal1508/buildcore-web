@@ -21,6 +21,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import CameraCapture from '@/app/ui/my/camera-capture';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 /** A captured shot plus the object URL its thumbnail is rendered from. */
 interface Shot {
@@ -207,7 +208,7 @@ export default function FaceEnrolmentStatusPanel() {
         </span>
         {data.enrolledAt && (
           <span className="text-sm text-gray-500">
-            Since {new Date(data.enrolledAt).toLocaleDateString()}
+            Since {dateLabel(data.enrolledAt)}
           </span>
         )}
       </div>
@@ -310,7 +311,7 @@ export default function FaceEnrolmentStatusPanel() {
               <>
                 {' '}
                 — this approval expires{' '}
-                {new Date(reEnrolment.unlockExpiresAt).toLocaleDateString()}
+                {dateLabel(reEnrolment.unlockExpiresAt)}
               </>
             )}
             .

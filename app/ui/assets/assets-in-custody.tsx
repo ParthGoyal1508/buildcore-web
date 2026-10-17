@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { getAllocations } from '@/app/lib/api/assets';
 import { MESSAGES, ROUTES, formatAssetQuantity } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
 
 /**
  * What one employee is currently holding (spec FR-028).
@@ -86,7 +87,7 @@ export default function AssetsInCustody({
             <span
               className={`text-sm ${entry.overdue ? 'text-red-700' : 'text-gray-600'}`}
             >
-              {entry.siteName} · due {entry.expectedReturnDate.slice(0, 10)}
+              {entry.siteName} · due {dateLabel(entry.expectedReturnDate)}
               {entry.overdue ? ` (${entry.daysOverdue}d over)` : ''}
             </span>
           </li>

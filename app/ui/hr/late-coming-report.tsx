@@ -13,6 +13,7 @@ import { MESSAGES } from '@/app/lib/constants';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import type { z } from 'zod';
+import { monthName } from '@/app/lib/format';
 
 type LateRow = z.infer<typeof lateComingRowSchema>;
 
@@ -121,10 +122,7 @@ export default function LateComingReport() {
         >
           {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
             <option key={value} value={value}>
-              {new Date(Date.UTC(2000, value - 1, 1)).toLocaleDateString(undefined, {
-                month: 'long',
-                timeZone: 'UTC',
-              })}
+              {monthName(value)}
             </option>
           ))}
         </SelectField>

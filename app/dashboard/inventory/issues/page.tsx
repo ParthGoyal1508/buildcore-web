@@ -27,6 +27,7 @@ import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 export default function IssuesPage() {
   const queryClient = useQueryClient();
@@ -81,7 +82,7 @@ export default function IssuesPage() {
             </span>
           )}
           <span className={row.slipNo ? 'text-xs text-gray-500' : undefined}>
-            {row.date.slice(0, 10)}
+            {dateLabel(row.date)}
           </span>
         </span>
       ),
@@ -121,7 +122,7 @@ export default function IssuesPage() {
           <span>
             {row.returnedQuantity}
             <span className="block text-xs text-gray-500">
-              {row.returnedOn?.slice(0, 10)}
+              {dateLabel(row.returnedOn)}
               {row.receivedBy ? ` · ${row.receivedBy}` : ''}
             </span>
           </span>

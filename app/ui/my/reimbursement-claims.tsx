@@ -19,6 +19,7 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import ReimbursementForm from '@/app/ui/my/reimbursement-form';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel, money } from '@/app/lib/format';
 
 /** Distinct per status (US8 AC4). Rejected is the one in red: it is the only
  * outcome that costs the employee money they have already spent. */
@@ -45,19 +46,7 @@ const PAYMENT_LABEL: Record<'payroll' | 'direct', string> = {
   direct: 'paid directly',
 };
 
-const money = (value: number) =>
-  value.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const shortDate = (value: string) =>
-  new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+const shortDate = (value: string) => dateLabel(value.slice(0, 10));
 
 export default function ReimbursementClaims() {
   const queryClient = useQueryClient();

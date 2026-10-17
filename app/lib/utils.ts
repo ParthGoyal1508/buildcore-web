@@ -1,27 +1,3 @@
-// Amounts are assumed to be stored in paise (minor units) and formatted as
-// Indian Rupees, per docs/prd/00-master-prd.md §11 ("Currency: Indian Rupee").
-export const formatCurrency = (amountInPaise: number) => {
-  return (amountInPaise / 100).toLocaleString('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  });
-};
-
-export const formatDateToLocal = (
-  dateStr: string,
-  locale: string = 'en-IN',
-) => {
-  const date = new Date(dateStr);
-  const options: Intl.DateTimeFormatOptions = {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  };
-  const formatter = new Intl.DateTimeFormat(locale, options);
-  return formatter.format(date);
-};
-
 export const generatePagination = (currentPage: number, totalPages: number) => {
   // If the total number of pages is 7 or less,
   // display all pages without any ellipsis.
@@ -58,7 +34,7 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
 /**
  * An amount in whole rupees, formatted for display.
  *
- * Distinct from `formatCurrency` above, which divides by 100 because it was written
+ * Its paise sibling `formatCurrency`, which divided by 100, is gone (036 A20): it was written
  * for amounts stored in paise. `buildcore-api` sends money as Prisma `Decimal`
  * columns in rupees — `contractValue: "25000000.00"` is ₹2.5 crore, not ₹2.5 lakh —
  * so passing those through the paise formatter would understate every figure on the

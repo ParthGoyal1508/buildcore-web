@@ -5,11 +5,12 @@ import Link from 'next/link';
 
 import { ProjectListItem } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
+import { formatRupees } from '@/app/lib/utils';
 import StatusBadge from '@/app/ui/status-badge';
 import { RowAction, RowActionLink } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 /**
  * The portfolio list (spec FR-010, FR-014).
@@ -128,13 +129,13 @@ export default function ProjectListTable({
     {
       key: 'startDate',
       header: 'Start',
-      render: (row) => formatDateToLocal(row.startDate),
+      render: (row) => dateLabel(row.startDate),
     },
     {
       key: 'endDate',
       header: 'Expected end',
       render: (row) =>
-        row.expectedEndDate ? formatDateToLocal(row.expectedEndDate) : '—',
+        row.expectedEndDate ? dateLabel(row.expectedEndDate) : '—',
       hideOnCard: true,
     },
   ];

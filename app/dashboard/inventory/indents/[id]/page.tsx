@@ -28,6 +28,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 export default function IndentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -168,7 +169,7 @@ export default function IndentDetailPage() {
           <p className="text-sm text-gray-600">
             {data.siteName}
             {data.department ? ` · ${data.department}` : ''} · required by{' '}
-            {data.requiredByDate.slice(0, 10)}
+            {dateLabel(data.requiredByDate)}
           </p>
           {data.overdue && (
             <p className="text-sm font-medium text-red-700">

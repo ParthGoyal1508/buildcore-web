@@ -20,7 +20,7 @@ import type {
   StatutoryDueItem,
 } from '@/app/lib/api/dashboard';
 import type { SelectableCompany } from '@/app/lib/api/company-selection';
-import { dateLabel, rupees } from '@/app/lib/format';
+import { dateLabel, rupees, shortPeriodLabel } from '@/app/lib/format';
 import { CompanyMark } from '@/app/ui/company-logo';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import {
@@ -47,13 +47,7 @@ import {
 function shortPeriod(period: string): string {
   const [year, month] = period.split('-').map(Number);
   if (!year || !month) return period;
-  // `en-US` for "Sep": `en-IN` and `en-GB` now abbreviate September to "Sept", which
-  // is the only month that breaks the column of three-letter months.
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-US', {
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return shortPeriodLabel(`${year}-${String(month).padStart(2, '0')}`);
 }
 
 /** "Sep 2026", or "Sep – Oct 2026" when the companies' latest runs differ. */

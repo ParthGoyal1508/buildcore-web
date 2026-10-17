@@ -4,16 +4,9 @@ import Link from 'next/link';
 
 import { dateLabel, rupees } from '@/app/lib/format';
 
-/** "23 Sep" this year, "23 Sep 2025" otherwise — short enough for a half-width card. */
+/** DD-MM-YYYY, like every other date (036 A18). Was "23 Sep" in this card alone. */
 function shortDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00Z`);
-  const sameYear = date.getUTCFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  });
+  return dateLabel(iso.slice(0, 10));
 }
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import type { WidgetResult } from '@/app/lib/api/dashboard';

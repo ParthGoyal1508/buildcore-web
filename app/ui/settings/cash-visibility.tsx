@@ -20,6 +20,7 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, SETTINGS_PERMISSIONS } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { clockTime } from '@/app/lib/format';
 
 /**
  * The cash visibility toggle (019 FR-012 to FR-015 — `bugs.md` item 16), in Settings only and
@@ -239,10 +240,7 @@ export default function CashVisibility() {
                 : 'cash amounts are shown'}
           </span>
           . Confirmed until{' '}
-          {new Date(confirmation.expiresAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {clockTime(confirmation.expiresAt)}
           .
         </p>
       </div>

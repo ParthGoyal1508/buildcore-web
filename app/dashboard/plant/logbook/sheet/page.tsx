@@ -8,10 +8,11 @@ import LogbookSheet from '@/app/ui/plant/logbook-sheet';
 import LogbookViews from '@/app/ui/plant/logbook-views';
 import { usePlantEquipment } from '@/app/ui/plant/use-plant-refs';
 import PageHeader from '@/app/ui/page-header';
+import { currentPeriod } from '@/app/lib/format';
 
-/** This month as `YYYY-MM`, in the browser's own calendar. */
+/** This month as `YYYY-MM`, in India time (036 A19 — was the browser’s own calendar). */
 function thisMonth(): string {
-  return new Date().toLocaleDateString('en-CA').slice(0, 7);
+  return currentPeriod();
 }
 
 /**

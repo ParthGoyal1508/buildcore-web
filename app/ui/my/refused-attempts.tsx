@@ -12,6 +12,7 @@ import {
   punchRefusalReasonMessage,
 } from '@/app/lib/punch-refusal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
+import { dateTimeLabel } from '@/app/lib/format';
 
 /**
  * The worker's own refused punches (020 FR-012, T026).
@@ -42,12 +43,7 @@ export default function RefusedAttempts() {
       header: REFUSED_ATTEMPTS.columnWhen,
       render: (row) => (
         <span className="whitespace-nowrap">
-          {new Date(row.capturedAt).toLocaleString(undefined, {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {dateTimeLabel(row.capturedAt)}
         </span>
       ),
     },

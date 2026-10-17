@@ -17,24 +17,8 @@ import {
   SelectField,
 } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import { money, periodLabel } from '@/app/lib/format';
 
-const money = (value: number) =>
-  value.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-/** "2026-07" → "July 2026". The API's period key is a sort key, not something to
- * put in front of a person. */
-function periodLabel(period: string): string {
-  const [year, month] = period.split('-').map(Number);
-  if (!year || !month) return period;
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
 
 function AmountRows({
   rows,

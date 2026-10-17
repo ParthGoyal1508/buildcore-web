@@ -12,7 +12,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, dateLabel } from '@/app/lib/format';
 
 const today = () => todayIso();
 
@@ -107,7 +107,7 @@ export default function IssueReturnModal({
         <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700 sm:col-span-2">
           {issue.slipNo ? `${issue.slipNo} · ` : ''}
           {issue.quantity} {issue.unit} of {issue.itemName} issued to{' '}
-          {issue.vendorName ?? issue.issuedTo} on {issue.date.slice(0, 10)}.
+          {issue.vendorName ?? issue.issuedTo} on {dateLabel(issue.date)}.
         </p>
 
         <TextField

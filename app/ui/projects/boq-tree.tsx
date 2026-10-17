@@ -15,7 +15,7 @@ import {
 } from '@/app/lib/api/projects';
 import { percentLabel, scheduleTotals } from '@/app/lib/bill-totals';
 import { BOQ_COPY } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { rupees, dateLabel } from '@/app/lib/format';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 import { RowAction } from '@/app/ui/settings/form-fields';
@@ -415,7 +415,7 @@ function GroupRows({
                   <Programme value={item.avgQtyPerDay} />
                   <td className={DENSE_TD}>
                     {item.finishDate ? (
-                      new Date(item.finishDate).toLocaleDateString()
+                      dateLabel(item.finishDate)
                     ) : (
                       <Unplanned />
                     )}

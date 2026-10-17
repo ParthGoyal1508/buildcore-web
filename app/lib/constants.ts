@@ -1,14 +1,8 @@
-/**
- * The timezone the business operates in.
- *
- * Every "today" and every calendar-day boundary in this app is this zone's, not the
- * browser's and not UTC. The API is configured the same way (`APP_TIMEZONE`,
- * defaulting to `Asia/Kolkata`), and the two must agree: at UTC+5:30 a UTC-derived
- * "today" is the previous date for the first five and a half hours of every working
- * day, so a client and a server disagreeing about it means a date the user picked
- * being refused as being in the future.
- */
-export const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+import { clockTime } from '@/app/lib/format';
+
+// Defined in a leaf module so `app/lib/format.ts` can read it and this file can use the formatters
+// without an import cycle (036 A18).
+export { BUSINESS_TIME_ZONE } from './time-zone';
 
 export const ROUTES = {
   login: '/login',
@@ -1844,12 +1838,7 @@ export const MESSAGES = {
    * last out, so a punch-in made after the last punch-out does not appear in them
    * at all — this is the only thing on screen that accounts for the button. */
   punchOpenSince: (capturedAt: string) =>
-    `You are currently punched in, since ${new Date(
-      capturedAt,
-    ).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    })}. Punch out to close this shift.`,
+    `You are currently punched in, since ${clockTime(capturedAt)}. Punch out to close this shift.`,
   /** Shown in place of the punch control once the day's pair is recorded. */
   punchDayComplete:
     'You have punched in and out for today. Attendance for today is complete.',
@@ -2236,7 +2225,7 @@ export function formatLockoutMessage(rawMessage: string): string {
   if (!match) return MESSAGES.lockoutFallback;
   const unlockTime = new Date(match[1]);
   if (Number.isNaN(unlockTime.getTime())) return MESSAGES.lockoutFallback;
-  return `Account temporarily locked. Try again after ${unlockTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+  return `Account temporarily locked. Try again after ${clockTime(unlockTime)}.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

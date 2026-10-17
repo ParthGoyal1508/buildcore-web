@@ -22,7 +22,7 @@ import {
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, dateLabel } from '@/app/lib/format';
 
 type Grouping = 'category' | 'status' | 'project';
 
@@ -224,7 +224,7 @@ export default function AssetSummaryPage() {
 
       {data && (
         <p className="text-xs text-gray-500">
-          As at {data.asOf.slice(0, 10)}. {data.totals.count.toLocaleString('en-IN')}{' '}
+          As at {dateLabel(data.asOf)}. {data.totals.count.toLocaleString('en-IN')}{' '}
           assets on the register in total, including scrapped ones.
         </p>
       )}

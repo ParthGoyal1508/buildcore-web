@@ -11,6 +11,7 @@ import { MY_PUNCH_EXCEPTIONS } from '@/app/lib/constants';
 import ActionReview from '@/app/ui/approvals/action-review';
 import LastAction from '@/app/ui/approvals/last-action';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
+import { dateTimeLabel } from '@/app/lib/format';
 
 /**
  * The worker's own flagged punches (016 FR-005, T042) — **history since 020 Phase 3**.
@@ -59,12 +60,7 @@ export default function PunchExceptions() {
       header: 'Punch',
       render: (row) => (
         <span className="whitespace-nowrap">
-          {new Date(row.punch.capturedAt).toLocaleString(undefined, {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {dateTimeLabel(row.punch.capturedAt)}
           <span className="ml-1 text-gray-500">
             ({row.punch.type === 'in' ? 'in' : 'out'})
           </span>

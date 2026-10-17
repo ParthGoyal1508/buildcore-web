@@ -17,6 +17,7 @@ import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
 import CameraCapture from '@/app/ui/my/camera-capture';
+import { clockTime, longDateLabel } from '@/app/lib/format';
 
 /** HTTP 423 — the backend's status for a write into a closed payroll period. */
 const HTTP_LOCKED = 423;
@@ -33,12 +34,7 @@ const REFUSALS_BEFORE_ESCALATING = 3;
 const two = (n: number) => String(n).padStart(2, '0');
 const clockText = (date: Date) =>
   `${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}`;
-const dateText = (date: Date) =>
-  date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+const dateText = (date: Date) => longDateLabel(date, { year: false });
 /**
  * Rendered until the clock starts on the client.
  *
@@ -46,13 +42,7 @@ const dateText = (date: Date) =>
  * time replaces it without shifting the layout.
  */
 const CLOCK_PLACEHOLDER = '--:--:--';
-const timeOnly = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '—';
+const timeOnly = (iso: string | null) => (iso ? clockTime(iso) : '—');
 
 /**
  * Reads the current position, rejecting a fix too vague to be worth sending

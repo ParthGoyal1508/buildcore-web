@@ -1,3 +1,4 @@
+import { dateTimeLabel } from '@/app/lib/format';
 /** The six display flags a document type can resolve to. */
 export type DocumentTypeFlag =
   | 'MandatoryNumber'
@@ -62,11 +63,5 @@ export function formatLastLogin(value: string | null | undefined): string {
   if (!value) return 'Never';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Never';
-  return date.toLocaleString([], {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return dateTimeLabel(date);
 }

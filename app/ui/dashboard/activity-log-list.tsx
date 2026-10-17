@@ -23,6 +23,7 @@ import {
   inlineSelectClass,
   SecondaryButton,
 } from '@/app/ui/settings/form-fields';
+import { dateTimeLabel } from '@/app/lib/format';
 
 /**
  * What each audited action is called, for the person reading the log.
@@ -99,7 +100,7 @@ export default function ActivityLogList() {
     {
       key: 'timestamp',
       header: 'When',
-      render: (e) => new Date(e.timestamp).toLocaleString(),
+      render: (e) => dateTimeLabel(e.timestamp),
     },
     { key: 'actor', header: 'User', render: (e) => e.actor },
     { key: 'action', header: 'Action', render: (e) => activityWhat(e) },

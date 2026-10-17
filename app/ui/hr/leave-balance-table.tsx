@@ -287,7 +287,7 @@ function LeaveHistory({ employeeId }: { employeeId: string }) {
                 <p className="text-xs text-gray-500">{entry.reason}</p>
               )}
               <p className="text-xs text-gray-400">
-                {dateLabel(entry.createdAt.slice(0, 10))}
+                {dateLabel(entry.createdAt)}
               </p>
             </div>
             <span

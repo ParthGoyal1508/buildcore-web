@@ -33,7 +33,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, dateLabel } from '@/app/lib/format';
 
 export default function HireBillsPage() {
   const queryClient = useQueryClient();
@@ -148,8 +148,8 @@ export default function HireBillsPage() {
       header: 'Period',
       render: (row) => (
         <span className="whitespace-nowrap">
-          {row.billingPeriodFrom.slice(0, 10)} →<br />
-          {row.billingPeriodTo.slice(0, 10)}
+          {dateLabel(row.billingPeriodFrom)} →<br />
+          {dateLabel(row.billingPeriodTo)}
         </span>
       ),
     },
