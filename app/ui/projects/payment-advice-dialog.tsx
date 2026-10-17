@@ -15,7 +15,7 @@ import {
   setPayeeBank,
 } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import {
   FormError,
   SecondaryButton,
@@ -300,16 +300,16 @@ function PayeePanel({
           ) : null}
         </h3>
         {!open && (
-          <button
-            type="button"
-            className="text-xs font-medium text-brand-700 underline"
+          <TextButton
+            size="xs"
+            className="underline"
             onClick={() => {
               setDraft({});
               setEditing(true);
             }}
           >
             Edit bank details
-          </button>
+          </TextButton>
         )}
       </div>
 

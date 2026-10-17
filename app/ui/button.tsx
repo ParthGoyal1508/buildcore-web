@@ -87,7 +87,9 @@ const VARIANT = {
     'bg-red-600 text-white shadow-sm hover:bg-red-500 active:bg-red-700 disabled:hover:bg-red-600',
 } as const;
 
-type BaseProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+// `ComponentProps<'button'>` rather than the attribute type so `ref` passes through — React 19
+// hands a function component its `ref` as a plain prop, and dialogs focus their close button by it.
+type BaseProps = React.ComponentProps<'button'> & {
   /**
    * The action this button starts is in flight (036 A7): disabled, a spinner, `aria-busy`. Pass the
    * mutation's `isPending`. A second click on a Save that has not answered yet used to send a second
@@ -148,8 +150,9 @@ export function Button({
 }: BaseProps & {
   children: React.ReactNode;
   /**
-   * `read` for the rare primary button that changes nothing — a report's "Run", a download.
-   * Everything else is a write, which is why that is the default.
+   * `read` for the rare primary button that changes nothing — a report's "Run", a download — or
+   * that is gated somewhere else already: a dialog's confirm, reached only through a gated action;
+   * an error screen's Retry. Everything else is a write, which is why that is the default.
    */
   intent?: 'write' | 'read';
   size?: Size;
@@ -227,8 +230,26 @@ export function TextButton({
  * ship without one.
  *
  * - `md`: 44×44 below `sm`, 36×36 above — the same touch-target rule as `Button`.
+ * - `lg`: 44×44 at every width, for a mobile-critical screen (016 T112: a supervisor on site with
+ *   one hand on a phone).
  * - `sm`: 32×32, for a remove inside a chip or a dense row.
+ * - `xs`: 24×24, for a toast's dismiss or the remove badge on a photo thumbnail.
+ *
+ * `tone="overlay"` is the dark round badge that sits on a photo's corner.
  */
+const ICON_SIZE = {
+  lg: 'h-11 w-11',
+  md: 'h-11 w-11 sm:h-9 sm:w-9',
+  sm: 'h-8 w-8',
+  xs: 'h-6 w-6',
+} as const;
+
+const ICON_TONE = {
+  neutral: 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+  danger: 'text-gray-500 hover:bg-red-50 hover:text-red-700',
+  overlay: 'rounded-full bg-gray-900/90 text-white hover:bg-gray-700',
+} as const;
+
 export function IconButton({
   label,
   children,
@@ -240,8 +261,8 @@ export function IconButton({
   ...rest
 }: Omit<BaseProps, 'aria-label'> & {
   label: string;
-  tone?: 'neutral' | 'danger';
-  size?: 'md' | 'sm';
+  tone?: 'neutral' | 'danger' | 'overlay';
+  size?: 'lg' | 'md' | 'sm' | 'xs';
 }) {
   return (
     <button
@@ -252,12 +273,10 @@ export function IconButton({
       disabled={rest.disabled || loading}
       aria-busy={loading || rest['aria-busy'] || undefined}
       className={clsx(
-        'inline-flex shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+        'inline-flex shrink-0 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40',
         FOCUS_RING,
-        size === 'md' ? 'h-11 w-11 sm:h-9 sm:w-9' : 'h-8 w-8',
-        tone === 'neutral'
-          ? 'hover:bg-gray-100 hover:text-gray-900'
-          : 'hover:bg-red-50 hover:text-red-700',
+        ICON_SIZE[size],
+        ICON_TONE[tone],
         className,
       )}
     >
@@ -299,7 +318,7 @@ export function RowAction({
   icon,
   loading = false,
   ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: React.ComponentProps<'button'> & {
   intent?: 'write' | 'read';
   /** The icon beside the label; chosen from the label's verb when not given, `null` for none. */
   icon?: ActionIcon | null;

@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { getMyHolidays } from '@/app/lib/api/my-workspace';
 import { todayIso, datePart } from '@/app/lib/format';
 import { LoadingText } from '@/app/ui/spinner';
+import { IconButton } from '@/app/ui/button';
 
 const TYPE_LABELS: Record<string, string> = {
   national: 'National',
@@ -31,25 +32,23 @@ export default function HolidayList() {
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-label="Previous year"
+        <IconButton
+          label="Previous year"
+          className="border border-gray-200 bg-white"
           onClick={() => setYear((y) => y - 1)}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           ‹
-        </button>
+        </IconButton>
         <span className="min-w-16 text-center text-sm font-medium text-gray-900">
           {year}
         </span>
-        <button
-          type="button"
-          aria-label="Next year"
+        <IconButton
+          label="Next year"
+          className="border border-gray-200 bg-white"
           onClick={() => setYear((y) => y + 1)}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           ›
-        </button>
+        </IconButton>
       </div>
 
       {isPending ? (

@@ -16,7 +16,7 @@ import { downloadDebitNote } from '@/app/lib/api/billing';
 import { money as roundMoney, productRounded } from '@/app/lib/bill-totals';
 import { saveBlob } from '@/app/lib/download-file';
 import { dateLabel, rupees, todayIso } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
@@ -520,36 +520,35 @@ function RaiseDebitNote({
                     {amountOf(line) === null ? '—' : rupees(amountOf(line))}
                   </p>
                   {lines.length > 1 && (
-                    <button
-                      type="button"
+                    <TextButton
+                      tone="danger"
+                      className="mb-1"
                       onClick={() =>
                         setLines((all) =>
                           all.filter((other) => other.key !== line.key),
                         )
                       }
-                      className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-red-700 hover:bg-red-50"
                     >
                       <TrashIcon className="h-4 w-4" aria-hidden="true" />
                       Remove
-                    </button>
+                    </TextButton>
                   )}
                 </div>
               </div>
             ))}
           </div>
-          <button
-            type="button"
+          <TextButton
+            className="mt-2"
             onClick={() =>
               setLines((all) => [
                 ...all,
                 blankLine(Math.max(...all.map((line) => line.key)) + 1),
               ])
             }
-            className="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
           >
             <PlusIcon className="h-4 w-4" aria-hidden="true" />
             Add an item
-          </button>
+          </TextButton>
         </div>
 
         <dl className="grid gap-1 rounded-md bg-gray-50 px-3 py-2 text-sm sm:grid-cols-3">

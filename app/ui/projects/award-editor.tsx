@@ -14,7 +14,7 @@ import { ApiError } from '@/app/lib/api/client';
 import { earnedRate } from '@/app/lib/bill-totals';
 import { WORK_ORDER_COPY } from '@/app/lib/constants';
 import { quantity3, rupees, unitRate } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import {
   PROJECT_LOCKED_MESSAGE,
   projectErrorMessage,
@@ -555,19 +555,18 @@ export default function AwardEditor({
                     </td>
                     {lockedBecause === null && (
                       <td className={clsx(DENSE_TD, 'text-right')}>
-                        <button
-                          type="button"
-                          aria-label={WORK_ORDER_COPY.awardRemoveRow}
-                          title={WORK_ORDER_COPY.awardRemoveRow}
+                        <IconButton
+                          size="sm"
+                          tone="danger"
+                          label={WORK_ORDER_COPY.awardRemoveRow}
                           onClick={() =>
                             edit((current) =>
                               current.filter((other) => other.key !== row.key),
                             )
                           }
-                          className="rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                         >
                           ✕
-                        </button>
+                        </IconButton>
                       </td>
                     )}
                   </tr>

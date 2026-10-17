@@ -33,7 +33,7 @@ import {
   projectErrorMessage,
   useProjectLock,
 } from '@/app/ui/projects/project-lock-context';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import {
   FieldLabelSpacer,
   SecondaryButton,
@@ -602,9 +602,8 @@ function CertifiedCopy({
     <div className="flex flex-wrap items-center gap-2 text-sm">
       {viewer}
       {isViewableFile(null, copy.fileName) && (
-        <button
-          type="button"
-          className="font-medium text-brand-700 underline hover:text-brand-900"
+        <TextButton
+          className="underline"
           onClick={() =>
             void view({
               title: `Certified copy — ${pkg.label}`,
@@ -614,16 +613,15 @@ function CertifiedCopy({
           }
         >
           View
-        </button>
+        </TextButton>
       )}
-      <button
-        type="button"
-        className="font-medium text-brand-700 underline hover:text-brand-900 disabled:opacity-50"
+      <TextButton
+        className="underline"
         onClick={() => void download()}
         disabled={busy}
       >
         {busy ? 'Downloading…' : 'Download certified copy'}
-      </button>
+      </TextButton>
       <span className="text-gray-500">{copy.fileName}</span>
     </div>
   );
@@ -991,13 +989,10 @@ function CertifyForm({
             </SecondaryButton>
           )}
           {lineMode && (
-            <button
-              type="button"
-              className="text-sm text-brand-600 hover:underline"
-              onClick={() => setMode('amount')}
-            >
+            <TextButton
+              onClick={() => setMode('amount')}>
               Certify as a single amount
-            </button>
+            </TextButton>
           )}
           {readError && (
             <p className="w-full text-sm text-red-700">{readError}</p>

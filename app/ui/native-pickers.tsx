@@ -530,7 +530,7 @@ function Calendar({
   const decade = Math.floor(view.y / 12) * 12;
 
   const nav =
-    'flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900';
+    'flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500';
 
   return createPortal(
     <div
@@ -562,7 +562,7 @@ function Calendar({
               mode === 'days' ? 'months' : mode === 'months' ? 'years' : mode,
             )
           }
-          className="rounded-lg px-2 py-1 font-semibold text-gray-900 transition-colors hover:bg-brand-50 hover:text-brand-700"
+          className="rounded-lg px-2 py-1 font-semibold text-gray-900 transition-colors hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           {mode === 'days'
             ? `${MONTHS[view.m]} ${view.y}`
@@ -605,7 +605,7 @@ function Calendar({
                   disabled={off}
                   onClick={() => pick(day)}
                   className={clsx(
-                    'flex h-9 items-center justify-center rounded-lg tabular-nums transition-colors',
+                    'flex h-9 items-center justify-center rounded-lg tabular-nums transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
                     day === value
                       ? 'bg-brand-600 font-semibold text-white shadow-sm hover:bg-brand-500'
                       : day === today
@@ -638,7 +638,7 @@ function Calendar({
                 setMode('days');
               }}
               className={clsx(
-                'rounded-lg py-2.5 transition-colors disabled:cursor-not-allowed disabled:opacity-30',
+                'rounded-lg py-2.5 transition-colors disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
                 (monthOnly ? value === isoMonth(view.y, m) : m === view.m)
                   ? 'bg-brand-600 font-semibold text-white'
                   : monthOnly && today === isoMonth(view.y, m)
@@ -663,7 +663,7 @@ function Calendar({
                 setMode('months');
               }}
               className={clsx(
-                'rounded-lg py-2.5 tabular-nums transition-colors',
+                'rounded-lg py-2.5 tabular-nums transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
                 y === view.y
                   ? 'bg-brand-600 font-semibold text-white'
                   : 'text-gray-800 hover:bg-brand-50 hover:text-brand-700',
@@ -686,7 +686,7 @@ function Calendar({
             el.focus();
           }}
           className={clsx(
-            'rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800',
+            'rounded-md px-2 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
             (el.required || !value) && 'invisible',
           )}
         >
@@ -696,7 +696,7 @@ function Calendar({
           type="button"
           disabled={outOfRange(today)}
           onClick={() => pick(today)}
-          className="rounded-md px-2 py-1 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 disabled:opacity-40"
+          className="rounded-md px-2 py-1 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           {monthOnly ? 'This month' : 'Today'}
         </button>

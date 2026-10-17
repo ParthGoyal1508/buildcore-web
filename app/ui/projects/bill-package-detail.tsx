@@ -26,7 +26,7 @@ import BillDeductionLines from '@/app/ui/projects/bill-deduction-lines';
 import DebitNotesPanel from '@/app/ui/projects/debit-notes-panel';
 import BillLifecycle, { describe } from '@/app/ui/projects/bill-lifecycle';
 import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import MeasurementSheet from '@/app/ui/projects/measurement-sheet';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import QueryError from '@/app/ui/query-error';
@@ -352,24 +352,24 @@ export default function BillPackageDetail({
               other schedule line
               {hiddenClaims === 1 ? ' carries' : 's carry'} no quantity.
             </p>
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="underline"
               onClick={() => setShowEveryLine(true)}
-              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               Show every schedule line
-            </button>
+            </TextButton>
           </div>
         )}
         {showEveryLine && !draftLike && (
           <div className="mb-2">
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="underline"
               onClick={() => setShowEveryLine(false)}
-              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               Show only what was claimed
-            </button>
+            </TextButton>
           </div>
         )}
         {/* Lines exist and none carries a quantity — a different fact from a bill with no lines,
@@ -381,13 +381,13 @@ export default function BillPackageDetail({
               considered and nothing was claimed.
             </p>
             {hiddenClaims > 0 && (
-              <button
-                type="button"
+              <TextButton
+                size="xs"
+                className="underline"
                 onClick={() => setShowEveryLine(true)}
-                className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 Show every schedule line
-              </button>
+              </TextButton>
             )}
           </div>
         ) : (
@@ -765,14 +765,11 @@ function ClaimRow({
         <td className={clsx(DENSE_TD, 'whitespace-nowrap')}>
           {/* 025 FR-028. Until now this existed only inside the downloaded workbook, so answering
             "where did this figure come from?" meant producing a document. */}
-          <button
-            type="button"
+          <TextButton
             onClick={onToggleSheet}
-            className="font-medium text-brand-700 hover:underline"
-            aria-expanded={sheetOpen}
-          >
+            aria-expanded={sheetOpen}>
             {claim.boqNo}
-          </button>
+          </TextButton>
         </td>
         <td className={clsx(DENSE_TD, 'max-w-md')}>
           <span className="line-clamp-2">{claim.description}</span>
@@ -782,13 +779,13 @@ function ClaimRow({
             </span>
           )}
           {canEditItem && !editingItem && (
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="ml-2 underline"
               onClick={() => setEditingItem(true)}
-              className="ml-2 text-xs font-medium text-brand-700 underline"
             >
               Edit item
-            </button>
+            </TextButton>
           )}
           {claim.overClaimed && (
             <span className="ml-1 rounded bg-amber-200 px-1 text-xs font-medium text-amber-900">

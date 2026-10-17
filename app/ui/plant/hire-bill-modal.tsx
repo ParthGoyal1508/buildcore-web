@@ -19,7 +19,7 @@ import {
 } from '@/app/lib/api/plant-hire';
 import { MESSAGES } from '@/app/lib/constants';
 import { quantity3, rupees as formatRupees } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -445,13 +445,13 @@ export default function HireBillModal({ onClose }: { onClose: () => void }) {
                 ) : logbook.isError ? (
                   <span className="text-red-700">
                     {errorMessage(logbook.error, 'The logbook could not be read.')}{' '}
-                    <button
-                      type="button"
+                    <TextButton
+                      tone="inherit"
                       className="underline"
                       onClick={() => void logbook.refetch()}
                     >
                       Retry
-                    </button>
+                    </TextButton>
                   </span>
                 ) : logbook.data.entryCount === 0 ? (
                   'No logbook entries in this period.'

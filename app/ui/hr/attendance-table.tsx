@@ -18,7 +18,7 @@ import {
   hrLabel,
 } from '@/app/lib/constants';
 import { timeLabel, todayIso } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -293,19 +293,19 @@ export default function AttendanceTable() {
             Date
           </label>
           <div className="flex gap-2">
-            <button
-              type="button"
+            <IconButton
+              size="lg"
+              label="Previous day"
+              className="border border-gray-200"
               onClick={() =>
                 changeView(() => setDate((current) => shiftDate(current, -1)))
               }
-              aria-label="Previous day"
               // `min-h-11 min-w-11` is 44×44px — the touch target Principle VI's mobile-critical
               // standard requires (016 T112). `px-3` alone gave a target about 24px tall: fine with a
               // mouse, and a supervisor on a site with one hand on a phone misses it.
-              className="min-h-11 min-w-11 rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               ‹
-            </button>
+            </IconButton>
             <input
               id="attendance-date"
               type="date"
@@ -324,18 +324,18 @@ export default function AttendanceTable() {
               }
               className="block min-h-11 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             />
-            <button
-              type="button"
+            <IconButton
+              size="lg"
+              label="Next day"
+              className="border border-gray-200"
               onClick={() =>
                 changeView(() => setDate((current) => shiftDate(current, 1)))
               }
-              aria-label="Next day"
               disabled={isToday}
               title={isToday ? 'Today is the latest date with attendance' : undefined}
-              className="min-h-11 min-w-11 rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
             >
               ›
-            </button>
+            </IconButton>
           </div>
         </div>
         <SelectField

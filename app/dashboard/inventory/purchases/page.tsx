@@ -33,7 +33,7 @@ import {
   useUrlState,
 } from '@/app/lib/use-url-state';
 import AsyncSelect from '@/app/ui/async-select';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { confirmDialog } from '@/app/ui/dialogs';
 import {
   dateRangeError,
@@ -175,18 +175,17 @@ function PurchasesList() {
   }
 
   const fileLink = (row: Purchase, which: 'bill' | 'photo') => (
-    <button
-      type="button"
+    <TextButton
+      className="underline"
       onClick={() => void openFile(row, which)}
       disabled={opening === `${which}:${row.id}`}
-      className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:text-gray-400"
     >
       {opening === `${which}:${row.id}`
         ? 'Opening…'
         : which === 'bill'
           ? 'Bill'
           : 'Photo'}
-    </button>
+    </TextButton>
   );
 
   const columns: Column<Purchase>[] = [

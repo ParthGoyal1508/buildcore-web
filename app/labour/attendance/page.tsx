@@ -38,6 +38,7 @@ import PageHeader from '@/app/ui/page-header';
 import { FormError, SelectField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 import { clockTime } from '@/app/lib/format';
+import { SecondaryButton } from '@/app/ui/button';
 
 /** The last site picked on this phone, so a supervisor with several opens where they left off. */
 const SITE_STORAGE_KEY = 'buildcore.labour.attendanceSite';
@@ -217,18 +218,17 @@ export default function LabourAttendancePage() {
         actions={
           siteId ? (
             <div className="flex flex-wrap gap-2">
-              <button
+              <SecondaryButton
                 type="button"
                 disabled={!online}
                 onClick={() => {
                   setNotice(null);
                   setGroupPhoto(true);
                 }}
-                className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50 sm:h-10"
               >
                 <CameraIcon className="w-5" aria-hidden="true" />
                 Group photo
-              </button>
+              </SecondaryButton>
               <Link
                 href={`${ROUTES.labourRegister}?siteId=${encodeURIComponent(siteId)}`}
                 className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 sm:h-10"
@@ -336,7 +336,7 @@ export default function LabourAttendancePage() {
                 aria-selected={filter === f.id}
                 onClick={() => setFilter(f.id)}
                 className={clsx(
-                  'flex h-9 flex-none items-center gap-1 rounded-full border px-3 text-sm font-medium',
+                  'flex h-9 flex-none items-center gap-1 rounded-full border px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
                   filter === f.id
                     ? 'border-brand-600 bg-brand-600 text-white'
                     : 'border-gray-300 bg-white text-gray-700',
@@ -486,7 +486,7 @@ function LabourRow({
           disabled={disabled}
           onClick={() => onPunch(next)}
           className={clsx(
-            'flex h-11 flex-none items-center rounded-lg px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50',
+            'flex h-11 flex-none items-center rounded-lg px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
             next === 'in'
               ? 'bg-brand-600 hover:bg-brand-500'
               : 'bg-gray-800 hover:bg-gray-700',

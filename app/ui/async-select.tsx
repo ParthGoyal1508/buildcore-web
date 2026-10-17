@@ -309,7 +309,7 @@ export default function AsyncSelect({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => void results.fetchNextPage()}
                 disabled={results.isFetchingNextPage}
-                className="shrink-0 rounded px-2 py-0.5 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                className="shrink-0 rounded px-2 py-0.5 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 {results.isFetchingNextPage ? 'Loading…' : 'Load more'}
               </button>

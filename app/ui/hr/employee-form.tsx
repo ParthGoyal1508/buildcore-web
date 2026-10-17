@@ -30,7 +30,7 @@ import {
   hrLabel,
 } from '@/app/lib/constants';
 import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
 import {
@@ -503,13 +503,13 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
           {tabsWithErrors.map((candidate, index) => (
             <span key={candidate.id}>
               {index > 0 && ', '}
-              <button
-                type="button"
+              <TextButton
+                tone="inherit"
+                className="underline"
                 onClick={() => setTab(candidate.id)}
-                className="font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 {candidate.label}
-              </button>
+              </TextButton>
             </span>
           ))}
         </p>

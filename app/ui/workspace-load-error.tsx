@@ -4,7 +4,7 @@ import { ArrowPathIcon, CloudIcon } from '@heroicons/react/24/outline';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { Spinner } from '@/app/ui/spinner';
+import { Button } from '@/app/ui/button';
 
 /**
  * Shown by a guard when it could not find out who the caller is — not that they were refused
@@ -41,20 +41,16 @@ export default function WorkspaceLoadError() {
       <p className="text-sm text-gray-600">
         Check your connection and try again. Nothing you had saved is affected.
       </p>
-      <button
+      <Button
         type="button"
+        intent="read"
         onClick={retry}
-        disabled={retrying}
-        aria-busy={retrying || undefined}
-        className="mt-1 inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
+        loading={retrying}
+        className="mt-1"
       >
-        {retrying ? (
-          <Spinner />
-        ) : (
-          <ArrowPathIcon aria-hidden="true" className="h-4 w-4" />
-        )}
+        {!retrying && <ArrowPathIcon aria-hidden="true" className="h-4 w-4" />}
         {retrying ? 'Retrying…' : 'Retry'}
-      </button>
+      </Button>
     </div>
   );
 }

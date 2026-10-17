@@ -364,31 +364,25 @@ function ApprovalHistoryInner() {
 
       {data && data.total > data.pageSize && (
         <div className="flex items-center justify-between gap-3">
-          <button
+          <SecondaryButton
             type="button"
+            size="sm"
             onClick={() => setFilters({ page: Math.max(1, query.page - 1) })}
             disabled={query.page === 1 || history.isFetching}
-            className={clsx(
-              'min-h-9 rounded-md border border-gray-300 px-3 text-sm disabled:opacity-40',
-              focusRing,
-            )}
           >
             Previous
-          </button>
+          </SecondaryButton>
           <span className="text-sm text-gray-500">
             {first}–{last} of {data.total}
           </span>
-          <button
+          <SecondaryButton
             type="button"
+            size="sm"
             onClick={() => setFilters({ page: query.page + 1 })}
             disabled={last >= data.total || history.isFetching}
-            className={clsx(
-              'min-h-9 rounded-md border border-gray-300 px-3 text-sm disabled:opacity-40',
-              focusRing,
-            )}
           >
             Next
-          </button>
+          </SecondaryButton>
         </div>
       )}
     </div>

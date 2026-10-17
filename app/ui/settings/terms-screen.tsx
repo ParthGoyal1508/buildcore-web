@@ -98,8 +98,8 @@ export function TermsScreen() {
             }}
             className={
               row.documentKind === selected
-                ? "rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white"
-                : "rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                ? "rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+                : "rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             }
           >
             {TERMS_COPY.kindLabels[row.documentKind]}

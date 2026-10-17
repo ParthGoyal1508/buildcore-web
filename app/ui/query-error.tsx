@@ -1,11 +1,11 @@
 'use client';
 
-import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { useState } from 'react';
 
 import { errorMessage } from '@/app/lib/api/client';
-import { Spinner } from '@/app/ui/spinner';
+import { RowAction } from '@/app/ui/button';
 
 /**
  * What a screen shows when its data did not load, with a way to try again (036 A4).
@@ -72,20 +72,16 @@ export default function QueryError({
       />
       <p className="min-w-0 flex-1">{text}</p>
       {onRetry && (
-        <button
+        // A row action's shape (036 A21); "Retry" picks up its refresh icon from the verb.
+        <RowAction
           type="button"
+          intent="read"
           onClick={retry}
-          disabled={retrying}
-          aria-busy={retrying || undefined}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+          loading={retrying}
+          className="shrink-0"
         >
-          {retrying ? (
-            <Spinner className="h-3.5 w-3.5" />
-          ) : (
-            <ArrowPathIcon aria-hidden="true" className="h-3.5 w-3.5" />
-          )}
           {retrying ? 'Retrying…' : 'Retry'}
-        </button>
+        </RowAction>
       )}
     </div>
   );

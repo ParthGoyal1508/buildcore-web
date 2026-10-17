@@ -21,8 +21,9 @@ import {
   type NotificationRow,
 } from '@/app/lib/api/dashboard';
 import QueryError from '@/app/ui/query-error';
-import { LoadingText, Spinner } from '@/app/ui/spinner';
+import { LoadingText } from '@/app/ui/spinner';
 import { toast } from '@/app/ui/toast';
+import { TextButton } from '@/app/ui/button';
 
 /** The panel's own box, in pixels — the `w-72`/`max-h-96` it used to carry as classes.
  *  Needed as numbers because the placement below has to know how much room it wants
@@ -203,15 +204,13 @@ export default function NotificationPanel({
       <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
         <span className="text-sm font-medium text-gray-700">Notifications</span>
         {unread.length > 0 && (
-          <button
-            type="button"
+          <TextButton
+            size="xs"
             onClick={() => markAll.mutate()}
-            disabled={markAll.isPending}
-            className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-700 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-50"
+            loading={markAll.isPending}
           >
-            {markAll.isPending && <Spinner className="h-3 w-3" />}
             Mark all read
-          </button>
+          </TextButton>
         )}
       </div>
       {notifications.isPending && (
@@ -264,13 +263,13 @@ export default function NotificationPanel({
                 <p className="text-xs text-gray-500">{n.subtitle}</p>
               </Link>
               {n.id && !n.read && (
-                <button
-                  type="button"
+                <TextButton
+                  size="xs"
+                  className="mb-2 ml-6"
                   onClick={() => markOne.mutate(n.id as string)}
-                  className="mb-2 ml-6 rounded text-xs text-brand-700 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   Mark as read
-                </button>
+                </TextButton>
               )}
             </li>
           ))}

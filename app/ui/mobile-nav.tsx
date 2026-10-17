@@ -31,6 +31,7 @@ import ApprovalBadge, {
 } from '@/app/ui/dashboard/approval-badge';
 import NavLinks from '@/app/ui/dashboard/nav-links';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
+import { IconButton } from '@/app/ui/button';
 
 /**
  * The phone navigation, the same in every shell (2026-10-15).
@@ -291,15 +292,13 @@ function MenuSheet({
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900">Menu</h2>
-          <button
+          <IconButton
+            label="Close menu"
             ref={closeRef}
-            type="button"
             onClick={onClose}
-            aria-label="Close menu"
-            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
           >
             <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="flex flex-col gap-5 overflow-y-auto px-3 py-4">

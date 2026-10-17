@@ -18,6 +18,7 @@ import {
 } from '@/app/lib/files';
 import { dateLabel } from '@/app/lib/format';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { RowAction } from '@/app/ui/button';
 
 /**
  * One kind's staging state, as the form needs to reason about it.
@@ -309,14 +310,14 @@ export default function ProjectDocumentUploads({
                                   attached.fileName,
                                 )}
                           </span>
-                          <button
+                          <RowAction
                             type="button"
+                            intent="read"
                             onClick={() => remove(requirement.documentTypeId)}
                             disabled={disabled}
-                            className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                           >
                             {DOCUMENT_COPY.creationReplace}
-                          </button>
+                          </RowAction>
                         </div>
                       ) : (
                         <input

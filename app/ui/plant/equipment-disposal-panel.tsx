@@ -24,6 +24,7 @@ import DisposeModal from '@/app/ui/plant/dispose-modal';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 import { dateTimeLabel } from '@/app/lib/format';
+import { TextButton } from '@/app/ui/button';
 
 /**
  * A machine's disposal on its detail page (2026-10-17): the Dispose action while it is in service,
@@ -192,13 +193,12 @@ export function DisposalFacts({
       ))}
       {disposal.hasAttachment && (
         <div className="sm:col-span-2">
-          <button
-            type="button"
+          <TextButton
+            className="underline"
             onClick={onOpenAttachment}
-            className="text-sm text-brand-700 underline hover:text-brand-900"
           >
             {disposal.attachmentName ?? 'View attachment'}
-          </button>
+          </TextButton>
         </div>
       )}
     </dl>

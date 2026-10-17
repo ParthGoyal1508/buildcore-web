@@ -4,6 +4,7 @@ import { ArrowPathIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline'
 import { useSyncExternalStore } from 'react';
 
 import { getCompanyChange, subscribeCompanyChange } from '@/app/lib/company-tab';
+import { SecondaryButton } from '@/app/ui/button';
 
 /**
  * "Company was changed to X in another tab." with Reload (036 B17).
@@ -33,14 +34,14 @@ export default function CompanyChangedBanner() {
           : 'Company was changed in another tab.'}{' '}
         Reload to continue.
       </p>
-      <button
+      <SecondaryButton
         type="button"
+        size="sm"
         onClick={() => window.location.reload()}
-        className="inline-flex items-center gap-1.5 rounded-md bg-amber-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-900"
       >
         <ArrowPathIcon aria-hidden="true" className="h-4 w-4" />
         Reload
-      </button>
+      </SecondaryButton>
     </div>
   );
 }

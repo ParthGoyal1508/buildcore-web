@@ -12,7 +12,7 @@ import {
   type FaceEnrolmentStatus,
 } from '@/app/lib/api/my-workspace';
 import { ENROLMENT_PHOTO_RANGE, MESSAGES } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import {
   CheckboxField,
   FormError,
@@ -174,19 +174,20 @@ export default function FaceEnrolmentStatusPanel() {
                   alt={`Captured photo ${index + 1}`}
                   className="h-20 w-20 rounded-md object-cover"
                 />
-                <button
-                  type="button"
+                <IconButton
+                  size="xs"
+                  tone="overlay"
+                  label={`Remove photo ${index + 1}`}
+                  className="absolute -right-1 -top-1"
                   onClick={() => {
                     URL.revokeObjectURL(shot.url);
                     setShots((current) =>
                       current.filter((s) => s.url !== shot.url),
                     );
                   }}
-                  aria-label={`Remove photo ${index + 1}`}
-                  className="absolute -right-1 -top-1 rounded-full bg-gray-800 px-1.5 text-xs text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   ×
-                </button>
+                </IconButton>
               </li>
             ))}
           </ul>

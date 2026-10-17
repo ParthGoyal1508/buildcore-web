@@ -37,7 +37,7 @@ import {
   urlString,
   useUrlState,
 } from '@/app/lib/use-url-state';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { promptDialog } from '@/app/ui/dialogs';
 import Pager from '@/app/ui/inventory/pager';
 import QueryError from '@/app/ui/query-error';
@@ -222,13 +222,17 @@ function PipelineInner() {
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-gray-200 p-0.5">
             <button
-              className={`rounded-md px-3 py-1 text-sm ${view === 'table' ? 'bg-gray-100 font-medium' : ''}`}
+              type="button"
+              aria-pressed={view === 'table'}
+              className={`rounded-md px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${view === 'table' ? 'bg-gray-100 font-medium' : ''}`}
               onClick={() => setView('table')}
             >
               Table
             </button>
             <button
-              className={`rounded-md px-3 py-1 text-sm ${view === 'board' ? 'bg-gray-100 font-medium' : ''}`}
+              type="button"
+              aria-pressed={view === 'board'}
+              className={`rounded-md px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${view === 'board' ? 'bg-gray-100 font-medium' : ''}`}
               onClick={() => setView('board')}
             >
               Board
@@ -362,15 +366,15 @@ function PipelineInner() {
                         {recruitmentLabel(c.source)}
                       </p>
                       <div className="mt-2 flex items-center justify-between">
-                        <button
-                          className="text-xs text-brand-600"
+                        <TextButton
+                          size="xs"
                           onClick={() => setDrawer(c)}
                         >
                           Open
-                        </button>
+                        </TextButton>
                         {NEXT_STAGE[c.stage] && (
-                          <button
-                            className="text-xs text-brand-600 disabled:cursor-not-allowed disabled:text-gray-400"
+                          <TextButton
+                            size="xs"
                             onClick={() =>
                               move.mutate({
                                 id: c.id,
@@ -381,7 +385,7 @@ function PipelineInner() {
                             title={blockedReason(c) ?? undefined}
                           >
                             {forwardLabel(c)}
-                          </button>
+                          </TextButton>
                         )}
                       </div>
                       {blockedReason(c) && (

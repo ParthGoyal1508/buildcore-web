@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { useEffect, useSyncExternalStore } from 'react';
+import { IconButton } from '@/app/ui/button';
 
 /**
  * Brief confirmation that something happened — "Vendor saved", "Couldn't delete the item" (036 A17).
@@ -138,14 +139,14 @@ function ToastCard({ toast: item }: { toast: Toast }) {
         )}
       />
       <p className="min-w-0 flex-1 text-gray-800">{item.message}</p>
-      <button
-        type="button"
+      <IconButton
+        size="xs"
+        label="Dismiss"
+        className="-m-1"
         onClick={() => dismissToast(item.id)}
-        aria-label="Dismiss"
-        className="-m-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
       >
         <XMarkIcon aria-hidden="true" className="h-4 w-4" />
-      </button>
+      </IconButton>
     </div>
   );
 }

@@ -296,22 +296,22 @@ export default function EmployeeList() {
             Page {page} of {lastPage} · {total} employees
           </p>
           <div className="flex gap-2">
-            <button
+            <SecondaryButton
               type="button"
+              size="sm"
               onClick={() => setUi({ page: Math.max(1, page - 1) })}
               disabled={page === 1}
-              className="rounded-md border border-gray-200 px-3 py-1.5 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-40"
             >
               Previous
-            </button>
-            <button
+            </SecondaryButton>
+            <SecondaryButton
               type="button"
+              size="sm"
               onClick={() => setUi({ page: Math.min(lastPage, page + 1) })}
               disabled={page >= lastPage}
-              className="rounded-md border border-gray-200 px-3 py-1.5 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-40"
             >
               Next
-            </button>
+            </SecondaryButton>
           </div>
         </nav>
       )}

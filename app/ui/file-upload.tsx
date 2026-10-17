@@ -19,6 +19,7 @@ import {
   matchesAccept,
 } from '@/app/lib/files';
 import { Spinner } from '@/app/ui/spinner';
+import { IconButton } from '@/app/ui/button';
 
 /** A file made ready to send: possibly shrunk, already in base64 for the JSON body. */
 export interface PreparedFile {
@@ -285,14 +286,13 @@ export default function FileUpload({
             </p>
           </div>
           {!onUpload && !busy && (
-            <button
-              type="button"
+            <IconButton
+              size="sm"
+              label={`Remove ${picked.fileName}`}
               onClick={remove}
-              aria-label={`Remove ${picked.fileName}`}
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
             >
               <XMarkIcon aria-hidden="true" className="h-4 w-4" />
-            </button>
+            </IconButton>
           )}
         </div>
       )}

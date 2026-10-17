@@ -200,7 +200,7 @@ function MusterAttendanceBody() {
             aria-selected={view === v}
             onClick={() => setView(v)}
             className={clsx(
-              'h-9 rounded-full border px-4 text-sm font-medium',
+              'h-9 rounded-full border px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
               view === v
                 ? 'border-brand-600 bg-brand-600 text-white'
                 : 'border-gray-300 bg-white text-gray-700',

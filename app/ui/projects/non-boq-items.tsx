@@ -11,7 +11,7 @@ import {
 } from '@/app/lib/api/bill-packages';
 import { productRounded } from '@/app/lib/bill-totals';
 import { rupees } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
 import {
   FormError,
@@ -179,32 +179,32 @@ export function NonBoqItemEditor({
         {confirmRemove ? (
           <span className="flex items-center gap-2 text-sm text-red-800">
             Remove {claim.boqNo} from this bill and the project?
-            <button
-              type="button"
+            <TextButton
+              tone="inherit"
+              className="underline"
               disabled={busy}
-              className="font-medium underline"
               onClick={() =>
                 run(() => removeNonBoqItem(packageId, claim.scheduleLineId))
               }
             >
               Yes, remove
-            </button>
-            <button
-              type="button"
+            </TextButton>
+            <TextButton
+              tone="inherit"
               className="underline"
               onClick={() => setConfirmRemove(false)}
             >
               Keep
-            </button>
+            </TextButton>
           </span>
         ) : (
-          <button
-            type="button"
-            className="text-sm font-medium text-red-700 underline"
+          <TextButton
+            tone="danger"
+            className="underline"
             onClick={() => setConfirmRemove(true)}
           >
             Remove item
-          </button>
+          </TextButton>
         )}
       </div>
     </div>

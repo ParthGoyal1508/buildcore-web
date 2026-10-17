@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef } from 'react';
 
 import { useLayer, useScrollLock } from '@/app/lib/layers';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { IconButton } from '@/app/ui/button';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -133,18 +134,16 @@ export default function Modal({
           <h2 id={titleId} className="text-lg font-medium">
             {title}
           </h2>
-          <button
-            type="button"
+          <IconButton
+            label="Close"
             onClick={() => void requestClose()}
             disabled={pending}
-            aria-label="Close"
             // 44×44px below `sm` (016 FR-021). `p-1` around a 20px icon is a 28px target: reachable
             // with a mouse, missed with a thumb — and the close control being the one somebody stabs
             // at repeatedly makes it the worst one to leave small.
-            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0 sm:p-1"
           >
             <XMarkIcon className="w-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && (

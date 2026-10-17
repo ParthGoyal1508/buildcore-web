@@ -10,7 +10,7 @@ import {
 } from '@/app/lib/api/hr-payroll';
 import { TDS_SECTIONS, TDS_SECTION_CEILINGS } from '@/app/lib/constants';
 import { financialYearOf, rupees } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, SecondaryButton } from '@/app/ui/button';
 import EmployeePicker from '@/app/ui/hr/employee-picker';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import {
@@ -300,7 +300,7 @@ export default function TaxDeclarationForm() {
           />
 
           <div className="flex flex-wrap justify-between gap-2">
-            <button
+            <SecondaryButton
               type="button"
               onClick={() =>
                 setLines((current) => [
@@ -308,10 +308,9 @@ export default function TaxDeclarationForm() {
                   { sectionCode: '', declaredAmount: '', proofRef: '' },
                 ])
               }
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               Add a line
-            </button>
+            </SecondaryButton>
             <Button
               type="button"
               onClick={() => save.mutate()}

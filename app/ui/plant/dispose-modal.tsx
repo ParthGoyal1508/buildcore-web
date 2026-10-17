@@ -18,7 +18,7 @@ import {
   SCRAP_REASONS,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { Button } from '@/app/ui/button';
+import { Button, DangerButton } from '@/app/ui/button';
 import { toBase64 } from '@/app/ui/plant/document-modal';
 import {
   FormError,
@@ -162,18 +162,15 @@ export default function DisposeModal({
             <SecondaryButton onClick={() => setStep('form')} disabled={save.isPending}>
               Back
             </SecondaryButton>
-            <button
-              type="button"
+            <DangerButton
               onClick={() => save.mutate()}
-              disabled={save.isPending}
-              className="flex h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-red-500 disabled:opacity-50 sm:h-10"
-            >
+              disabled={save.isPending}>
               {save.isPending
                 ? 'Saving…'
                 : isSale
                 ? 'Yes, mark as sold'
                 : 'Yes, mark as scrapped'}
-            </button>
+            </DangerButton>
           </div>
         }
       >
@@ -258,7 +255,7 @@ export default function DisposeModal({
               aria-checked={type === t}
               onClick={() => setType(t)}
               className={clsx(
-                'h-11 rounded-lg border text-sm font-medium',
+                'h-11 rounded-lg border text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
                 type === t
                   ? 'border-brand-600 bg-brand-50 text-brand-800'
                   : 'border-gray-300 bg-white text-gray-700',

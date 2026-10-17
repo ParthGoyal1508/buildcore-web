@@ -38,7 +38,7 @@ import {
 } from '@/app/lib/files';
 import { dateTimeLabel, todayIso } from '@/app/lib/format';
 import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton, SecondaryButton, TextButton } from '@/app/ui/button';
 import { confirmDialog } from '@/app/ui/dialogs';
 import SearchableSelect, {
   type SearchableOption,
@@ -940,7 +940,8 @@ export default function DwrForm({
             Saved — opening…
           </Button>
         ) : savedReportId ? (
-          <Button intent="read"
+          <Button
+            intent="read"
             type="button"
             onClick={() =>
               router.push(ROUTES.projectsDwrReport(projectId, savedReportId))
@@ -1159,8 +1160,9 @@ function LineEditor({
                         {/* Never the last row: removing it would leave an item measured nowhere,
                             and the way to drop an item is to remove the item. */}
                         {line.rows.length > 1 && (
-                          <button
-                            type="button"
+                          <TextButton
+                            tone="danger"
+                            className="min-h-11 px-2"
                             onClick={() =>
                               onChange({
                                 ...line,
@@ -1169,11 +1171,10 @@ function LineEditor({
                                 ),
                               })
                             }
-                            className="min-h-11 px-2 text-sm text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                             aria-label={`Remove measurement ${rowIndex + 1}`}
                           >
                             Remove
-                          </button>
+                          </TextButton>
                         )}
                       </td>
                     </tr>
@@ -1448,13 +1449,14 @@ function UploadProgress({
                     : job.error ?? 'Failed'}
             </span>
             {job.status === 'failed' && job.taskId && (
-              <button
+              <SecondaryButton
                 type="button"
+                size="sm"
+                className="min-h-[44px]"
                 onClick={() => onRetry(job)}
-                className="min-h-[44px] rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
                 Retry
-              </button>
+              </SecondaryButton>
             )}
           </li>
         ))}
@@ -1624,17 +1626,18 @@ function PickedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
       <span className="min-w-0 flex-1 truncate" title={file.name}>
         {file.name}
       </span>
-      <button
-        type="button"
-        aria-label={`Remove ${file.name}`}
+      <IconButton
+        size="lg"
+        tone="danger"
+        label={`Remove ${file.name}`}
+        className="text-lg"
         onClick={() => {
           releasePreview(file);
           onRemove();
         }}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-lg text-red-700 hover:bg-red-50"
       >
         &times;
-      </button>
+      </IconButton>
     </span>
   );
 }

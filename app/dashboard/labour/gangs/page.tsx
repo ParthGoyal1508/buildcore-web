@@ -13,7 +13,7 @@ import {
   type Gang,
 } from '@/app/lib/api/labour';
 import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import {
   FormError,
   SecondaryButton,
@@ -227,16 +227,16 @@ function GangForm({
                     {m.sublabel && (
                       <span className="text-xs text-gray-500">{m.sublabel}</span>
                     )}
-                    <button
-                      type="button"
+                    <IconButton
+                      size="sm"
+                      label={`Remove ${m.label}`}
+                      className="rounded-full"
                       onClick={() =>
                         setMembers((list) => list.filter((x) => x.id !== m.id))
                       }
-                      aria-label={`Remove ${m.label}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-200"
                     >
                       ×
-                    </button>
+                    </IconButton>
                   </li>
                 ))}
               </ul>

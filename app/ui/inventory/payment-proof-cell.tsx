@@ -24,6 +24,7 @@ import { useToast } from '@/app/ui/toast';
 const ACCEPT_PROOF =
   'application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
+import { RowAction } from '@/app/ui/button';
 
 /**
  * One payment's transfer proof — the RTGS advice or confirmation (017 FR-020, bugs.md item 23).
@@ -126,13 +127,14 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
       {viewer}
       {payment.hasProof ? (
         <>
-          <button
+          <RowAction
             type="button"
+            intent="read"
+            className="self-start"
             onClick={() => void open()}
-            className="self-start rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {DOCUMENT_COPY.proofOpen}
-          </button>
+          </RowAction>
           <span className="text-xs text-gray-500">
             {payment.proofUploadedAt
               ? DOCUMENT_COPY.proofAttachedOn(

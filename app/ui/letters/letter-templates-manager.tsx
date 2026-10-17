@@ -417,7 +417,7 @@ function TemplateEditor({
                     <button
                       type="button"
                       disabled={locked}
-                      className="w-full rounded border disabled:cursor-default disabled:hover:bg-transparent border-gray-200 px-2 py-1 text-left text-xs hover:bg-gray-50"
+                      className="w-full rounded border disabled:cursor-default disabled:hover:bg-transparent border-gray-200 px-2 py-1 text-left text-xs hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                       onClick={() => insert(field.token)}
                       title={`${TEMPLATE_COPY.insert} {{${field.token}}}`}
                     >

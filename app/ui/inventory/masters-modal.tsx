@@ -513,8 +513,8 @@ export default function MastersModal({ onClose }: { onClose: () => void }) {
               onClick={() => setTab(value)}
               className={
                 tab === value
-                  ? 'border-b-2 border-brand-600 px-3 py-2 text-sm font-medium text-brand-700'
-                  : 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900'
+                  ? 'border-b-2 border-brand-600 px-3 py-2 text-sm font-medium text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
+                  : 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
               }
             >
               {value === 'items' ? 'Items' : 'Categories'}

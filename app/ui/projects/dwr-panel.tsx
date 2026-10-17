@@ -31,7 +31,7 @@ import {
   urlString,
   useUrlState,
 } from '@/app/lib/use-url-state';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import Pager from '@/app/ui/inventory/pager';
 import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import QueryError from '@/app/ui/query-error';
@@ -230,13 +230,12 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
           />
         </label>
         {filtered && (
-          <button
-            type="button"
+          <TextButton
+            className="h-10 px-3"
             onClick={() => setFilters({ status: 'all', from: '', to: '' })}
-            className="h-10 rounded-md px-3 text-sm font-medium text-brand-700 hover:underline"
           >
             Clear filters
-          </button>
+          </TextButton>
         )}
       </div>
 

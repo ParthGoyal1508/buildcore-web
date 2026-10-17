@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { saveBlob } from '@/app/lib/download-file';
+import { IconButton, SecondaryButton, TextButton } from '@/app/ui/button';
 
 /**
  * Reading a PDF in the page, without saving it first (2026-10-14).
@@ -287,13 +288,12 @@ export function PdfPreview({
     <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <button
-          type="button"
+        <TextButton
+          className="underline"
           onClick={onClose}
-          className="text-sm font-medium text-brand-700 underline"
         >
           Close preview
-        </button>
+        </TextButton>
       </div>
       {note && <p className="text-xs text-gray-500">{note}</p>}
       <FileFrame
@@ -372,37 +372,35 @@ export function FileViewer({
           </h2>
           <div className="flex shrink-0 items-center gap-2">
             {state.status === 'ready' && (
-              <button
+              <SecondaryButton
                 type="button"
+                size="sm"
                 onClick={() =>
                   saveBlob(
                     state.file.blob,
                     state.file.filename || state.fallbackName,
                   )
                 }
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Download
-              </button>
+              </SecondaryButton>
             )}
             {state.status === 'ready' && (
-              <button
+              <SecondaryButton
                 type="button"
+                size="sm"
                 onClick={() => printFile(state.file)}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Print
-              </button>
+              </SecondaryButton>
             )}
-            <button
+            <IconButton
+              label="Close"
               ref={closeRef}
-              type="button"
               onClick={onClose}
-              aria-label="Close"
-              className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 sm:min-h-0 sm:min-w-0 sm:p-1"
             >
               <XMarkIcon className="w-5" aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
         </div>
         <div className="flex min-h-0 flex-1 flex-col bg-gray-100">

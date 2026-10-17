@@ -25,7 +25,7 @@ import {
   VENDOR_TYPES,
   partnersLabel,
 } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
@@ -447,13 +447,12 @@ export default function VendorModal({
                 />
               </Field>
               <div className="flex items-end">
-                <button
-                  type="button"
+                <TextButton
+                  tone="danger"
                   onClick={() => remove(index)}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   Remove
-                </button>
+                </TextButton>
               </div>
             </div>
           ))}

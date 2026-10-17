@@ -27,6 +27,7 @@ import ProjectListTable from '@/app/ui/projects/project-list-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
 import { useToast } from '@/app/ui/toast';
+import { TextButton } from '@/app/ui/button';
 
 /** The project portfolio (spec US3). */
 export default function PortfolioPage() {
@@ -162,13 +163,10 @@ export default function PortfolioPage() {
 
       {filtered && (
         <div className="mb-3">
-          <button
-            type="button"
-            onClick={() => setFilters({ q: '', status: '', client: '' })}
-            className="text-sm font-medium text-brand-700 hover:underline"
-          >
+          <TextButton
+            onClick={() => setFilters({ q: '', status: '', client: '' })}>
             Clear filters
-          </button>
+          </TextButton>
         </div>
       )}
 

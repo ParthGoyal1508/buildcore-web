@@ -17,6 +17,7 @@ import { CompanyMark } from '@/app/ui/company-logo';
 import { LoadingText } from '@/app/ui/spinner';
 import PageHeader from '@/app/ui/page-header';
 import { longDateLabel } from '@/app/lib/format';
+import { DangerButton } from '@/app/ui/button';
 
 /** "Thursday, 15 October 2026". */
 function todayLabel(): string {
@@ -67,12 +68,13 @@ export default function DashboardPage() {
           role="alert"
         >
           <p className="text-sm text-red-700">Could not load the dashboard.</p>
-          <button
+          <DangerButton
+            size="sm"
+            className="mt-2"
             onClick={() => widgets.refetch()}
-            className="mt-2 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
           >
             Retry
-          </button>
+          </DangerButton>
         </div>
       )}
 

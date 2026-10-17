@@ -46,6 +46,7 @@ import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
 import { todayIso, dateLabel, rupees } from '@/app/lib/format';
+import { TextButton } from '@/app/ui/button';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -144,14 +145,13 @@ export default function EquipmentDetailPage() {
       key: 'file',
       header: 'File',
       render: (row) => (
-        <button
-          type="button"
+        <TextButton
+          className="underline"
           onClick={() => void openDocument(row.id)}
           disabled={opening === row.id}
-          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:text-gray-400"
         >
           {opening === row.id ? 'Opening…' : (row.fileName ?? 'View')}
-        </button>
+        </TextButton>
       ),
     },
     {

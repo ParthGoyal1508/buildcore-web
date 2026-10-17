@@ -7,6 +7,7 @@ import { type RaBill } from '@/app/lib/api/billing';
 import { BILLING_COPY } from '@/app/lib/constants';
 import { dateLabel, quantity3, rupees, unitRate } from '@/app/lib/format';
 import { TABLE } from '@/app/ui/table';
+import { TextButton } from '@/app/ui/button';
 
 /**
  * One subcontractor bill, read-only (027).
@@ -122,15 +123,15 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
           <p className="text-xs text-gray-500">
             {BILLING_COPY.linesHidden(hidden, measured.length)}
           </p>
-          <button
-            type="button"
+          <TextButton
+            size="xs"
+            className="underline"
             onClick={() => setShowAllLines((current) => !current)}
-            className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {showAllLines
               ? BILLING_COPY.showBilledLines
               : BILLING_COPY.showAllLines}
-          </button>
+          </TextButton>
         </div>
       )}
 

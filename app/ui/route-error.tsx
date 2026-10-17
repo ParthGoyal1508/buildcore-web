@@ -3,6 +3,7 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { Button } from '@/app/ui/button';
 
 /**
  * The fallback every route error boundary renders (036 A1).
@@ -82,13 +83,13 @@ export default function RouteError({
         <p className="font-mono text-xs text-gray-400">Reference: {error.digest}</p>
       )}
       <div className="mt-2 flex flex-wrap justify-center gap-2">
-        <button
+        <Button
           type="button"
+          intent="read"
           onClick={() => (chunk ? window.location.reload() : retry())}
-          className="h-10 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {chunk ? 'Reload' : 'Try again'}
-        </button>
+        </Button>
         <Link
           href={homeHref}
           className="flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
