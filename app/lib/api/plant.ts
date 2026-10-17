@@ -1470,3 +1470,174 @@ export async function recoverFromOperator(exceptionId: string) {
     { method: 'POST' },
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Disposal — scrapping and selling machines (2026-10-17)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const disposalSchema = z.object({
+  id: z.string(),
+  equipmentId: z.string(),
+  equipmentCode: z.string(),
+  equipmentName: z.string(),
+  categoryId: z.string(),
+  categoryName: z.string().nullable(),
+  make: z.string().nullable(),
+  model: z.string().nullable(),
+  purchaseDate: z.string().nullable(),
+  purchaseCost: z.number().nullable(),
+  type: z.enum(['scrapped', 'sold']),
+  disposalDate: z.string(),
+  scrapReason: z.string().nullable(),
+  counterpartyName: z.string().nullable(),
+  buyerContact: z.string().nullable(),
+  paymentMode: z.string().nullable(),
+  invoiceNumber: z.string().nullable(),
+  valueRealised: z.number().nullable(),
+  bookValue: z.number().nullable(),
+  bookValueSource: z.string().nullable(),
+  profitLoss: z.number().nullable(),
+  approvedBy: z.string(),
+  remarks: z.string().nullable(),
+  attachmentName: z.string().nullable(),
+  hasAttachment: z.boolean(),
+  releasedSiteName: z.string().nullable(),
+  projectId: z.string().nullable(),
+  projectName: z.string().nullable(),
+  createdAt: z.string(),
+  reversedAt: z.string().nullable(),
+  reversalReason: z.string().nullable(),
+});
+export type EquipmentDisposal = z.infer<typeof disposalSchema>;
+
+const disposalPreviewSchema = z.object({
+  equipmentId: z.string(),
+  code: z.string(),
+  name: z.string(),
+  status: z.string(),
+  disposed: z.boolean(),
+  deployedSiteId: z.string().nullable(),
+  deployedSiteName: z.string().nullable(),
+  purchaseDate: z.string().nullable(),
+  purchaseCost: z.number().nullable(),
+  bookValue: z.number().nullable(),
+});
+export type DisposalPreview = z.infer<typeof disposalPreviewSchema>;
+
+export async function getDisposalPreview(
+  equipmentId: string,
+  disposalDate: string,
+): Promise<DisposalPreview> {
+  const raw = await authFetch<unknown>(
+    `/plant/equipment/${equipmentId}/disposal/preview${qs({ disposalDate })}`,
+  );
+  return disposalPreviewSchema.parse(raw);
+}
+
+export async function getCurrentDisposal(
+  equipmentId: string,
+): Promise<EquipmentDisposal | null> {
+  const raw = await authFetch<unknown>(`/plant/equipment/${equipmentId}/disposal`);
+  return raw ? disposalSchema.parse(raw) : null;
+}
+
+export interface DisposeInput {
+  type: 'scrapped' | 'sold';
+  disposalDate: string;
+  scrapReason?: string;
+  counterpartyName?: string;
+  buyerContact?: string;
+  paymentMode?: string;
+  invoiceNumber?: string;
+  valueRealised?: number;
+  bookValue?: number;
+  approvedBy: string;
+  remarks?: string;
+  /** Base64, without the `data:` prefix. */
+  attachment?: string;
+  attachmentName?: string;
+  attachmentMime?: string;
+}
+
+export async function disposeEquipment(
+  equipmentId: string,
+  input: DisposeInput,
+): Promise<EquipmentDisposal> {
+  const raw = await authFetch<unknown>(`/plant/equipment/${equipmentId}/dispose`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return disposalSchema.parse(raw);
+}
+
+export async function reverseDisposal(
+  equipmentId: string,
+  reason: string,
+): Promise<EquipmentDisposal> {
+  const raw = await authFetch<unknown>(
+    `/plant/equipment/${equipmentId}/disposal/reverse`,
+    { method: 'POST', body: JSON.stringify({ reason }) },
+  );
+  return disposalSchema.parse(raw);
+}
+
+const historyEventSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  summary: z.string(),
+  at: z.string(),
+  actorName: z.string().nullable(),
+});
+export type EquipmentHistoryEvent = z.infer<typeof historyEventSchema>;
+
+export async function getEquipmentHistory(
+  equipmentId: string,
+): Promise<EquipmentHistoryEvent[]> {
+  const raw = await authFetch<unknown>(`/plant/equipment/${equipmentId}/history`);
+  return z.array(historyEventSchema).parse(raw);
+}
+
+export interface DisposalFilters {
+  companyId?: string;
+  type?: 'scrapped' | 'sold';
+  from?: string;
+  to?: string;
+  categoryId?: string;
+  projectId?: string;
+  search?: string;
+}
+
+const disposalDashboardSchema = z.object({
+  summary: z.object({
+    totalScrapped: z.number(),
+    totalSold: z.number(),
+    saleValueRealised: z.number(),
+    scrapValueRealised: z.number(),
+    netProfitLossOnSales: z.number(),
+  }),
+  byMonth: z.array(
+    z.object({ month: z.string(), scrapped: z.number(), sold: z.number() }),
+  ),
+  items: z.array(disposalSchema),
+});
+export type DisposalDashboard = z.infer<typeof disposalDashboardSchema>;
+
+export async function getDisposals(
+  filters: DisposalFilters = {},
+): Promise<DisposalDashboard> {
+  const raw = await authFetch<unknown>(`/plant/disposals${qs({ ...filters })}`);
+  return disposalDashboardSchema.parse(raw);
+}
+
+export async function downloadDisposals(
+  filters: DisposalFilters = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/plant/disposals/export${qs({ ...filters })}`,
+  );
+  return { blob, filename: filename ?? 'Scrapped and sold machines.xlsx' };
+}
+
+export async function getDisposalAttachment(id: string): Promise<StoredFile> {
+  return authFetchFile(`/plant/disposals/${id}/attachment`);
+}

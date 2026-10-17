@@ -2246,3 +2246,79 @@ export async function importLeaveOpening(
       ),
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monthly attendance download and salary bank sheet (2026-10-17)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MonthlyAttendanceQuery {
+  companyId?: string;
+  year: number;
+  month: number;
+  projectId?: string;
+  siteId?: string;
+  departmentId?: string;
+}
+
+/** `Attendance_<Company>_<Month>_<Year>.xlsx` in the client's staff attendance layout. */
+export async function downloadMonthlyAttendance(
+  query: MonthlyAttendanceQuery,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/hr/attendance/monthly-sheet${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? `Attendance_${query.year}_${query.month}.xlsx` };
+}
+
+export interface SalaryBankSheetQuery {
+  companyId?: string;
+  year: number;
+  month: number;
+  debitAccount?: string;
+  /** Comma-separated employee ids to leave off. */
+  exclude?: string;
+}
+
+const bankSheetLeftOffSchema = z.object({
+  employeeId: z.string(),
+  employeeCode: z.string(),
+  name: z.string(),
+  netPay: z.number(),
+  kind: z.enum(['bank_details', 'excluded', 'nothing_to_pay']),
+  reason: z.string(),
+});
+export type BankSheetLeftOff = z.infer<typeof bankSheetLeftOffSchema>;
+
+const bankSheetPreviewSchema = z.object({
+  runId: z.string(),
+  period: z.string(),
+  companyName: z.string(),
+  debitAccount: z.string(),
+  defaultDebitAccount: z.string().nullable(),
+  employeeCount: z.number(),
+  transferTotal: z.number(),
+  payrollNetTotal: z.number(),
+  recoveredTotal: z.number(),
+  leftOffTotal: z.number(),
+  reconciles: z.boolean(),
+  leftOff: z.array(bankSheetLeftOffSchema),
+});
+export type BankSheetPreview = z.infer<typeof bankSheetPreviewSchema>;
+
+export async function getSalaryBankSheetPreview(
+  query: SalaryBankSheetQuery,
+): Promise<BankSheetPreview> {
+  return bankSheetPreviewSchema.parse(
+    await authFetch<unknown>(`/hr/payroll/bank-sheet/preview${qs({ ...query })}`),
+  );
+}
+
+/** `Salary_Bank_Sheet_<Company>_<Month>_<Year>.xlsx` in the bank's upload format. */
+export async function downloadSalaryBankSheet(
+  query: SalaryBankSheetQuery,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/hr/payroll/bank-sheet${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? `Salary_Bank_Sheet_${query.year}_${query.month}.xlsx` };
+}

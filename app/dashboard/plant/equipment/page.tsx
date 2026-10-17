@@ -13,6 +13,7 @@ import {
 } from '@/app/lib/api/plant';
 import { saveBlob } from '@/app/lib/download-file';
 import {
+  DISPOSED_EQUIPMENT_STATUSES,
   EQUIPMENT_STATUSES,
   MESSAGES,
   ROUTES,
@@ -22,6 +23,8 @@ import {
 import CategoryOptions from '@/app/ui/plant/category-options';
 import EquipmentImportModal from '@/app/ui/plant/equipment-import-modal';
 import EquipmentModal from '@/app/ui/plant/equipment-modal';
+import DisposeModal from '@/app/ui/plant/dispose-modal';
+import { getCurrentUser } from '@/app/lib/api/users';
 import Pager from '@/app/ui/inventory/pager';
 import {
   usePlantCategories,
@@ -54,6 +57,11 @@ export default function AssetRegisterPage() {
   const [showImport, setShowImport] = useState(false);
   const [downloading, setDownloading] = useState<'pdf' | 'xlsx' | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // 2026-10-17: retiring a machine — Super Admin's (`MACHINERY_DISPOSE`).
+  const [disposing, setDisposing] = useState<Equipment | null>(null);
+  const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const canDispose =
+    user.data?.permissions.includes('MACHINERY_DISPOSE') ?? false;
 
   const companyId = usePlantCompanyId();
 
@@ -332,16 +340,28 @@ export default function AssetRegisterPage() {
             ? MESSAGES.plantEquipmentEmptyFiltered
             : MESSAGES.plantEquipmentEmpty
         }
-        actions={(row) => (
-          <RowAction
-            onClick={() => {
-              setEditing(row);
-              setShowModal(true);
-            }}
-          >
-            Edit
-          </RowAction>
-        )}
+        actions={(row) => {
+          const disposed = (DISPOSED_EQUIPMENT_STATUSES as readonly string[]).includes(
+            row.status,
+          );
+          return (
+            <>
+              {!disposed && (
+                <RowAction
+                  onClick={() => {
+                    setEditing(row);
+                    setShowModal(true);
+                  }}
+                >
+                  Edit
+                </RowAction>
+              )}
+              {canDispose && !disposed && (
+                <RowAction onClick={() => setDisposing(row)}>Dispose</RowAction>
+              )}
+            </>
+          );
+        }}
       />
 
       <Pager
@@ -351,6 +371,15 @@ export default function AssetRegisterPage() {
         onPageChange={setPage}
         noun="machine"
       />
+
+      {disposing && (
+        <DisposeModal
+          equipment={disposing}
+          initialType="scrapped"
+          onClose={() => setDisposing(null)}
+          onDone={() => setDisposing(null)}
+        />
+      )}
 
       {showImport && (
         <EquipmentImportModal onClose={() => setShowImport(false)} />

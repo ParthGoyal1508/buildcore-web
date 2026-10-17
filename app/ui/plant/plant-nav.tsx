@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArchiveBoxXMarkIcon,
   BanknotesIcon,
   BookOpenIcon,
   ClipboardDocumentCheckIcon,
@@ -76,7 +77,16 @@ const TABS: { tab: SectionTab; permission: string }[] = [
       icon: DocumentTextIcon,
     },
     permission: PLANT_PERMISSIONS.equipment,
+  },  {
+    // 2026-10-17: machines retired by scrapping or sale, readable by anyone on the register.
+    tab: {
+      name: 'Scrapped & Sold',
+      href: ROUTES.plantDisposals,
+      icon: ArchiveBoxXMarkIcon,
+    },
+    permission: PLANT_PERMISSIONS.equipment,
   },
+
   {
     tab: {
       name: 'Hire Bills',

@@ -283,6 +283,8 @@ export const ROUTES = {
   plantHireBills: '/dashboard/plant/hire-bills',
   plantSpareParts: '/dashboard/plant/spare-parts',
   plantMasters: '/dashboard/plant/masters',
+  /** 2026-10-17: the Scrapped & Sold Machines dashboard. */
+  plantDisposals: '/dashboard/plant/disposals',
 
   // Built by 009; the module index is a real screen rather than
   // <ModuleInProgress>. Kept here because NAV_MODULES points the sidebar at it.
@@ -3340,7 +3342,42 @@ export const EQUIPMENT_STATUSES = [
   'active',
   'under_maintenance',
   'inactive',
+  // 2026-10-17: set only by Dispose, and listed only when filtered for.
+  'scrapped',
+  'sold',
 ] as const;
+
+/** Machines retired by a disposal. */
+export const DISPOSED_EQUIPMENT_STATUSES = ['scrapped', 'sold'] as const;
+
+export const SCRAP_REASONS = [
+  'damaged_beyond_repair',
+  'end_of_life',
+  'accident',
+  'obsolete',
+  'other',
+] as const;
+export const SCRAP_REASON_LABELS: Record<string, string> = {
+  damaged_beyond_repair: 'Damaged beyond repair',
+  end_of_life: 'End of life',
+  accident: 'Accident',
+  obsolete: 'Obsolete',
+  other: 'Other',
+};
+export const DISPOSAL_PAYMENT_MODES = [
+  'cash',
+  'cheque',
+  'bank_transfer',
+  'upi',
+  'other',
+] as const;
+export const DISPOSAL_PAYMENT_MODE_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  cheque: 'Cheque',
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  other: 'Other',
+};
 export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
 
 /** The two an admin may actually choose. */
