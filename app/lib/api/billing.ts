@@ -526,14 +526,18 @@ export async function getRaBills(projectId: string): Promise<RaBill[]> {
   return z.array(raBillSchema).parse(raw);
 }
 
-/** One page of a project's RA bills, newest first (036 I26). */
+/**
+ * One page of a project's RA bills, newest first (036 I26) — of one work order's when `workOrderId`
+ * is given (036 follow-up), so that order's "Load more" pages only its own bills.
+ */
 export async function getRaBillsPage(
   projectId: string,
   page: number,
   pageSize = BILLING_PAGE_SIZE,
+  workOrderId?: string,
 ): Promise<BillingPage<RaBill>> {
   const raw = await authFetch<unknown>(
-    `/projects/ra-bills${qs({ projectId, page, pageSize })}`,
+    `/projects/ra-bills${qs({ projectId, page, pageSize, workOrderId })}`,
   );
   return pageOf(raBillSchema).parse(raw);
 }

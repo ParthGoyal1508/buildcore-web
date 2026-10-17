@@ -161,9 +161,8 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
    * those prefixes still refreshes them, while the bill-package composer's own unpaged
    * `['workOrders', projectId]` array keeps a cache entry of its own shape.
    *
-   * Bills accumulate across pages rather than replacing each other, because the bills tab filters
-   * them to the selected work order: a page-at-a-time view would leave an order's bills split
-   * across pages nobody can see together.
+   * The project-wide bill pages now feed only the "no work order" section below; the bills tab
+   * reads the chosen order's own pages (`orderBillsQuery`).
    */
   const ordersQuery = useInfiniteQuery({
     queryKey: ['workOrders', projectId, 'pages'],
@@ -237,6 +236,23 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
   // while nothing has been picked — an explicit choice is never overridden.
   const chosen =
     orderList?.find((order) => order.id === selected) ?? orderList?.[0];
+
+  /**
+   * The chosen work order's own bills, paged on the server (036 follow-up). Filtering the project's
+   * pages here left an order's older bills behind a "Load more" that fetched every other order's
+   * bills first. Under `['raBills', projectId]`, so every existing invalidation refreshes it.
+   */
+  const orderBillsQuery = useInfiniteQuery({
+    queryKey: ['raBills', projectId, 'pages', 'workOrder', chosen?.id ?? null],
+    queryFn: ({ pageParam }) =>
+      getRaBillsPage(projectId, pageParam, BILLING_PAGE_SIZE, chosen?.id),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.page * last.pageSize < last.total ? last.page + 1 : undefined,
+    enabled: Boolean(chosen),
+  });
+  const orderBills = orderBillsQuery.data?.pages.flatMap((page) => page.items);
+  const orderBillsTotal = orderBillsQuery.data?.pages.at(-1)?.total ?? 0;
 
   const vendorName = (partnerId: string | null) =>
     partnerId === null
@@ -569,12 +585,10 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   <BillsTab
                     projectId={projectId}
                     order={chosen}
-                    billsQuery={billsQuery}
-                    billsTotal={billsTotal}
-                    loadedCount={billList?.length ?? 0}
-                    bills={(billList ?? []).filter(
-                      (bill) => bill.workOrderId === chosen.id,
-                    )}
+                    billsQuery={orderBillsQuery}
+                    billsTotal={orderBillsTotal}
+                    loadedCount={orderBills?.length ?? 0}
+                    bills={orderBills ?? []}
                     revising={revising}
                     onRevise={setRevising}
                     onCaptureAward={() => setTab('award')}
@@ -633,6 +647,14 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
               </li>
             ))}
           </ul>
+          {/* These come from the project's own pages, which also hold every work order's bills. */}
+          <LoadMore
+            shown={billList?.length ?? 0}
+            total={billsTotal}
+            noun="bills on this project"
+            loading={billsQuery.isFetchingNextPage}
+            onMore={() => void billsQuery.fetchNextPage()}
+          />
         </section>
       )}
     </div>
@@ -1156,7 +1178,7 @@ function BillsTab({
           <LoadMore
             shown={loadedCount}
             total={billsTotal}
-            noun="bills on this project"
+            noun="bills on this work order"
             loading={billsQuery.isFetchingNextPage}
             onMore={() => void billsQuery.fetchNextPage()}
           />
