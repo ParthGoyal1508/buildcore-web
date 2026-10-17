@@ -3,13 +3,15 @@
 import clsx from 'clsx';
 
 import { STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import {
   SortHeader,
   TABLE,
-  useSortedRows,
+  useTableSort,
   type SortValue,
+  type TableSort,
 } from '@/app/ui/table';
-import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One column. `numeric` right-aligns and applies tabular figures, which is what
@@ -47,6 +49,9 @@ export interface Column<T> {
  *
  * Since 2026-10-15 it shares its look with every other table (`TABLE` in `app/ui/table.tsx`) and
  * its headers sort the loaded rows on a click.
+ *
+ * 036 A4, A13–A16: `onRetry`, `skeletonRows`, `sort`/`onSortChange`, `serverPaged` and
+ * `isRefreshing`, exactly as on `ResponsiveList` — see the note there.
  */
 export default function DataTable<T>({
   columns,
@@ -59,6 +64,12 @@ export default function DataTable<T>({
   error,
   footer,
   caption,
+  onRetry,
+  skeletonRows = 5,
+  sort,
+  onSortChange,
+  serverPaged = false,
+  isRefreshing = false,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -71,24 +82,42 @@ export default function DataTable<T>({
   actions?: (row: T) => React.ReactNode;
   emptyMessage?: string;
   isLoading?: boolean;
-  error?: string | null;
+  /** A message, or the query's error itself (its server message is shown). */
+  error?: unknown;
   /** A totals row, rendered in `<tfoot>` so it stays associated with the table. */
   footer?: React.ReactNode;
   caption?: string;
+  /** Adds Retry to the error state. */
+  onRetry?: () => unknown;
+  skeletonRows?: number;
+  sort?: TableSort;
+  onSortChange?: (sort: TableSort) => void;
+  serverPaged?: boolean;
+  isRefreshing?: boolean;
 }) {
-  const { sorted, sort, toggle } = useSortedRows(rows, columns);
+  const {
+    sorted,
+    sort: activeSort,
+    toggle,
+    enabled: sortEnabled,
+  } = useTableSort(rows, columns, { sort, onSortChange, serverPaged });
   if (isLoading) {
     return (
-      <p className={TABLE.empty} role="status">
-        <LoadingText />
-      </p>
+      <div role="status">
+        <span className="sr-only">Loading…</span>
+        <ListSkeleton
+          headers={columns.map((column) => column.header)}
+          rows={skeletonRows}
+          actions={Boolean(actions)}
+        />
+      </div>
     );
   }
   if (error) {
-    return (
-      <p className={TABLE.failed} role="alert">
-        {error}
-      </p>
+    return typeof error === 'string' ? (
+      <QueryError message={error} onRetry={onRetry} />
+    ) : (
+      <QueryError error={error} onRetry={onRetry} />
     );
   }
   if (rows.length === 0) {
@@ -104,7 +133,9 @@ export default function DataTable<T>({
       className={clsx(
         TABLE.wrap,
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
+        isRefreshing && 'opacity-60 transition-opacity',
       )}
+      aria-busy={isRefreshing || undefined}
       tabIndex={0}
       role="region"
       aria-label={caption ?? 'Data table'}
@@ -118,9 +149,9 @@ export default function DataTable<T>({
                 key={column.key}
                 label={column.header}
                 columnKey={column.key}
-                sort={sort}
+                sort={activeSort}
                 onSort={toggle}
-                sortable={column.sortable !== false}
+                sortable={sortEnabled && column.sortable !== false}
                 numeric={column.numeric}
                 className={clsx(
                   column.sticky && 'sticky left-0 z-10 bg-gray-50',
