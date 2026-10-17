@@ -12,7 +12,12 @@ import {
   RESIGNATION_REASON_CATEGORIES,
   RESIGNATION_STATUSES,
 } from '@/app/lib/constants';
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import { totalCountOf } from '@/app/lib/api/client';
+import {
+  authFetch,
+  authFetchBlob,
+  authFetchWithMeta,
+} from '@/app/lib/session';
 
 /**
  * Every `/recruitment/*` and `/recruitment/letter-templates` call to `buildcore-api`
@@ -393,8 +398,7 @@ export function interviewerName(interview: Interview, employeeId: string) {
 
 /**
  * Rounds, oldest first. Pass `page` (and `pageSize`, at most 100) for one page (036 H4); without
- * `page` the server caps the list at 500. The total travels in `X-Total-Count`, which `authFetch`
- * does not expose — a screen pages with "Next while a full page came back".
+ * `page` the server caps the list at 500. For a pager that needs the total, `getInterviewsPage`.
  */
 export async function getInterviews(
   query: {
@@ -410,6 +414,25 @@ export async function getInterviews(
     .array(interviewSchema)
     .parse(await authFetch(`/recruitment/interviews${qs({ ...query })}`));
 }
+/**
+ * One page of rounds with the server's total (`X-Total-Count`). `total` is null only when the header
+ * did not arrive, and a screen then falls back to "Next while a full page came back".
+ */
+export async function getInterviewsPage(query: {
+  status?: string;
+  page: number;
+  pageSize: number;
+  order?: 'asc' | 'desc';
+}): Promise<{ items: Interview[]; total: number | null }> {
+  const { data, headers } = await authFetchWithMeta<unknown>(
+    `/recruitment/interviews${qs({ ...query })}`,
+  );
+  return {
+    items: z.array(interviewSchema).parse(data),
+    total: totalCountOf(headers),
+  };
+}
+
 export interface ScheduleInterviewInput {
   roundNumber: number;
   roundType: string;

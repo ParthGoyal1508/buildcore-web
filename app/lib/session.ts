@@ -2,9 +2,11 @@ import {
   apiFetch,
   apiFetchBlob,
   apiFetchFile,
+  apiFetchWithMeta,
   ApiError,
   type ApiInit,
   type StoredFile,
+  type WithMeta,
 } from './api/client';
 import { expectedCompanyHeaders } from './company-tab';
 import { clearLocalUserData } from './local-data';
@@ -137,6 +139,17 @@ export function consumeJustLoggedIn(): boolean {
  */
 export async function authFetch<T>(path: string, init?: ApiInit): Promise<T> {
   return withAuth(path, init, apiFetch<T>);
+}
+
+/**
+ * `authFetch`, also handing back the response headers — for a paged list whose total rides in
+ * `X-Total-Count` while its body stays a plain array. Same refresh-and-retry path.
+ */
+export async function authFetchWithMeta<T>(
+  path: string,
+  init?: ApiInit,
+): Promise<WithMeta<T>> {
+  return withAuth(path, init, apiFetchWithMeta<T>);
 }
 
 /**

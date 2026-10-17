@@ -1,8 +1,12 @@
 import { z } from 'zod';
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, totalCountOf } from '@/app/lib/api/client';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
-import { authFetch, authFetchFile } from '@/app/lib/session';
+import {
+  authFetch,
+  authFetchFile,
+  authFetchWithMeta,
+} from '@/app/lib/session';
 import {
   reimbursementCategorySchema,
   type ReimbursementCategory,
@@ -2518,8 +2522,7 @@ export type BankSheetExport = z.infer<typeof bankSheetExportSchema>;
 
 /**
  * Bank sheets generated for a company, newest first (2026-10-17). Paged since 036 F11 (it was capped
- * at 100); the server's total is in a header the shared client cannot read, so a screen offers Next
- * while a page comes back full.
+ * at 100), with the server's total from `X-Total-Count` — null only when the header did not arrive.
  */
 export async function getBankSheetHistory(query: {
   companyId?: string;
@@ -2527,11 +2530,14 @@ export async function getBankSheetHistory(query: {
   month?: number;
   page?: number;
   pageSize?: number;
-}): Promise<BankSheetExport[]> {
-  const data = await authFetch<unknown>(
+}): Promise<{ items: BankSheetExport[]; total: number | null }> {
+  const { data, headers } = await authFetchWithMeta<unknown>(
     `/hr/payroll/bank-sheet/history${qs({ ...query })}`,
   );
-  return z.array(bankSheetExportSchema).parse(data);
+  return {
+    items: z.array(bankSheetExportSchema).parse(data),
+    total: totalCountOf(headers),
+  };
 }
 
 /** The exact file a history entry gave the bank. */

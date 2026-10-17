@@ -6,13 +6,13 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 import { errorMessage } from '@/app/lib/api/client';
 import { listEmployees } from '@/app/lib/api/hr-payroll';
 import {
   getCandidates,
-  getInterviews,
+  getInterviewsPage,
   interviewerName,
   rescheduleInterview,
   scheduleInterview,
@@ -94,7 +94,7 @@ function InterviewsInner() {
   const interviews = useQuery({
     queryKey: ['interviews', 'page', query.status, query.page],
     queryFn: () =>
-      getInterviews({
+      getInterviewsPage({
         status: query.status,
         page: query.page,
         pageSize: PAGE_SIZE,
@@ -106,8 +106,22 @@ function InterviewsInner() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['interviews'] });
 
-  const list = interviews.data ?? [];
-  const hasNext = list.length === PAGE_SIZE;
+  const list = interviews.data?.items ?? [];
+  const total = interviews.data?.total ?? null;
+  const pageCount =
+    total === null ? null : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Without the header's total, Next is offered while a full page came back.
+  const hasNext =
+    pageCount === null ? list.length === PAGE_SIZE : query.page < pageCount;
+  // A page past the end (a stale link, or the last round on it just completed) goes back to the
+  // last one that has rows rather than showing an empty page.
+  const lastPage =
+    !interviews.isPlaceholderData && pageCount !== null && query.page > pageCount
+      ? pageCount
+      : null;
+  useEffect(() => {
+    if (lastPage !== null) setFilters({ page: lastPage });
+  }, [lastPage, setFilters]);
   const today = todayIso();
   // Grouped by what is left to do (2026-10-14); since 036 H4 the open rounds only, the completed
   // and cancelled ones each being a tab of their own.
@@ -245,6 +259,8 @@ function InterviewsInner() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-600" aria-live="polite">
             Page {query.page}
+            {pageCount !== null && ` of ${pageCount}`}
+            {total !== null && ` · ${total} ${total === 1 ? 'interview' : 'interviews'}`}
           </p>
           <div className="flex gap-2">
             <SecondaryButton

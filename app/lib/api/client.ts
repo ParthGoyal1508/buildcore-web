@@ -229,6 +229,42 @@ export async function apiFetch<T>(path: string, init?: ApiInit): Promise<T> {
   );
 }
 
+/** A JSON body and the response's headers, for what only a header carries (`X-Total-Count`). */
+export interface WithMeta<T> {
+  data: T;
+  headers: Headers;
+}
+
+/** `apiFetch`, keeping the response headers alongside the parsed body. */
+export async function apiFetchWithMeta<T>(
+  path: string,
+  init?: ApiInit,
+): Promise<WithMeta<T>> {
+  return send(
+    path,
+    init,
+    { 'Content-Type': 'application/json', ...init?.headers },
+    async (res) => {
+      const text = await res.text();
+      return {
+        data: text ? JSON.parse(text) : (undefined as T),
+        headers: res.headers,
+      };
+    },
+  );
+}
+
+/**
+ * The `X-Total-Count` a paged list sent, or null when absent or unreadable (a cross-origin response
+ * whose header the server did not expose).
+ */
+export function totalCountOf(headers: Headers): number | null {
+  const raw = headers.get('X-Total-Count');
+  if (raw === null || raw.trim() === '') return null;
+  const total = Number(raw);
+  return Number.isFinite(total) && total >= 0 ? total : null;
+}
+
 /**
  * Same request handling as `apiFetch`, returning the raw bytes.
  *

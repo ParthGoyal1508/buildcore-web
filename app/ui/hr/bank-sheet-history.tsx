@@ -28,8 +28,8 @@ const PAGE_SIZE = 20;
  * and the exact file given to the bank to download again.
  *
  * 036 F11: filtered to the month chosen above by default (it showed every month, capped at 100,
- * whatever month was selected), with "All months" to widen it, and paged. The server's total rides
- * in a header the shared client cannot read, so Next is offered while a page comes back full.
+ * whatever month was selected), with "All months" to widen it, and paged with the server's total
+ * (`X-Total-Count`); without the header, Next is offered while a page comes back full.
  * The parent remounts this (`key`) when the month or company changes, which resets the page.
  */
 export default function BankSheetHistory({
@@ -55,7 +55,16 @@ export default function BankSheetHistory({
       }),
     placeholderData: keepPreviousData,
   });
-  const rows = history.data ?? [];
+  const rows = history.data?.items ?? [];
+  const total = history.data?.total ?? null;
+  const pageCount =
+    total === null ? null : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasNext =
+    pageCount === null ? rows.length === PAGE_SIZE : page < pageCount;
+  // Never an empty page past the end: a total that shrank (or a page left over) steps back.
+  if (!history.isPlaceholderData && pageCount !== null && page > pageCount) {
+    setPage(pageCount);
+  }
   const download = useMutation({
     mutationFn: (entry: BankSheetExport) => downloadBankSheetHistoryFile(entry),
     onSuccess: ({ blob, filename }) => saveBlob(blob, filename),
@@ -142,7 +151,7 @@ export default function BankSheetHistory({
           </RowAction>
         )}
       />
-      {(page > 1 || rows.length === PAGE_SIZE) && (
+      {(page > 1 || hasNext) && (
         <div className="mt-3 flex items-center justify-end gap-2 text-sm text-gray-600">
           <SecondaryButton
             type="button"
@@ -151,10 +160,13 @@ export default function BankSheetHistory({
           >
             Previous
           </SecondaryButton>
-          <span>Page {page}</span>
+          <span>
+            Page {page}
+            {pageCount !== null && ` of ${pageCount}`}
+          </span>
           <SecondaryButton
             type="button"
-            disabled={rows.length < PAGE_SIZE || history.isFetching}
+            disabled={!hasNext || history.isFetching}
             onClick={() => setPage((p) => p + 1)}
           >
             Next
