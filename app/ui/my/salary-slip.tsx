@@ -247,11 +247,11 @@ function SlipBody({ slip }: { slip: Slip }) {
         </div>
       </div>
 
-      <div className="rounded-md bg-blue-50 px-3 py-3">
-        <p className="text-lg font-semibold text-blue-900">
+      <div className="rounded-md bg-brand-50 px-3 py-3">
+        <p className="text-lg font-semibold text-brand-900">
           Net pay: {rupees(slip.netPay)}
         </p>
-        <p className="text-xs text-blue-800">{slip.netPayInWords}</p>
+        <p className="text-xs text-brand-800">{slip.netPayInWords}</p>
       </div>
 
       <div>

@@ -26,7 +26,7 @@ import {
   SETTABLE_EQUIPMENT_STATUSES,
   plantLabel,
 } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -798,20 +798,20 @@ function PaperFile({
         <span className="truncate text-gray-800" title={file.name}>
           {file.name}
         </span>
-        <button
-          type="button"
-          aria-label={`Remove the ${label} file`}
-          className="shrink-0 rounded px-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        <IconButton
+          size="sm"
+          label={`Remove the ${label} file`}
+          className="shrink-0"
           onClick={() => onFile(undefined)}
         >
           ×
-        </button>
+        </IconButton>
       </div>
     );
   }
   return (
     <div className="flex flex-col">
-      <label className="inline-flex w-fit cursor-pointer items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+      <label className="inline-flex w-fit cursor-pointer items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-accent-500">
         Attach
         <input
           type="file"

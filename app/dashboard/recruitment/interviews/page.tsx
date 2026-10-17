@@ -32,7 +32,7 @@ import {
   useUrlState,
 } from '@/app/lib/use-url-state';
 import AsyncSelect from '@/app/ui/async-select';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import QueryError from '@/app/ui/query-error';
 import { useToast } from '@/app/ui/toast';
 import {
@@ -196,7 +196,7 @@ function InterviewsInner() {
                 {label}
               </h2>
               {groups[label].length === 0 ? (
-                <p className="text-sm text-gray-400">Nothing here.</p>
+                <p className="text-sm text-gray-500">Nothing here.</p>
               ) : (
                 <div className="space-y-2">
                   {groups[label].map((i) => (
@@ -731,17 +731,16 @@ function InterviewerPicker({
           {selected.map((id) => (
             <span
               key={id}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800"
+              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-800"
             >
               {nameOf(id)}
-              <button
-                type="button"
-                aria-label={`Remove ${nameOf(id)}`}
+              <IconButton
+                size="xs"
+                label={`Remove ${nameOf(id)}`}
                 onClick={() => toggle({ id, name: nameOf(id) })}
-                className="text-blue-700 hover:text-blue-900"
               >
                 ×
-              </button>
+              </IconButton>
             </span>
           ))}
         </div>

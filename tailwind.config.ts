@@ -92,11 +92,8 @@ const config: Config = {
          * which the old vivid #0070F3 focus ring (3.4:1) barely cleared.
          */
         //
-        // **Transitional since 036 A21.** Every `blue-*` class in the app was rewritten to
-        // `brand-*` (the same colours, so nothing moved), apart from the files another stream owned
-        // at the time. Once those are migrated this line goes, `blue` becomes Tailwind's own blue
-        // again, and the lint rule in `eslint.config.mjs` keeps `blue-*`-as-brand from returning.
-        blue: brand,
+        // `blue` is Tailwind's own blue again (036 A21): every brand use is `brand-*`, and the lint
+        // rule in `eslint.config.mjs` keeps `blue-*`-as-brand from returning.
         brand: {
           ...brand,
           /** brand-50 at 60% over white, made opaque — a sticky table cell's hover, which must not

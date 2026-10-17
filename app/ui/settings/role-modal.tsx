@@ -161,7 +161,7 @@ function PermissionRow({
                 checked={level === 'write' ? writable : !writable}
                 disabled={level === 'write' && !canGrantWrite && !writable}
                 onChange={() => onLevel(level)}
-                className="h-3.5 w-3.5 border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="h-3.5 w-3.5 border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               />
               {label}
             </label>

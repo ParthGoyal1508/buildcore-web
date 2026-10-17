@@ -344,9 +344,9 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   aria-current={
                     !raising && chosen?.id === order.id ? 'true' : undefined
                   }
-                  className={`min-h-11 w-full rounded border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+                  className={`min-h-11 w-full rounded border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
                     !raising && chosen?.id === order.id
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-brand-500 bg-brand-50'
                       : 'border-gray-200 hover:bg-gray-50'
                   }`}
                 >
@@ -537,9 +537,9 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                     aria-selected={tab === name}
                     aria-controls={`wo-panel-${name}`}
                     onClick={() => setTab(name)}
-                    className={`-mb-px min-h-11 border-b-2 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+                    className={`-mb-px min-h-11 border-b-2 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
                       tab === name
-                        ? 'border-blue-600 font-semibold text-blue-700'
+                        ? 'border-brand-600 font-semibold text-brand-700'
                         : 'border-transparent text-gray-600 hover:text-gray-900'
                     }`}
                   >
@@ -1012,7 +1012,7 @@ function BillsTab({
                 ? `&partnerId=${encodeURIComponent(order.partnerId)}`
                 : ''
             }`}
-            className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="inline-flex min-h-11 items-center rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             Generate the next bill on this work order
           </Link>

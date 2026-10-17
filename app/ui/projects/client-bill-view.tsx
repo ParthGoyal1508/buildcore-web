@@ -20,7 +20,7 @@ import { openStoredFile } from '@/app/lib/download-file';
 import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import { percentLabel } from '@/app/lib/bill-totals';
 import { dateLabel, quantity3, rupees, unitRate } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { confirmDialog } from '@/app/ui/dialogs';
 import {
   projectErrorMessage,
@@ -402,15 +402,15 @@ export default function ClientBillView({
             <p className="text-xs text-gray-500">
               {BILLING_COPY.linesHidden(hidden, billed.length)}
             </p>
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="underline"
               onClick={() => setShowAllLines((current) => !current)}
-              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               {showAllLines
                 ? BILLING_COPY.showBilledLines
                 : BILLING_COPY.showAllLines}
-            </button>
+            </TextButton>
           </div>
         )}
         {quoted && (
@@ -487,27 +487,19 @@ export default function ClientBillView({
         {viewer}
         {bill.certificate && (
           <p className="text-sm">
-            <button
-              type="button"
-              className="text-blue-600 hover:underline"
-              onClick={() => void openCertificate()}
-            >
+            <TextButton onClick={() => void openCertificate()}>
               {BILLING_COPY.certifyCopyOpen} — {bill.certificate.fileName}
-            </button>
+            </TextButton>
           </p>
         )}
 
         {certifying && (
           <div className="space-y-3">
-            <button
-              type="button"
-              className="text-sm text-blue-600 hover:underline"
-              onClick={() => setPerLine((on) => !on)}
-            >
+            <TextButton onClick={() => setPerLine((on) => !on)}>
               {perLine
                 ? BILLING_COPY.certifyAmountOnly
                 : BILLING_COPY.certifyLinesInstead}
-            </button>
+            </TextButton>
 
             {perLine ? (
               <div className="space-y-2">
@@ -655,7 +647,7 @@ export default function ClientBillView({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={ROUTES.projectsBillPackage(projectId, bill.package.id)}
-            className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 sm:min-h-0"
+            className="inline-flex min-h-11 items-center rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 sm:min-h-0"
           >
             Open {bill.package.label} — approve, issue and certify
           </Link>
