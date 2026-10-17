@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   approveMuster,
   getMuster,
@@ -13,9 +13,13 @@ import {
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { labourLabel } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   SecondaryButton,
@@ -23,11 +27,30 @@ import {
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
-import { LoadingText } from '@/app/ui/spinner';
 
 // Keys match the line's own fields, so each column sorts by the raw value rather than its label.
 const LINE_COLUMNS: Column<MusterLine>[] = [
-  { key: 'workerId', header: 'Worker', render: (line) => line.workerId },
+  {
+    key: 'workerId',
+    header: 'Worker',
+    // 036 O8: names from the API instead of the raw worker id.
+    sortValue: (line) => line.workerName ?? line.labourCode ?? '',
+    render: (line) => (
+      <>
+        {line.workerName ?? 'Unknown worker'}
+        {line.labourCode && (
+          <span className="ml-1 text-xs text-gray-500">{line.labourCode}</span>
+        )}
+        {(line.contractorName || line.skillCategoryName) && (
+          <span className="block text-xs text-gray-500">
+            {[line.skillCategoryName, line.contractorName]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        )}
+      </>
+    ),
+  },
   {
     key: 'attendanceType',
     header: 'Attendance',
@@ -54,7 +77,7 @@ const LINE_COLUMNS: Column<MusterLine>[] = [
           needs review
         </span>
       ) : (
-        <span className="text-gray-400">ok</span>
+        <span className="text-gray-500">ok</span>
       ),
   },
 ];
@@ -63,6 +86,7 @@ export default function MusterDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [returnReason, setReturnReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -74,31 +98,47 @@ export default function MusterDetailPage() {
 
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
 
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['muster', id] }),
+      queryClient.invalidateQueries({ queryKey: ['musters'] }),
+    ]);
   const approve = useMutation({
     mutationFn: () => approveMuster(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['muster', id] }),
+    onSuccess: () => {
+      toast.success('Muster approved.');
+      return refresh();
+    },
     onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not approve.'),
+      setError(
+        // 036 O4/O10: a payment sheet already covers this day, so approving it now would leave
+        // the day never paid. The server says which sheet; this adds what to do about it.
+        e instanceof ApiError && e.code === 'LABOUR_DAY_ON_PAYMENT_SHEET'
+          ? `${e.message} Return it to the supervisor, or reopen or delete that payment sheet first.`
+          : errorMessage(e, 'Could not approve.'),
+      ),
   });
   const returnToDraft = useMutation({
-    mutationFn: () => returnMuster(id, returnReason),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['muster', id] }),
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not return.'),
+    mutationFn: () => returnMuster(id, returnReason.trim()),
+    onSuccess: () => {
+      toast.success('Muster returned to the supervisor.');
+      setReturnReason('');
+      return refresh();
+    },
+    onError: (e) => setError(errorMessage(e, 'Could not return.')),
   });
+  const busy = approve.isPending || returnToDraft.isPending;
 
   if (muster.isPending) {
-    return (
-      <p className="p-4 text-sm text-gray-500">
-        <LoadingText />
-      </p>
-    );
+    return <ListSkeleton headers={['Worker', 'Attendance', 'Overtime', 'Rate', 'Face']} />;
   }
   if (muster.isError || !muster.data) {
     return (
-      <p className="p-4 text-sm text-red-600">Could not load this muster.</p>
+      <QueryError
+        error={muster.error}
+        onRetry={muster.refetch}
+        fallback="Could not load this muster."
+      />
     );
   }
 
@@ -109,8 +149,14 @@ export default function MusterDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageHeader
-          title={<>Muster — {m.date}</>}
-          description={<>Supervisor {m.supervisorId}</>}
+          title={<>Muster — {dateLabel(m.date)}</>}
+          description={
+            <>
+              {m.siteName ?? 'Unknown site'} · Supervisor{' '}
+              {m.supervisorName ?? 'unknown'}
+              {m.approvedByName ? ` · Approved by ${m.approvedByName}` : ''}
+            </>
+          }
         />
         <StatusBadge status={m.status} />
       </div>
@@ -144,6 +190,7 @@ export default function MusterDetailPage() {
             <TextField
               id="return-reason"
               label="Return reason (required to return)"
+              maxLength={500}
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
             />
@@ -154,15 +201,23 @@ export default function MusterDetailPage() {
                 setError(null);
                 returnToDraft.mutate();
               }}
-              disabled={!returnReason}
+              disabled={!returnReason.trim() || busy}
+              loading={returnToDraft.isPending}
             >
               Return
             </SecondaryButton>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setError(null);
-                approve.mutate();
+                const ok = await confirmDialog({
+                  title: 'Approve this muster?',
+                  message: `${m.lines.length} worker${m.lines.length === 1 ? '' : 's'} on ${dateLabel(m.date)} will be counted for payment.`,
+                  confirmLabel: 'Approve',
+                });
+                if (ok) approve.mutate();
               }}
+              disabled={busy}
+              loading={approve.isPending}
             >
               Approve
             </Button>

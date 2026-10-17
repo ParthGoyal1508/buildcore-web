@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { getMusters, type MusterListItem } from '@/app/lib/api/labour';
-import { getSites } from '@/app/lib/api/projects';
 import { MUSTER_STATUSES, ROUTES } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
 import {
   RowAction,
   SecondaryButton,
@@ -18,22 +19,29 @@ import PageHeader from '@/app/ui/page-header';
 
 export default function MustersPage() {
   const [status, setStatus] = useState('submitted');
+  const companyId = useSelectedCompanyId();
 
-  const sites = useQuery({
-    queryKey: ['sites', 'all'],
-    queryFn: () => getSites({ pageSize: 200 }),
-  });
   const musters = useQuery({
-    queryKey: ['musters', status],
+    queryKey: ['musters', companyId, status],
     queryFn: () => getMusters({ status }),
   });
 
-  const siteName = (id: string) =>
-    sites.data?.items.find((s) => s.id === id)?.name ?? id;
-
+  // 036 O8: the site and supervisor names come with each muster; the page used to look sites up
+  // in the first 200 of a separate list and show the raw id past that.
   const columns: Column<MusterListItem>[] = [
-    { key: 'date', header: 'Date', render: (m) => m.date },
-    { key: 'site', header: 'Site', render: (m) => siteName(m.siteId) },
+    { key: 'date', header: 'Date', render: (m) => dateLabel(m.date) },
+    {
+      key: 'site',
+      header: 'Site',
+      render: (m) => (
+        <>
+          {m.siteName ?? 'Unknown site'}
+          {m.supervisorName && (
+            <span className="block text-xs text-gray-500">{m.supervisorName}</span>
+          )}
+        </>
+      ),
+    },
     { key: 'lines', header: 'Workers', render: (m) => `${m.lineCount}` },
     {
       key: 'flags',
@@ -99,7 +107,8 @@ export default function MustersPage() {
         rows={musters.data ?? []}
         rowKey={(m) => m.id}
         isLoading={musters.isPending}
-        error={musters.isError ? 'Could not load musters.' : null}
+        error={musters.error}
+        onRetry={musters.refetch}
         emptyMessage="No musters in this state."
         actions={(m) => (
           <Link href={ROUTES.labourMuster(m.id)}>
