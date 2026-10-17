@@ -1,16 +1,6 @@
 'use client';
 
 import clsx from 'clsx';
-import Link from 'next/link';
-
-import { useCanWrite } from '@/app/lib/write-access';
-import {
-  ActionGlyph,
-  labelText,
-  type Icon as ActionIcon,
-} from '@/app/ui/action-icons';
-import { FileGlyph } from '@/app/ui/file-icons';
-import { Spinner } from '@/app/ui/spinner';
 
 /**
  * The box every field shares (2026-10-14 consistency pass).
@@ -211,119 +201,11 @@ export function CheckboxField({
   );
 }
 
-/** Secondary action button, matching `app/ui/button.tsx`'s focus treatment. */
-export function SecondaryButton({
-  children,
-  className,
-  loading = false,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  /** In flight: disabled, a spinner, `aria-busy` (036 A7). See `Button`. */
-  loading?: boolean;
-}) {
-  return (
-    <button
-      {...rest}
-      disabled={rest.disabled || loading}
-      aria-busy={loading || rest['aria-busy'] || undefined}
-      className={clsx(
-        // 44px below `sm`, the design's 40px above it — see `Button`, which does the same for the
-        // same reason. A Cancel that is hard to hit is how somebody submits a form they meant to
-        // abandon.
-        // 2026-10-14: the same `gap-2`, shadow and accent focus as `Button`, and a border that
-        // picks up the brand on hover so it reads as a control rather than a box.
-        'flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:h-10 sm:justify-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-50',
-        className,
-      )}
-    >
-      {loading || (rest.disabled && labelText(children).trim().endsWith('…')) ? (
-        <Spinner />
-      ) : (
-        // "Excel", "PDF", "Word" on a button get their format's mark (2026-10-15).
-        <FileGlyph label={labelText(children)} />
-      )}
-      {children}
-    </button>
-  );
-}
-
 /**
- * Small inline action used in list rows.
- *
- * **Gated on write access by default** (019 FR-009, FR-007). Nearly every row action in this app
- * changes something — Edit, Delete, Approve, Disburse, Reverse — so the default that is right 65
- * times out of 70 is the one that hides. A read-only holder sees the list and no way to act on it,
- * and nothing had to be remembered at each of the 65 call sites for that to be true.
- *
- * `intent="read"` for the handful that only look: Open, Download, View. Spelling it out at those
- * call sites is the trade this makes — and it is the right way round, because forgetting `read`
- * hides a harmless control, while forgetting `write` would leave a destructive one on screen for
- * somebody who may not use it.
- *
- * Removed, not disabled: FR-007 says so, and a disabled button still advertises an action its
- * viewer cannot take, inviting the support call that asks why it does nothing.
- *
- * The server refuses either way. This is the affordance; `PermissionsGuard` is the boundary.
+ * The secondary and row-action buttons moved to `app/ui/button.tsx` with the rest of the button
+ * variants (036 A21). Re-exported here so the ~200 imports from this module keep working.
  */
-// Row actions carry an icon beside their label since 2026-10-15 (`app/ui/action-icons.tsx`).
-const ROW_ACTION =
-  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40';
-
-const DESTRUCTIVE = /^(delete|remove|discard)\b/i;
-
-export function RowAction({
-  children,
-  className,
-  intent = 'write',
-  icon,
-  loading = false,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  intent?: 'write' | 'read';
-  /** The icon beside the label; chosen from the label's verb when not given, `null` for none. */
-  icon?: ActionIcon | null;
-  /** In flight: disabled, a spinner in place of the icon, `aria-busy` (036 A7). */
-  loading?: boolean;
-}) {
-  const canWrite = useCanWrite();
-  if (intent === 'write' && !canWrite) return null;
-  return (
-    <button
-      {...rest}
-      disabled={rest.disabled || loading}
-      aria-busy={loading || rest['aria-busy'] || undefined}
-      className={clsx(
-        ROW_ACTION,
-        // A destructive action warns on hover rather than inviting like the others.
-        DESTRUCTIVE.test(labelText(children).trim()) &&
-          'hover:border-red-300 hover:bg-red-50 hover:text-red-700',
-        className,
-      )}
-    >
-      {loading ? (
-        <Spinner className="h-3.5 w-3.5" />
-      ) : (
-        <ActionGlyph label={children} icon={icon} />
-      )}
-      {children}
-    </button>
-  );
-}
-
-/** A row action that navigates — Open, Edit — drawn exactly like `RowAction`. */
-export function RowActionLink({
-  children,
-  className,
-  icon,
-  ...rest
-}: React.ComponentProps<typeof Link> & { icon?: ActionIcon | null }) {
-  return (
-    <Link {...rest} className={clsx(ROW_ACTION, className)}>
-      <ActionGlyph label={children} icon={icon} />
-      {children}
-    </Link>
-  );
-}
+export { RowAction, RowActionLink, SecondaryButton } from '@/app/ui/button';
 
 /** Server-rejection banner shown at the top of a form, leaving entered data intact
  * (spec FR-022). */
