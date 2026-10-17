@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ApiError } from '@/app/lib/api/client';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import { API_URL } from '@/app/lib/config';
 import { authFetch, authFetchFile, getAccessToken } from '@/app/lib/session';
@@ -1049,12 +1050,42 @@ export async function setPayrollRunStatus(
   id: string,
   status: (typeof PAYROLL_RUN_STATUSES)[number],
 ) {
-  return payrollRunSchema.parse(
-    await authFetch<unknown>(`/hr/payroll/runs/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    }),
-  );
+  // The API answers with the run id and its new status, not the whole run (2026-10-17: parsing it
+  // as a run showed a validation error after every successful Mark as paid).
+  return z
+    .object({ runId: z.string(), status: enumOf(PAYROLL_RUN_STATUSES) })
+    .parse(
+      await authFetch<unknown>(`/hr/payroll/runs/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    );
+}
+
+/**
+ * Puts a processed run into its approval chain (2026-10-17) — for a run processed before
+ * processing did that itself, whose bank sheet is otherwise held for good.
+ */
+export async function submitPayrollRunForApproval(id: string) {
+  return z
+    .object({ runId: z.string(), submitted: z.boolean() })
+    .parse(
+      await authFetch<unknown>(`/hr/payroll/runs/${id}/submit-for-approval`, {
+        method: 'POST',
+      }),
+    );
+}
+
+/** The bank sheet's refusal for a run never submitted for approval: the run to submit, or null. */
+export function unsubmittedRunOf(error: unknown): string | null {
+  if (
+    error instanceof ApiError &&
+    error.code === 'PAYROLL_RUN_NOT_SUBMITTED' &&
+    typeof error.details?.runId === 'string'
+  ) {
+    return error.details.runId;
+  }
+  return null;
 }
 
 /** The bank salary sheet for a run, as a file. */
