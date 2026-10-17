@@ -3,27 +3,31 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   approveAdvance,
   createAdvance,
   disburseAdvance,
   getAdvances,
-  getWorkers,
+  MAX_ADVANCE_AMOUNT,
+  MAX_RECOVERY_INSTALMENTS,
+  searchWorkerOptions,
   type Advance,
-  type Worker,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { labourLabel } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { rupees, todayIso } from '@/app/lib/format';
+import AsyncSelect from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
 import {
-  FormError,
   RowAction,
   SecondaryButton,
-  SelectField,
   TextField,
+  FormError,
 } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
@@ -31,33 +35,77 @@ import PageHeader from '@/app/ui/page-header';
 
 export default function AdvancesPage() {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
   const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 036 O12: which row's action is in flight. One shared mutation's `isPending` would lock — or
+  // fail to lock — every row at once; this disables exactly the row being acted on.
+  const [actingId, setActingId] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
   const advances = useQuery({
-    queryKey: ['advances'],
+    queryKey: ['advances', companyId],
     queryFn: () => getAdvances({}),
   });
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['advances'] });
 
-  const approve = useMutation({
-    mutationFn: (id: string) => approveAdvance(id),
-    onSuccess: invalidate,
+  const act = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'disburse' }) =>
+      action === 'approve' ? approveAdvance(id) : disburseAdvance(id),
+    onMutate: ({ id }) => setActingId(id),
+    onSuccess: (_, { action }) => {
+      toast.success(action === 'approve' ? 'Advance approved.' : 'Advance disbursed.');
+      return invalidate();
+    },
     onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not approve.'),
-  });
-  const disburse = useMutation({
-    mutationFn: (id: string) => disburseAdvance(id),
-    onSuccess: invalidate,
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not disburse.'),
+      toast.error(
+        e instanceof ApiError && e.code === 'SELF_APPROVAL'
+          ? 'You raised this advance, so someone else must approve it.'
+          : errorMessage(e, 'Could not update the advance.'),
+      ),
+    onSettled: () => setActingId(null),
   });
 
+  const who = (a: Advance) => a.workerName ?? 'Unknown worker';
+  const askApprove = async (a: Advance) => {
+    const ok = await confirmDialog({
+      title: 'Approve this advance?',
+      message: `${rupees(a.amount)} to ${who(a)}, recovered in ${a.recoveryInstalments} instalment${a.recoveryInstalments === 1 ? '' : 's'} of ${rupees(a.instalmentAmount)}.${a.exceedsLimit ? ' It is above the advance limit for this worker.' : ''}`,
+      confirmLabel: 'Approve',
+    });
+    if (ok) act.mutate({ id: a.id, action: 'approve' });
+  };
+  const askDisburse = async (a: Advance) => {
+    const ok = await confirmDialog({
+      title: 'Record this advance as paid?',
+      message: `${rupees(a.amount)} handed to ${who(a)}. Recovery starts on their payment sheets from then on.`,
+      confirmLabel: 'Disburse',
+    });
+    if (ok) act.mutate({ id: a.id, action: 'disburse' });
+  };
+
   const columns: Column<Advance>[] = [
-    { key: 'worker', header: 'Worker', render: (a) => a.workerId },
+    {
+      key: 'worker',
+      header: 'Worker',
+      // 036 O8: names from the API, not the raw worker id.
+      render: (a) => (
+        <>
+          {who(a)}
+          {a.labourCode && (
+            <span className="ml-1 text-xs text-gray-500">{a.labourCode}</span>
+          )}
+          {a.createdByName && (
+            <span className="block text-xs text-gray-500">
+              Raised by {a.createdByName}
+              {a.approvedByName ? ` · approved by ${a.approvedByName}` : ''}
+            </span>
+          )}
+        </>
+      ),
+    },
     { key: 'amount', header: 'Amount', render: (a) => rupees(a.amount) },
     {
       key: 'instalments',
@@ -96,34 +144,54 @@ export default function AdvancesPage() {
         <Button onClick={() => setShowForm(true)}>New Advance</Button>
       </div>
 
-      <FormError message={error} />
-
       <ResponsiveList
         columns={columns}
         rows={advances.data ?? []}
         rowKey={(a) => a.id}
         isLoading={advances.isPending}
-        error={advances.isError ? 'Could not load advances.' : null}
+        error={advances.error}
+        onRetry={advances.refetch}
         emptyMessage="No advances yet."
-        actions={(a) => (
-          <span className="flex gap-2">
-            {a.status === 'pending' && canApprove && (
-              <RowAction onClick={() => approve.mutate(a.id)}>Approve</RowAction>
-            )}
-            {a.status === 'approved' && canApprove && (
-              <RowAction onClick={() => disburse.mutate(a.id)}>
-                Disburse
-              </RowAction>
-            )}
-          </span>
-        )}
+        actions={(a) => {
+          // O12 maker-checker: the server refuses a requester approving their own advance
+          // (`SELF_APPROVAL`), so the button is not offered to them.
+          const own = !!user.data && a.createdBy === user.data.id;
+          return (
+            <span className="flex gap-2">
+              {a.status === 'pending' && canApprove && !own && (
+                <RowAction
+                  onClick={() => void askApprove(a)}
+                  loading={actingId === a.id}
+                  disabled={actingId === a.id}
+                >
+                  Approve
+                </RowAction>
+              )}
+              {a.status === 'pending' && canApprove && own && (
+                <span className="text-xs text-gray-500">
+                  Awaiting another approver
+                </span>
+              )}
+              {a.status === 'approved' && canApprove && (
+                <RowAction
+                  onClick={() => void askDisburse(a)}
+                  loading={actingId === a.id}
+                  disabled={actingId === a.id}
+                >
+                  Disburse
+                </RowAction>
+              )}
+            </span>
+          );
+        }}
       />
 
       {showForm && (
         <AdvanceForm
           onClose={() => setShowForm(false)}
           onSaved={() => {
-            invalidate();
+            toast.success('Advance raised. It needs approval before it is paid.');
+            void invalidate();
             setShowForm(false);
           }}
         />
@@ -139,25 +207,38 @@ function AdvanceForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const companyId = useSelectedCompanyId();
   const [workerId, setWorkerId] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [recoveryInstalments, setRecoveryInstalments] = useState('3');
-  const [recoveryStartPeriod, setRecoveryStartPeriod] = useState('');
+  const [recoveryStartPeriod, setRecoveryStartPeriod] = useState(todayIso);
   const [error, setError] = useState<string | null>(null);
 
-  const workers = useQuery({
-    queryKey: ['workers', 'advance'],
-    queryFn: () =>
-      getWorkers({
-        status: 'active',
-        pageSize: 200,
-      }),
-  });
+  // 036 O12: the limits the server enforces, said beside the field first. 0 and 2.5 instalments
+  // used to pass the form.
+  const amountValue = Number(amount);
+  const amountError =
+    amount === ''
+      ? undefined
+      : !Number.isFinite(amountValue) || amountValue <= 0
+      ? 'Enter an amount above zero.'
+      : amountValue > MAX_ADVANCE_AMOUNT
+      ? `At most ${rupees(MAX_ADVANCE_AMOUNT)}.`
+      : undefined;
+  const instalmentsValue = Number(recoveryInstalments);
+  const instalmentsError =
+    recoveryInstalments === ''
+      ? undefined
+      : !Number.isInteger(instalmentsValue) ||
+        instalmentsValue < 1 ||
+        instalmentsValue > MAX_RECOVERY_INSTALMENTS
+      ? `A whole number from 1 to ${MAX_RECOVERY_INSTALMENTS}.`
+      : undefined;
 
   const instalment =
-    amount && Number(recoveryInstalments) > 0
-      ? Number(amount) / Number(recoveryInstalments)
+    !amountError && !instalmentsError && amount && instalmentsValue > 0
+      ? amountValue / instalmentsValue
       : 0;
 
   const mutation = useMutation({
@@ -165,80 +246,108 @@ function AdvanceForm({
       createAdvance({
         workerId,
         amount: Number(amount),
-        reason,
+        reason: reason.trim(),
         recoveryInstalments: Number(recoveryInstalments),
         recoveryStartPeriod,
       }),
     onSuccess: onSaved,
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not create the advance.'),
+    onError: (e) => setError(errorMessage(e, 'Could not create the advance.')),
   });
 
+  const dirty = !!workerId || amount !== '' || reason !== '';
   return (
     <Modal
       title="New Advance"
       onClose={onClose}
+      isDirty={dirty}
+      pending={mutation.isPending}
+      // O15: buttons passed straight to the footer, so a phone stacks them full width.
       footer={
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <>
+          <SecondaryButton onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
               mutation.mutate();
             }}
             disabled={
-              !workerId || !amount || !reason || !recoveryStartPeriod
+              !workerId ||
+              !amount ||
+              !reason.trim() ||
+              !recoveryStartPeriod ||
+              !!amountError ||
+              !!instalmentsError ||
+              recoveryInstalments === ''
             }
+            loading={mutation.isPending}
           >
             Save
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-3">
         <FormError message={error} />
-        <SelectField
-          id="a-worker"
-          label="Worker"
-          value={workerId}
-          onChange={(e) => setWorkerId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {workers.data?.items.map((w: Worker) => (
-            <option key={w.id} value={w.id}>
-              {w.fullName} ({w.labourCode})
-            </option>
-          ))}
-        </SelectField>
+        <div>
+          <label
+            htmlFor="a-worker"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Worker *
+          </label>
+          {/* 036 O12: searched on the server — the select stopped at the first 200 workers. */}
+          <AsyncSelect
+            id="a-worker"
+            value={workerId}
+            onChange={(id) => setWorkerId(id)}
+            search={(term, page) => searchWorkerOptions(term, page)}
+            cacheKey={['labour-workers', companyId]}
+            placeholder="Search by name or labour code"
+          />
+        </div>
         <TextField
           id="a-amount"
-          label="Amount (₹)"
+          label="Amount (₹) *"
           type="number"
-          min="0"
+          inputMode="decimal"
+          required
+          min="1"
+          max={MAX_ADVANCE_AMOUNT}
           step="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
+          error={amountError}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextField
             id="a-instalments"
-            label="Recovery instalments"
+            label="Recovery instalments *"
             type="number"
+            inputMode="numeric"
+            required
             min="1"
+            max={MAX_RECOVERY_INSTALMENTS}
+            step="1"
             value={recoveryInstalments}
             onChange={(e) => setRecoveryInstalments(e.target.value)}
+            error={instalmentsError}
           />
           <TextField
             id="a-start"
-            label="Recovery start period"
+            label="Recovery starts from *"
             type="date"
+            required
             value={recoveryStartPeriod}
             onChange={(e) => setRecoveryStartPeriod(e.target.value)}
           />
         </div>
         <TextField
           id="a-reason"
-          label="Reason"
+          label="Reason *"
+          required
+          maxLength={500}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
