@@ -28,7 +28,7 @@ import {
   useSortedRows,
   type SortableColumn,
 } from '@/app/ui/table';
-import { LoadingText } from '@/app/ui/spinner';
+import { ListSkeleton } from '@/app/ui/skeletons';
 
 /**
  * The Reminders centre (spec US9, FR-024 to FR-029).
@@ -113,10 +113,14 @@ export default function RemindersList() {
   );
 
   if (isPending) {
+    // The table's own shape while it loads (036 A16), not a "Loading…" line it jumps away from.
     return (
-      <p className="text-sm text-gray-500" role="status">
-        <LoadingText />
-      </p>
+      <>
+        <p className="sr-only" role="status">
+          Loading…
+        </p>
+        <ListSkeleton headers={COLUMNS.map((column) => column.label)} rows={6} actions />
+      </>
     );
   }
 

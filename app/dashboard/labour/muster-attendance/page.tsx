@@ -54,6 +54,7 @@ import {
   dateTimeLabel,
   todayIso,
 } from '@/app/lib/format';
+import { ListSkeleton } from '@/app/ui/skeletons';
 
 /** The badge colour for each day status: a missing punch reads as a warning, not as absent. */
 const STATUS_TONE: Record<string, string> = {
@@ -570,10 +571,17 @@ function MonthlyView({
   });
 
   if (monthly.isPending) {
+    // The grid's shape while the month loads (036 A16).
     return (
-      <p className="text-sm text-gray-500" role="status">
-        <LoadingText />
-      </p>
+      <>
+        <p className="sr-only" role="status">
+          Loading…
+        </p>
+        <ListSkeleton
+          headers={['Worker', 'Days', 'Full', 'Half', 'Short', 'Payable', 'Hours']}
+          rows={8}
+        />
+      </>
     );
   }
   if (monthly.isError) {

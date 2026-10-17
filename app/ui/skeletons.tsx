@@ -2,42 +2,21 @@ import clsx from 'clsx';
 
 import { TABLE } from '@/app/ui/table-classes';
 
-export function TableRowSkeleton() {
-  return (
-    <tr className={TABLE.row}>
-      <td className={clsx(TABLE.td, 'whitespace-nowrap')}>
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-gray-100"></div>
-          <div className="h-6 w-24 rounded bg-gray-100"></div>
-        </div>
-      </td>
-      <td className={clsx(TABLE.td, 'whitespace-nowrap')}>
-        <div className="h-6 w-32 rounded bg-gray-100"></div>
-      </td>
-      <td className={clsx(TABLE.td, 'whitespace-nowrap')}>
-        <div className="h-6 w-16 rounded bg-gray-100"></div>
-      </td>
-      <td className={clsx(TABLE.td, 'whitespace-nowrap')}>
-        <div className="h-6 w-16 rounded bg-gray-100"></div>
-      </td>
-      <td className={clsx(TABLE.td, 'whitespace-nowrap')}>
-        <div className="flex justify-end gap-3">
-          <div className="h-[38px] w-[38px] rounded bg-gray-100"></div>
-          <div className="h-[38px] w-[38px] rounded bg-gray-100"></div>
-        </div>
-      </td>
-    </tr>
-  );
-}
+const BAR_WIDTHS = ['w-24', 'w-32', 'w-16', 'w-20', 'w-28', 'w-14'];
 
-/** The loaded table's own card, header band and rows, with bars where the text will be. */
+/**
+ * The page skeleton's table: the loaded table's own card, header band and rows, with bars where
+ * the text will be. The tutorial's row skeleton it was built from — an avatar circle and two
+ * 38px icon squares per row, a shape no table here has — is gone (036 A16).
+ */
 export function TableSkeleton() {
+  const columns = ['w-20', 'w-28', 'w-14', 'w-14', 'w-10'];
   return (
     <div className={clsx(TABLE.wrap, 'mt-6')} aria-hidden="true">
       <table className={TABLE.table}>
         <thead className={TABLE.thead}>
           <tr>
-            {['w-20', 'w-28', 'w-14', 'w-14', 'w-10'].map((width, i) => (
+            {columns.map((width, i) => (
               <th key={i} className={TABLE.th}>
                 <div className={clsx('h-3 rounded bg-gray-200', width)} />
               </th>
@@ -45,19 +24,25 @@ export function TableSkeleton() {
           </tr>
         </thead>
         <tbody>
-          <TableRowSkeleton />
-          <TableRowSkeleton />
-          <TableRowSkeleton />
-          <TableRowSkeleton />
-          <TableRowSkeleton />
-          <TableRowSkeleton />
+          {[0, 1, 2, 3, 4, 5].map((line) => (
+            <tr key={line} className="border-b border-gray-100 last:border-0">
+              {columns.map((_, i) => (
+                <td key={i} className={TABLE.td}>
+                  <div
+                    className={clsx(
+                      'h-4 rounded bg-gray-100',
+                      BAR_WIDTHS[(line + i) % BAR_WIDTHS.length],
+                    )}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
-
-const BAR_WIDTHS = ['w-24', 'w-32', 'w-16', 'w-20', 'w-28', 'w-14'];
 
 /**
  * Placeholder rows for a shared list while it loads (036 A16), with the list's own column headers.
