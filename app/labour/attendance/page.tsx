@@ -112,6 +112,10 @@ function punchErrorMessage(error: unknown): string {
  * attendance nobody could check until later — and a refusal discovered hours after the labour has
  * gone home cannot be retaken.
  */
+/** 036 O5: a night shift still open from yesterday counts as "in", not as still to punch in. */
+const isIn = (i: LabourDayRow) =>
+  (!!i.punchInAt && !i.punchOutAt) || (!i.punchInAt && !!i.openShiftFrom);
+
 export default function LabourAttendancePage() {
   const queryClient = useQueryClient();
   // Null until the supervisor picks one; until then the remembered site, or the only one.
@@ -158,8 +162,8 @@ export default function LabourAttendancePage() {
   const counts = useMemo(() => {
     const items = today.data?.items ?? [];
     return {
-      todo: items.filter((i) => !i.punchInAt).length,
-      in: items.filter((i) => i.punchInAt && !i.punchOutAt).length,
+      todo: items.filter((i) => !i.punchInAt && !i.openShiftFrom).length,
+      in: items.filter(isIn).length,
       done: items.filter((i) => i.punchOutAt).length,
       all: items.length,
     };
@@ -168,8 +172,8 @@ export default function LabourAttendancePage() {
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return (today.data?.items ?? []).filter((i) => {
-      if (filter === 'todo' && i.punchInAt) return false;
-      if (filter === 'in' && (!i.punchInAt || i.punchOutAt)) return false;
+      if (filter === 'todo' && (i.punchInAt || i.openShiftFrom)) return false;
+      if (filter === 'in' && !isIn(i)) return false;
       if (filter === 'done' && !i.punchOutAt) return false;
       if (!needle) return true;
       return [i.fullName, i.labourCode, i.fatherName ?? '']
@@ -439,7 +443,13 @@ function LabourRow({
   disabled: boolean;
   onPunch: (type: 'in' | 'out') => void;
 }) {
-  const next: 'in' | 'out' | null = !worker.punchInAt
+  // 036 O5: an in-punch from yesterday still open (within 16 hours) is a night shift — the next
+  // punch closes it, so Punch out is offered before a new Punch in. The server attaches the
+  // out-punch to that open shift.
+  const nightShift = !worker.punchInAt && !!worker.openShiftFrom;
+  const next: 'in' | 'out' | null = nightShift
+    ? 'out'
+    : !worker.punchInAt
     ? 'in'
     : !worker.punchOutAt
     ? 'out'
@@ -454,6 +464,11 @@ function LabourRow({
           {worker.labourCode}
           {worker.fatherName ? ` · S/o, D/o ${worker.fatherName}` : ''}
         </p>
+        {nightShift && worker.openShiftFrom && (
+          <p className="mt-0.5 text-xs text-gray-600">
+            Night shift · in {timeOf(worker.openShiftFrom)} yesterday
+          </p>
+        )}
         {(worker.punchInAt || worker.punchOutAt) && (
           <p className="mt-0.5 text-xs text-gray-600">
             {worker.punchInAt && `In ${timeOf(worker.punchInAt)}`}
