@@ -851,6 +851,9 @@ export async function getResignationReport(query: {
     attritionRatePercent: number | null;
     items: {
       employeeId: string;
+      /** Since 036 follow-up; null for an employee the caller cannot read. */
+      employeeCode?: string | null;
+      employeeName?: string | null;
       resignationDate: string;
       lastWorkingDay: string;
       tenureMonths: number | null;
