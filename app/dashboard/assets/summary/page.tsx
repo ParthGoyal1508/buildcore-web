@@ -8,20 +8,18 @@ import {
   getAssetSummary,
   type SummaryBucket,
 } from '@/app/lib/api/assets';
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   ACTIVE_ASSET_STATUSES,
   MESSAGES,
   assetsLabel,
 } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import {
-  useAssetProjects,
-  useAssetsCompanyId,
-} from '@/app/ui/assets/use-asset-refs';
+import { useAssetsCompanyId } from '@/app/ui/assets/use-asset-refs';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import QueryError from '@/app/ui/query-error';
 import { todayIso, dateLabel } from '@/app/lib/format';
 
 type Grouping = 'category' | 'status' | 'project';
@@ -41,19 +39,14 @@ type Grouping = 'category' | 'status' | 'project';
  */
 export default function AssetSummaryPage() {
   const companyId = useAssetsCompanyId();
-  const projects = useAssetProjects();
   const [grouping, setGrouping] = useState<Grouping>('category');
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, error: loadError, refetch } = useQuery({
     queryKey: ['assets', 'summary', companyId],
     queryFn: () => getAssetSummary(companyId ?? undefined),
   });
-
-  const projectNames = new Map(
-    (projects.data ?? []).map((project) => [project.id, project.name]),
-  );
 
   /**
    * Downloads the workbook.
@@ -75,9 +68,7 @@ export default function AssetSummaryPage() {
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : MESSAGES.assetsExportFailed,
-      );
+      setError(errorMessage(err, MESSAGES.assetsExportFailed));
     } finally {
       setExporting(false);
     }
@@ -92,10 +83,10 @@ export default function AssetSummaryPage() {
 
   const label = (bucket: SummaryBucket) => {
     if (grouping === 'status') return assetsLabel(bucket.label);
+    // 036 L4: the API names each project bucket, so project 201 onward — and every project
+    // while a 200-row dropdown list was still loading — no longer reads "Unknown project".
     if (grouping === 'project') {
-      return bucket.key === 'unallocated'
-        ? 'Not on a project'
-        : (projectNames.get(bucket.key) ?? 'Unknown project');
+      return bucket.key === 'unallocated' ? 'Not on a project' : bucket.label;
     }
     return bucket.label;
   };
@@ -140,17 +131,19 @@ export default function AssetSummaryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Asset Summary" />
-        <SecondaryButton type="button" onClick={download} disabled={exporting}>
-          {exporting ? 'Building…' : 'Export to Excel'}
+        <SecondaryButton type="button" onClick={download} loading={exporting}>
+          Export to Excel
         </SecondaryButton>
       </div>
 
       <FormError message={error} />
 
       {isError && (
-        <p className="text-sm text-red-600" role="alert">
-          {MESSAGES.assetsLoadFailed}
-        </p>
+        <QueryError
+          error={loadError}
+          fallback={MESSAGES.assetsLoadFailed}
+          onRetry={refetch}
+        />
       )}
 
       {data && (
