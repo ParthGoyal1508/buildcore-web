@@ -1765,6 +1765,35 @@ export async function listAdminClaims(
 }
 
 /**
+ * One page of the claims queue, with its total (036 F17). `listAdminClaims` reads only the first
+ * page the server sends (25), which is how claim 26 went missing from the review screen.
+ */
+export async function listAdminClaimsPage(filters: {
+  status?: string;
+  employeeId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{ items: AdminClaim[]; total: number }> {
+  const data = await authFetch<unknown>(`/hr/reimbursements${qs({ ...filters })}`);
+  const parsed = z
+    .union([
+      z.array(adminClaimSchema),
+      z.object({ items: z.array(adminClaimSchema), total: z.number().optional() }),
+    ])
+    .parse(data);
+  return Array.isArray(parsed)
+    ? { items: parsed, total: parsed.length }
+    : { items: parsed.items, total: parsed.total ?? parsed.items.length };
+}
+
+/** A claim's receipt — a photo or a PDF — for the approver to open (036 F17). */
+export async function getClaimReceipt(id: string) {
+  return authFetchFile(`/hr/reimbursements/${id}/receipt`);
+}
+
+/**
  * The company's reimbursement categories, for an admin resolving a claim's category name.
  *
  * Reads the **settings** master, not `/my/reimbursements/categories`. That one is

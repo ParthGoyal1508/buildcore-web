@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 import ReimbursementsAdminTable from '@/app/ui/hr/reimbursements-admin-table';
 import PageHeader from '@/app/ui/page-header';
@@ -9,7 +10,10 @@ export default function ReimbursementsPage() {
   return (
     <main>
       <PageHeader title="Reimbursement claims" className="mb-6" />
-      <ReimbursementsAdminTable />
+      {/* Filters live in the URL (036 F17), which reads useSearchParams. */}
+      <Suspense>
+        <ReimbursementsAdminTable />
+      </Suspense>
     </main>
   );
 }

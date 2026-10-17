@@ -1,18 +1,36 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import {
   approveClaim,
-  listAdminClaims,
+  getClaimReceipt,
+  listAdminClaimsPage,
   listReimbursementCategories,
   payClaim,
   rejectClaim,
   type AdminClaim,
 } from '@/app/lib/api/hr-payroll';
-import { HR_MESSAGES, MESSAGES, hrLabel } from '@/app/lib/constants';
-import { dateLabel, money } from '@/app/lib/format';
+import { getCurrentUser, hasWrite } from '@/app/lib/api/users';
+import { HR_MESSAGES, hrLabel } from '@/app/lib/constants';
+import { dateLabel, money, periodLabel, rupees } from '@/app/lib/format';
+import {
+  urlEnum,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
+import { downloadCsv } from '@/app/ui/hr/csv';
+import { useApproverSelf } from '@/app/ui/hr/use-approver-self';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
+import { useToast } from '@/app/ui/toast';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
 import { Button } from '@/app/ui/button';
@@ -24,9 +42,8 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { promptDialog } from '@/app/ui/dialogs';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 
-const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
 
 /**
  * Admin review of reimbursement claims (005 US12).
@@ -57,6 +74,7 @@ function PayClaimModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [paymentMode, setPaymentMode] = useState<'payroll' | 'direct'>(
     'payroll',
   );
@@ -73,16 +91,19 @@ function PayClaimModal({
         paymentReference: paymentReference.trim() || undefined,
       }),
     onSuccess: () => {
+      toast.success('Payment recorded.');
       queryClient.invalidateQueries({ queryKey: ['hr', 'claims'] });
       onClose();
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(errorMessage(err, 'Could not record the payment.')),
   });
 
   return (
     <Modal
       title="Record payment"
       onClose={onClose}
+      pending={pay.isPending}
+      isDirty={paymentReference.trim().length > 0}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
@@ -91,9 +112,10 @@ function PayClaimModal({
           <Button
             type="button"
             onClick={() => pay.mutate()}
-            disabled={!canSubmit || pay.isPending}
+            disabled={!canSubmit}
+            loading={pay.isPending}
           >
-            {pay.isPending ? 'Saving…' : 'Mark paid'}
+            Mark paid
           </Button>
         </>
       }
@@ -130,9 +152,32 @@ function PayClaimModal({
   );
 }
 
+const STATUS_FILTERS = ['submitted', 'approved', 'rejected', 'paid', 'all'] as const;
+const PAGE_SIZE = 25;
+
+/** `YYYY-MM` → the first and last day of that month. */
+function monthRange(month: string): { from?: string; to?: string } {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return {};
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const mm = String(m).padStart(2, '0');
+  return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, '0')}` };
+}
+
+/**
+ * 036 F17/F18: the approver can open the receipt and read the description; Approve asks first,
+ * naming who and how much, and every action locks while it runs; the queue pages on the server
+ * (it showed the first 25 only), filters by expense month, keeps its filters in the URL, and
+ * exports CSV. Approve, Reject and Mark paid need PAYROLL write — the server's rule since 036 —
+ * so a reader with EMPLOYEES only sees the queue without them.
+ */
 export default function ReimbursementsAdminTable() {
   const queryClient = useQueryClient();
-  const employees = useEmployeeNames();
+  const toast = useToast();
+  const self = useApproverSelf();
+  const { view, viewer } = useFileViewer();
+  const { data: user } = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const canDecide = hasWrite(user, 'PAYROLL');
   // The claim carries only `categoryId`; the category master supplies the name.
   const { data: categories } = useQuery({
     queryKey: ['settings', 'reimbursementCategories'],
@@ -140,30 +185,87 @@ export default function ReimbursementsAdminTable() {
   });
   const categoryName = (id: string | null | undefined) =>
     (id && categories?.find((c) => c.id === id)?.name) || '—';
-  const [status, setStatus] = useState<string>('submitted');
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState<AdminClaim | null>(null);
+  const [filters, setFilters] = useUrlState(
+    {
+      status: urlEnum(STATUS_FILTERS, 'submitted'),
+      month: urlString(),
+      page: urlNumber(1),
+    },
+    { resetPage: 'page' },
+  );
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['hr', 'claims', status],
-    queryFn: () => listAdminClaims(status ? { status } : {}),
+  const query = {
+    ...(filters.status === 'all' ? {} : { status: filters.status }),
+    ...monthRange(filters.month),
+  };
+  const claims = useQuery({
+    queryKey: ['hr', 'claims', query, filters.page],
+    queryFn: () =>
+      listAdminClaimsPage({ ...query, page: filters.page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   });
+  const rows = claims.data?.items ?? [];
+  const total = claims.data?.total ?? 0;
+  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const employees = useEmployeeNames(rows.map((row) => row.employeeId));
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['hr', 'claims'] });
 
   const approve = useMutation({
     mutationFn: (id: string) => approveClaim(id),
-    onSuccess: invalidate,
-    onError: (err: Error) => setError(err.message),
+    onSuccess: () => {
+      setError(null);
+      toast.success('Claim approved.');
+      void invalidate();
+    },
+    onError: (err: Error) => setError(errorMessage(err, 'Could not approve the claim.')),
   });
 
   const reject = useMutation({
     mutationFn: ({ id, remarks }: { id: string; remarks: string }) =>
       rejectClaim(id, remarks),
-    onSuccess: invalidate,
-    onError: (err: Error) => setError(err.message),
+    onSuccess: () => {
+      setError(null);
+      toast.success('Claim rejected.');
+      void invalidate();
+    },
+    onError: (err: Error) => setError(errorMessage(err, 'Could not reject the claim.')),
   });
+
+  const exportCsv = useMutation({
+    mutationFn: async () => {
+      const all: AdminClaim[] = [];
+      for (let page = 1; ; page += 1) {
+        const batch = await listAdminClaimsPage({ ...query, page, pageSize: 100 });
+        all.push(...batch.items);
+        if (all.length >= batch.total || batch.items.length === 0) break;
+      }
+      return all;
+    },
+    onSuccess: (all) =>
+      downloadCsv(
+        `Reimbursements_${filters.month || 'all'}_${filters.status}.csv`,
+        ['Employee', 'Category', 'Description', 'Amount', 'Expense date', 'Receipt', 'Status', 'Remarks'],
+        all.map((row) => [
+          employees.label(row.employeeId),
+          categoryName(row.categoryId),
+          row.description ?? '',
+          row.amount.toFixed(2),
+          row.expenseDate ? dateLabel(row.expenseDate) : '',
+          row.receiptRef ? 'Yes' : 'No',
+          hrLabel(row.status),
+          row.adminRemarks ?? '',
+        ]),
+      ),
+    onError: (err) => toast.error(errorMessage(err, 'Could not export the claims.')),
+  });
+
+  const busy = approve.isPending || reject.isPending;
+  const isOwn = (row: AdminClaim) =>
+    self.isSelf({ employeeCode: employees.code(row.employeeId) });
 
   const columns: Column<AdminClaim>[] = [
     {
@@ -176,6 +278,15 @@ export default function ReimbursementsAdminTable() {
       key: 'category',
       header: 'Category',
       render: (row) => categoryName(row.categoryId),
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      render: (row) => (
+        <span className="block max-w-[18rem] whitespace-normal text-gray-700">
+          {row.description || '—'}
+        </span>
+      ),
     },
     {
       key: 'amount',
@@ -191,9 +302,22 @@ export default function ReimbursementsAdminTable() {
     {
       key: 'receipt',
       header: 'Receipt',
+      sortable: false,
       render: (row) =>
         row.receiptRef ? (
-          'Attached'
+          <RowAction
+            intent="read"
+            type="button"
+            onClick={() =>
+              void view({
+                title: `Receipt · ${employees.label(row.employeeId)} · ${rupees(row.amount)}`,
+                fileName: `receipt-${row.id}`,
+                load: () => getClaimReceipt(row.id),
+              })
+            }
+          >
+            View
+          </RowAction>
         ) : (
           <span className="text-amber-700">None</span>
         ),
@@ -212,20 +336,39 @@ export default function ReimbursementsAdminTable() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="max-w-xs">
-        <SelectField
-          id="claim-status"
-          label="Status"
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:max-w-xl">
+          <SelectField
+            id="claim-status"
+            label="Status"
+            value={filters.status}
+            onChange={(event) =>
+              setFilters({ status: event.target.value as (typeof STATUS_FILTERS)[number] })
+            }
+          >
+            {STATUS_FILTERS.map((value) => (
+              <option key={value} value={value}>
+                {value === 'all' ? 'All statuses' : hrLabel(value)}
+              </option>
+            ))}
+          </SelectField>
+          <TextField
+            id="claim-month"
+            label="Expense month"
+            type="month"
+            value={filters.month}
+            onChange={(event) => setFilters({ month: event.target.value })}
+            hint={filters.month ? periodLabel(filters.month) : 'All months'}
+          />
+        </div>
+        <SecondaryButton
+          type="button"
+          loading={exportCsv.isPending}
+          disabled={total === 0}
+          onClick={() => exportCsv.mutate()}
         >
-          <option value="">All statuses</option>
-          {STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {hrLabel(value)}
-            </option>
-          ))}
-        </SelectField>
+          Export CSV
+        </SecondaryButton>
       </div>
 
       <FormError message={error} />
@@ -233,49 +376,103 @@ export default function ReimbursementsAdminTable() {
       <DataTable
         caption="Reimbursement claims"
         columns={columns}
-        rows={data ?? []}
+        rows={rows}
         rowKey={(row) => row.id}
-        isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        isLoading={claims.isPending}
+        error={claims.isError ? claims.error : null}
+        onRetry={() => claims.refetch()}
+        serverPaged
+        isRefreshing={claims.isPlaceholderData}
         emptyMessage="No claims match this filter."
-        actions={(row) => (
-          <>
-            {row.status === 'submitted' && (
-              <>
-                <RowAction type="button" onClick={() => approve.mutate(row.id)}>
-                  Approve
-                </RowAction>
-                <RowAction
-                  type="button"
-                  onClick={async () => {
-                    const remarks = await promptDialog({
-                      title: 'Reject this claim?',
-                      message: HR_MESSAGES.rejectNeedsRemarks,
-                      required: true,
-                      multiline: true,
-                      confirmLabel: 'Reject',
-                      tone: 'danger',
-                    });
-                    if (remarks?.trim()) {
-                      reject.mutate({ id: row.id, remarks: remarks.trim() });
-                    }
-                  }}
-                >
-                  Reject
-                </RowAction>
-              </>
-            )}
-            {row.status === 'approved' && (
-              <RowAction type="button" onClick={() => setPaying(row)}>
-                Mark paid
+        actions={(row) => {
+          if (!canDecide || !['submitted', 'approved'].includes(row.status)) {
+            return <span className="text-xs text-gray-400">—</span>;
+          }
+          if (isOwn(row)) {
+            return (
+              <span className="text-xs text-gray-500">Another approver must decide</span>
+            );
+          }
+          return row.status === 'submitted' ? (
+            <>
+              <RowAction
+                type="button"
+                loading={approve.isPending && approve.variables === row.id}
+                disabled={busy}
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Approve this claim?',
+                      message: `${rupees(row.amount)} to ${employees.label(
+                        row.employeeId,
+                      )} for ${categoryName(row.categoryId)}${
+                        row.receiptRef ? '' : ' — no receipt attached'
+                      }.`,
+                      confirmLabel: 'Approve',
+                      tone: 'default',
+                    })
+                  ) {
+                    approve.mutate(row.id);
+                  }
+                }}
+              >
+                Approve
               </RowAction>
-            )}
-            {!['submitted', 'approved'].includes(row.status) && (
-              <span className="text-xs text-gray-400">—</span>
-            )}
-          </>
-        )}
+              <RowAction
+                type="button"
+                loading={reject.isPending && reject.variables?.id === row.id}
+                disabled={busy}
+                onClick={async () => {
+                  const remarks = await promptDialog({
+                    title: 'Reject this claim?',
+                    message: HR_MESSAGES.rejectNeedsRemarks,
+                    required: true,
+                    multiline: true,
+                    confirmLabel: 'Reject',
+                    tone: 'danger',
+                  });
+                  if (remarks?.trim()) {
+                    reject.mutate({ id: row.id, remarks: remarks.trim() });
+                  }
+                }}
+              >
+                Reject
+              </RowAction>
+            </>
+          ) : (
+            <RowAction type="button" onClick={() => setPaying(row)}>
+              Mark paid
+            </RowAction>
+          );
+        }}
       />
+
+      {total > PAGE_SIZE && (
+        <nav
+          className="flex items-center justify-between text-sm"
+          aria-label="Claim pages"
+        >
+          <p className="text-gray-600">
+            Page {filters.page} of {lastPage} · {total} claims
+          </p>
+          <div className="flex gap-2">
+            <SecondaryButton
+              type="button"
+              disabled={filters.page === 1}
+              onClick={() => setFilters({ page: Math.max(1, filters.page - 1) })}
+            >
+              Previous
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              disabled={filters.page >= lastPage}
+              onClick={() => setFilters({ page: Math.min(lastPage, filters.page + 1) })}
+            >
+              Next
+            </SecondaryButton>
+          </div>
+        </nav>
+      )}
 
       {paying && (
         <PayClaimModal
@@ -284,6 +481,7 @@ export default function ReimbursementsAdminTable() {
           onClose={() => setPaying(null)}
         />
       )}
+      {viewer}
     </div>
   );
 }
