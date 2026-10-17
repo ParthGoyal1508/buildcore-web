@@ -1,14 +1,21 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import Link from 'next/link';
 
-import { getClientBills, type ClientBill } from '@/app/lib/api/billing';
+import {
+  BILLING_PAGE_SIZE,
+  getClientBillsPage,
+  type ClientBill,
+} from '@/app/lib/api/billing';
 import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import ClientBillView from '@/app/ui/projects/client-bill-view';
+import QueryError from '@/app/ui/query-error';
+import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { ListSkeleton } from '@/app/ui/skeletons';
 
 /**
  * Client bills for one project: the bills down the left, one of them filling the right (027).
@@ -34,17 +41,34 @@ import ClientBillView from '@/app/ui/projects/client-bill-view';
  *
  */
 export default function ClientBillsPanel({ projectId }: { projectId: string }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  /**
+   * The picked bill, kept whole rather than by id (036 I26, 2026-10-17): with the list paged, the
+   * bill being read may be on a page the list has since moved off, and the panel must not swap to
+   * a different bill because somebody pressed Next.
+   */
+  const [picked, setPicked] = useState<ClientBill | null>(null);
+  const [page, setPage] = useState(1);
 
+  /**
+   * 036 I26: a page at a time, newest first, with the total. Keyed under `['clientBills',
+   * projectId]` so every existing invalidation of that prefix (certify, the bill sheet) refreshes
+   * it. `keepPreviousData` so Next does not blank the list while the next page loads.
+   */
   const bills = useQuery({
-    queryKey: ['clientBills', projectId],
-    queryFn: () => getClientBills(projectId),
+    queryKey: ['clientBills', projectId, 'page', page],
+    queryFn: () => getClientBillsPage(projectId, page, BILLING_PAGE_SIZE),
+    placeholderData: keepPreviousData,
   });
+  const rows = bills.data?.items;
+  const total = bills.data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / BILLING_PAGE_SIZE));
 
   // Falls back to the first — the list is newest-first — so the panel is never empty on a project
-  // that has bills, but only while nothing has been picked. An explicit choice is never overridden.
+  // that has bills, but only while nothing has been picked. An explicit choice is never overridden;
+  // the fresh copy from the current page wins when it is there, so a certify shows its new state.
   const chosen =
-    bills.data?.find((bill) => bill.id === selected) ?? bills.data?.[0];
+    (picked && (rows?.find((bill) => bill.id === picked.id) ?? picked)) ??
+    rows?.[0];
 
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -79,30 +103,57 @@ export default function ClientBillsPanel({ projectId }: { projectId: string }) {
         </div>
 
         {bills.isLoading && (
-          <p className="text-sm text-gray-500" role="status">
-            {BILLING_COPY.boqLoading}
-          </p>
+          <div role="status" aria-label={BILLING_COPY.boqLoading}>
+            <ListSkeleton headers={[BILLING_COPY.billsHeading]} rows={3} cards />
+          </div>
         )}
+        {/* 036 I17: the failure with a retry, not a red line that reads as the end of the matter. */}
         {bills.isError && (
-          <p className="text-sm text-red-700" role="alert">
-            {BILLING_COPY.boqLoadFailed}
-          </p>
+          <QueryError
+            compact
+            error={bills.error}
+            fallback="The client bills could not be loaded."
+            onRetry={bills.refetch}
+          />
         )}
-        {bills.data?.length === 0 && (
+        {rows?.length === 0 && (
           <p className="text-sm text-gray-600">{BILLING_COPY.billsEmpty}</p>
         )}
 
-        <ul className="space-y-2">
-          {(bills.data ?? []).map((bill) => (
+        <ul
+          className={`space-y-2 ${bills.isPlaceholderData ? 'opacity-60' : ''}`}
+          aria-busy={bills.isPlaceholderData || undefined}
+        >
+          {(rows ?? []).map((bill) => (
             <li key={bill.id}>
               <BillRow
                 bill={bill}
                 current={chosen?.id === bill.id}
-                onPick={() => setSelected(bill.id)}
+                onPick={() => setPicked(bill)}
               />
             </li>
           ))}
         </ul>
+
+        {total > BILLING_PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+            <SecondaryButton
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Previous
+            </SecondaryButton>
+            <span>{`Page ${page} of ${pages} · ${total} bills`}</span>
+            <SecondaryButton
+              type="button"
+              disabled={page >= pages || bills.isPlaceholderData}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </SecondaryButton>
+          </div>
+        )}
       </aside>
 
       <div className="min-w-0">

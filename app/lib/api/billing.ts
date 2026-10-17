@@ -69,6 +69,32 @@ function qs(params: Record<string, string | number | boolean | undefined>) {
   return query ? `?${query}` : '';
 }
 
+/**
+ * One page of a project list (036 I26 / I17, 2026-10-17).
+ *
+ * `GET /projects/{ra-bills,client-bills,work-orders}` answer `{ items, total, page, pageSize }`
+ * once `page` or `pageSize` is on the request, and the old bare array (capped at 500 per project)
+ * without. The bare-array functions stay for the pickers that need the whole list; the list screens
+ * use the `…Page` variants so a project with years of bills does not ship every one of them at once.
+ */
+export interface BillingPage<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const BILLING_PAGE_SIZE = 50;
+
+function pageOf<T extends z.ZodTypeAny>(item: T) {
+  return z.object({
+    items: z.array(item),
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The BOQ, as the sheet needs it
 // ─────────────────────────────────────────────────────────────────────────────
@@ -300,6 +326,18 @@ export async function getClientBills(projectId: string): Promise<ClientBill[]> {
   return z.array(clientBillSchema).parse(raw);
 }
 
+/** One page of a project's client bills, newest first (036 I26). */
+export async function getClientBillsPage(
+  projectId: string,
+  page: number,
+  pageSize = BILLING_PAGE_SIZE,
+): Promise<BillingPage<ClientBill>> {
+  const raw = await authFetch<unknown>(
+    `/projects/client-bills${qs({ projectId, page, pageSize })}`,
+  );
+  return pageOf(clientBillSchema).parse(raw);
+}
+
 export async function getClientBill(id: string): Promise<ClientBill> {
   const raw = await authFetch<unknown>(`/projects/client-bills/${id}`);
   return clientBillSchema.parse(raw);
@@ -488,6 +526,18 @@ export async function getRaBills(projectId: string): Promise<RaBill[]> {
   return z.array(raBillSchema).parse(raw);
 }
 
+/** One page of a project's RA bills, newest first (036 I26). */
+export async function getRaBillsPage(
+  projectId: string,
+  page: number,
+  pageSize = BILLING_PAGE_SIZE,
+): Promise<BillingPage<RaBill>> {
+  const raw = await authFetch<unknown>(
+    `/projects/ra-bills${qs({ projectId, page, pageSize })}`,
+  );
+  return pageOf(raBillSchema).parse(raw);
+}
+
 export async function getRaBill(id: string): Promise<RaBill> {
   const raw = await authFetch<unknown>(`/projects/ra-bills/${id}`);
   return raBillSchema.parse(raw);
@@ -638,6 +688,18 @@ export async function getWorkOrders(projectId: string): Promise<WorkOrder[]> {
     `/projects/work-orders${qs({ projectId })}`,
   );
   return z.array(workOrderSchema).parse(raw);
+}
+
+/** One page of a project's work orders, newest first (036 I26). */
+export async function getWorkOrdersPage(
+  projectId: string,
+  page: number,
+  pageSize = BILLING_PAGE_SIZE,
+): Promise<BillingPage<WorkOrder>> {
+  const raw = await authFetch<unknown>(
+    `/projects/work-orders${qs({ projectId, page, pageSize })}`,
+  );
+  return pageOf(workOrderSchema).parse(raw);
 }
 
 export async function createWorkOrder(

@@ -19,8 +19,14 @@ import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { openStoredFile } from '@/app/lib/download-file';
 import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import { percentLabel } from '@/app/lib/bill-totals';
-import { dateLabel, rupees, unitRate } from '@/app/lib/format';
+import { dateLabel, quantity3, rupees, unitRate } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   SecondaryButton,
@@ -71,6 +77,8 @@ export default function ClientBillView({
   bill: ClientBill;
 }) {
   const queryClient = useQueryClient();
+  const { isLocked } = useProjectLock();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [certifying, setCertifying] = useState(false);
   const [certifiedAmount, setCertifiedAmount] = useState('');
@@ -103,11 +111,21 @@ export default function ClientBillView({
 
   const submit = useMutation({
     mutationFn: () => submitClientBill(bill.id),
-    onSuccess: refresh,
-    onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : BILLING_COPY.submitFailed,
-      ),
+    onSuccess: () => {
+      toast.success(`${bill.billNumber} was submitted.`);
+      refresh();
+    },
+    onError: (err) => {
+      // A second submit (double click, second tab) is refused 409 BILL_NOT_DRAFT: the bill did go,
+      // so say so and refetch rather than report a failure (036 Wave 3, 2026-10-17).
+      if (err instanceof ApiError && err.code === 'BILL_NOT_DRAFT') {
+        toast.info('This bill has already been submitted.');
+        refresh();
+        return;
+      }
+      // A 423 reads as the lock, not "could not be submitted".
+      setError(projectErrorMessage(err, BILLING_COPY.submitFailed));
+    },
   });
 
   const certify = useMutation({
@@ -131,12 +149,11 @@ export default function ClientBillView({
       setCertifiedAmount('');
       setCertifiedQtys({});
       setCertificate(null);
+      toast.success('The certification was recorded.');
       refresh();
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : BILLING_COPY.submitFailed,
-      ),
+      setError(projectErrorMessage(err, BILLING_COPY.submitFailed)),
   });
 
   // A PDF or scanned certificate opens in the page's own viewer (2026-10-14) rather than a new tab
@@ -320,7 +337,7 @@ export default function ClientBillView({
                             'text-gray-900',
                           )}
                         >
-                          {line.quantity}
+                          {quantity3(Number(line.quantity))}
                         </td>
                         <td
                           className={clsx(
@@ -330,7 +347,7 @@ export default function ClientBillView({
                           )}
                         >
                           {/* The schedule's rate, frozen at composition. Never today's BOQ rate. */}
-                          {rupees(line.rate)}
+                          {unitRate(line.rate)}
                         </td>
                         {quoted && (
                           <td
@@ -505,7 +522,7 @@ export default function ClientBillView({
                             </span>
                           </td>
                           <td className={clsx(DENSE_TD, TABLE.numeric)}>
-                            {line.quantity} {line.unit}
+                            {quantity3(Number(line.quantity))} {line.unit}
                           </td>
                           <td className={clsx(DENSE_TD, 'text-right')}>
                             <input
@@ -579,8 +596,8 @@ export default function ClientBillView({
               </SecondaryButton>
               <Button
                 type="button"
+                loading={certify.isPending}
                 disabled={
-                  certify.isPending ||
                   // Line by line needs at least one figure; a single amount needs the
                   // amount. Neither path should post an empty certification.
                   (perLine
@@ -616,11 +633,21 @@ export default function ClientBillView({
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {bill.status === 'draft' && (
+          {/* Write controls are absent on a locked project (036 Wave 3): the server refuses 423. */}
+          {bill.status === 'draft' && !isLocked && (
             <Button
               type="button"
-              disabled={submit.isPending}
-              onClick={() => {
+              loading={submit.isPending}
+              onClick={async () => {
+                if (
+                  !(await confirmDialog({
+                    title: 'Submit this bill?',
+                    message: `${bill.billNumber} is sent to the client. It cannot be edited as a draft afterwards.`,
+                    confirmLabel: 'Submit',
+                  }))
+                ) {
+                  return;
+                }
                 setError(null);
                 submit.mutate();
               }}
@@ -633,7 +660,7 @@ export default function ClientBillView({
           {/* **Also once it is certified (2026-10-11)**: re-certifying is how a
             certification is corrected, which is what was asked for. The server accepts
             an already-certified bill and replaces what it holds. */}
-          {bill.status !== 'draft' && !certifying && (
+          {bill.status !== 'draft' && !certifying && !isLocked && (
             <SecondaryButton
               type="button"
               onClick={() => {
