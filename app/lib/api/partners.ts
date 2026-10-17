@@ -8,7 +8,8 @@ import {
   RAG_CELL_STATUSES,
   VENDOR_TYPES,
 } from '@/app/lib/constants';
-import { authFetch } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/dashboard/partners/*` call to `buildcore-api` (feature 007).
@@ -365,9 +366,14 @@ export async function createContractor(
   return contractorSchema.parse(raw);
 }
 
+/** The registration numbers a contractor's detail screen edits (036 N5). `null` clears one. */
+export type ContractorRegistrationsInput = {
+  [K in Exclude<keyof ContractorInput, 'vendorId'>]?: string | null;
+};
+
 export async function updateContractor(
   id: string,
-  input: Omit<Partial<ContractorInput>, 'vendorId'>,
+  input: ContractorRegistrationsInput,
 ): Promise<Contractor> {
   const raw = await authFetch<unknown>(`/partners/contractors/${id}`, {
     method: 'PATCH',
@@ -383,6 +389,7 @@ export async function uploadContractorDocument(
     /** Base64 content, without a data: prefix. */
     file: string;
     fileName?: string;
+    /** Ignored by the API since 036 N4: it detects the type from the bytes. */
     contentType?: string;
     expiresAt?: string;
   },
@@ -392,6 +399,13 @@ export async function uploadContractorDocument(
     { method: 'POST', body: JSON.stringify(input) },
   );
   return contractorDocumentSchema.parse(raw);
+}
+
+/** The stored file of a contractor document, under the uploader's own name (036 N4). */
+export async function getContractorDocumentFile(
+  documentId: string,
+): Promise<StoredFile> {
+  return authFetchFile(`/partners/contractors/documents/${documentId}/file`);
 }
 
 export async function deleteContractorDocument(documentId: string): Promise<void> {
@@ -427,7 +441,7 @@ export const complianceSchema = z.object({
 export type MonthlyCompliance = z.infer<typeof complianceSchema>;
 
 export async function getCompliance(
-  query: { contractorProfileId?: string; month?: string } = {},
+  query: { contractorProfileId?: string; month?: string; status?: string } = {},
 ): Promise<MonthlyCompliance[]> {
   const raw = await authFetch<unknown>(`/partners/compliance${qs({ ...query })}`);
   return z.array(complianceSchema).parse(raw);
@@ -502,6 +516,11 @@ export async function getRagMatrix(fy: string): Promise<RagMatrix> {
   return ragMatrixSchema.parse(raw);
 }
 
+/** The matrix as an .xlsx workbook, built by the API from the same data (036 N6). */
+export async function exportRagMatrix(fy: string): Promise<Blob> {
+  return authFetchBlob(`/partners/rag/export${qs({ fy })}`);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BOCW cess
 // ─────────────────────────────────────────────────────────────────────────────
@@ -545,6 +564,11 @@ export type BocwPayment = z.infer<typeof bocwPaymentSchema>;
 export async function getBocw(): Promise<BocwList> {
   const raw = await authFetch<unknown>('/partners/bocw');
   return bocwListSchema.parse(raw);
+}
+
+/** The cess list as an .xlsx workbook, built by the API from the same data (036 N6). */
+export async function exportBocw(): Promise<Blob> {
+  return authFetchBlob('/partners/bocw/export');
 }
 
 export async function getBocwPayments(projectId: string): Promise<BocwPayment[]> {
