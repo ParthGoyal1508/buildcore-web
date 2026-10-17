@@ -42,9 +42,8 @@ import {
   usePlantCategories,
   usePlantCompanyId,
   usePlantDocTypes,
-  usePlantSites,
-  usePlantVendors,
 } from './use-plant-refs';
+import { SitePicker, VendorPicker } from './pickers';
 
 /**
  * Add or edit a machine.
@@ -70,8 +69,6 @@ export default function EquipmentModal({
   const queryClient = useQueryClient();
   const companyId = usePlantCompanyId();
   const categories = usePlantCategories();
-  const vendors = usePlantVendors();
-  const sites = usePlantSites();
   const docTypes = usePlantDocTypes();
   // Set once a new machine is saved (2026-10-15). If a paper's file then fails to upload, the
   // form stays open, and saving again must update that machine rather than register a second.
@@ -436,22 +433,19 @@ export default function EquipmentModal({
           </SelectField>
 
           {!isOwned && (
-            <SelectField
+            <VendorPicker
               id="equipment-vendor"
               label={isHired ? 'Hire vendor' : 'Lessor'}
               required={isHired}
               value={vendorId}
-              onChange={(event) => setVendorId(event.target.value)}
-            >
-              <option value="">
-                {isHired ? 'Select a vendor' : 'Not recorded'}
-              </option>
-              {(vendors.data ?? []).map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>
-                  {vendor.name}
-                </option>
-              ))}
-            </SelectField>
+              emptyLabel={isHired ? 'Select a vendor' : 'Not recorded'}
+              selectedOption={
+                equipment?.vendorId
+                  ? { id: equipment.vendorId, label: equipment.vendorName ?? '' }
+                  : null
+              }
+              onChange={(id) => setVendorId(id)}
+            />
           )}
 
           <TextField
@@ -469,19 +463,21 @@ export default function EquipmentModal({
             hint="Whose name the RC stands in."
           />
 
-          <SelectField
+          <SitePicker
             id="equipment-site"
             label="Deployed at"
             value={deployedSiteId}
-            onChange={(event) => setDeployedSiteId(event.target.value)}
-          >
-            <option value="">Not deployed</option>
-            {(sites.data ?? []).map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.name}
-              </option>
-            ))}
-          </SelectField>
+            emptyLabel="Not deployed"
+            selectedOption={
+              equipment?.deployedSiteId
+                ? {
+                    id: equipment.deployedSiteId,
+                    label: equipment.siteName ?? '',
+                  }
+                : null
+            }
+            onChange={(id) => setDeployedSiteId(id)}
+          />
           <TextField
             id="equipment-operator"
             label="Operator / in-charge"

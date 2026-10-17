@@ -6,9 +6,11 @@ import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import {
   consumeSparePart,
+  getEquipmentDetail,
   getJobParts,
   reversePartConsumption,
   type MaintenanceJob,
+  type SparePart,
   type SparePartMovement,
 } from '@/app/lib/api/plant';
 import { MESSAGES, plantLabel } from '@/app/lib/constants';
@@ -17,11 +19,10 @@ import {
   FormError,
   RowAction,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
-import { usePlantEquipment, usePlantSpareParts } from './use-plant-refs';
+import { SparePartPicker } from './pickers';
 import { promptDialog } from '@/app/ui/dialogs';
 
 /**
@@ -39,10 +40,14 @@ import { promptDialog } from '@/app/ui/dialogs';
  */
 export default function JobPartsPanel({ job }: { job: MaintenanceJob }) {
   const queryClient = useQueryClient();
-  const parts = usePlantSpareParts();
-  const equipment = usePlantEquipment();
+  // The job's own machine, for its category — not the whole fleet list (036 K15).
+  const machineQuery = useQuery({
+    queryKey: ['plant', 'equipment', job.equipmentId],
+    queryFn: () => getEquipmentDetail(job.equipmentId),
+  });
 
   const [sparePartId, setSparePartId] = useState('');
+  const [selected, setSelected] = useState<SparePart | null>(null);
   const [quantity, setQuantity] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -52,24 +57,23 @@ export default function JobPartsPanel({ job }: { job: MaintenanceJob }) {
   });
 
   const isClosed = job.status === 'closed';
-  const selected = parts.data?.find((row) => row.id === sparePartId);
-  const machine = equipment.data?.find((row) => row.id === job.equipmentId);
+  const machine = machineQuery.data;
 
   const requested = quantity === '' ? 0 : Number(quantity);
   const exceedsStock =
-    selected !== undefined && requested > selected.stockQuantity;
+    selected !== null && requested > selected.stockQuantity;
 
   // Read-only and computed (web FR-012). The rate is the part's weighted average
   // *now*, which is exactly what the consumption will be valued at and frozen onto
   // — so this is the real figure, not an estimate.
   const amount =
-    selected !== undefined && requested > 0
+    selected !== null && requested > 0
       ? Math.round(requested * selected.avgRate * 100) / 100
       : null;
 
   // Empty means unrestricted — a part nobody has classified fits anything.
   const incompatible =
-    selected !== undefined &&
+    selected !== null &&
     machine !== undefined &&
     selected.compatibleCategoryIds.length > 0 &&
     !selected.compatibleCategoryIds.includes(machine.categoryId);
@@ -83,8 +87,13 @@ export default function JobPartsPanel({ job }: { job: MaintenanceJob }) {
     onSuccess: () => {
       setError(null);
       setSparePartId('');
+      setSelected(null);
       setQuantity('');
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
+      // The picker's rows carry stock, which this consumption just moved.
+      void queryClient.invalidateQueries({
+        queryKey: ['async-select', 'plant-spare-parts'],
+      });
     },
     onError: (err) =>
       setError(
@@ -159,25 +168,22 @@ export default function JobPartsPanel({ job }: { job: MaintenanceJob }) {
       <h3 className="text-sm font-semibold text-gray-900">Parts consumed</h3>
 
       <div className="grid items-start gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]">
-        <SelectField
+        <SparePartPicker
           id="job-part"
           label="Spare part"
           value={sparePartId}
           disabled={isClosed}
-          onChange={(event) => setSparePartId(event.target.value)}
+          emptyLabel="Select a part"
+          onChange={(id, part) => {
+            setSparePartId(id);
+            setSelected(part);
+          }}
           hint={
             selected
               ? `${selected.stockQuantity} ${selected.unitOfMeasure} in stock at ${formatRupees(selected.avgRate)}`
               : undefined
           }
-        >
-          <option value="">Select a part</option>
-          {(parts.data ?? []).map((part) => (
-            <option key={part.id} value={part.id}>
-              {part.partNumber} · {part.name}
-            </option>
-          ))}
-        </SelectField>
+        />
 
         <TextField
           id="job-part-quantity"

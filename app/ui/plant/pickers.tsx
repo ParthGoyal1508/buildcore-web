@@ -5,7 +5,12 @@ import { useRef } from 'react';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { listEmployees, EMPLOYEE_PAGE_MAX } from '@/app/lib/api/hr-payroll';
 import { getVendors } from '@/app/lib/api/partners';
-import { getEquipment, type Equipment } from '@/app/lib/api/plant';
+import {
+  getEquipment,
+  getSpareParts,
+  type Equipment,
+  type SparePart,
+} from '@/app/lib/api/plant';
 import { getProjects, getSites } from '@/app/lib/api/projects';
 import { quantity3 } from '@/app/lib/format';
 import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
@@ -191,6 +196,53 @@ export function EmployeePicker({
   );
 }
 
+/**
+ * An active spare part. `onChange` hands back the whole row, so a form can show its stock and rate.
+ * The server has no active-only filter, so retired parts are dropped from each page here.
+ */
+export function SparePartPicker({
+  onChange,
+  ...props
+}: PickerProps & {
+  onChange: (id: string, part: SparePart | null) => void;
+}) {
+  const companyId = useSelectedCompanyId();
+  const seen = useRef(new Map<string, SparePart>());
+  return (
+    <Field {...props}>
+      <AsyncSelect
+        id={props.id}
+        value={props.value}
+        disabled={props.disabled}
+        invalid={Boolean(props.error)}
+        emptyLabel={props.emptyLabel}
+        selectedOption={props.selectedOption}
+        placeholder="Search part number or name"
+        cacheKey={['plant-spare-parts', companyId]}
+        search={async (term, page) => {
+          const result = await getSpareParts({
+            search: term || undefined,
+            page,
+            pageSize: PAGE,
+          });
+          for (const row of result.items) seen.current.set(row.id, row);
+          const rows = result.items.filter((row) => row.active);
+          return {
+            total: result.total - (result.items.length - rows.length),
+            items: rows.map((row) => ({
+              id: row.id,
+              label: row.partNumber,
+              sublabel: row.name,
+              note: `${quantity3(row.stockQuantity)} ${row.unitOfMeasure}`,
+            })),
+          };
+        }}
+        onChange={(id) => onChange(id, seen.current.get(id) ?? null)}
+      />
+    </Field>
+  );
+}
+
 export function VendorPicker({
   onChange,
   ...props
@@ -221,6 +273,8 @@ export function VendorPicker({
             items: result.items.map((vendor) => ({
               id: vendor.id,
               label: vendor.name,
+              // Hire vendors are the answer nearly every time on a plant form; say which they are.
+              note: vendor.type === 'hire' ? 'Hire vendor' : undefined,
             })),
           };
         }}

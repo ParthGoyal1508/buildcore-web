@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
@@ -10,7 +10,7 @@ import {
   type HireOrder,
   type HireOrderInput,
 } from '@/app/lib/api/plant-hire';
-import { getProjects } from '@/app/lib/api/projects';
+import { getEquipmentDetail } from '@/app/lib/api/plant';
 import { MESSAGES } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import { Button } from '@/app/ui/button';
@@ -19,15 +19,15 @@ import {
   FormError,
   RowAction,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import {
-  usePlantCompanyId,
-  usePlantEquipment,
-  usePlantVendors,
-} from './use-plant-refs';
-import VendorOptions from './vendor-options';
+  equipmentOption,
+  EquipmentPicker,
+  ProjectPicker,
+  VendorPicker,
+} from './pickers';
+import { usePlantCompanyId } from './use-plant-refs';
 import { todayIso } from '@/app/lib/format';
 
 interface LineDraft {
@@ -82,13 +82,20 @@ export default function HireOrderModal({
 }) {
   const queryClient = useQueryClient();
   const companyId = usePlantCompanyId();
-  const vendors = usePlantVendors();
-  const equipment = usePlantEquipment();
-  const projects = useQuery({
-    queryKey: ['plant', 'projects'],
-    queryFn: () => getProjects({ pageSize: 200 }),
-    select: (page) => page.items,
+  // The machines an existing order's lines already name, so each picker can show its label before
+  // anything is searched (036 K15). The line carries only the id.
+  const linkedMachines = useQueries({
+    queries: [
+      ...new Set((order?.lines ?? []).flatMap((l) => l.equipmentId ?? [])),
+    ].map((id) => ({
+      queryKey: ['plant', 'equipment', id],
+      queryFn: () => getEquipmentDetail(id),
+    })),
   });
+  const linkedOption = (id: string) => {
+    const machine = linkedMachines.find((q) => q.data?.id === id)?.data;
+    return machine ? equipmentOption(machine) : null;
+  };
 
   const [date, setDate] = useState(
     order?.date.slice(0, 10) ?? todayIso(),
@@ -231,29 +238,29 @@ export default function HireOrderModal({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
+          <VendorPicker
             id="ho-vendor"
             label="Supplier"
             required
             value={vendorId}
-            onChange={(event) => setVendorId(event.target.value)}
-          >
-            <option value="">Select the supplier</option>
-            <VendorOptions vendors={vendors.data ?? []} />
-          </SelectField>
-          <SelectField
+            emptyLabel="Select the supplier"
+            selectedOption={
+              order ? { id: order.vendorId, label: order.vendorName } : null
+            }
+            onChange={(id) => setVendorId(id)}
+          />
+          <ProjectPicker
             id="ho-project"
             label="Project"
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-          >
-            <option value="">No project</option>
-            {(projects.data ?? []).map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </SelectField>
+            emptyLabel="No project"
+            selectedOption={
+              order?.projectId
+                ? { id: order.projectId, label: order.projectName ?? '' }
+                : null
+            }
+            onChange={(id) => setProjectId(id)}
+          />
         </div>
 
         <TextField
@@ -377,21 +384,14 @@ export default function HireOrderModal({
                   </p>
                 </div>
               </div>
-              <SelectField
+              <EquipmentPicker
                 id={`ho-machine-${line.key}`}
                 label="Machine (optional)"
                 value={line.equipmentId}
-                onChange={(event) =>
-                  patchLine(line.key, { equipmentId: event.target.value })
-                }
-              >
-                <option value="">Not linked to a registered machine</option>
-                {(equipment.data ?? []).map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.code} · {row.name}
-                  </option>
-                ))}
-              </SelectField>
+                emptyLabel="Not linked to a registered machine"
+                selectedOption={linkedOption(line.equipmentId)}
+                onChange={(id) => patchLine(line.key, { equipmentId: id })}
+              />
             </div>
           ))}
           <datalist id="ho-uoms">
