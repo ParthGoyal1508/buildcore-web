@@ -1,19 +1,22 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   Company,
   createCompany,
   updateCompany,
   uploadCompanyLogo,
 } from '@/app/lib/api/settings';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
+import { toast } from '@/app/ui/toast';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -130,13 +133,23 @@ export default function CompanyModal({
 }) {
   const [tab, setTab] = useState<TabId>('basic');
   const [serverError, setServerError] = useState<string | null>(null);
+  // A logo chosen while creating, sent once the company exists (036 C7).
+  const [pendingLogo, setPendingLogo] = useState<PreparedFile | null>(null);
   const queryClient = useQueryClient();
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  // 036 C9: a company's status and short code are a group administrator's to change; the API
+  // refuses anyone else (GROUP_ACCESS_REQUIRED). Shown, not offered, for a company administrator.
+  const isGroupAdmin = me?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false;
+  const lockedForCompanyAdmin = Boolean(company) && !isGroupAdmin;
 
   const {
     register,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -192,17 +205,36 @@ export default function CompanyModal({
           .filter(([key, value]) => !(NUMERIC.has(key) && value === ''))
           .map(([key, value]) => [key, value === '' ? null : value]),
       );
+      if (lockedForCompanyAdmin) {
+        // Not sent at all: unchanged values would pass, but a stale form must not trip the rule.
+        delete payload.status;
+        delete payload.shortCode;
+      }
       return company
         ? updateCompany(company.id, payload)
         : createCompany(payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
+    onSuccess: async (saved) => {
+      if (!company && pendingLogo) {
+        // The company exists now, so its logo can be stored (036 C7). A failed logo does not undo
+        // the company; it says so, and the logo can be added from Edit.
+        try {
+          await uploadCompanyLogo(saved.id, pendingLogo.file);
+        } catch (error) {
+          toast.error(
+            errorMessage(error, 'The company was saved, but its logo could not be. Add it from Edit.'),
+          );
+        }
+      }
+      // `['companies']` also covers `['companies', 'selectable']`, which the sidebar logo and the
+      // company switcher read (036 C7).
+      await queryClient.invalidateQueries({ queryKey: ['companies'] });
+      toast.success(company ? `${saved.name} saved.` : `${saved.name} added.`);
       onClose();
     },
     onError: (error: unknown) => {
       if (!(error instanceof ApiError)) {
-        setServerError(MESSAGES.saveFailed);
+        setServerError(errorMessage(error, MESSAGES.saveFailed));
         return;
       }
       // A duplicate short code is a field-level problem, so report it on the field
@@ -240,13 +272,26 @@ export default function CompanyModal({
       wide
       title={company ? `Edit ${company.name}` : 'Add company'}
       onClose={onClose}
+      isDirty={isDirty || pendingLogo !== null}
+      pending={mutation.isPending}
       footer={
         <>
-          <SecondaryButton type="button" onClick={onClose}>
+          <SecondaryButton
+            type="button"
+            onClick={onClose}
+            disabled={mutation.isPending}
+          >
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="company-form" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving…' : 'Save'}
+          {/* `isPending`, not react-hook-form's `isSubmitting`: the submit handler calls `mutate`
+              without awaiting it, so `isSubmitting` was false again before the request left and a
+              second click sent a second create (036 C6). */}
+          <Button
+            type="submit"
+            form="company-form"
+            loading={mutation.isPending}
+          >
+            Save
           </Button>
         </>
       }
@@ -280,19 +325,49 @@ export default function CompanyModal({
         {/* Every tab stays mounted; only its visibility changes, so switching tabs
             never discards what was typed on another. */}
         <div className={tab === 'basic' ? 'space-y-4' : 'hidden'}>
-          <TextField id="name" label="Company name" error={err('name')} {...register('name')} />
+          <TextField id="name" label="Company name" aria-required="true" error={err('name')} {...register('name')} />
           <TextField
             id="shortCode"
             label="Short code"
-            hint="Used as the prefix for employee codes, e.g. DC-0001."
+            aria-required="true"
+            readOnly={lockedForCompanyAdmin}
+            hint={
+              lockedForCompanyAdmin
+                ? 'Only a group administrator can change the short code.'
+                : 'Used as the prefix for employee codes, e.g. DC-0001.'
+            }
             error={err('shortCode')}
             {...register('shortCode')}
           />
-          <SelectField id="status" label="Status" error={err('status')} {...register('status')}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </SelectField>
-          {company && <LogoUpload companyId={company.id} />}
+          {lockedForCompanyAdmin ? (
+            // Not a disabled select: react-hook-form reads a disabled field as undefined, and the
+            // schema would then refuse the form over a field the user cannot touch. Unregistered,
+            // the value stays the loaded one (and the save does not send it).
+            <TextField
+              id="status"
+              label="Status"
+              readOnly
+              value={company?.status === 'inactive' ? 'Inactive' : 'Active'}
+              hint="Only a group administrator can activate or deactivate a company."
+            />
+          ) : (
+            <SelectField id="status" label="Status" error={err('status')} {...register('status')}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </SelectField>
+          )}
+          {company ? (
+            <LogoUpload companyId={company.id} />
+          ) : (
+            <FileUpload
+              label="Logo"
+              accept={LOGO_ACCEPT}
+              maxBytes={LOGO_MAX_BYTES}
+              compress={false}
+              hint="PNG or JPEG, up to 2 MB. Saved once the company is added."
+              onSelect={setPendingLogo}
+            />
+          )}
           {/* "Logo URL" is gone (2026-10-12). It was written here and read by nothing
               since 002, and a company's logo is now an uploaded image — see
               `Company.logoRef` and `PUT /settings/companies/:id/logo`. Two controls for
@@ -338,51 +413,33 @@ export default function CompanyModal({
   );
 }
 
+/** Logos keep their own pixels: compressing would flatten a transparent PNG onto white. */
+const LOGO_ACCEPT = 'image/png,image/jpeg';
+const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
 /**
  * The company's logo, uploaded as an image (2026-10-13). Shown in the sidebar and at the head of
  * every payment advice. Saved on its own, the moment a file is chosen — it is not part of the form.
+ *
+ * 036 C7: it refreshed `['companies', id, 'logo']`, a key nothing reads, so the sidebar kept the old
+ * mark until a reload. The sidebar reads `['companies', 'selectable']` — whose `logoVersion` names
+ * the image — so that is what is refreshed now. `FileUpload` adds the preview, the size check and
+ * the reset after an error.
  */
 function LogoUpload({ companyId }: { companyId: string }) {
   const queryClient = useQueryClient();
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor="company-logo" className="text-sm font-medium text-gray-700">
-        Logo
-      </label>
-      <input
-        id="company-logo"
-        type="file"
-        accept="image/png,image/jpeg"
-        disabled={busy}
-        className="text-sm"
-        onChange={async (event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          setBusy(true);
-          setMessage(null);
-          try {
-            await uploadCompanyLogo(companyId, file);
-            setMessage('Logo saved.');
-            void queryClient.invalidateQueries({
-              queryKey: ['companies', companyId, 'logo'],
-            });
-          } catch (err) {
-            setMessage(
-              (err as { message?: string })?.message ??
-                'The logo could not be saved.',
-            );
-          } finally {
-            setBusy(false);
-          }
-        }}
-      />
-      <p className="text-xs text-gray-500">
-        PNG or JPEG. Shown in the sidebar and printed on payment advices — a
-        wide, short image reads best.
-      </p>
-      {message && <p className="text-xs text-gray-700">{message}</p>}
-    </div>
+    <FileUpload
+      label="Logo"
+      accept={LOGO_ACCEPT}
+      maxBytes={LOGO_MAX_BYTES}
+      compress={false}
+      hint="PNG or JPEG, up to 2 MB. Shown in the sidebar and printed on payment advices — a wide, short image reads best."
+      onUpload={async (prepared) => {
+        await uploadCompanyLogo(companyId, prepared.file);
+        await queryClient.invalidateQueries({ queryKey: ['companies'] });
+        toast.success('Logo saved.');
+      }}
+    />
   );
 }

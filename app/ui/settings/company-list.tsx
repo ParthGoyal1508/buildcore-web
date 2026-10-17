@@ -2,9 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { errorMessage } from '@/app/lib/api/client';
 import { Company, listCompanies, updateCompany } from '@/app/lib/api/settings';
-import { MESSAGES } from '@/app/lib/constants';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { toast } from '@/app/ui/toast';
 import CompanyModal from '@/app/ui/settings/company-modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { RowAction } from '@/app/ui/settings/form-fields';
@@ -29,10 +32,18 @@ export default function CompanyList() {
 
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['companies'],
     queryFn: listCompanies,
   });
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  // 036 C9: adding a company, and activating or deactivating one, are a group administrator's
+  // (CROSS_COMPANY_ACCESS). The API refused a company administrator every time; the controls now
+  // are not offered rather than offered and refused.
+  const isGroupAdmin = me?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false;
 
   /** Companies are never hard-deleted — historical data has to stay intact — so
    * deactivating is the delete-equivalent action (FR-001, FR-005). */
@@ -41,13 +52,35 @@ export default function CompanyList() {
       updateCompany(company.id, {
         status: company.status === 'active' ? 'inactive' : 'active',
       }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // Covers `['companies', 'active']` and `['companies', 'selectable']`, which every
+      // company-selector reads and this change alters.
       queryClient.invalidateQueries({ queryKey: ['companies'] });
-      // Any company-selector elsewhere reads the active-only list, which this
-      // change alters.
-      queryClient.invalidateQueries({ queryKey: ['companies', 'active'] });
+      toast.success(
+        saved.status === 'active'
+          ? `${saved.name} activated.`
+          : `${saved.name} deactivated.`,
+      );
     },
+    // It used to fail silently (036 C8).
+    onError: (err: unknown) =>
+      toast.error(errorMessage(err, 'The company status could not be changed.')),
   });
+
+  /** Deactivating hides a company from every selector, so it is confirmed first (036 C8). */
+  const changeStatus = async (company: Company) => {
+    if (company.status === 'active') {
+      const ok = await confirmDialog({
+        title: `Deactivate ${company.name}?`,
+        message:
+          'It will no longer be offered in company selectors, and nobody can switch to it. Its records are kept, and it can be activated again.',
+        confirmLabel: 'Deactivate',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+    toggleStatus.mutate(company);
+  };
 
   const columns: Column<Company>[] = [
     { key: 'name', header: 'Name', render: (c) => c.name },
@@ -62,32 +95,41 @@ export default function CompanyList() {
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <Button type="button" onClick={() => setIsCreating(true)}>
-          Add company
-        </Button>
-      </div>
+      {isGroupAdmin && (
+        <div className="mb-4 flex justify-end">
+          <Button type="button" onClick={() => setIsCreating(true)}>
+            Add company
+          </Button>
+        </div>
+      )}
 
       <ResponsiveList
         columns={columns}
         rows={data ?? []}
         rowKey={(c) => c.id}
         isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        error={isError ? error : null}
+        onRetry={refetch}
         emptyMessage="No companies yet."
         actions={(company) => (
           <>
             <RowAction type="button" onClick={() => setEditing(company)}>
               Edit
             </RowAction>
-            <RowAction
-              type="button"
-              onClick={() => toggleStatus.mutate(company)}
-              disabled={toggleStatus.isPending}
-              className={company.status === 'active' ? 'text-red-600' : undefined}
-            >
-              {company.status === 'active' ? 'Deactivate' : 'Activate'}
-            </RowAction>
+            {isGroupAdmin && (
+              <RowAction
+                type="button"
+                onClick={() => void changeStatus(company)}
+                loading={
+                  toggleStatus.isPending &&
+                  toggleStatus.variables?.id === company.id
+                }
+                disabled={toggleStatus.isPending}
+                className={company.status === 'active' ? 'text-red-600' : undefined}
+              >
+                {company.status === 'active' ? 'Deactivate' : 'Activate'}
+              </RowAction>
+            )}
           </>
         )}
       />
