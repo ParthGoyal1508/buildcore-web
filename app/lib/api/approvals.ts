@@ -148,6 +148,8 @@ const approvalStateObjectSchema = z.object({
 
   /** The level deciding now. Null once the chain has finished. */
   levelLabel: z.string().nullable(),
+  /** That level is the chain's final authority (036 D4). Defaulted for an older API. */
+  isFinalAuthority: z.boolean().default(false),
   awaitingRoleName: z.string().nullable(),
   /** Named only when exactly one person could act; null when several could, or none. */
   awaitingUserName: z.string().nullable(),
@@ -217,6 +219,8 @@ const queueEntrySchema = z.object({
   ageHours: z.number(),
   currentPosition: z.number(),
   levelLabel: z.string(),
+  /** The caller's level is the chain's final authority (036 D4). Defaulted for an older API. */
+  isFinalAuthority: z.boolean().default(false),
 });
 
 const queuePageSchema = z.object({

@@ -14,6 +14,7 @@ import {
   APPROVAL_INERT_MESSAGES,
   APPROVAL_RESUBMIT,
 } from '@/app/lib/constants';
+import { confirmDialog } from '@/app/ui/dialogs';
 import { RowAction } from '@/app/ui/settings/form-fields';
 
 /**
@@ -64,6 +65,12 @@ export interface ActionReviewState {
    * older shape still satisfies this interface; absent means no.
    */
   canResubmitNow?: boolean;
+  /**
+   * The deciding level is the chain's final authority (036 D4): an Approve there is the last
+   * word — a payment released, a payroll run cleared — so it is confirmed first. Optional; absent
+   * means no confirmation, as before.
+   */
+  isFinalAuthority?: boolean;
 }
 
 export interface ActionReviewProps {
@@ -151,6 +158,9 @@ export default function ActionReview({
             </p>
           )}
           <RowAction
+            // 036 D5: authority here is the item's own (raised it, or the chain), not the module's
+            // write permission — `RowAction` would otherwise vanish for a read-only holder.
+            intent="read"
             onClick={() => {
               setError(null);
               setInFlight(true);
@@ -222,7 +232,7 @@ export default function ActionReview({
     }
   };
 
-  const start = (action: ApprovalDecisionAction) => {
+  const start = async (action: ApprovalDecisionAction) => {
     const config = APPROVAL_ACTIONS.find((a) => a.action === action);
     if (config?.requiresReason) {
       // Asked for inline, before sending. The server refuses a reject or return with no
@@ -231,6 +241,18 @@ export default function ActionReview({
       setPending(action);
       setError(null);
       return;
+    }
+    // 036 D4: nothing comes after a final authority to catch a mistaken tap — on a phone, in a
+    // queue — so that one Approve asks first. Every other level still approves in one tap.
+    if (action === 'approve' && state.isFinalAuthority) {
+      const ok = await confirmDialog({
+        title: `Approve ${entityLabel}?`,
+        message: `You are the final authority${
+          state.levelLabel ? ` (${state.levelLabel})` : ''
+        }. This approval completes the chain and cannot be undone here.`,
+        confirmLabel: 'Approve',
+      });
+      if (!ok) return;
     }
     void submit(action);
   };
@@ -265,6 +287,7 @@ export default function ActionReview({
         <div className="flex flex-wrap gap-2">
           <RowAction
             type="button"
+            intent="read"
             // Disabled while in flight so repeated clicks produce exactly one request
             // (FR-005), and disabled without a reason so the request is never sent to
             // be refused (FR-004).
@@ -276,6 +299,7 @@ export default function ActionReview({
           </RowAction>
           <RowAction
             type="button"
+            intent="read"
             disabled={inFlight}
             onClick={() => {
               setPending(null);
@@ -298,8 +322,12 @@ export default function ActionReview({
           <RowAction
             key={action}
             type="button"
+            // 036 D5: the chain decides who may approve, not the module's write permission. A
+            // chain approver with read-only access to the module (a director who only reads
+            // payroll) lost Approve and Reject here while the API would have accepted them.
+            intent="read"
             disabled={inFlight}
-            onClick={() => start(action)}
+            onClick={() => void start(action)}
             className={
               action === 'approve'
                 ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100'

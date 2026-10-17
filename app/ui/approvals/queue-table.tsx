@@ -1,9 +1,12 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
-import { useState } from 'react';
 
 import {
   decideApproval,
@@ -13,7 +16,6 @@ import {
 } from '@/app/lib/api/approvals';
 import {
   APPROVAL_QUEUE_AGE_WARNING_HOURS,
-  MESSAGES,
   approvalActionTypeLabel,
 } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
@@ -57,18 +59,17 @@ import { RowAction } from '@/app/ui/settings/form-fields';
  */
 export default function ApprovalQueue() {
   const queryClient = useQueryClient();
-  /** Cursors walked so far, so "load more" appends rather than replacing. */
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
-
-  const pages = useQuery({
-    queryKey: ['approvalQueue', cursors],
-    queryFn: async () => {
-      const results = [];
-      for (const cursor of cursors) {
-        results.push(await getApprovalQueue({ cursor }));
-      }
-      return results;
-    },
+  /**
+   * 036 D3: an infinite query. "Load more" used to put every cursor walked so far into the query
+   * key, so each press made a new key — the list blanked to its loading state and then re-fetched
+   * every page from the first. React Query keeps the pages it has and fetches only the next one;
+   * a refetch (focus, a decision) re-walks the loaded pages in place without blanking.
+   */
+  const pages = useInfiniteQuery({
+    queryKey: ['approvalQueue'],
+    queryFn: ({ pageParam }) => getApprovalQueue({ cursor: pageParam }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
     // FR-013: a decision elsewhere changes this list, and so does a colleague's. Refetching
     // when the tab regains focus is what keeps a queue left open on a second monitor from
     // quietly going stale — without any realtime infrastructure to maintain.
@@ -94,11 +95,15 @@ export default function ApprovalQueue() {
       void queryClient.invalidateQueries({ queryKey: ['approvalCount'] });
       // The decision is now part of the history listed under the queue (2026-10-15).
       void queryClient.invalidateQueries({ queryKey: ['approvalHistoryList'] });
+      // An approval moves the item on, possibly onto a later step that is "coming up" for this
+      // caller — or off that list (036 D4). And the bell's approvals row changes with it.
+      void queryClient.invalidateQueries({ queryKey: ['approvalUpcoming'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      void queryClient.invalidateQueries({ queryKey: ['notificationCount'] });
     },
   });
 
-  const items = pages.data?.flatMap((page) => page.items) ?? [];
-  const nextCursor = pages.data?.[pages.data.length - 1]?.nextCursor ?? null;
+  const items = pages.data?.pages.flatMap((page) => page.items) ?? [];
 
   const columns: Column<ApprovalQueueEntry>[] = [
     {
@@ -180,6 +185,7 @@ export default function ApprovalQueue() {
         canActNow: true,
         inertReason: null,
         levelLabel: row.levelLabel,
+        isFinalAuthority: row.isFinalAuthority,
         awaitingUserName: null,
         currentPosition: row.currentPosition,
       }}
@@ -217,7 +223,8 @@ export default function ApprovalQueue() {
           rowKey={(row) => row.instanceId}
           actions={decision}
           isLoading={pages.isLoading}
-          error={pages.isError ? MESSAGES.loadFailed : null}
+          error={pages.isError ? pages.error : null}
+          onRetry={pages.refetch}
           // Said plainly rather than left as a blank screen (FR-006). "Nothing is waiting
           // on you" is a result; an empty table is indistinguishable from one that failed.
           // The history below still shows everything already decided.
@@ -242,7 +249,7 @@ export default function ApprovalQueue() {
           </section>
         ))
       )}
-      {nextCursor && (
+      {pages.hasNextPage && (
         <RowAction
           type="button"
           intent="read"
@@ -251,10 +258,11 @@ export default function ApprovalQueue() {
           // small for a thumb. `intent="read"` because loading the next page writes nothing: without
           // it the control would vanish for a reader, who is exactly who scrolls a queue.
           className="min-h-11 w-full justify-center sm:w-auto"
-          onClick={() => setCursors((c) => [...c, nextCursor])}
+          onClick={() => void pages.fetchNextPage()}
+          loading={pages.isFetchingNextPage}
           disabled={pages.isFetching}
         >
-          {pages.isFetching ? 'Loading…' : 'Load more'}
+          Load more
         </RowAction>
       )}
     </div>
