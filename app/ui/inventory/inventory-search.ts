@@ -1,19 +1,28 @@
-"use client";
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
 
 import {
+  getItem,
   getItems,
   getStock,
   type Item,
   type StockRow,
-} from "@/app/lib/api/inventory";
+} from '@/app/lib/api/inventory';
 import {
+  getVendor,
   getVendors,
   type VendorListItem as Vendor,
-} from "@/app/lib/api/partners";
-import { getProjects, getSites, type Site } from "@/app/lib/api/projects";
-import { inventoryLabel } from "@/app/lib/constants";
-import { quantity } from "@/app/lib/format";
-import type { AsyncSearchPage, SearchableOption } from "@/app/ui/async-select";
+} from '@/app/lib/api/partners';
+import {
+  getProjects,
+  getSite,
+  getSites,
+  type Site,
+} from '@/app/lib/api/projects';
+import { inventoryLabel } from '@/app/lib/constants';
+import { quantity } from '@/app/lib/format';
+import type { AsyncSearchPage, SearchableOption } from '@/app/ui/async-select';
 
 /**
  * Server searches for the inventory pickers, in the shape `<AsyncSelect search>` takes (036 M5).
@@ -30,7 +39,7 @@ import type { AsyncSearchPage, SearchableOption } from "@/app/ui/async-select";
 const PAGE = 25;
 
 export const itemOption = (
-  item: Pick<Item, "id" | "name" | "code" | "unit">,
+  item: Pick<Item, 'id' | 'name' | 'code' | 'unit'>,
 ): SearchableOption => ({
   id: item.id,
   label: item.name,
@@ -39,7 +48,7 @@ export const itemOption = (
 });
 
 export const vendorOption = (
-  vendor: Pick<Vendor, "id" | "name" | "code" | "type"> & {
+  vendor: Pick<Vendor, 'id' | 'name' | 'code' | 'type'> & {
     city?: string | null;
   },
 ): SearchableOption => ({
@@ -50,7 +59,7 @@ export const vendorOption = (
 });
 
 export const siteOption = (
-  site: Pick<Site, "id" | "name"> & { code?: string | null },
+  site: Pick<Site, 'id' | 'name'> & { code?: string | null },
 ): SearchableOption => ({
   id: site.id,
   label: site.name,
@@ -140,4 +149,40 @@ export function searchStoreStock(siteId: string) {
         total: r.total,
       }),
     );
+}
+
+/**
+ * The option for an id read back from the URL or a record — so a picker restored from a shared
+ * link shows the store's name, not an empty box. Fetched only when the id is set.
+ */
+export function useSiteOption(id: string): SearchableOption | null {
+  const site = useQuery({
+    queryKey: ['inventory', 'site', id],
+    queryFn: () => getSite(id),
+    enabled: Boolean(id),
+  });
+  return id && site.data ? siteOption(site.data) : null;
+}
+
+export function useVendorOption(id: string): SearchableOption | null {
+  const vendor = useQuery({
+    queryKey: ['inventory', 'vendors', 'one', id],
+    queryFn: () => getVendor(id),
+    enabled: Boolean(id),
+  });
+  return id && vendor.data ? vendorOption(vendor.data) : null;
+}
+
+export function useItemOption(id: string): SearchableOption | null {
+  const item = useQuery({
+    queryKey: ['inventory', 'item', id],
+    queryFn: () => getItem(id),
+    enabled: Boolean(id),
+  });
+  return id && item.data ? itemOption(item.data) : null;
+}
+
+/** "From" after "To" — said beside the filter rather than sent and answered with nothing (036 M12). */
+export function dateRangeError(from: string, to: string): string | undefined {
+  return from && to && from > to ? '“From” is after “To”.' : undefined;
 }
