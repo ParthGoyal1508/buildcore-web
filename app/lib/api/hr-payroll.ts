@@ -243,6 +243,8 @@ export interface EmployeeFilters {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  /** `code|name|joining:asc|desc`, sorted on the server (036 F12). */
+  sort?: string;
 }
 
 /**
