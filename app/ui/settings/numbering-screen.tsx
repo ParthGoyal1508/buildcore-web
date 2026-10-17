@@ -10,7 +10,10 @@ import {
   resetNumbering,
   setNumbering,
 } from '@/app/lib/api/settings';
+import { errorMessage } from '@/app/lib/api/client';
 import { Button } from '@/app/ui/button';
+import QueryError from '@/app/ui/query-error';
+import { toast } from '@/app/ui/toast';
 import { confirmDialog } from '@/app/ui/dialogs';
 import {
   FormError,
@@ -45,7 +48,7 @@ function named(width: number, separator: string) {
  */
 export function NumberingScreen() {
   const companyId = useSelectedCompanyId();
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['numbering', companyId],
     queryFn: () => getNumbering(companyId as string),
     enabled: !!companyId,
@@ -67,9 +70,11 @@ export function NumberingScreen() {
   }
   if (isError || !data) {
     return (
-      <p className="text-sm text-red-700" role="alert">
-        Could not load the numbering settings.
-      </p>
+      <QueryError
+        error={error}
+        onRetry={refetch}
+        fallback="Could not load the numbering settings."
+      />
     );
   }
 
@@ -139,20 +144,20 @@ function SeriesCard({
     onSuccess: () => {
       setError(null);
       setSaved(true);
+      toast.success(`${entry.label} numbering saved.`);
       void refresh();
     },
-    onError: (err) =>
-      setError(err instanceof Error ? err.message : 'Could not save.'),
+    onError: (err) => setError(errorMessage(err, 'Could not save.')),
   });
 
   const reset = useMutation({
     mutationFn: () => resetNumbering(companyId, entry.series),
     onSuccess: () => {
       setError(null);
+      toast.success(`${entry.label} numbering is back to the default.`);
       void refresh();
     },
-    onError: (err) =>
-      setError(err instanceof Error ? err.message : 'Could not reset.'),
+    onError: (err) => setError(errorMessage(err, 'Could not reset.')),
   });
 
   return (
@@ -296,7 +301,7 @@ function SeriesCard({
         {!entry.isDefault && (
           <SecondaryButton
             type="button"
-            disabled={reset.isPending}
+            loading={reset.isPending}
             onClick={async () => {
               if (
                 await confirmDialog({
@@ -315,10 +320,25 @@ function SeriesCard({
         )}
         <Button
           type="button"
-          disabled={!valid || !changed || save.isPending}
-          onClick={() => save.mutate()}
+          disabled={!valid || !changed}
+          loading={save.isPending}
+          onClick={async () => {
+            // 036 C15: "Use default" asked first and Save — which restarts a counted series — did
+            // not. A restart is the change people cannot easily undo, so it asks too.
+            if (
+              isCounted &&
+              !(await confirmDialog({
+                title: `Restart the ${entry.label.toLowerCase()} series?`,
+                message: `New codes will start from ${preview[0] ?? 'the new start'}. Codes already given stay as they are, and any already in use are skipped.`,
+                confirmLabel: 'Save and restart',
+              }))
+            ) {
+              return;
+            }
+            save.mutate();
+          }}
         >
-          {save.isPending ? 'Saving…' : 'Save'}
+          Save
         </Button>
       </div>
     </section>
