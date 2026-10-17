@@ -118,6 +118,8 @@ const STATUS_STYLES: Record<string, string> = {
   allocated: 'bg-blue-100 text-blue-800',
   under_repair: 'bg-orange-100 text-orange-800',
   scrapped: 'bg-red-100 text-red-800',
+  // 2026-10-17: a machine sold — gone, but for money, so not alarming.
+  sold: 'bg-slate-200 text-slate-800',
   closed_with_shortage: 'bg-amber-100 text-amber-900',
 };
 

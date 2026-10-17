@@ -56,7 +56,11 @@ export default function LabourLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      <LabourNav canSeeReports={canSeeReports} stripHidden={isModuleIndex} />
+      <LabourNav
+        canSeeReports={canSeeReports}
+        canManage={user.permissions.includes('LABOUR_APPROVE')}
+        stripHidden={isModuleIndex}
+      />
       {/*
         Renders a company selector for a cross-company administrator and nothing at all
         for everyone else — the same treatment Plant and Assets already mount over their

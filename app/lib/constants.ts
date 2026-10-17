@@ -245,7 +245,17 @@ export const ROUTES = {
   labourReportsDeployment: '/dashboard/labour/reports/deployment',
   labourReportsAttendance: '/dashboard/labour/reports/attendance',
   labourReportsPaymentRegister: '/dashboard/labour/reports/payment-register',
-  /** Field muster capture, outside /dashboard (spec FR-001). */
+  /** 031: the male/female daily rate per site, and which sites each supervisor works. */
+  labourSiteRates: '/dashboard/labour/site-rates',
+  labourSupervisors: '/dashboard/labour/supervisors',
+  /** 031: the month-end consolidated attendance sheet. */
+  labourAttendanceSheet: '/dashboard/labour/attendance-sheet',
+  /** 034: daily and monthly muster from punch times, corrections, day rules and export. */
+  labourMusterAttendance: '/dashboard/labour/muster-attendance',
+  /** Field screens, outside /dashboard (spec FR-001): face punch in/out and registration. */
+  labourAttendance: '/labour/attendance',
+  labourRegister: '/labour/register',
+  /** Pre-031 muster wizard; now redirects to `labourAttendance` so old bookmarks still land. */
   musterCapture: '/labour/muster',
 
   // --- Recruitment & Onboarding (feature 011) ---
@@ -275,6 +285,8 @@ export const ROUTES = {
   plantHireBills: '/dashboard/plant/hire-bills',
   plantSpareParts: '/dashboard/plant/spare-parts',
   plantMasters: '/dashboard/plant/masters',
+  /** 2026-10-17: the Scrapped & Sold Machines dashboard. */
+  plantDisposals: '/dashboard/plant/disposals',
 
   // Built by 009; the module index is a real screen rather than
   // <ModuleInProgress>. Kept here because NAV_MODULES points the sidebar at it.
@@ -693,6 +705,9 @@ export const SLIP_DELIVERY_COPY = {
   hint: 'Emails each employee their payslip for this run, as an attachment. Sending is deliberate rather than automatic.',
   loading: 'Checking who has been sent their payslip…',
   loadFailed: 'Could not load the delivery status for this run.',
+  /** 2026-10-16: payslip email switched off (`PAYSLIP_EMAIL_ENABLED` on the API). */
+  turnedOff:
+    'Emailing payslips is turned off. Employees can view and download their payslips in My Workspace → Salary.',
   send: 'Email payslips',
   sendRemaining: (count: number) =>
     count === 0 ? 'Email payslips' : `Email the remaining ${count}`,
@@ -3227,12 +3242,84 @@ export const ADVANCE_STATUSES = [
 
 export const LABOUR_PAYMENT_MODES = ['cash', 'bank'] as const;
 
-export const RATE_SOURCES = ['override', 'project_rate'] as const;
+export const RATE_SOURCES = ['override', 'project_rate', 'site_rate'] as const;
 
 export const RATE_SOURCE_LABELS: Record<string, string> = {
   override: 'Worker override',
   project_rate: 'Project rate',
+  site_rate: 'Site rate',
 };
+
+/** 031: labour gender — the two rates HR sets per site. */
+export const LABOUR_GENDERS = ['male', 'female'] as const;
+export const LABOUR_GENDER_LABELS: Record<string, string> = {
+  male: 'Male',
+  female: 'Female',
+};
+
+/** 031: face photos taken when registering labour — the range the API enforces. */
+export const LABOUR_ENROLMENT_PHOTOS = { min: 3, max: 5 } as const;
+
+/**
+ * What a supervisor is told when a labour punch fails (031), by the API's stable code. Written
+ * for the person holding the phone, not the labour in the photo — and never the server's prose,
+ * for the reason `punch-refusal.ts` gives.
+ */
+export const LABOUR_PUNCH_MESSAGES = {
+  LABOUR_PUNCH_REFUSED_FACE:
+    'The photo does not match the face registered for this labour, so attendance was not marked. Check you picked the right person, then retake the photo in good light, facing the camera.',
+  LABOUR_PUNCH_REFUSED_LOCATION:
+    'You are too far from this site for attendance to be marked. Move to the site and try again.',
+  LABOUR_PUNCH_REFUSED_UNLOCATABLE:
+    'Your phone could not work out where you are accurately enough. Step outside or somewhere with a clearer view of the sky, then try again.',
+  LABOUR_ALREADY_PUNCHED: 'Already marked — refresh the list to see the latest.',
+  LABOUR_NOT_PUNCHED_IN: 'Punch this labour in before punching them out.',
+  LABOUR_FACE_NOT_ENROLLED:
+    'This labour has no registered face photos yet. Open their record and take 3 to 5 photos first.',
+  LABOUR_SITE_NOT_ASSIGNED:
+    'You are not assigned to this site. Ask the HR office to assign it to you.',
+  LABOUR_ALREADY_ON_MUSTER:
+    'This labour is already on a muster for today that was entered another way.',
+} as const;
+
+/** 034: how a labour day counts, from the hours between punch in and out. */
+export const LABOUR_DAY_STATUS_LABELS: Record<string, string> = {
+  full_day: 'Full day',
+  half_day: 'Half day',
+  short: 'Short',
+  on_site: 'On site',
+  unresolved: 'Unresolved',
+  absent: 'Absent',
+};
+
+export const LABOUR_DAY_FLAG_LABELS: Record<string, string> = {
+  missing_punch_out: 'Missing punch out',
+  missing_punch_in: 'Missing punch in',
+  out_before_in: 'Out before in',
+};
+
+export const LABOUR_REFUSAL_REASON_LABELS: Record<string, string> = {
+  face_mismatch: 'Face did not match',
+  no_face_detected: 'No face in photo',
+  outside_geofence: 'Outside the site',
+  unlocatable: 'Location not accurate',
+};
+
+export const LABOUR_ATTENDANCE_COPY = {
+  needsConnection:
+    'You are offline. Attendance needs a connection to check the face, so connect and try again.',
+  noSites:
+    'No sites are assigned to you yet. Ask the HR office to assign your site, then come back.',
+  matching: 'Checking the face…',
+  locating: 'Finding your location…',
+  flaggedLocation:
+    'Marked — but your location could not be confirmed inside the site, so the HR office will see it flagged.',
+  registerHelp:
+    'Take 3 to 5 clear photos of the face: straight on, in good light, nothing covering the face. A slight turn left and right in two of them helps matching later.',
+  groupPhotoHint:
+    'For reference only — it does not mark anyone in or out. Punch each labour separately.',
+  groupPhotoSaved: 'Group photo saved for reference. Nobody was marked by it.',
+} as const;
 
 /** Indian currency note denominations, descending — the client renders the
  * server-computed breakup against these; the authoritative list is company config on
@@ -3276,7 +3363,42 @@ export const EQUIPMENT_STATUSES = [
   'active',
   'under_maintenance',
   'inactive',
+  // 2026-10-17: set only by Dispose, and listed only when filtered for.
+  'scrapped',
+  'sold',
 ] as const;
+
+/** Machines retired by a disposal. */
+export const DISPOSED_EQUIPMENT_STATUSES = ['scrapped', 'sold'] as const;
+
+export const SCRAP_REASONS = [
+  'damaged_beyond_repair',
+  'end_of_life',
+  'accident',
+  'obsolete',
+  'other',
+] as const;
+export const SCRAP_REASON_LABELS: Record<string, string> = {
+  damaged_beyond_repair: 'Damaged beyond repair',
+  end_of_life: 'End of life',
+  accident: 'Accident',
+  obsolete: 'Obsolete',
+  other: 'Other',
+};
+export const DISPOSAL_PAYMENT_MODES = [
+  'cash',
+  'cheque',
+  'bank_transfer',
+  'upi',
+  'other',
+] as const;
+export const DISPOSAL_PAYMENT_MODE_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  cheque: 'Cheque',
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  other: 'Other',
+};
 export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
 
 /** The two an admin may actually choose. */

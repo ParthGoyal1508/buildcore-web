@@ -26,6 +26,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import BulkLocationAssignment from '@/app/ui/hr/bulk-location-assignment';
+import { NocStatusBadge, useNocStatuses } from '@/app/ui/nocs/noc-status';
 
 /** Falls back to the code when an employee has no name recorded yet. */
 function displayName(employee: Employee): string {
@@ -63,6 +64,12 @@ export default function EmployeeList() {
     // doesn't flash an empty table between every click.
     placeholderData: keepPreviousData,
   });
+  // Open until the employee's NOC is uploaded, then closed (2026-10-17). Paged on the server, so
+  // a column only — a filter here would filter the page on screen, not the register.
+  const nocStatuses = useNocStatuses(
+    'employee',
+    (data?.items ?? []).map((row) => row.id),
+  );
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -113,6 +120,12 @@ export default function EmployeeList() {
       render: (row) => (
         <StatusBadge status={row.isActive ? 'active' : 'closed'} />
       ),
+    },
+    {
+      key: 'noc',
+      header: 'NOC',
+      sortValue: (row) => nocStatuses?.get(row.id)?.status ?? '',
+      render: (row) => <NocStatusBadge status={nocStatuses?.get(row.id)} />,
     },
   ];
 

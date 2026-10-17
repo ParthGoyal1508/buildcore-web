@@ -25,6 +25,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { LoadingText } from '@/app/ui/spinner';
+import { NocStatusBadge, useNocStatuses } from './noc-status';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -56,6 +57,8 @@ export default function NocPanel({
   const [error, setError] = useState<string | null>(null);
   const key = ['nocs', subjectType, subjectId];
 
+  const status = useNocStatuses(subjectType, [subjectId]);
+
   const nocs = useQuery({
     queryKey: key,
     queryFn: () => getNocs(subjectType, subjectId),
@@ -66,7 +69,8 @@ export default function NocPanel({
 
   const remove = useMutation({
     mutationFn: deleteNoc,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: key }),
+    // `['nocs']`, not just this list: the record's open/closed status is under it too.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['nocs'] }),
     onError: (err) =>
       setError(err instanceof ApiError ? err.message : 'Could not remove it.'),
   });
@@ -89,8 +93,22 @@ export default function NocPanel({
       {viewer}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
-          {hint && <p className="text-xs text-gray-500">{hint}</p>}
+          <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+            {title}
+            {/* The LOI's NOC does not close a work order, so its panel shows no status. */}
+            {stage !== 'loi' && <NocStatusBadge status={status?.get(subjectId)} />}
+          </h4>
+          {hint ? (
+            <p className="text-xs text-gray-500">{hint}</p>
+          ) : stage === 'loi' ? (
+            <p className="text-xs text-gray-500">
+              The work order stays open until its NOC after the work order is uploaded.
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500">
+              Open until a NOC is uploaded, then closed.
+            </p>
+          )}
         </div>
         {!adding && (
           <SecondaryButton type="button" onClick={() => setAdding(true)}>
@@ -105,7 +123,7 @@ export default function NocPanel({
           onCancel={() => setAdding(false)}
           onSaved={() => {
             setAdding(false);
-            void queryClient.invalidateQueries({ queryKey: key });
+            void queryClient.invalidateQueries({ queryKey: ['nocs'] });
           }}
           subjectType={subjectType}
           subjectId={subjectId}

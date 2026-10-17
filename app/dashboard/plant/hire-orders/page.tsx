@@ -29,6 +29,13 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
+import {
+  filterByNoc,
+  NocFilterField,
+  NocStatusBadge,
+  useNocStatuses,
+  type NocFilter,
+} from '@/app/ui/nocs/noc-status';
 
 /**
  * Vehicle work/hire orders (2026-10-15), each downloadable in the client's WORK/HIRE ORDER
@@ -67,6 +74,12 @@ export default function HireOrdersPage() {
     queryKey: ['plant', 'hire-orders', filters],
     queryFn: () => getHireOrders(filters),
   });
+  // Open until the order's NOC is uploaded, then closed (2026-10-17).
+  const [nocFilter, setNocFilter] = useState<NocFilter>('');
+  const nocStatuses = useNocStatuses(
+    'hire_order',
+    (data ?? []).map((row) => row.id),
+  );
 
   const remove = useMutation({
     mutationFn: (id: string) => deleteHireOrder(id),
@@ -121,6 +134,12 @@ export default function HireOrdersPage() {
       header: 'Total incl. GST',
       render: (row) => formatRupees(row.totalAmount),
     },
+    {
+      key: 'noc',
+      header: 'NOC',
+      sortValue: (row) => nocStatuses?.get(row.id)?.status ?? '',
+      render: (row) => <NocStatusBadge status={nocStatuses?.get(row.id)} />,
+    },
   ];
 
   return (
@@ -132,7 +151,7 @@ export default function HireOrdersPage() {
         </SecondaryButton>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <SelectField
           id="ho-filter-vendor"
           label="Supplier"
@@ -159,13 +178,18 @@ export default function HireOrdersPage() {
             </option>
           ))}
         </SelectField>
+        <NocFilterField
+          id="ho-filter-noc"
+          value={nocFilter}
+          onChange={setNocFilter}
+        />
       </div>
 
       <FormError message={error} />
 
       <ResponsiveList
         columns={columns}
-        rows={data ?? []}
+        rows={filterByNoc(data ?? [], nocFilter, nocStatuses, (row) => row.id)}
         rowKey={(row) => row.id}
         // The whole row opens the order (2026-10-15).
         rowHref={(row) => `${ROUTES.plantHireOrders}/${row.id}`}

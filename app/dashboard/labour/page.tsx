@@ -6,63 +6,70 @@ import {
   ClipboardDocumentCheckIcon,
   CreditCardIcon,
   DocumentTextIcon,
+  TableCellsIcon,
   UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import { useQuery } from '@tanstack/react-query';
 
+import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
 import TileGrid, { type Tile } from '@/app/ui/tile-grid';
 
 /**
- * Capture is first because it is the daily action; everything below it is review or
- * masters. It is also the only tile that leaves the dashboard shell — the capture
- * screen lives at `/labour/muster`, outside `/dashboard`, because it is the
- * supervisor's phone flow (013 FR-001). It had no entry point at all until now:
- * `ROUTES.musterCapture` was defined and never linked, so the screen was reachable
- * only by typing its URL.
- *
- * No permission filtering, for the same reason the other six tiles have none:
- * capture needs `DAILY_WORKER_REGISTRY`, which `ModuleGuard` has already established
- * for anyone who can see this page at all.
+ * Attendance is first because it is the daily action; it is also the only tile that leaves the
+ * dashboard shell — face punch in/out lives at `/labour/attendance`, outside `/dashboard`, because
+ * it is the supervisor's phone flow (013 FR-001, 031). Site Rates and Supervisors are the HR
+ * office's, so they show only with Labour Approve.
  */
-const TILES: Tile[] = [
+const tilesFor = (canManage: boolean): Tile[] => [
   {
-    name: 'Capture Muster',
-    href: ROUTES.musterCapture,
+    name: 'Attendance',
+    href: ROUTES.labourAttendance,
     icon: CameraIcon,
-    description:
-      'Mark today’s workers present on site, with a photo and a GPS fix.',
+    description: 'Punch labour in and out with a face photo, and register new labour.',
   },
   {
-    name: 'Wage Rates',
-    href: ROUTES.labourWageRates,
-    icon: BanknotesIcon,
-    description: 'Per-project daily rates by skill category, effective-dated.',
-  },
-  {
-    name: 'Workers',
+    name: 'Labour',
     href: ROUTES.labourWorkers,
     icon: UserGroupIcon,
-    description: 'The labour registry — direct and contractor-engaged.',
+    description: 'Everyone registered, with their codes and face photos.',
   },
+  ...(canManage
+    ? [
+        {
+          name: 'Site Rates',
+          href: ROUTES.labourSiteRates,
+          icon: BanknotesIcon,
+          description: 'Daily wage for male and female labour at each site.',
+        },
+        {
+          name: 'Supervisors',
+          href: ROUTES.labourSupervisors,
+          icon: UsersIcon,
+          description: 'Which sites each supervisor marks attendance at.',
+        },
+      ]
+    : []),
   {
-    name: 'Gangs',
-    href: ROUTES.labourGangs,
-    icon: UsersIcon,
-    description: 'Group workers under a leader for faster muster capture.',
-  },
-  {
-    name: 'Musters',
-    href: ROUTES.labourMusters,
-    icon: ClipboardDocumentCheckIcon,
-    description: 'Review and approve submitted attendance.',
+    name: 'Muster Attendance',
+    href: ROUTES.labourMusterAttendance,
+    icon: TableCellsIcon,
+    description:
+      'Punch in and out times, hours, missing punches and corrections — by day or month, with the Excel.',
   },
   {
     name: 'Payment Sheets',
     href: ROUTES.labourPaymentSheets,
     icon: DocumentTextIcon,
-    description: 'Generate, approve and disburse cash payment sheets.',
+    description: 'Generate a site’s payment sheet for any dates, then approve and pay.',
+  },
+  {
+    name: 'Musters',
+    href: ROUTES.labourMusters,
+    icon: ClipboardDocumentCheckIcon,
+    description: 'Each site’s daily attendance, built from the face punches.',
   },
   {
     name: 'Advances',
@@ -73,13 +80,15 @@ const TILES: Tile[] = [
 ];
 
 export default function LabourIndexPage() {
+  const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const canManage = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Labour"
-        description="Wage masters, the worker registry, supervisor attendance and cash payment sheets."
+        description="Face attendance on site, site rates, and labour payment sheets."
       />
-      <TileGrid tiles={TILES} />
+      <TileGrid tiles={tilesFor(canManage)} />
     </div>
   );
 }

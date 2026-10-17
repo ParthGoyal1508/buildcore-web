@@ -7,10 +7,11 @@ import {
   LABOUR_PAYMENT_MODES,
   MUSTER_STATUSES,
   PAYMENT_SHEET_LINE_STATUSES,
+  LABOUR_GENDERS,
   PAYMENT_SHEET_STATUSES,
   RATE_SOURCES,
 } from '@/app/lib/constants';
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 import { amountHidden, hideableDecimal } from './cash-hiding';
 
 /**
@@ -183,12 +184,18 @@ export async function updateWageRate(
 
 const engagementType = z.enum(ENGAGEMENT_TYPES);
 
+const labourGender = z.enum(LABOUR_GENDERS);
+export type LabourGender = z.infer<typeof labourGender>;
+
 const workerSchema = z.object({
   id: z.string(),
   labourCode: z.string(),
   fullName: z.string(),
-  phone: z.string(),
-  skillCategoryId: z.string(),
+  // 031: father's name, mobile and skill are optional at registration.
+  fatherName: z.string().nullable().catch(null),
+  gender: labourGender.nullable().catch(null),
+  phone: z.string().nullable(),
+  skillCategoryId: z.string().nullable(),
   engagementType,
   contractorId: z.string().nullable(),
   siteId: z.string(),
@@ -237,13 +244,16 @@ export async function getWorker(id: string): Promise<WorkerDetail> {
 export interface WorkerInput {
   companyId?: string;
   fullName: string;
-  phone: string;
-  gender: string;
-  dateOfBirth: string;
-  skillCategoryId: string;
-  engagementType: 'direct' | 'contractor';
-  contractorId?: string;
+  gender: LabourGender;
+  fatherName?: string;
+  phone?: string;
   siteId: string;
+  /** 3–5 face photos, sent with the registration so nobody is registered without a face. */
+  photos?: string[];
+  dateOfBirth?: string;
+  skillCategoryId?: string;
+  engagementType?: 'direct' | 'contractor';
+  contractorId?: string;
   aadhaarNumber?: string;
   bankAccount?: string;
   rateOverride?: number;
@@ -391,74 +401,6 @@ export async function getMuster(id: string): Promise<MusterDetail> {
   return musterDetailSchema.parse(data);
 }
 
-export interface OpenMusterInput {
-  siteId: string;
-  date: string;
-  latitude: number;
-  longitude: number;
-  accuracyMetres: number;
-  capturedAt?: string;
-}
-
-export async function openMuster(input: OpenMusterInput): Promise<MusterDetail> {
-  const data = await authFetch<unknown>('/labour/musters', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-  return musterDetailSchema.parse(data);
-}
-
-export interface CaptureMusterLineInput {
-  workerId: string;
-  attendanceType: string;
-  overtimeHours?: number;
-  photo: string;
-}
-
-export interface CaptureMusterInput extends OpenMusterInput {
-  lines: CaptureMusterLineInput[];
-}
-
-/** Composite offline-drain path: opens, marks and submits in one call (FR-011). */
-export async function captureMuster(
-  input: CaptureMusterInput,
-): Promise<MusterDetail> {
-  const data = await authFetch<unknown>('/labour/musters/capture', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-  return musterDetailSchema.parse(data);
-}
-
-export async function addMusterLine(
-  musterId: string,
-  input: { workerId: string; attendanceType: string; overtimeHours?: number; photo?: string },
-): Promise<MusterDetail> {
-  const data = await authFetch<unknown>(`/labour/musters/${musterId}/lines`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-  return musterDetailSchema.parse(data);
-}
-
-export async function bulkAddGang(
-  musterId: string,
-  input: { gangId: string; attendanceType: string },
-): Promise<MusterDetail> {
-  const data = await authFetch<unknown>(
-    `/labour/musters/${musterId}/lines/bulk`,
-    { method: 'POST', body: JSON.stringify(input) },
-  );
-  return musterDetailSchema.parse(data);
-}
-
-export async function submitMuster(musterId: string): Promise<MusterDetail> {
-  const data = await authFetch<unknown>(`/labour/musters/${musterId}/submit`, {
-    method: 'PATCH',
-  });
-  return musterDetailSchema.parse(data);
-}
-
 export async function approveMuster(musterId: string): Promise<MusterDetail> {
   const data = await authFetch<unknown>(`/labour/musters/${musterId}/approve`, {
     method: 'PATCH',
@@ -483,7 +425,9 @@ export async function returnMuster(
 
 const paymentSheetListItemSchema = z.object({
   id: z.string(),
-  projectId: z.string(),
+  projectId: z.string().nullable(),
+  /** 031: set on a site sheet; null on a pre-031 project sheet. */
+  siteId: z.string().nullable().catch(null),
   periodFrom: z.string(),
   periodTo: z.string(),
   engagementType,
@@ -526,7 +470,8 @@ export type PaymentSheetLine = z.infer<typeof paymentSheetLineSchema>;
 
 const paymentSheetSchema = z.object({
   id: z.string(),
-  projectId: z.string(),
+  projectId: z.string().nullable(),
+  siteId: z.string().nullable().catch(null),
   periodFrom: z.string(),
   periodTo: z.string(),
   engagementType,
@@ -550,6 +495,7 @@ export type PaymentSheet = z.infer<typeof paymentSheetSchema>;
 export interface PaymentSheetQuery {
   companyId?: string;
   projectId?: string;
+  siteId?: string;
   engagementType?: string;
   status?: string;
 }
@@ -570,10 +516,10 @@ export async function getPaymentSheet(id: string): Promise<PaymentSheet> {
 
 export interface GeneratePaymentSheetInput {
   companyId?: string;
-  projectId: string;
+  siteId: string;
   periodFrom: string;
   periodTo: string;
-  engagementType: 'direct' | 'contractor';
+  engagementType?: 'direct' | 'contractor';
 }
 
 export async function generatePaymentSheet(
@@ -813,4 +759,427 @@ export async function getPaymentRegister(
     `/labour/reports/payment-register${qs({ ...query })}`,
   );
   return paymentRegisterSchema.parse(data);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Face attendance, site rates and supervisor sites (031)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const siteOptionSchema = z.object({ id: z.string(), name: z.string() });
+export type LabourSiteOption = z.infer<typeof siteOptionSchema>;
+
+/** The sites the caller may register labour and mark attendance at. */
+export async function getMyLabourSites(): Promise<LabourSiteOption[]> {
+  const data = await authFetch<unknown>('/labour/my-sites');
+  return z.array(siteOptionSchema).parse(data);
+}
+
+const labourDayRowSchema = z.object({
+  workerId: z.string(),
+  labourCode: z.string(),
+  fullName: z.string(),
+  fatherName: z.string().nullable(),
+  gender: labourGender.nullable().catch(null),
+  faceEnrolled: z.boolean(),
+  punchInAt: z.string().nullable(),
+  punchOutAt: z.string().nullable(),
+  status: z.string().catch('absent'),
+  hours: z.number().nullable().catch(null),
+  overtimeHours: z.number().catch(0),
+});
+export type LabourDayRow = z.infer<typeof labourDayRowSchema>;
+
+const labourDaySchema = z.object({
+  date: z.string(),
+  items: z.array(labourDayRowSchema),
+});
+export type LabourDay = z.infer<typeof labourDaySchema>;
+
+export async function getLabourToday(siteId: string): Promise<LabourDay> {
+  const data = await authFetch<unknown>(
+    `/labour/attendance/today${qs({ siteId })}`,
+  );
+  return labourDaySchema.parse(data);
+}
+
+export interface LabourPunchInput {
+  siteId: string;
+  workerId: string;
+  type: 'in' | 'out';
+  photo: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+}
+
+const labourPunchResultSchema = z.object({
+  workerId: z.string(),
+  type: z.enum(['in', 'out']),
+  punchedAt: z.string(),
+  status: z.string(),
+  hours: z.number().nullable(),
+  overtimeHours: z.number(),
+  geofenceViolation: z.boolean(),
+});
+export type LabourPunchResult = z.infer<typeof labourPunchResultSchema>;
+
+export async function punchLabour(
+  input: LabourPunchInput,
+): Promise<LabourPunchResult> {
+  const data = await authFetch<unknown>('/labour/attendance/punch', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return labourPunchResultSchema.parse(data);
+}
+
+const labourRefusalSchema = z.object({
+  id: z.string(),
+  workerId: z.string(),
+  labourCode: z.string().nullable(),
+  fullName: z.string().nullable(),
+  type: z.enum(['in', 'out']),
+  reason: z.string(),
+  at: z.string(),
+});
+export type LabourRefusal = z.infer<typeof labourRefusalSchema>;
+
+export async function getLabourRefusals(
+  siteId: string,
+  days?: number,
+): Promise<LabourRefusal[]> {
+  const data = await authFetch<unknown>(
+    `/labour/attendance/refusals${qs({ siteId, days })}`,
+  );
+  return z.array(labourRefusalSchema).parse(data);
+}
+
+const siteWageRateSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  gender: labourGender,
+  dailyRate: decimal,
+  effectiveFrom: z.string(),
+  effectiveTo: z.string().nullable(),
+  isCurrent: z.boolean(),
+});
+export type SiteWageRate = z.infer<typeof siteWageRateSchema>;
+
+export async function getSiteWageRates(siteId?: string): Promise<SiteWageRate[]> {
+  const data = await authFetch<unknown>(`/labour/site-rates${qs({ siteId })}`);
+  return z.array(siteWageRateSchema).parse(data);
+}
+
+export interface SiteWageRateInput {
+  siteId: string;
+  effectiveFrom: string;
+  maleRate?: number;
+  femaleRate?: number;
+}
+
+export async function createSiteWageRates(
+  input: SiteWageRateInput,
+): Promise<SiteWageRate[]> {
+  const data = await authFetch<unknown>('/labour/site-rates', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return z.array(siteWageRateSchema).parse(data);
+}
+
+export async function updateSiteWageRate(
+  id: string,
+  dailyRate: number,
+): Promise<SiteWageRate> {
+  const data = await authFetch<unknown>(`/labour/site-rates/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ dailyRate }),
+  });
+  return siteWageRateSchema.parse(data);
+}
+
+const supervisorAssignmentSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  siteIds: z.array(z.string()),
+});
+export type SupervisorAssignment = z.infer<typeof supervisorAssignmentSchema>;
+
+const supervisorAssignmentsSchema = z.object({
+  supervisors: z.array(supervisorAssignmentSchema),
+  sites: z.array(siteOptionSchema),
+});
+export type SupervisorAssignments = z.infer<typeof supervisorAssignmentsSchema>;
+
+export async function getSupervisorSites(): Promise<SupervisorAssignments> {
+  const data = await authFetch<unknown>('/labour/supervisor-sites');
+  return supervisorAssignmentsSchema.parse(data);
+}
+
+export async function setSupervisorSites(
+  userId: string,
+  siteIds: string[],
+): Promise<SupervisorAssignment> {
+  const data = await authFetch<unknown>(
+    `/labour/supervisor-sites/${encodeURIComponent(userId)}`,
+    { method: 'PUT', body: JSON.stringify({ siteIds }) },
+  );
+  return supervisorAssignmentSchema.parse(data);
+}
+
+/** The month-end consolidated attendance sheet. Omit `siteId` for every site the caller sees. */
+export async function downloadLabourAttendanceSheet(query: {
+  siteId?: string;
+  year: number;
+  month: number;
+}): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/labour/sheets/attendance${qs({ ...query })}`,
+  );
+  return {
+    blob,
+    filename:
+      filename ??
+      `Labour attendance ${query.year}-${String(query.month).padStart(2, '0')}.xlsx`,
+  };
+}
+
+export async function downloadPaymentSheetXlsx(
+  id: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(`/labour/sheets/payment/${id}`);
+  return { blob, filename: filename ?? 'Labour payment sheet.xlsx' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Muster attendance from punch times (034)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const LABOUR_DAY_STATUSES = [
+  'full_day',
+  'half_day',
+  'short',
+  'on_site',
+  'unresolved',
+  'absent',
+] as const;
+export type LabourDayStatus = (typeof LABOUR_DAY_STATUSES)[number];
+export type LabourDayFlag = 'missing_punch_out' | 'missing_punch_in' | 'out_before_in';
+
+const punchFactSchema = z.object({
+  at: z.string(),
+  source: z.enum(['face', 'correction']),
+  corrected: z.boolean(),
+  recordedBy: z.string().nullable(),
+  outsideFence: z.boolean(),
+});
+export type PunchFact = z.infer<typeof punchFactSchema>;
+
+const musterDaySchema = z.object({
+  date: z.string(),
+  punchIn: punchFactSchema.nullable(),
+  punchOut: punchFactSchema.nullable(),
+  hours: z.number().nullable(),
+  status: z.enum(LABOUR_DAY_STATUSES),
+  overtimeHours: z.number(),
+  flag: z.enum(['missing_punch_out', 'missing_punch_in', 'out_before_in']).nullable(),
+  manual: z.boolean(),
+});
+export type MusterDay = z.infer<typeof musterDaySchema>;
+
+const musterWorkerRefSchema = z.object({
+  workerId: z.string(),
+  labourCode: z.string(),
+  fullName: z.string(),
+  fatherName: z.string().nullable(),
+  gender: z.string().nullable(),
+  contractorName: z.string().nullable(),
+  gangName: z.string().nullable(),
+  siteId: z.string(),
+  siteName: z.string(),
+});
+
+const musterDailyRowSchema = musterWorkerRefSchema.merge(musterDaySchema);
+export type MusterDailyRow = z.infer<typeof musterDailyRowSchema>;
+
+const musterDailySchema = z.object({
+  date: z.string(),
+  today: z.string(),
+  summary: z.object({
+    workers: z.number(),
+    present: z.number(),
+    fullDay: z.number(),
+    halfDay: z.number(),
+    short: z.number(),
+    onSite: z.number(),
+    absent: z.number(),
+    missingPunchOut: z.number(),
+    otherFlags: z.number(),
+    overtimeHours: z.number(),
+  }),
+  items: z.array(musterDailyRowSchema),
+});
+export type MusterDaily = z.infer<typeof musterDailySchema>;
+
+export type MusterFilter =
+  | 'missing_punch_out'
+  | 'flagged'
+  | 'present'
+  | 'absent'
+  | 'on_site'
+  | 'short';
+
+export async function getMusterDaily(query: {
+  date?: string;
+  siteId?: string;
+  filter?: MusterFilter;
+}): Promise<MusterDaily> {
+  const data = await authFetch<unknown>(
+    `/labour/muster-attendance/daily${qs({ ...query })}`,
+  );
+  return musterDailySchema.parse(data);
+}
+
+const musterMonthRowSchema = musterWorkerRefSchema.extend({
+  days: z.record(z.string(), musterDaySchema),
+  totals: z.object({
+    fullDays: z.number(),
+    halfDays: z.number(),
+    shortDays: z.number(),
+    unresolved: z.number(),
+    payableDays: z.number(),
+    hours: z.number(),
+    overtimeHours: z.number(),
+  }),
+});
+export type MusterMonthRow = z.infer<typeof musterMonthRowSchema>;
+
+const musterMonthlySchema = z.object({
+  year: z.number(),
+  month: z.number(),
+  daysInMonth: z.number(),
+  today: z.string(),
+  summary: z.object({
+    workers: z.number(),
+    unresolved: z.number(),
+    payableDays: z.number(),
+    overtimeHours: z.number(),
+  }),
+  items: z.array(musterMonthRowSchema),
+});
+export type MusterMonthly = z.infer<typeof musterMonthlySchema>;
+
+export async function getMusterMonthly(query: {
+  year: number;
+  month: number;
+  siteId?: string;
+}): Promise<MusterMonthly> {
+  const data = await authFetch<unknown>(
+    `/labour/muster-attendance/monthly${qs({ ...query })}`,
+  );
+  return musterMonthlySchema.parse(data);
+}
+
+export interface PunchCorrectionInput {
+  workerId: string;
+  date: string;
+  /** HH:mm, 24-hour. */
+  punchIn?: string;
+  punchOut?: string;
+  reason: string;
+}
+
+export async function correctLabourPunch(
+  input: PunchCorrectionInput,
+): Promise<MusterDailyRow> {
+  const data = await authFetch<unknown>('/labour/muster-attendance/corrections', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return musterDailyRowSchema.parse(data);
+}
+
+const punchCorrectionSchema = z.object({
+  id: z.string(),
+  type: z.enum(['in', 'out']),
+  oldPunchedAt: z.string().nullable(),
+  newPunchedAt: z.string(),
+  reason: z.string(),
+  correctedBy: z.string().nullable(),
+  correctedAt: z.string(),
+});
+export type PunchCorrection = z.infer<typeof punchCorrectionSchema>;
+
+export async function getPunchCorrections(
+  workerId: string,
+  date: string,
+): Promise<PunchCorrection[]> {
+  const data = await authFetch<unknown>(
+    `/labour/muster-attendance/corrections${qs({ workerId, date })}`,
+  );
+  return z.array(punchCorrectionSchema).parse(data);
+}
+
+const labourDayRulesSchema = z.object({
+  fullDayHours: z.number(),
+  halfDayHours: z.number(),
+  standardHours: z.number(),
+});
+export type LabourDayRules = z.infer<typeof labourDayRulesSchema>;
+
+export async function getLabourDayRules(companyId?: string): Promise<LabourDayRules> {
+  const data = await authFetch<unknown>(
+    `/labour/muster-attendance/rules${qs({ companyId })}`,
+  );
+  return labourDayRulesSchema.parse(data);
+}
+
+export async function setLabourDayRules(
+  rules: LabourDayRules,
+  companyId?: string,
+): Promise<LabourDayRules & { recounted: number }> {
+  const data = await authFetch<unknown>(
+    `/labour/muster-attendance/rules${qs({ companyId })}`,
+    { method: 'PUT', body: JSON.stringify(rules) },
+  );
+  return labourDayRulesSchema.extend({ recounted: z.number() }).parse(data);
+}
+
+const sitePhotoSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  date: z.string(),
+  note: z.string().nullable(),
+  takenBy: z.string().nullable(),
+  takenAt: z.string(),
+});
+export type SitePhoto = z.infer<typeof sitePhotoSchema>;
+
+/** A group photo for reference only — it marks nobody's attendance. */
+export async function addSitePhoto(input: {
+  siteId: string;
+  photo: string;
+  note?: string;
+  latitude?: number;
+  longitude?: number;
+}): Promise<SitePhoto> {
+  const data = await authFetch<unknown>('/labour/muster-attendance/site-photos', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return sitePhotoSchema.parse(data);
+}
+
+export async function getSitePhotos(siteId: string, date?: string): Promise<SitePhoto[]> {
+  const data = await authFetch<unknown>(
+    `/labour/muster-attendance/site-photos${qs({ siteId, date })}`,
+  );
+  return z.array(sitePhotoSchema).parse(data);
+}
+
+export async function getSitePhotoImage(id: string): Promise<Blob> {
+  const { blob } = await authFetchFile(
+    `/labour/muster-attendance/site-photos/${id}/image`,
+  );
+  return blob;
 }

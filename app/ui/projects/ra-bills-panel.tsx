@@ -46,6 +46,13 @@ import {
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import {
+  filterByNoc,
+  NocFilterField,
+  NocStatusBadge,
+  useNocStatuses,
+  type NocFilter,
+} from '@/app/ui/nocs/noc-status';
 
 const TABS = ['award', 'bills', 'retention', 'settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -97,6 +104,12 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
     queryKey: ['workOrders', projectId],
     queryFn: () => getWorkOrders(projectId),
   });
+  // Open until the NOC after the work order is uploaded, then closed (2026-10-17).
+  const [nocFilter, setNocFilter] = useState<NocFilter>('');
+  const nocStatuses = useNocStatuses(
+    'work_order',
+    (orders.data ?? []).map((o) => o.id),
+  );
   const bills = useQuery({
     queryKey: ['raBills', projectId],
     queryFn: () => getRaBills(projectId),
@@ -222,8 +235,21 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
             <p className="text-sm text-gray-600">{WORK_ORDER_COPY.empty}</p>
           )}
 
+          {(orders.data?.length ?? 0) > 0 && (
+            <NocFilterField
+              id="wo-noc-filter"
+              value={nocFilter}
+              onChange={setNocFilter}
+            />
+          )}
+
           <ul className="space-y-2">
-            {(orders.data ?? []).map((order) => (
+            {filterByNoc(
+              orders.data ?? [],
+              nocFilter,
+              nocStatuses,
+              (o) => o.id,
+            ).map((order) => (
               <li key={order.id}>
                 <button
                   type="button"
@@ -244,8 +270,14 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   <span className="mt-0.5 line-clamp-2 block text-gray-700">
                     {order.workDetail}
                   </span>
-                  <span className="mt-0.5 block text-xs text-gray-500">
-                    {vendorName(order.partnerId)}
+                  <span className="mt-0.5 flex items-center justify-between gap-2 text-xs text-gray-500">
+                    <span className="truncate">
+                      {vendorName(order.partnerId)}
+                    </span>
+                    <NocStatusBadge
+                      status={nocStatuses?.get(order.id)}
+                      labelled
+                    />
                   </span>
                 </button>
               </li>
@@ -278,6 +310,10 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                     {chosen.code ?? WORK_ORDER_COPY.unnumbered}
                   </h2>
                   <StatusBadge status={chosen.status} />
+                  <NocStatusBadge
+                    status={nocStatuses?.get(chosen.id)}
+                    labelled
+                  />
                 </div>
                 <p className="text-sm text-gray-900">{chosen.workDetail}</p>
                 <p className="text-sm text-gray-600">

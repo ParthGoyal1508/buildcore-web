@@ -286,12 +286,15 @@ export function LetterTable({
   isLoading,
   emptyMessage,
   extraActions,
+  statusExtra,
 }: {
   letters: IssuedLetter[];
   isLoading: boolean;
   emptyMessage: string;
   /** More actions for an issued letter's row — a purchase order's NOC (2026-10-15). */
   extraActions?: (letter: IssuedLetter) => React.ReactNode;
+  /** Shown under an issued letter's status — a purchase order's NOC open/closed (2026-10-17). */
+  statusExtra?: (letter: IssuedLetter) => React.ReactNode;
 }) {
   const refresh = useRefreshLetters();
   const [error, setError] = useState<string | null>(null);
@@ -421,6 +424,9 @@ export function LetterTable({
                     </td>
                     <td className={clsx(TABLE.td, 'align-top')}>
                       <StatusBadge status={letter.status} />
+                      {statusExtra && letter.status !== 'composed' && (
+                        <div className="mt-1">{statusExtra(letter)}</div>
+                      )}
                       {awaiting && approval && (
                         <div className="mt-2 max-w-md">
                           <ActionReview

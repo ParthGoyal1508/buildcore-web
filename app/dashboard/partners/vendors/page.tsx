@@ -26,6 +26,7 @@ import VendorModal from '@/app/ui/partners/vendor-modal';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
+import { NocStatusBadge, useNocStatuses } from '@/app/ui/nocs/noc-status';
 
 const PAGE_SIZE = 25;
 
@@ -55,6 +56,11 @@ export default function VendorsPage() {
     queryKey: ['partners', 'vendors', params],
     queryFn: () => getVendors(params),
   });
+  // Open until the vendor's NOC is uploaded, then closed (2026-10-17).
+  const nocStatuses = useNocStatuses(
+    'vendor',
+    (data?.items ?? []).map((row) => row.id),
+  );
 
   const { data: categories } = useQuery({
     queryKey: ['partners', 'vendor-categories'],
@@ -150,6 +156,12 @@ export default function VendorsPage() {
       render: (row) => (
         <StatusBadge status={row.active ? 'active' : 'closed'} />
       ),
+    },
+    {
+      key: 'noc',
+      header: 'NOC',
+      sortValue: (row) => nocStatuses?.get(row.id)?.status ?? '',
+      render: (row) => <NocStatusBadge status={nocStatuses?.get(row.id)} />,
     },
   ];
 

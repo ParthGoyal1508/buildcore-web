@@ -27,6 +27,10 @@ import { formatRupees } from '@/app/lib/utils';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import DocumentModal from '@/app/ui/plant/document-modal';
 import {
+  EquipmentDisposalPanel,
+  EquipmentHistoryPanel,
+} from '@/app/ui/plant/equipment-disposal-panel';
+import {
   FormError,
   RowAction,
   SecondaryButton,
@@ -306,6 +310,8 @@ export default function EquipmentDetailPage() {
       <FormError message={error} />
       {viewer}
 
+      <EquipmentDisposalPanel equipment={data} />
+
       <section className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Overview</h2>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -481,6 +487,8 @@ export default function EquipmentDetailPage() {
       {showUpload && (
         <DocumentModal equipmentId={id} onClose={() => setShowUpload(false)} />
       )}
+
+      <EquipmentHistoryPanel equipmentId={id} />
     </div>
   );
 }

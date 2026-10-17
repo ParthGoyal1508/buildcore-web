@@ -108,7 +108,14 @@ export default function TransfersPage() {
           '—'
         ),
     },
-    { key: 'date', header: 'Date', render: (row) => row.date.slice(0, 10) },
+    {
+      key: 'date',
+      header: 'Date',
+      // Kept on one line: a narrow column broke the date at its hyphen.
+      render: (row) => (
+        <span className="whitespace-nowrap">{row.date.slice(0, 10)}</span>
+      ),
+    },
     { key: 'from', header: 'From', render: (row) => row.fromSiteName },
     { key: 'to', header: 'To', render: (row) => row.toSiteName },
     {
@@ -227,7 +234,9 @@ export default function TransfersPage() {
         error={isError ? MESSAGES.inventoryLoadFailed : undefined}
         emptyMessage={MESSAGES.transfersEmpty}
         actions={(row) => (
-          <div className="flex flex-wrap gap-2">
+          // One line on desktop, right-aligned like every other row: wrapping put an In Transit
+          // row's four actions on two ragged lines. Cards still wrap.
+          <div className="flex flex-wrap justify-end gap-2 md:flex-nowrap">
             {/* Only the transitions the backend will accept. Offering the rest
                 would be offering a 409. */}
             <StoreDocumentDownload

@@ -39,5 +39,15 @@ export const config = {
   // does not cover it, and without this the shell would render to a signed-out
   // visitor before any request failed (spec FR-016, SC-007).
   // `/change-password` needs a session too: without one, its form can only fail.
-  matcher: ['/dashboard/:path*', '/my/:path*', '/login', '/home', '/change-password'],
+  // `/labour/:path*` is the supervisor's field tree (013, 031) — outside `/dashboard` for the same
+  // reason `/my` is, and it was missing here, so a signed-out phone saw the shell and then a
+  // "could not load" instead of the sign-in page. It also sends `no-store` on a screen of photos.
+  matcher: [
+    '/dashboard/:path*',
+    '/my/:path*',
+    '/labour/:path*',
+    '/login',
+    '/home',
+    '/change-password',
+  ],
 };

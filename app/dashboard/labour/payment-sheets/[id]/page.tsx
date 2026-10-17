@@ -9,7 +9,10 @@ import {
   approvePaymentSheet,
   blobToBase64,
   disburseLine,
+  downloadPaymentSheetXlsx,
+  getMyLabourSites,
   getPaymentSheet,
+  getWorkers,
   reopenPaymentSheet,
   reverseLine,
   type PaymentSheet,
@@ -24,6 +27,7 @@ import {
   MESSAGES,
   RATE_SOURCE_LABELS,
 } from '@/app/lib/constants';
+import { saveBlob } from '@/app/lib/download-file';
 import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
@@ -55,9 +59,26 @@ function deductionTotal(l: PaymentSheetLine): number | null {
   return l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0);
 }
 
+type WorkerNames = Map<string, { name: string; code: string }>;
+
 // Keys match the line's own fields, so each column sorts by the raw figure rather than its text.
-const LINE_COLUMNS: Column<PaymentSheetLine>[] = [
-  { key: 'workerId', header: 'Worker', render: (l) => l.workerId },
+const lineColumns = (workers: WorkerNames): Column<PaymentSheetLine>[] => [
+  {
+    key: 'workerId',
+    header: 'Labour',
+    sortValue: (l) => workers.get(l.workerId)?.code ?? l.workerId,
+    render: (l) => {
+      const w = workers.get(l.workerId);
+      return w ? (
+        <>
+          {w.name}
+          <span className="ml-1 text-xs text-gray-400">{w.code}</span>
+        </>
+      ) : (
+        l.workerId
+      );
+    },
+  },
   {
     key: 'daysWorked',
     header: 'Days',
@@ -125,6 +146,35 @@ export default function PaymentSheetDetailPage() {
     queryFn: () => getPaymentSheet(id),
   });
 
+  // Names for the lines. A sheet is one site's labour, so that site's list covers it; a pre-031
+  // project sheet falls back to the first page of everyone.
+  const workers = useQuery({
+    queryKey: ['labour', 'workers', 'for-sheet', sheet.data?.siteId ?? 'all'],
+    queryFn: () =>
+      getWorkers({
+        ...(sheet.data?.siteId ? { siteId: sheet.data.siteId } : {}),
+        pageSize: 200,
+      }),
+    enabled: !!sheet.data,
+  });
+  const workerNames: WorkerNames = new Map(
+    (workers.data?.items ?? []).map((w) => [
+      w.id,
+      { name: w.fullName, code: w.labourCode },
+    ]),
+  );
+  const sites = useQuery({
+    queryKey: ['labour', 'my-sites'],
+    queryFn: getMyLabourSites,
+  });
+  const siteName = sites.data?.find((x) => x.id === sheet.data?.siteId)?.name;
+
+  const download = useMutation({
+    mutationFn: () => downloadPaymentSheetXlsx(id),
+    onSuccess: ({ blob, filename }) => saveBlob(blob, filename),
+    onError: () => setError('Could not download the sheet.'),
+  });
+
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   // 019 FR-017a, FR-017d. Two separate rights, and neither is inferred from the company's
   // hiding setting — see `app/lib/cash-entry.ts`.
@@ -177,7 +227,9 @@ export default function PaymentSheetDetailPage() {
               Payment Sheet — {s.periodFrom} → {s.periodTo}
             </>
           }
-          description={<>{labourLabel(s.engagementType)} engagement</>}
+          description={
+            siteName ?? <>{labourLabel(s.engagementType)} engagement</>
+          }
         />
         <StatusBadge status={s.status} label={labourLabel(s.status)} />
       </div>
@@ -195,6 +247,12 @@ export default function PaymentSheetDetailPage() {
       <FormError message={error} />
 
       <div className="flex flex-wrap gap-2">
+        <SecondaryButton
+          onClick={() => download.mutate()}
+          disabled={download.isPending}
+        >
+          {download.isPending ? 'Excel…' : 'Excel'}
+        </SecondaryButton>
         {s.status === 'draft' && canApprove && (
           <Button onClick={() => approve.mutate()}>Approve</Button>
         )}
@@ -218,7 +276,7 @@ export default function PaymentSheetDetailPage() {
         caption="Payment sheet lines"
         rows={s.lines}
         rowKey={(l) => l.id}
-        columns={LINE_COLUMNS}
+        columns={lineColumns(workerNames)}
         emptyMessage="No workers on this sheet."
         actions={(l) => (
           <>

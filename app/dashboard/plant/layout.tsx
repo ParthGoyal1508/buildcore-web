@@ -36,6 +36,7 @@ const SECTION_PERMISSIONS: { prefix: string; permission: string }[] = [
   { prefix: ROUTES.plantSpareParts, permission: PLANT_PERMISSIONS.spareParts },
   { prefix: ROUTES.plantHireBills, permission: PLANT_PERMISSIONS.hireBills },
   { prefix: ROUTES.plantMasters, permission: PLANT_PERMISSIONS.masters },
+  { prefix: ROUTES.plantDisposals, permission: PLANT_PERMISSIONS.equipment },
 ];
 
 export default function PlantLayout({

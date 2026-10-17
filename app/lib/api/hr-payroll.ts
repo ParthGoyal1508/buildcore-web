@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ApiError } from '@/app/lib/api/client';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import { API_URL } from '@/app/lib/config';
 import { authFetch, authFetchFile, getAccessToken } from '@/app/lib/session';
@@ -1049,12 +1050,42 @@ export async function setPayrollRunStatus(
   id: string,
   status: (typeof PAYROLL_RUN_STATUSES)[number],
 ) {
-  return payrollRunSchema.parse(
-    await authFetch<unknown>(`/hr/payroll/runs/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    }),
-  );
+  // The API answers with the run id and its new status, not the whole run (2026-10-17: parsing it
+  // as a run showed a validation error after every successful Mark as paid).
+  return z
+    .object({ runId: z.string(), status: enumOf(PAYROLL_RUN_STATUSES) })
+    .parse(
+      await authFetch<unknown>(`/hr/payroll/runs/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    );
+}
+
+/**
+ * Puts a processed run into its approval chain (2026-10-17) — for a run processed before
+ * processing did that itself, whose bank sheet is otherwise held for good.
+ */
+export async function submitPayrollRunForApproval(id: string) {
+  return z
+    .object({ runId: z.string(), submitted: z.boolean() })
+    .parse(
+      await authFetch<unknown>(`/hr/payroll/runs/${id}/submit-for-approval`, {
+        method: 'POST',
+      }),
+    );
+}
+
+/** The bank sheet's refusal for a run never submitted for approval: the run to submit, or null. */
+export function unsubmittedRunOf(error: unknown): string | null {
+  if (
+    error instanceof ApiError &&
+    error.code === 'PAYROLL_RUN_NOT_SUBMITTED' &&
+    typeof error.details?.runId === 'string'
+  ) {
+    return error.details.runId;
+  }
+  return null;
 }
 
 /** The bank salary sheet for a run, as a file. */
@@ -1803,6 +1834,11 @@ export const slipDeliverySummarySchema = z.object({
    * them sends somebody retrying what was never attempted.
    */
   notAttempted: z.number(),
+  /**
+   * Whether payslips may be emailed at all — the API's `PAYSLIP_EMAIL_ENABLED`, off since
+   * 2026-10-16. Defaults to on for an API that predates the field, which is what it did then.
+   */
+  emailEnabled: z.boolean().default(true),
   rows: z.array(slipDeliveryRowSchema),
 });
 export type SlipDeliverySummary = z.infer<typeof slipDeliverySummarySchema>;
@@ -2240,4 +2276,115 @@ export async function importLeaveOpening(
         { method: 'POST', body: JSON.stringify({ financialYear, file }) },
       ),
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monthly attendance download and salary bank sheet (2026-10-17)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MonthlyAttendanceQuery {
+  companyId?: string;
+  year: number;
+  month: number;
+  projectId?: string;
+  siteId?: string;
+  departmentId?: string;
+}
+
+/** `Attendance_<Company>_<Month>_<Year>.xlsx` in the client's staff attendance layout. */
+export async function downloadMonthlyAttendance(
+  query: MonthlyAttendanceQuery,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/hr/attendance/monthly-sheet${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? `Attendance_${query.year}_${query.month}.xlsx` };
+}
+
+export interface SalaryBankSheetQuery {
+  companyId?: string;
+  year: number;
+  month: number;
+  debitAccount?: string;
+  /** Comma-separated employee ids to leave off. */
+  exclude?: string;
+}
+
+const bankSheetLeftOffSchema = z.object({
+  employeeId: z.string(),
+  employeeCode: z.string(),
+  name: z.string(),
+  netPay: z.number(),
+  kind: z.enum(['bank_details', 'excluded', 'nothing_to_pay']),
+  reason: z.string(),
+});
+export type BankSheetLeftOff = z.infer<typeof bankSheetLeftOffSchema>;
+
+const bankSheetPreviewSchema = z.object({
+  runId: z.string(),
+  period: z.string(),
+  companyName: z.string(),
+  debitAccount: z.string(),
+  defaultDebitAccount: z.string().nullable(),
+  employeeCount: z.number(),
+  transferTotal: z.number(),
+  payrollNetTotal: z.number(),
+  recoveredTotal: z.number(),
+  leftOffTotal: z.number(),
+  reconciles: z.boolean(),
+  leftOff: z.array(bankSheetLeftOffSchema),
+});
+export type BankSheetPreview = z.infer<typeof bankSheetPreviewSchema>;
+
+export async function getSalaryBankSheetPreview(
+  query: SalaryBankSheetQuery,
+): Promise<BankSheetPreview> {
+  return bankSheetPreviewSchema.parse(
+    await authFetch<unknown>(`/hr/payroll/bank-sheet/preview${qs({ ...query })}`),
+  );
+}
+
+/** `Salary_Bank_Sheet_<Company>_<Month>_<Year>.xlsx` in the bank's upload format. */
+export async function downloadSalaryBankSheet(
+  query: SalaryBankSheetQuery,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/hr/payroll/bank-sheet${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? `Salary_Bank_Sheet_${query.year}_${query.month}.xlsx` };
+}
+
+const bankSheetExportSchema = z.object({
+  id: z.string(),
+  period: z.string(),
+  debitAccount: z.string(),
+  employeeCount: z.number(),
+  transferTotal: z.number(),
+  leftOffCount: z.number(),
+  fileName: z.string(),
+  generatedBy: z.string().nullable(),
+  generatedAt: z.string(),
+});
+export type BankSheetExport = z.infer<typeof bankSheetExportSchema>;
+
+/** Bank sheets generated for a company, newest first (2026-10-17). */
+export async function getBankSheetHistory(query: {
+  companyId?: string;
+  year?: number;
+  month?: number;
+}): Promise<BankSheetExport[]> {
+  const data = await authFetch<unknown>(
+    `/hr/payroll/bank-sheet/history${qs({ ...query })}`,
+  );
+  return z.array(bankSheetExportSchema).parse(data);
+}
+
+/** The exact file a history entry gave the bank. */
+export async function downloadBankSheetHistoryFile(
+  entry: BankSheetExport,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/hr/payroll/bank-sheet/history/${entry.id}/file`,
+  );
+  return { blob, filename: filename ?? entry.fileName };
 }

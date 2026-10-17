@@ -1,21 +1,21 @@
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError } from "@/app/lib/api/client";
 import {
   getSlipDeliveries,
   retrySlipDeliveries,
   sendSlipDeliveries,
   type SlipDeliveryRow,
   type SlipDeliveryStatus,
-} from '@/app/lib/api/hr-payroll';
-import { SLIP_DELIVERY_COPY } from '@/app/lib/constants';
-import { dateTimeLabel } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
-import DataTable, { type Column } from '@/app/ui/hr/data-table';
-import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
+} from "@/app/lib/api/hr-payroll";
+import { SLIP_DELIVERY_COPY } from "@/app/lib/constants";
+import { dateTimeLabel } from "@/app/lib/format";
+import { Button } from "@/app/ui/button";
+import DataTable, { type Column } from "@/app/ui/hr/data-table";
+import { FormError, SecondaryButton } from "@/app/ui/settings/form-fields";
 
 /**
  * Who has been emailed their payslip, and what to do about the ones who have not
@@ -47,13 +47,13 @@ export default function SlipDelivery({ runId }: { runId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const deliveries = useQuery({
-    queryKey: ['hr', 'slipDeliveries', runId],
+    queryKey: ["hr", "slipDeliveries", runId],
     queryFn: () => getSlipDeliveries(runId),
   });
 
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: ['hr', 'slipDeliveries', runId],
+      queryKey: ["hr", "slipDeliveries", runId],
     });
 
   const send = useMutation({
@@ -100,6 +100,20 @@ export default function SlipDelivery({ runId }: { runId: string }) {
   const summary = deliveries.data;
   const busy = send.isPending || retry.isPending;
 
+  // Emailing payslips is switched off (2026-10-16). With nothing ever sent for this run there is no
+  // record to show, so the tab says so and where payslips are instead; a run emailed before the
+  // switch keeps its record below, without the send controls.
+  if (
+    !summary.emailEnabled &&
+    summary.sent + summary.failed + summary.undeliverable === 0
+  ) {
+    return (
+      <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+        {SLIP_DELIVERY_COPY.turnedOff}
+      </p>
+    );
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -111,38 +125,40 @@ export default function SlipDelivery({ runId }: { runId: string }) {
             {SLIP_DELIVERY_COPY.hint}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setError(null);
-              send.mutate();
-            }}
-          >
-            {summary.sent > 0
-              ? SLIP_DELIVERY_COPY.sendRemaining(summary.notAttempted)
-              : SLIP_DELIVERY_COPY.send}
-          </Button>
-          {/*
-            Absent when nothing failed, rather than disabled. A greyed "Retry 0 failures" is a
-            control inviting a question, and the answer is that there is nothing to retry.
-          */}
-          {summary.failed > 0 && (
-            <SecondaryButton
+        {summary.emailEnabled && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
               type="button"
               disabled={busy}
               onClick={() => {
                 setError(null);
-                retry.mutate();
+                send.mutate();
               }}
             >
-              {/* Names the count, because the difference between this and Send is twelve emails
+              {summary.sent > 0
+                ? SLIP_DELIVERY_COPY.sendRemaining(summary.notAttempted)
+                : SLIP_DELIVERY_COPY.send}
+            </Button>
+            {/*
+            Absent when nothing failed, rather than disabled. A greyed "Retry 0 failures" is a
+            control inviting a question, and the answer is that there is nothing to retry.
+          */}
+            {summary.failed > 0 && (
+              <SecondaryButton
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setError(null);
+                  retry.mutate();
+                }}
+              >
+                {/* Names the count, because the difference between this and Send is twelve emails
                   or five hundred. */}
-              {SLIP_DELIVERY_COPY.retry(summary.failed)}
-            </SecondaryButton>
-          )}
-        </div>
+                {SLIP_DELIVERY_COPY.retry(summary.failed)}
+              </SecondaryButton>
+            )}
+          </div>
+        )}
       </div>
 
       <FormError message={error} />
@@ -161,12 +177,12 @@ export default function SlipDelivery({ runId }: { runId: string }) {
         <Tally
           label={SLIP_DELIVERY_COPY.tally.failed}
           value={summary.failed}
-          tone={summary.failed > 0 ? 'warn' : 'quiet'}
+          tone={summary.failed > 0 ? "warn" : "quiet"}
         />
         <Tally
           label={SLIP_DELIVERY_COPY.tally.undeliverable}
           value={summary.undeliverable}
-          tone={summary.undeliverable > 0 ? 'warn' : 'quiet'}
+          tone={summary.undeliverable > 0 ? "warn" : "quiet"}
         />
         <Tally
           label={SLIP_DELIVERY_COPY.tally.notAttempted}
@@ -201,7 +217,7 @@ export default function SlipDelivery({ runId }: { runId: string }) {
 
 const DELIVERY_COLUMNS: Column<SlipDeliveryRow>[] = [
   {
-    key: 'employee',
+    key: "employee",
     header: SLIP_DELIVERY_COPY.columns.employee,
     sortValue: (row) => row.employeeName || row.employeeCode,
     render: (row) => (
@@ -216,26 +232,26 @@ const DELIVERY_COLUMNS: Column<SlipDeliveryRow>[] = [
   {
     // The address as sent. See the schema's comment: showing the current one would make an old
     // failure read as though it went to the corrected address.
-    key: 'address',
+    key: "address",
     header: SLIP_DELIVERY_COPY.columns.address,
-    className: 'break-all text-gray-700',
-    render: (row) => row.address || '—',
+    className: "break-all text-gray-700",
+    render: (row) => row.address || "—",
   },
   {
-    key: 'status',
+    key: "status",
     header: SLIP_DELIVERY_COPY.columns.status,
     render: (row) => <StatusPill status={row.status} />,
   },
   {
-    key: 'detail',
+    key: "detail",
     header: SLIP_DELIVERY_COPY.columns.detail,
-    className: 'text-xs text-gray-600',
+    className: "text-xs text-gray-600",
     sortValue: (row) =>
-      row.status === 'sent' ? row.sentAt : row.failureReason,
+      row.status === "sent" ? row.sentAt : row.failureReason,
     render: (row) =>
-      row.status === 'sent'
+      row.status === "sent"
         ? dateTimeLabel(row.sentAt)
-        : row.failureReason || '—',
+        : row.failureReason || "—",
   },
 ];
 
@@ -246,12 +262,12 @@ function Tally({
 }: {
   label: string;
   value: number;
-  tone: 'good' | 'warn' | 'quiet';
+  tone: "good" | "warn" | "quiet";
 }) {
   const tones = {
-    good: 'border-green-200 bg-green-50/60 text-green-900',
-    warn: 'border-amber-200 bg-amber-50/60 text-amber-900',
-    quiet: 'border-gray-200 bg-gray-50 text-gray-800',
+    good: "border-green-200 bg-green-50/60 text-green-900",
+    warn: "border-amber-200 bg-amber-50/60 text-amber-900",
+    quiet: "border-gray-200 bg-gray-50 text-gray-800",
   } as const;
   return (
     <div className={`rounded-lg border p-3 ${tones[tone]}`}>
@@ -263,11 +279,11 @@ function Tally({
 
 function StatusPill({ status }: { status: SlipDeliveryStatus }) {
   const tones: Record<SlipDeliveryStatus, string> = {
-    sent: 'bg-green-100 text-green-900',
-    failed: 'bg-amber-100 text-amber-900',
+    sent: "bg-green-100 text-green-900",
+    failed: "bg-amber-100 text-amber-900",
     // Distinct from `failed`, visually as well as in words: these need a person, not a button.
-    undeliverable: 'bg-red-100 text-red-900',
-    pending: 'bg-gray-100 text-gray-700',
+    undeliverable: "bg-red-100 text-red-900",
+    pending: "bg-gray-100 text-gray-700",
   };
   return (
     <span
