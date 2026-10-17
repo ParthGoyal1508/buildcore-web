@@ -2,20 +2,21 @@
 
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   downloadDailyIssueRegister,
   type StoreDocumentFormat,
 } from '@/app/lib/api/inventory';
 import { saveBlob } from '@/app/lib/download-file';
+import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
 import {
   FieldLabelSpacer,
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { useSites } from './use-inventory-refs';
+import { searchSites } from './inventory-search';
 import { todayIso } from '@/app/lib/format';
 
 const today = () => todayIso();
@@ -28,14 +29,20 @@ const today = () => todayIso();
  * Its own store and dates rather than the list's filters: the register is a document for one
  * store's day, while the list above is usually read across every store. The store starts as the
  * list's, when one is chosen, and the dates as today — the register's everyday use.
+ *
+ * 036 M5 (2026-10-17): the store is a server search, not one page of 200 stores.
  */
 export default function DailyRegisterDownload({
   defaultSiteId,
+  defaultSiteLabel,
 }: {
   defaultSiteId?: string;
+  /** The list's store name, so the picker can show it before anything is searched. */
+  defaultSiteLabel?: string;
 }) {
-  const sites = useSites();
+  const companyId = useSelectedCompanyId();
   const [siteChoice, setSiteChoice] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<SearchableOption | null>(null);
   const [dateFrom, setDateFrom] = useState(today());
   const [dateTo, setDateTo] = useState(today());
   const [busy, setBusy] = useState<StoreDocumentFormat | null>(null);
@@ -56,11 +63,7 @@ export default function DailyRegisterDownload({
       );
       saveBlob(blob, filename ?? `Daily Issue Register ${dateFrom}.${format}`);
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not produce the Daily Issue Register.',
-      );
+      setError(errorMessage(err, 'Could not produce the Daily Issue Register.'));
     } finally {
       setBusy(null);
     }
@@ -76,19 +79,28 @@ export default function DailyRegisterDownload({
         </p>
       </div>
       <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]">
-        <SelectField
-          id="register-site"
-          label="Store"
-          value={siteId}
-          onChange={(event) => setSiteChoice(event.target.value)}
-        >
-          <option value="">Select…</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="register-site" className="font-medium text-gray-700">
+            Store <span className="text-red-600">*</span>
+          </label>
+          <AsyncSelect
+            id="register-site"
+            value={siteId}
+            onChange={(id, option) => {
+              setSiteChoice(id);
+              setChosen(option);
+            }}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={
+              chosen ??
+              (defaultSiteId && defaultSiteLabel
+                ? { id: defaultSiteId, label: defaultSiteLabel }
+                : null)
+            }
+            placeholder="Search stores"
+          />
+        </div>
         <TextField
           id="register-from"
           label="From"
@@ -118,11 +130,12 @@ export default function DailyRegisterDownload({
               <SecondaryButton
                 key={format}
                 type="button"
-                disabled={!ready || busy !== null}
+                disabled={!ready || (busy !== null && busy !== format)}
+                loading={busy === format}
                 title={!siteId ? 'Choose a store first.' : undefined}
                 onClick={() => void get(format)}
               >
-                {busy === format ? 'Producing…' : label}
+                {label}
               </SecondaryButton>
             ))}
           </div>
