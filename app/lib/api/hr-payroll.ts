@@ -364,6 +364,19 @@ export async function transferEmployee(id: string, input: TransferInput) {
 // Employee documents (US2)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** An upload a later one replaced, kept rather than deleted (036 F15). */
+const employeeDocumentVersionSchema = z.object({
+  id: z.string(),
+  documentNumber: z.string().nullable(),
+  expiresAt: nullableIsoDate,
+  fileName: z.string().nullable().optional(),
+  mimeType: z.string().nullable().optional(),
+  sizeBytes: z.number().nullable().optional(),
+  uploadedAt: z.string(),
+  replacedAt: z.string(),
+});
+export type EmployeeDocumentVersion = z.infer<typeof employeeDocumentVersionSchema>;
+
 export const employeeDocumentSchema = z.object({
   id: z.string(),
   documentTypeId: z.string(),
@@ -372,6 +385,11 @@ export const employeeDocumentSchema = z.object({
   expiresAt: nullableIsoDate,
   uploadedAt: isoDate.optional(),
   contentType: z.string().nullable().optional(),
+  // 036 F15: what the file is, and what it replaced. Null for documents filed before 036.
+  fileName: z.string().nullable().optional(),
+  mimeType: z.string().nullable().optional(),
+  sizeBytes: z.number().nullable().optional(),
+  previousVersions: z.array(employeeDocumentVersionSchema).optional(),
 });
 
 const documentsResponseSchema = z.union([
@@ -381,23 +399,48 @@ const documentsResponseSchema = z.union([
     mandatoryTotal: z.number().optional(),
     mandatoryUploaded: z.number().optional(),
   }),
+  // What the API actually sends (005 US2): `documents`, not `items`. The two shapes above never
+  // matched it, so the tab failed to parse its own response.
+  z.object({
+    documents: z.array(employeeDocumentSchema),
+    mandatoryTotal: z.number().optional(),
+    mandatoryHeld: z.number().optional(),
+  }),
 ]);
 
 export type EmployeeDocument = z.infer<typeof employeeDocumentSchema>;
 
-/** Normalises both shapes the backend may return into one the UI can rely on. */
+/** Normalises the shapes the backend may return into one the UI can rely on. */
 export async function listEmployeeDocuments(employeeId: string) {
   const parsed = documentsResponseSchema.parse(
     await authFetch<unknown>(`/hr/employees/${employeeId}/documents`),
   );
-  return Array.isArray(parsed) ? { items: parsed } : parsed;
+  if (Array.isArray(parsed)) return { items: parsed };
+  return 'documents' in parsed ? { items: parsed.documents } : parsed;
+}
+
+/**
+ * An uploaded document's file (036 F15) — the current one, or with `versionId` one it replaced.
+ * There was no way to open an uploaded document before this.
+ */
+export async function getEmployeeDocumentFile(
+  employeeId: string,
+  documentId: string,
+  versionId?: string,
+) {
+  return authFetchFile(
+    `/hr/employees/${employeeId}/documents/${documentId}/file${qs({ versionId })}`,
+  );
 }
 
 export interface UploadDocumentInput {
   documentTypeId: string;
   /** base64 payload, matching the backend's `file` field. */
   file: string;
-  contentType: string;
+  /** Ignored by the server since 036 F15 (it detects the type); still sent for older servers. */
+  contentType?: string;
+  /** The picked file's name, kept for the download (036 F15). */
+  fileName?: string;
   documentNumber?: string;
   expiresAt?: string;
 }
