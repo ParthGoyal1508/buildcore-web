@@ -429,10 +429,11 @@ function DailyView({
       header: 'Flag',
       render: (r) =>
         r.flag ? (
-          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900">
-            <ExclamationTriangleIcon className="w-4" aria-hidden="true" />
-            {LABOUR_DAY_FLAG_LABELS[r.flag]}
-          </span>
+          <StatusBadge
+            tone="warning"
+            label={LABOUR_DAY_FLAG_LABELS[r.flag]}
+            icon={ExclamationTriangleIcon}
+          />
         ) : (
           <span className="text-sm text-gray-400">—</span>
         ),
@@ -595,11 +596,12 @@ function MonthlyView({
         {data.summary.workers} labour · {data.summary.payableDays} payable days ·{' '}
         {data.summary.overtimeHours} h overtime
         {data.summary.unresolved > 0 && (
-          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-            <ExclamationTriangleIcon className="w-4" aria-hidden="true" />
-            {data.summary.unresolved} unresolved day{data.summary.unresolved === 1 ? '' : 's'} —
-            not counted until corrected
-          </span>
+          <StatusBadge
+            tone="warning"
+            label={`${data.summary.unresolved} unresolved day${data.summary.unresolved === 1 ? '' : 's'} — not counted until corrected`}
+            icon={ExclamationTriangleIcon}
+            className="ml-2 !whitespace-normal"
+          />
         )}
       </p>
       <p className="text-xs text-gray-500">

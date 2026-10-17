@@ -27,6 +27,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { useToast } from '@/app/ui/toast';
+import StatusBadge from '@/app/ui/status-badge';
 
 /** Warn this many days before an expiry, so there is time to act on it. */
 const EXPIRY_WARNING_DAYS = 30;
@@ -130,12 +131,12 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
           <span className="inline-flex items-center gap-1.5">
             {dateLabel(expiresAt)}
             {warn && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
-                role="status"
-              >
-                <ExclamationTriangleIcon className="w-3.5" aria-hidden="true" />
-                {HR_MESSAGES.documentExpiringSoon(days)}
+              <span role="status">
+                <StatusBadge
+                  tone="warning"
+                  label={HR_MESSAGES.documentExpiringSoon(days)}
+                  icon={ExclamationTriangleIcon}
+                />
               </span>
             )}
           </span>

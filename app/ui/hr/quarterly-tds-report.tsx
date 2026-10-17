@@ -8,6 +8,7 @@ import { HR_MESSAGES, MESSAGES } from '@/app/lib/constants';
 import { financialYearOf, money, rupees } from '@/app/lib/format';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import StatusBadge from '@/app/ui/status-badge';
 
 type Row = Awaited<ReturnType<typeof getQuarterlyTds>>['rows'][number];
 
@@ -46,9 +47,7 @@ export default function QuarterlyTdsReport() {
         row.pan ? (
           <span className="font-mono">{row.pan}</span>
         ) : (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-            Missing
-          </span>
+          <StatusBadge tone="danger" label={'Missing'} />
         ),
     },
     {

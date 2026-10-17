@@ -225,11 +225,11 @@ export default function AssetRegisterPage() {
       render: (row) => {
         const alerts = row.alertDocumentTypes;
         return alerts.length > 0 ? (
-          <span
-            className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-            title={alerts.join(', ')}
-          >
-            {alerts.join(', ')}
+          <span title={alerts.join(', ')}>
+            <StatusBadge
+              tone="warning"
+              label={alerts.join(', ')}
+            />
           </span>
         ) : (
           <span className="text-sm text-gray-400">—</span>

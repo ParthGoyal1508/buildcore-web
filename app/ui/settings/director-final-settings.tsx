@@ -19,6 +19,7 @@ import { dateTimeLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * The action type whose gate cannot be moved.
@@ -302,14 +303,10 @@ function DirectorFinalRow({
           {DIRECTOR_FINAL_MESSAGES.stateLabels[entry.state]}
         </span>
         {moved && (
-          <span className="whitespace-nowrap rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-900">
-            {DIRECTOR_FINAL_MESSAGES.proposed}:{' '}
-            {
-              DIRECTOR_FINAL_MESSAGES.stateLabels[
-                edited ? 'final' : 'not_final_by_decision'
-              ]
-            }
-          </span>
+          <StatusBadge
+            tone="info"
+            label={`${DIRECTOR_FINAL_MESSAGES.proposed}: ${DIRECTOR_FINAL_MESSAGES.stateLabels[edited ? 'final' : 'not_final_by_decision']}`}
+          />
         )}
         {/* Hidden rather than disabled for a reader who may not change the set, and absent
             entirely on the one entry whose gate cannot move. */}

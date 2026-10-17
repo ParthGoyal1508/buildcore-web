@@ -2,8 +2,9 @@
 
 import clsx from 'clsx';
 
-import { STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
+import { HR_STATUS_TONES, hrLabel } from '@/app/lib/constants';
 import QueryError from '@/app/ui/query-error';
+import SharedStatusBadge from '@/app/ui/status-badge';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import {
   SortHeader,
@@ -218,15 +219,14 @@ export default function DataTable<T>({
  * background colours.
  */
 export function StatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <span className="text-gray-400">—</span>;
+  // The shared badge since 036 A21, with HR's own tone per status and HR's own wording — the same
+  // shape, dot and ring as every other status in the app instead of a flatter copy of them.
+  if (!status) return <span className="text-gray-500">—</span>;
   return (
-    <span
-      className={clsx(
-        'inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium',
-        STATUS_BADGE_CLASSES[status] ?? 'bg-gray-100 text-gray-700',
-      )}
-    >
-      {hrLabel(status)}
-    </span>
+    <SharedStatusBadge
+      status={status}
+      tone={HR_STATUS_TONES[status] ?? 'neutral'}
+      label={hrLabel(status)}
+    />
   );
 }

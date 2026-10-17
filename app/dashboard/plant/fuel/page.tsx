@@ -41,6 +41,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { useToast } from '@/app/ui/toast';
+import StatusBadge from '@/app/ui/status-badge';
 
 const litres = (value: number) => `${quantity3(value)} litres`;
 
@@ -157,9 +158,7 @@ export default function FuelPage() {
         <span className="flex items-center gap-2">
           <span>{formatVariance(row.variancePercent)}</span>
           {row.varianceAlert && (
-            <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
-              Over
-            </span>
+            <StatusBadge tone="warning" label={'Over'} />
           )}
         </span>
       ),

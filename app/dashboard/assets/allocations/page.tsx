@@ -269,9 +269,11 @@ export default function AllocationsPage() {
                   {group.allocations.length} asset(s)
                 </span>
                 {group.overdueCount > 0 && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-                    {group.overdueCount} overdue
-                  </span>
+                  <StatusBadge
+                    tone="danger"
+                    label={`${group.overdueCount} overdue`}
+                    className="ml-2"
+                  />
                 )}
               </h2>
               <ul className="mt-3 divide-y divide-gray-100">

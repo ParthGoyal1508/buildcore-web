@@ -39,6 +39,7 @@ import { FormError, SelectField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 import { clockTime } from '@/app/lib/format';
 import { SecondaryButton } from '@/app/ui/button';
+import StatusBadge from '@/app/ui/status-badge';
 
 /** The last site picked on this phone, so a supervisor with several opens where they left off. */
 const SITE_STORAGE_KEY = 'buildcore.labour.attendanceSite';
@@ -477,9 +478,7 @@ function LabourRow({
         )}
       </div>
       {!worker.faceEnrolled ? (
-        <span className="flex-none rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-          No face photos
-        </span>
+        <StatusBadge tone="warning" label={'No face photos'} className="flex-none" />
       ) : next ? (
         <button
           type="button"

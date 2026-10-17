@@ -14,6 +14,7 @@ import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import type { z } from 'zod';
 import { monthName } from '@/app/lib/format';
+import StatusBadge from '@/app/ui/status-badge';
 
 type LateRow = z.infer<typeof lateComingRowSchema>;
 
@@ -102,9 +103,7 @@ export default function LateComingReport() {
       header: 'Repeat',
       render: (row) =>
         row.repeatLateComer ? (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-            Repeat late-comer
-          </span>
+          <StatusBadge tone="danger" label={'Repeat late-comer'} />
         ) : (
           <span className="text-gray-400">—</span>
         ),

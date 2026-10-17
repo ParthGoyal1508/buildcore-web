@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReportType } from '@/app/lib/api/dashboard';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * The report-type picker (spec FR-012). Available types are selectable; unavailable
@@ -34,9 +35,7 @@ export default function ReportTypeList({
             >
               <span className="font-medium text-gray-900">{type.name}</span>
               {!type.isAvailable && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                  Coming soon
-                </span>
+                <StatusBadge tone="neutral" label={'Coming soon'} />
               )}
             </button>
           </li>

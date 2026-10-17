@@ -166,13 +166,9 @@ export default function EquipmentDetailPage() {
       // read as orange rather than red: neither is a failure, both are a task.
       render: (row) =>
         row.expired ? (
-          <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-            Expired
-          </span>
+          <StatusBadge tone="danger" label={'Expired'} />
         ) : row.expiring ? (
-          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
-            Expiring soon
-          </span>
+          <StatusBadge tone="warning" label={'Expiring soon'} />
         ) : (
           <span className="text-sm text-gray-400">—</span>
         ),
@@ -535,16 +531,12 @@ function PaperExpiry({ paper }: { paper: RegistrationPaper }) {
   );
   if (days < 0) {
     return (
-      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-        {date} · lapsed
-      </span>
+      <StatusBadge tone="danger" label={`${date} · lapsed`} />
     );
   }
   if (days <= 30) {
     return (
-      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-        {date} · {days === 0 ? 'today' : `${days} days`}
-      </span>
+      <StatusBadge tone="warning" label={`${date} · ${days === 0 ? 'today' : `${days} days`}`} />
     );
   }
   return <>{date}</>;

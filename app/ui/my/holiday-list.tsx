@@ -8,6 +8,7 @@ import { getMyHolidays } from '@/app/lib/api/my-workspace';
 import { todayIso, datePart } from '@/app/lib/format';
 import { LoadingText } from '@/app/ui/spinner';
 import { IconButton } from '@/app/ui/button';
+import StatusBadge from '@/app/ui/status-badge';
 
 const TYPE_LABELS: Record<string, string> = {
   national: 'National',
@@ -104,9 +105,7 @@ export default function HolidayList() {
                   </div>
                 </div>
                 {holiday.id === nextId && (
-                  <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                    Next
-                  </span>
+                  <StatusBadge tone="success" label={'Next'} className="shrink-0" />
                 )}
               </li>
             );

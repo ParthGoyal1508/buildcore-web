@@ -149,12 +149,11 @@ export default function AssetRegisterPage() {
         return (
           <span className="flex flex-wrap gap-1">
             {flags.map((flag) => (
-              <span
-                key={flag.key}
-                className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-                title={flag.title}
-              >
-                {flag.text}
+              <span key={flag.key} title={flag.title}>
+                <StatusBadge
+                  tone="warning"
+                  label={flag.text}
+                />
               </span>
             ))}
           </span>

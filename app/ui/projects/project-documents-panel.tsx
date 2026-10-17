@@ -31,6 +31,7 @@ import QueryError from '@/app/ui/query-error';
 import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import { useToast } from '@/app/ui/toast';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * What a project document may be: the API's document allow-list (036 B5) — PDF, the photo formats,
@@ -402,9 +403,10 @@ export default function ProjectDocumentsPanel({
                           {/* Only a lapsed one is badged: an expired mandatory paper no longer
                               counts towards readiness, and that is worth saying in red. */}
                           {hasLapsed(document) && document.documentTypeId && (
-                            <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
-                              {DOCUMENT_COPY.projectDocumentExpiredBadge}
-                            </span>
+                            <StatusBadge
+                              tone="danger"
+                              label={DOCUMENT_COPY.projectDocumentExpiredBadge}
+                            />
                           )}
                           <RowAction
                             intent="read"

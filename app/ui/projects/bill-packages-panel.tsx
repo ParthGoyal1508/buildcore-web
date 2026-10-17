@@ -624,9 +624,11 @@ function BillTable({
                     </Link>
                     {/* The approver opening the project sees which bill is waiting on them. */}
                     {pkg.awaitingMe && (
-                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-                        Awaiting your approval
-                      </span>
+                      <StatusBadge
+                        tone="warning"
+                        label={'Awaiting your approval'}
+                        className="ml-2"
+                      />
                     )}
                   </td>
                   {counterparty && (

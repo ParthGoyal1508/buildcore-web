@@ -22,6 +22,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import StatusBadge from '@/app/ui/status-badge';
 
 /** Same rendering as the server's `formatCode`, for the live preview while typing. */
 function counted(prefix: string, base: number, step: number, width: number) {
@@ -172,13 +173,9 @@ function SeriesCard({
           </p>
         </div>
         {entry.isDefault ? (
-          <span className="whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-            Default
-          </span>
+          <StatusBadge tone="neutral" label={'Default'} />
         ) : (
-          <span className="whitespace-nowrap rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
-            Custom
-          </span>
+          <StatusBadge tone="info" label={'Custom'} />
         )}
       </header>
 

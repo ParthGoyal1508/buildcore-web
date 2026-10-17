@@ -1,3 +1,4 @@
+import { TONE_CLASSES, type StatusTone } from '@/app/lib/status-tones';
 import { clockTime } from '@/app/lib/format';
 
 // Defined in a leaf module so `app/lib/format.ts` can read it and this file can use the formatters
@@ -2849,47 +2850,52 @@ export function hrLabel(value: string): string {
  * Colour is never the only signal — every badge also carries its text label, so a
  * colour-blind reader loses nothing.
  */
-export const STATUS_BADGE_CLASSES: Record<string, string> = {
+export const HR_STATUS_TONES: Record<string, StatusTone> = {
   // Partners (007). `bocw_*` keys are deliberately prefixed: BOCW's `partial` means
   // "part-paid" and reads better in orange, while compliance's `partial` means "one
   // of two challans filed" and is yellow. One key for both would force the same
   // colour on two different meanings.
-  compliant: 'bg-green-100 text-green-800',
-  partially_compliant: 'bg-amber-100 text-amber-800',
-  non_compliant: 'bg-red-100 text-red-800',
-  submitted: 'bg-brand-100 text-brand-800',
-  partial: 'bg-amber-100 text-amber-800',
-  missing: 'bg-red-100 text-red-800',
-  gray: 'bg-gray-100 text-gray-600',
-  bocw_pending: 'bg-red-100 text-red-800',
-  bocw_partial: 'bg-orange-100 text-orange-800',
-  bocw_paid: 'bg-green-100 text-green-800',
-  expiring_soon: 'bg-orange-100 text-orange-800',
-  expired: 'bg-red-100 text-red-800',
+  compliant: 'success',
+  partially_compliant: 'warning',
+  non_compliant: 'danger',
+  submitted: 'info',
+  partial: 'warning',
+  missing: 'danger',
+  gray: 'neutral',
+  bocw_pending: 'danger',
+  bocw_partial: 'warning',
+  bocw_paid: 'success',
+  expiring_soon: 'warning',
+  expired: 'danger',
   // Attendance
-  present: 'bg-green-100 text-green-800',
-  complete: 'bg-green-100 text-green-800',
-  absent: 'bg-red-100 text-red-800',
-  half_day: 'bg-orange-100 text-orange-800',
-  on_leave: 'bg-brand-100 text-brand-800',
-  weekly_off: 'bg-gray-100 text-gray-700',
-  holiday: 'bg-gray-100 text-gray-700',
+  present: 'success',
+  complete: 'success',
+  absent: 'danger',
+  half_day: 'warning',
+  on_leave: 'info',
+  weekly_off: 'neutral',
+  holiday: 'neutral',
   // Workflow
-  pending: 'bg-amber-100 text-amber-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-700',
-  draft: 'bg-gray-100 text-gray-700',
-  processed: 'bg-brand-100 text-brand-800',
-  paid: 'bg-green-100 text-green-800',
-  active: 'bg-brand-100 text-brand-800',
-  closed: 'bg-gray-100 text-gray-700',
-  disbursed: 'bg-indigo-100 text-indigo-800',
-  declared: 'bg-amber-100 text-amber-800',
-  verified: 'bg-green-100 text-green-800',
-  overdue: 'bg-red-100 text-red-800',
-  upcoming: 'bg-gray-100 text-gray-700',
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  cancelled: 'neutral',
+  draft: 'neutral',
+  processed: 'info',
+  paid: 'success',
+  active: 'info',
+  closed: 'neutral',
+  disbursed: 'info',
+  declared: 'warning',
+  verified: 'success',
+  overdue: 'danger',
+  upcoming: 'neutral',
 };
+
+/** The same statuses as classes, for the attendance calendar's day cells (which are not badges). */
+export const STATUS_BADGE_CLASSES: Record<string, string> = Object.fromEntries(
+  Object.entries(HR_STATUS_TONES).map(([status, tone]) => [status, TONE_CLASSES[tone]]),
+);
 
 /**
  * Statutory ceilings per deduction section, mirroring `buildcore-api`'s

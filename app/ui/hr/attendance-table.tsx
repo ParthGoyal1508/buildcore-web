@@ -28,6 +28,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import ToneBadge from '@/app/ui/status-badge';
 
 const ATTENDANCE_PAGE_SIZE = 50;
 
@@ -255,23 +256,16 @@ export default function AttendanceTable() {
       render: (row) => (
         <span className="flex flex-wrap gap-1.5">
           {row.adminEdited && (
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
-              Edited
-            </span>
+            <ToneBadge tone="info" label={'Edited'} />
           )}
           {row.hasException && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-              Exception
-            </span>
+            <ToneBadge tone="warning" label={'Exception'} />
           )}
           {row.pendingCorrection && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-              {row.pendingCorrection.levelLabel
-                ? HR_MESSAGES.correctionAwaiting(
-                    row.pendingCorrection.levelLabel,
-                  )
-                : HR_MESSAGES.correctionAwaitingUnknown}
-            </span>
+            <ToneBadge
+              tone="warning"
+              label={row.pendingCorrection.levelLabel ? HR_MESSAGES.correctionAwaiting(row.pendingCorrection.levelLabel) : HR_MESSAGES.correctionAwaitingUnknown}
+            />
           )}
           {!row.adminEdited && !row.hasException && !row.pendingCorrection && (
             <span className="text-gray-400">—</span>

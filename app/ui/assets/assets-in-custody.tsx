@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getAllocations } from '@/app/lib/api/assets';
 import { MESSAGES, ROUTES, formatAssetQuantity } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * What one employee is currently holding (spec FR-028).
@@ -61,9 +62,7 @@ export default function AssetsInCustody({
       <h2 className="text-sm font-semibold text-gray-900">
         Assets in custody ({data.length})
         {overdue > 0 && (
-          <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-            {overdue} overdue
-          </span>
+          <StatusBadge tone="danger" label={`${overdue} overdue`} className="ml-2" />
         )}
       </h2>
       <ul className="mt-3 divide-y divide-gray-100">
