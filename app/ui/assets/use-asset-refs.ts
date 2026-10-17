@@ -63,7 +63,7 @@ export function useAssetsMastersAccess(): boolean {
 export function useAssetCategories() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'categories'],
+    queryKey: ['assets', 'categories', companyId],
     queryFn: () => getAssetCategories(),
     select: (rows) => rows.filter((row) => row.active),
   });
@@ -74,7 +74,7 @@ export function useAssetCategories() {
 export function useAllAssetCategories() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'categories', 'all'],
+    queryKey: ['assets', 'categories', 'all', companyId],
     queryFn: () => getAssetCategories(),
   });
 }
@@ -82,7 +82,7 @@ export function useAllAssetCategories() {
 export function useAssetDocTypes() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'doc-types'],
+    queryKey: ['assets', 'doc-types', companyId],
     queryFn: () => getAssetDocTypes(),
     select: (rows) => rows.filter((row) => row.active),
   });
@@ -93,7 +93,7 @@ export function useAssetDocTypes() {
 export function useConditionGrades() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'condition-grades'],
+    queryKey: ['assets', 'condition-grades', companyId],
     queryFn: () => getConditionGrades(),
     select: (rows) => rows.filter((row) => row.active),
   });
@@ -104,7 +104,7 @@ export function useConditionGrades() {
 export function useAllAssets() {
   const companyId = useAssetsCompanyId();
   return useQuery({
-    queryKey: ['assets', 'register', 'all'],
+    queryKey: ['assets', 'register', 'all', companyId],
     queryFn: () => getAssets({ pageSize: 200 }),
     select: (page) => page.items,
   });

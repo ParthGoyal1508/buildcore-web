@@ -44,7 +44,7 @@ export function usePlantCompanyId(): string | null {
 export function usePlantEquipment() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'equipment', 'all'],
+    queryKey: ['plant', 'equipment', 'all', companyId],
     queryFn: () => getEquipment({ pageSize: 200 }),
     select: (page) => page.items,
   });
@@ -55,7 +55,7 @@ export function usePlantEquipment() {
 export function usePlantCategories() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'categories'],
+    queryKey: ['plant', 'categories', companyId],
     queryFn: () => getEquipmentCategories(),
     select: (rows) => rows.filter((row) => row.active),
   });
@@ -65,7 +65,7 @@ export function usePlantCategories() {
 export function usePlantDocTypes() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'doc-types'],
+    queryKey: ['plant', 'doc-types', companyId],
     queryFn: () => getEquipmentDocTypes(),
     select: (rows) => rows.filter((row) => row.active),
   });
@@ -74,7 +74,7 @@ export function usePlantDocTypes() {
 export function usePlantSpareParts() {
   const companyId = usePlantCompanyId();
   return useQuery({
-    queryKey: ['plant', 'spare-parts', 'all'],
+    queryKey: ['plant', 'spare-parts', 'all', companyId],
     queryFn: () => getSpareParts({ pageSize: 200 }),
     select: (page) => page.items.filter((row) => row.active),
   });
