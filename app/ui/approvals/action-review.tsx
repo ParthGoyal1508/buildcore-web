@@ -276,7 +276,7 @@ export default function ActionReview({
           rows={3}
           maxLength={500}
           disabled={inFlight}
-          className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:bg-gray-50"
+          className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:bg-gray-50"
           placeholder="This is recorded against the item and shown to everyone who approved earlier."
         />
         {error && (

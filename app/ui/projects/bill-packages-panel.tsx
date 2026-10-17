@@ -618,7 +618,7 @@ function BillTable({
                   <td className={TABLE.td}>
                     <Link
                       href={ROUTES.projectsBillPackage(projectId, pkg.id)}
-                      className="font-medium text-blue-700 hover:underline"
+                      className="font-medium text-brand-700 hover:underline"
                     >
                       {pkg.label}
                     </Link>

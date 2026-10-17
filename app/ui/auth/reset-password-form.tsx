@@ -70,7 +70,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
         </p>
         <Link
           href={`${ROUTES.login}?reset=1`}
-          className="inline-flex h-11 items-center rounded-lg bg-blue-500 px-4 text-sm font-medium text-white hover:bg-blue-400 sm:h-10"
+          className="inline-flex h-11 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-400 sm:h-10"
         >
           Go to sign in
         </Link>
@@ -106,7 +106,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
         <p className="rounded-md bg-red-50 px-3 py-3 text-red-800">
           {INVALID_REASONS[reason] ?? INVALID_REASONS.not_found}
         </p>
-        <Link href={ROUTES.forgotPassword} className="text-blue-600 hover:underline">
+        <Link href={ROUTES.forgotPassword} className="text-brand-600 hover:underline">
           Send me a new link
         </Link>
       </div>

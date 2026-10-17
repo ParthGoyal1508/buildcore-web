@@ -80,7 +80,7 @@ export default function AllocationsPage() {
       render: (row) => (
         <Link
           href={ROUTES.assetsAsset(row.assetId)}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           {row.assetCode}
         </Link>
@@ -283,7 +283,7 @@ export default function AllocationsPage() {
                     <span className="text-sm text-gray-900">
                       <Link
                         href={ROUTES.assetsAsset(entry.assetId)}
-                        className="text-blue-700 underline hover:text-blue-900"
+                        className="text-brand-700 underline hover:text-brand-900"
                       >
                         {entry.assetCode}
                       </Link>{' '}

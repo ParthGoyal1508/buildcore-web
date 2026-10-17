@@ -82,7 +82,7 @@ export default function PayrollRunsTable() {
       render: (row) => (
         <Link
           href={ROUTES.hrPayrollRun(row.id)}
-          className="font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           {periodLabel(row.period)}
         </Link>

@@ -253,7 +253,7 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
             </p>
             <p className="text-xs text-gray-500">{MESSAGES.paymentFifoNote}</p>
             {surplus !== null && surplus > 0 && (
-              <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900">
                 {rupees(surplus)} of this payment has no bill to settle and
                 will be recorded as an advance.
               </p>

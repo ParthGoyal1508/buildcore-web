@@ -163,7 +163,7 @@ export default function LoginForm({
               session that ended when they closed the browser. Every session now lasts
               the same 90 days, so there is nothing left to ask. */}
           <div className="mt-4 flex items-center justify-end">
-            <Link href={ROUTES.forgotPassword} className="text-xs text-blue-600 hover:underline">
+            <Link href={ROUTES.forgotPassword} className="text-xs text-brand-600 hover:underline">
               Forgot Password?
             </Link>
           </div>

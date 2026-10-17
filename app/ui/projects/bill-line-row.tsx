@@ -119,7 +119,7 @@ function BillLineRowImpl({
       <td className="px-2 py-1.5 align-top text-sm text-gray-900">
         {taskName}
         {isVariation && (
-          <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-800">
+          <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-800">
             {variationRef ? `Variation ${variationRef}` : 'Variation'}
           </span>
         )}

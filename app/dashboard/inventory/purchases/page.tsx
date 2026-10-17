@@ -179,7 +179,7 @@ function PurchasesList() {
       type="button"
       onClick={() => void openFile(row, which)}
       disabled={opening === `${which}:${row.id}`}
-      className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400"
+      className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:text-gray-400"
     >
       {opening === `${which}:${row.id}`
         ? 'Opening…'

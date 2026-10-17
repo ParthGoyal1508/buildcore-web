@@ -59,7 +59,7 @@ export default function DecisionHistory({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="rounded text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        className="rounded text-brand-700 underline decoration-dotted underline-offset-2 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
       >
         {open ? 'Hide history' : 'Show full history'}
         {state.returnCount > 0 ? ` (returned ${state.returnCount}×)` : ''}

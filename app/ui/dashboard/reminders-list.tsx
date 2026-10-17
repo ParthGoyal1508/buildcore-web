@@ -311,7 +311,7 @@ function RemindersTable({
                 {reminder.actionLink ? (
                   <Link
                     href={reminder.actionLink}
-                    className="font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                    className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                   >
                     {reminder.subject}
                   </Link>

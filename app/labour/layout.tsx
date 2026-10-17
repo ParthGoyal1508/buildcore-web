@@ -77,7 +77,7 @@ export default function LabourFieldLayout({
                 sections this screen does not have. */}
             <Link
               href={ROUTES.labour}
-              className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:hidden"
+              className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 md:hidden"
             >
               <ArrowLeftIcon className="w-4" aria-hidden="true" />
               Labour

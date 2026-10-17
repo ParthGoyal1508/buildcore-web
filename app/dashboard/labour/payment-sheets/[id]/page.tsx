@@ -363,7 +363,7 @@ export default function PaymentSheetDetailPage() {
           {fix && (
             <Link
               href={fix.href}
-              className="inline-block text-sm font-medium text-blue-700 underline"
+              className="inline-block text-sm font-medium text-brand-700 underline"
             >
               {fix.label}
             </Link>

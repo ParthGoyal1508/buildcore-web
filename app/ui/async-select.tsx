@@ -273,7 +273,7 @@ export default function AsyncSelect({
                   onMouseEnter={() => setActive(index)}
                   className={clsx(
                     'cursor-pointer px-3 py-2 text-sm',
-                    index === active && 'bg-blue-50',
+                    index === active && 'bg-brand-50',
                     row.id === value && 'font-medium',
                   )}
                 >

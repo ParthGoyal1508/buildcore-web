@@ -202,7 +202,7 @@ function MusterAttendanceBody() {
             className={clsx(
               'h-9 rounded-full border px-4 text-sm font-medium',
               view === v
-                ? 'border-blue-600 bg-blue-600 text-white'
+                ? 'border-brand-600 bg-brand-600 text-white'
                 : 'border-gray-300 bg-white text-gray-700',
             )}
           >
@@ -300,7 +300,7 @@ function MusterAttendanceBody() {
 
       <p className="text-xs text-gray-500">
         Muster rolls entered before face punches are still under{' '}
-        <Link href={ROUTES.labourMusters} className="text-blue-700 underline">
+        <Link href={ROUTES.labourMusters} className="text-brand-700 underline">
           Musters
         </Link>
         .
@@ -484,13 +484,13 @@ function DailyView({
             const box = clsx(
               'rounded-md border p-2.5 text-left',
               c.warn ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white',
-              c.filter && filter === c.filter && 'ring-2 ring-blue-500',
+              c.filter && filter === c.filter && 'ring-2 ring-brand-500',
             );
             return c.filter ? (
               <button
                 key={c.label}
                 type="button"
-                className={clsx(box, 'hover:border-blue-300')}
+                className={clsx(box, 'hover:border-brand-300')}
                 onClick={() => onFilter(filter === c.filter ? '' : c.filter!)}
               >
                 {body}
@@ -701,7 +701,7 @@ function MonthlyView({
 
 const CELL_TONE: Record<string, string> = {
   full_day: 'bg-green-100 text-green-900 hover:bg-green-200',
-  half_day: 'bg-blue-100 text-blue-900 hover:bg-blue-200',
+  half_day: 'bg-brand-100 text-brand-900 hover:bg-brand-200',
   short: 'bg-orange-100 text-orange-900 hover:bg-orange-200',
   on_site: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
   unresolved: 'bg-amber-300 text-amber-950 ring-1 ring-amber-500 hover:bg-amber-400',
@@ -868,7 +868,7 @@ function CorrectionModal({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="e.g. Phone had no signal at punch out; gate register shows 6:10 pm"
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Kept in the edit history with the old and new time, your name and when.

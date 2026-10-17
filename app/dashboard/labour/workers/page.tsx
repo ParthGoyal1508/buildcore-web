@@ -159,7 +159,7 @@ function WorkersPageBody() {
         />
         <Link
           href={ROUTES.labourRegister}
-          className="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-500 sm:h-10"
+          className="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-brand-500 sm:h-10"
         >
           Register Labour
         </Link>

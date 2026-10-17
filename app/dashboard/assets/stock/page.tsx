@@ -104,7 +104,7 @@ export default function AssetStockPage() {
       render: (row) => (
         <Link
           href={ROUTES.assetsAsset(row.assetId)}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           {row.assetCode}
         </Link>
@@ -127,7 +127,7 @@ export default function AssetStockPage() {
       header: 'In transit',
       render: (row) =>
         row.inTransit > 0 ? (
-          <span className="text-blue-700">{quantity(row, row.inTransit)}</span>
+          <span className="text-brand-700">{quantity(row, row.inTransit)}</span>
         ) : (
           quantity(row, row.inTransit)
         ),

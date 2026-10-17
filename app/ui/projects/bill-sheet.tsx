@@ -321,10 +321,10 @@ export default function BillSheet({ projectId }: { projectId: string }) {
   return (
     <section className="space-y-4">
       {draft && (
-        <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm">
-          <p className="font-medium text-blue-900">{BILLING_COPY.draftFound}</p>
-          <p className="mt-1 text-blue-800">{BILLING_COPY.draftFoundHint}</p>
-          <p className="mt-1 text-xs text-blue-700">
+        <div className="rounded border border-brand-200 bg-brand-50 p-3 text-sm">
+          <p className="font-medium text-brand-900">{BILLING_COPY.draftFound}</p>
+          <p className="mt-1 text-brand-800">{BILLING_COPY.draftFoundHint}</p>
+          <p className="mt-1 text-xs text-brand-700">
             {BILLING_COPY.draftSaved(dateTimeLabel(draft.savedAt))}
           </p>
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row">
@@ -686,7 +686,7 @@ function HeadingAndItems({
             type="button"
             onClick={onToggle}
             aria-expanded={!collapsed}
-            className="flex w-full flex-wrap items-baseline gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="flex w-full flex-wrap items-baseline gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             <span aria-hidden="true" className="text-gray-400">
               {collapsed ? '▸' : '▾'}
@@ -697,7 +697,7 @@ function HeadingAndItems({
               {BILLING_COPY.sectionLineCount(items.length)}
             </span>
             {measured.length > 0 && (
-              <span className="text-xs font-medium text-blue-800">
+              <span className="text-xs font-medium text-brand-800">
                 {BILLING_COPY.sectionMeasured(
                   measured.length,
                   rupees(measuredAmount),

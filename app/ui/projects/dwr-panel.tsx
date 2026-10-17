@@ -233,7 +233,7 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
           <button
             type="button"
             onClick={() => setFilters({ status: 'all', from: '', to: '' })}
-            className="h-10 rounded-md px-3 text-sm font-medium text-blue-700 hover:underline"
+            className="h-10 rounded-md px-3 text-sm font-medium text-brand-700 hover:underline"
           >
             Clear filters
           </button>
@@ -383,7 +383,7 @@ function ReportRow({
       <td className={clsx(TABLE.td, 'align-top')}>
         <Link
           href={ROUTES.projectsDwrReport(projectId, report.id)}
-          className="font-medium text-blue-700 hover:underline"
+          className="font-medium text-brand-700 hover:underline"
         >
           {report.dprNumber}
         </Link>

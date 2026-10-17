@@ -242,9 +242,9 @@ export default function VendorModal({
                 aria-selected={tab === name}
                 onClick={() => setTab(name)}
                 className={clsx(
-                  '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                  '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
                   tab === name
-                    ? 'border-blue-600 text-blue-700'
+                    ? 'border-brand-600 text-brand-700'
                     : errorCount > 0
                       ? 'border-transparent text-red-700 hover:text-red-800'
                       : 'border-transparent text-gray-600 hover:text-gray-900',
@@ -334,7 +334,7 @@ export default function VendorModal({
                     type="checkbox"
                     value={category.id}
                     {...register('categoryIds')}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                   />
                   {category.name}
                 </label>
@@ -350,7 +350,7 @@ export default function VendorModal({
             <input
               type="checkbox"
               {...register('active')}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             />
             Active
           </label>
@@ -450,7 +450,7 @@ export default function VendorModal({
                 <button
                   type="button"
                   onClick={() => remove(index)}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                 >
                   Remove
                 </button>
@@ -470,7 +470,7 @@ export default function VendorModal({
 
         <div className={clsx('space-y-3', tab !== 'Work detail' && 'hidden')}>
           {supportsHire ? (
-            <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+            <p className="rounded-md bg-brand-50 p-3 text-sm text-brand-800">
               Hire and contract terms for this vendor are recorded on the vendor
               record. Detailed hire terms are not editable from this screen yet.
             </p>

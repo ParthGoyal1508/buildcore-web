@@ -38,7 +38,7 @@ import {
  * meaning, so each one gets a `title` and an accessible label instead. */
 const DOT_CLASSES: Record<RagCellStatus, string> = {
   verified: 'bg-green-600',
-  submitted: 'bg-blue-500',
+  submitted: 'bg-brand-500',
   partial: 'bg-amber-500',
   missing: 'bg-red-600',
   gray: 'bg-gray-200',
@@ -133,10 +133,10 @@ function RagTable({ data }: { data: RagMatrix }) {
                           )
                         }
                         className={clsx(
-                          'inline-block h-4 w-4 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                          'inline-block h-4 w-4 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
                           DOT_CLASSES[cell.status],
                           clickable
-                            ? 'cursor-pointer hover:ring-2 hover:ring-blue-300'
+                            ? 'cursor-pointer hover:ring-2 hover:ring-brand-300'
                             : 'cursor-default',
                         )}
                       />

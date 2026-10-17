@@ -38,7 +38,7 @@ export default function PurchaseOrderTracePage() {
     <div className="flex flex-col gap-6">
       <Link
         href="/dashboard/inventory/purchase-orders"
-        className="self-start text-sm text-blue-700 hover:underline"
+        className="self-start text-sm text-brand-700 hover:underline"
       >
         ← Purchase orders
       </Link>

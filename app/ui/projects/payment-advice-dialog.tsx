@@ -302,7 +302,7 @@ function PayeePanel({
         {!open && (
           <button
             type="button"
-            className="text-xs font-medium text-blue-700 underline"
+            className="text-xs font-medium text-brand-700 underline"
             onClick={() => {
               setDraft({});
               setEditing(true);

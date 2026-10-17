@@ -99,7 +99,7 @@ export default function PortfolioPage() {
         <PageHeader title="Portfolio" />
         <Link
           href={ROUTES.projectsNewProject}
-          className="flex h-10 items-center rounded-lg bg-blue-500 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           Add project
         </Link>
@@ -108,7 +108,7 @@ export default function PortfolioPage() {
       {movedCompany && (
         <p
           role="status"
-          className="mb-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900"
+          className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900"
         >
           {PROJECT_SHELL_COPY.otherCompanyExplanation}
         </p>
@@ -165,7 +165,7 @@ export default function PortfolioPage() {
           <button
             type="button"
             onClick={() => setFilters({ q: '', status: '', client: '' })}
-            className="text-sm font-medium text-blue-700 hover:underline"
+            className="text-sm font-medium text-brand-700 hover:underline"
           >
             Clear filters
           </button>

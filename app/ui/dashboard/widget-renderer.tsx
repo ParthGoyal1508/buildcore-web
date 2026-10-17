@@ -86,7 +86,7 @@ const cardClass = 'rounded-xl border border-gray-200 bg-white p-4 shadow-sm';
 
 /** The focus ring every link on the dashboard carries — keyboard users must see where they are. */
 const focusRing =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500';
 
 /**
  * A headline card that is itself the link (2026-10-15).
@@ -110,7 +110,7 @@ function CardShell({
     <Link
       href={href}
       aria-label={label}
-      className={`group block ${cardClass} transition hover:border-blue-300 hover:shadow ${focusRing}`}
+      className={`group block ${cardClass} transition hover:border-brand-300 hover:shadow ${focusRing}`}
     >
       {children}
     </Link>
@@ -153,7 +153,7 @@ function CardHeading({
       </p>
       <Link
         href={href}
-        className={`shrink-0 rounded text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline ${focusRing}`}
+        className={`shrink-0 rounded text-xs font-medium text-brand-700 hover:text-brand-900 hover:underline ${focusRing}`}
         aria-label={`View all — ${title}`}
       >
         View all →
@@ -207,7 +207,7 @@ export function KpiCard({
   }
   return (
     <CardShell href={href} label={`${title}: ${display}`}>
-      <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
+      <p className="text-sm text-gray-500 group-hover:text-brand-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
       {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </CardShell>
@@ -232,7 +232,7 @@ export function StatCard({
   }
   return (
     <CardShell href={href} label={`${title}: ${display}`}>
-      <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
+      <p className="text-sm text-gray-500 group-hover:text-brand-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
     </CardShell>
   );

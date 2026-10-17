@@ -27,7 +27,7 @@ const TYPE_LABEL: Record<LeavePolicyRow['leaveType'], string> = {
 };
 
 const cell =
-  'rounded-md border border-gray-300 px-2 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:bg-gray-100';
+  'rounded-md border border-gray-300 px-2 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 disabled:bg-gray-100';
 
 /**
  * The company's leave policy (2026-10-16: "create a screen with typical defaults where HR can edit
@@ -387,7 +387,7 @@ function OpeningImport() {
         >
           Download sheet
         </SecondaryButton>
-        <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+        <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-brand-500">
           {upload.isPending ? 'Importing…' : 'Upload filled sheet'}
           <input
             type="file"

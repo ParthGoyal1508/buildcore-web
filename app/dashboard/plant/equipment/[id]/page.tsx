@@ -148,7 +148,7 @@ export default function EquipmentDetailPage() {
           type="button"
           onClick={() => void openDocument(row.id)}
           disabled={opening === row.id}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:text-gray-400"
         >
           {opening === row.id ? 'Opening…' : (row.fileName ?? 'View')}
         </button>
@@ -279,7 +279,7 @@ export default function EquipmentDetailPage() {
               {data.openMaintenanceJobId && (
                 <Link
                   href={ROUTES.plantMaintenance}
-                  className="text-sm text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                 >
                   Open maintenance job
                 </Link>
@@ -289,7 +289,7 @@ export default function EquipmentDetailPage() {
         </div>
         <Link
           href={ROUTES.plantEquipment}
-          className="text-sm text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           Back to the register
         </Link>
@@ -314,7 +314,7 @@ export default function EquipmentDetailPage() {
           <Link
             key={link.href}
             href={`${link.href}?equipmentId=${id}`}
-            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             {link.name}
           </Link>

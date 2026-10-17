@@ -186,7 +186,7 @@ export default function DirectorFinalSettings() {
       {submitted && (
         <p
           role="status"
-          className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900"
+          className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900"
         >
           {DIRECTOR_FINAL_MESSAGES.submitted}
         </p>
@@ -302,7 +302,7 @@ function DirectorFinalRow({
           {DIRECTOR_FINAL_MESSAGES.stateLabels[entry.state]}
         </span>
         {moved && (
-          <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900">
+          <span className="whitespace-nowrap rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-900">
             {DIRECTOR_FINAL_MESSAGES.proposed}:{' '}
             {
               DIRECTOR_FINAL_MESSAGES.stateLabels[

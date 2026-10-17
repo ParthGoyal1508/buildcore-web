@@ -363,14 +363,14 @@ function PipelineInner() {
                       </p>
                       <div className="mt-2 flex items-center justify-between">
                         <button
-                          className="text-xs text-blue-600"
+                          className="text-xs text-brand-600"
                           onClick={() => setDrawer(c)}
                         >
                           Open
                         </button>
                         {NEXT_STAGE[c.stage] && (
                           <button
-                            className="text-xs text-blue-600 disabled:cursor-not-allowed disabled:text-gray-400"
+                            className="text-xs text-brand-600 disabled:cursor-not-allowed disabled:text-gray-400"
                             onClick={() =>
                               move.mutate({
                                 id: c.id,

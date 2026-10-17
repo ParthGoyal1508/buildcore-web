@@ -71,7 +71,7 @@ export default function SiteDetailPage() {
           {MESSAGES.loadFailed}
         </p>
         <p className="mt-3 text-sm">
-          <Link href={ROUTES.projectsSites} className="text-blue-700 underline">
+          <Link href={ROUTES.projectsSites} className="text-brand-700 underline">
             Back to sites
           </Link>
         </p>
@@ -94,7 +94,7 @@ export default function SiteDetailPage() {
           </span>
         }
         description={
-          <Link href={ROUTES.projectsSites} className="text-blue-700 underline">
+          <Link href={ROUTES.projectsSites} className="text-brand-700 underline">
             Sites
           </Link>
         }

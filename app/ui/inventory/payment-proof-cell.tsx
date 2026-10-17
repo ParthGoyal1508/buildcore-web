@@ -95,7 +95,7 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
   };
 
   const picker = (label: string) => (
-    <label className="cursor-pointer self-start text-xs font-medium text-blue-700 hover:underline">
+    <label className="cursor-pointer self-start text-xs font-medium text-brand-700 hover:underline">
       {busy ? DOCUMENT_COPY.proofUploading : label}
       {/* The input itself is hidden behind its label rather than rendered bare: a file
           input in a table cell is wider than any sensible column. */}
@@ -129,7 +129,7 @@ export default function PaymentProofCell({ payment }: { payment: Payment }) {
           <button
             type="button"
             onClick={() => void open()}
-            className="self-start rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="self-start rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             {DOCUMENT_COPY.proofOpen}
           </button>

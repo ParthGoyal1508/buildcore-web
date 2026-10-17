@@ -102,7 +102,7 @@ export default function DisposalsPage() {
       render: (r) => (
         <Link
           href={ROUTES.plantEquipmentDetail(r.equipmentId)}
-          className="font-mono text-blue-700 hover:underline"
+          className="font-mono text-brand-700 hover:underline"
         >
           {r.equipmentCode}
         </Link>

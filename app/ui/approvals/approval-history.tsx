@@ -84,7 +84,7 @@ const SCOPES = ['visible', 'mine'] as const;
 const PAGE_SIZE = 20;
 
 const focusRing =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500';
 
 /**
  * 036 D1–D2: filters in the URL (status, scope, module, date, search, who raised it), a CSV export
@@ -212,7 +212,7 @@ function ApprovalHistoryInner() {
                 'min-h-9 rounded px-3 text-sm font-medium',
                 focusRing,
                 filters.status === tab.value
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-brand-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100',
               )}
             >
@@ -415,7 +415,7 @@ function ModuleChip({
         'min-h-8 rounded-full border px-3 text-xs font-medium',
         focusRing,
         active
-          ? 'border-blue-600 bg-blue-50 text-blue-800'
+          ? 'border-brand-600 bg-brand-50 text-brand-800'
           : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
       )}
     >
@@ -426,7 +426,7 @@ function ModuleChip({
 
 const STATE_BADGE: Record<ApprovalStateName, { label: string; cls: string }> =
   {
-    pending: { label: 'In progress', cls: 'bg-blue-50 text-blue-800' },
+    pending: { label: 'In progress', cls: 'bg-brand-50 text-brand-800' },
     returned: {
       label: 'Returned for correction',
       cls: 'bg-amber-50 text-amber-900',
@@ -448,7 +448,7 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
             {item.href ? (
               <Link
                 href={item.href}
-                className={`rounded text-blue-700 hover:text-blue-900 hover:underline ${focusRing}`}
+                className={`rounded text-brand-700 hover:text-brand-900 hover:underline ${focusRing}`}
               >
                 {item.subject}
               </Link>
@@ -482,7 +482,7 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
       </div>
 
       {item.state === 'pending' && item.awaitingLabel && (
-        <p className="mt-2 text-xs text-blue-800">
+        <p className="mt-2 text-xs text-brand-800">
           Waiting on {item.delegatedToName ?? item.awaitingLabel}
           {item.delegatedToName ? ` (reassigned, ${item.awaitingLabel})` : ''} —
           level {item.currentPosition} of {item.totalLevels}
@@ -506,7 +506,7 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
       {earlier.length > 0 && (
         <details className="mt-3 text-xs">
           <summary
-            className={`cursor-pointer rounded text-blue-700 hover:text-blue-900 ${focusRing}`}
+            className={`cursor-pointer rounded text-brand-700 hover:text-brand-900 ${focusRing}`}
           >
             Earlier rounds — returned {item.returnCount || earlier.length}×
           </summary>
@@ -557,8 +557,8 @@ const STEP_STYLE: Record<
   },
   current: {
     label: 'Waiting here',
-    dot: 'bg-blue-600 ring-4 ring-blue-100',
-    box: 'border-blue-400 bg-blue-50 ring-1 ring-blue-300',
+    dot: 'bg-brand-600 ring-4 ring-brand-100',
+    box: 'border-brand-400 bg-brand-50 ring-1 ring-brand-300',
   },
   upcoming: {
     label: 'Not yet',

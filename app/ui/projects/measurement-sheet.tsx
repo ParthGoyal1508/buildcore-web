@@ -97,7 +97,7 @@ export default function MeasurementSheet({
             {data.history.map((row) => (
               <tr
                 key={`${row.billLabel}-${row.periodFrom}`}
-                className={clsx(TABLE.row, row.isThisBill && 'bg-blue-50')}
+                className={clsx(TABLE.row, row.isThisBill && 'bg-brand-50')}
               >
                 <td className={clsx(DENSE_TD, 'whitespace-nowrap')}>
                   {row.billLabel}

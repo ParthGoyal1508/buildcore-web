@@ -155,7 +155,7 @@ function FunnelReport() {
                   </span>
                   <div className="h-6 flex-1 rounded bg-gray-100">
                     <div
-                      className="h-6 rounded bg-blue-400"
+                      className="h-6 rounded bg-brand-400"
                       style={{ width: widthPct }}
                     />
                   </div>

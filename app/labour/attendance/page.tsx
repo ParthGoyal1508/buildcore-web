@@ -338,7 +338,7 @@ export default function LabourAttendancePage() {
                 className={clsx(
                   'flex h-9 flex-none items-center gap-1 rounded-full border px-3 text-sm font-medium',
                   filter === f.id
-                    ? 'border-blue-600 bg-blue-600 text-white'
+                    ? 'border-brand-600 bg-brand-600 text-white'
                     : 'border-gray-300 bg-white text-gray-700',
                 )}
               >
@@ -488,7 +488,7 @@ function LabourRow({
           className={clsx(
             'flex h-11 flex-none items-center rounded-lg px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50',
             next === 'in'
-              ? 'bg-blue-600 hover:bg-blue-500'
+              ? 'bg-brand-600 hover:bg-brand-500'
               : 'bg-gray-800 hover:bg-gray-700',
           )}
           aria-label={`Punch ${next} ${worker.fullName}`}

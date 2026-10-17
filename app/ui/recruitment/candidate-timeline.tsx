@@ -191,7 +191,7 @@ function dotColour(event: {
 }): string {
   if (event.kind === 'interview') {
     const i = event.interview as Interview;
-    if (i.status === 'completed') return 'bg-blue-600';
+    if (i.status === 'completed') return 'bg-brand-600';
     return i.overdue ? 'bg-amber-500' : 'bg-gray-300';
   }
   if (event.kind === 'stage') {

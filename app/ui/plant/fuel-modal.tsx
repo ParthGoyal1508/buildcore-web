@@ -208,7 +208,7 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
                 value={value}
                 checked={priceBy === value}
                 onChange={() => setPriceBy(value)}
-                className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-accent-500"
+                className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-accent-500"
               />
               {label}
             </label>

@@ -19,7 +19,7 @@ const STATUS_STYLES: Record<string, string> = {
   planning: 'bg-gray-100 text-gray-700',
   ongoing: 'bg-green-100 text-green-800',
   on_hold: 'bg-orange-100 text-orange-800',
-  completed: 'bg-blue-100 text-blue-800',
+  completed: 'bg-brand-100 text-brand-800',
 
   // Client and site
   active: 'bg-green-100 text-green-800',
@@ -30,7 +30,7 @@ const STATUS_STYLES: Record<string, string> = {
   // reusing the project palette's green here would say "fine" about something late.
   overdue: 'bg-red-100 text-red-800',
   warning: 'bg-amber-100 text-amber-900',
-  info: 'bg-blue-100 text-blue-800',
+  info: 'bg-brand-100 text-brand-800',
 
   // Bill payment status (009 FR-011). Red for money still owed, amber for part
   // settled, green for closed — the same three-step urgency the severities above
@@ -43,7 +43,7 @@ const STATUS_STYLES: Record<string, string> = {
   // green above: a received transfer is complete, but so is a paid bill, and the
   // two carry no relation. Blue reads as "done, nothing owed" rather than "good".
   pending: 'bg-gray-100 text-gray-700',
-  in_transit: 'bg-blue-100 text-blue-800',
+  in_transit: 'bg-brand-100 text-brand-800',
   received: 'bg-green-100 text-green-800',
 
   // Asset outcome on a settlement summary (021 FR-018a). Three keys of its own rather than reusing
@@ -72,14 +72,14 @@ const STATUS_STYLES: Record<string, string> = {
   // down; `closed` is blue rather than green for the reason `received` is — the work
   // is finished, which is not the same as good news.
   open: 'bg-amber-100 text-amber-900',
-  closed: 'bg-blue-100 text-blue-800',
+  closed: 'bg-brand-100 text-brand-800',
 
   // Hire and service bill verification (006 FR-005, FR-021). Grey while nobody has
   // checked it, blue once someone has — `verified` is deliberately not green,
   // because a verified bill is still money owed and green would read as settled.
   // `paid` above already carries that.
   pending_verification: 'bg-gray-100 text-gray-700',
-  verified: 'bg-blue-100 text-blue-800',
+  verified: 'bg-brand-100 text-brand-800',
   partially_paid: 'bg-amber-100 text-amber-900',
 
   // Indent status (009 FR-025). `draft` and `submitted` are neutral — nobody has
@@ -87,11 +87,11 @@ const STATUS_STYLES: Record<string, string> = {
   // problem to fix, they are both settled outcomes, and red would put an alarm on
   // every indent an approver correctly turned down.
   draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-800',
+  submitted: 'bg-brand-100 text-brand-800',
   // Bill packages (2026-10-13). Amber while an approver holds it — somebody specific owes a
   // decision — blue once issued (sent, money not yet agreed), green once certified.
   pending_approval: 'bg-amber-100 text-amber-900',
-  issued: 'bg-blue-100 text-blue-800',
+  issued: 'bg-brand-100 text-brand-800',
   certified: 'bg-green-100 text-green-800',
   abandoned: 'bg-gray-200 text-gray-700',
   approved: 'bg-green-100 text-green-800',
@@ -115,7 +115,7 @@ const STATUS_STYLES: Record<string, string> = {
   // terminal.
   not_in_service: 'bg-gray-100 text-gray-700',
   idle: 'bg-green-100 text-green-800',
-  allocated: 'bg-blue-100 text-blue-800',
+  allocated: 'bg-brand-100 text-brand-800',
   under_repair: 'bg-orange-100 text-orange-800',
   scrapped: 'bg-red-100 text-red-800',
   // 2026-10-17: a machine sold — gone, but for money, so not alarming.

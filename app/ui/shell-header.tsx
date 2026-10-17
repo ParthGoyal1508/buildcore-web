@@ -81,7 +81,7 @@ export default function ShellHeader({
         {home ? (
           <Link
             href={home}
-            className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             {wordmark}
           </Link>

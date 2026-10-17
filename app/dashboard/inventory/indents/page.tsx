@@ -75,7 +75,7 @@ function IndentsPageBody() {
       render: (row) => (
         <Link
           href={ROUTES.inventoryIndent(row.id)}
-          className="font-medium text-blue-700 hover:underline"
+          className="font-medium text-brand-700 hover:underline"
         >
           {row.indentNumber}
         </Link>
@@ -131,7 +131,7 @@ function IndentsPageBody() {
           {canApprove && (
             <Link
               href={ROUTES.inventoryProcurement}
-              className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             >
               Procurement needed
             </Link>

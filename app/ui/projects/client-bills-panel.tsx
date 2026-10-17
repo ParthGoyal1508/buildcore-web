@@ -92,7 +92,7 @@ export default function ClientBillsPanel({ projectId }: { projectId: string }) {
         <div className="space-y-2 rounded border border-gray-200 p-3">
           <Link
             href={ROUTES.projectsBillPackages(projectId)}
-            className="block min-h-11 rounded bg-blue-700 px-3 py-2 text-center text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="block min-h-11 rounded bg-brand-700 px-3 py-2 text-center text-sm font-medium text-white hover:bg-brand-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             {BILLING_COPY.composeFromWork}
           </Link>
@@ -194,9 +194,9 @@ function BillRow({
       type="button"
       onClick={onPick}
       aria-current={current ? 'true' : undefined}
-      className={`min-h-11 w-full rounded border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+      className={`min-h-11 w-full rounded border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
         current
-          ? 'border-blue-500 bg-blue-50'
+          ? 'border-brand-500 bg-brand-50'
           : 'border-gray-200 hover:bg-gray-50'
       }`}
     >

@@ -73,7 +73,7 @@ const LINE_COLUMNS: Column<MusterLine>[] = [
     header: 'Face',
     render: (line) =>
       line.faceMatchLow ? (
-        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-700">
           needs review
         </span>
       ) : (

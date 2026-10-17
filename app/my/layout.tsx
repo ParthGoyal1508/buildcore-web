@@ -188,13 +188,13 @@ export default function MyWorkspaceLayout({
                   {syncNotice && (
                     <p
                       role="status"
-                      className="mb-4 flex items-start justify-between gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+                      className="mb-4 flex items-start justify-between gap-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800"
                     >
                       <span>{syncNotice}</span>
                       <button
                         type="button"
                         onClick={() => setSyncNotice(null)}
-                        className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                        className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                       >
                         Dismiss
                       </button>
@@ -235,7 +235,7 @@ function NoEmployeeRecord() {
         The{' '}
         <Link
           href={ROUTES.myHolidays}
-          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           holiday list
         </Link>{' '}

@@ -195,7 +195,7 @@ export function DisposalFacts({
           <button
             type="button"
             onClick={onOpenAttachment}
-            className="text-sm text-blue-700 underline hover:text-blue-900"
+            className="text-sm text-brand-700 underline hover:text-brand-900"
           >
             {disposal.attachmentName ?? 'View attachment'}
           </button>

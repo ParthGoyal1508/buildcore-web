@@ -70,7 +70,7 @@ export default function ClientDetailPage() {
         <p className="mt-3 text-sm">
           <Link
             href={ROUTES.projectsClients}
-            className="text-blue-700 underline"
+            className="text-brand-700 underline"
           >
             Back to clients
           </Link>
@@ -94,7 +94,7 @@ export default function ClientDetailPage() {
         description={
           <Link
             href={ROUTES.projectsClients}
-            className="text-blue-700 underline"
+            className="text-brand-700 underline"
           >
             Clients
           </Link>

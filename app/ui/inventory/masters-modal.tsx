@@ -513,7 +513,7 @@ export default function MastersModal({ onClose }: { onClose: () => void }) {
               onClick={() => setTab(value)}
               className={
                 tab === value
-                  ? 'border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-700'
+                  ? 'border-b-2 border-brand-600 px-3 py-2 text-sm font-medium text-brand-700'
                   : 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900'
               }
             >

@@ -162,7 +162,7 @@ export default function LateComingReport() {
       </div>
 
       {data?.note && (
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+        <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
           {data.note} Repeat late-comers are flagged at{' '}
           {data.repeatLateComerThreshold} late days in the month.
         </p>

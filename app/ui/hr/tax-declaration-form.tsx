@@ -160,7 +160,7 @@ export default function TaxDeclarationForm() {
                 ),
               )
             }
-            className="w-32 rounded-md border border-gray-200 px-2 py-1 text-right text-sm tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="w-32 rounded-md border border-gray-200 px-2 py-1 text-right text-sm tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           />
         );
       },
@@ -203,7 +203,7 @@ export default function TaxDeclarationForm() {
                 ),
               )
             }
-            className="w-44 rounded-md border border-gray-200 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="w-44 rounded-md border border-gray-200 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           />
         );
       },
@@ -308,7 +308,7 @@ export default function TaxDeclarationForm() {
                   { sectionCode: '', declaredAmount: '', proofRef: '' },
                 ])
               }
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             >
               Add a line
             </button>

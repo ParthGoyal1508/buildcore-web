@@ -26,7 +26,7 @@ export default function RecruitmentLetterTemplatesPage() {
           payment letters, are in{" "}
           <Link
             href={ROUTES.settingsLetterTemplates}
-            className="font-medium text-blue-700 underline"
+            className="font-medium text-brand-700 underline"
           >
             Settings → Letter templates
           </Link>

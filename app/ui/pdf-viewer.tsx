@@ -290,7 +290,7 @@ export function PdfPreview({
         <button
           type="button"
           onClick={onClose}
-          className="text-sm font-medium text-blue-700 underline"
+          className="text-sm font-medium text-brand-700 underline"
         >
           Close preview
         </button>
@@ -399,7 +399,7 @@ export function FileViewer({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 sm:min-h-0 sm:min-w-0 sm:p-1"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:min-h-0 sm:min-w-0 sm:p-1"
             >
               <XMarkIcon className="w-5" aria-hidden="true" />
             </button>

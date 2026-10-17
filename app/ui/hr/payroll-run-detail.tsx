@@ -471,7 +471,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
             figures, so there is nothing to email — and saying so is what stops somebody waiting for
             an email that was never going to be sent.
           */
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
             {HR_MESSAGES.deliveryNeedsProcessedRun}
           </p>
         ) : (
@@ -481,7 +481,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
 
       <TabPanel id="reconciliation" idPrefix="run" active={tab}>
         {!processed ? (
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
             {HR_MESSAGES.reconciliationNeedsProcessedRun}
           </p>
         ) : (
@@ -491,7 +491,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
 
       <TabPanel id="register" idPrefix="run" active={tab}>
         {!processed ? (
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
             {HR_MESSAGES.registerNeedsProcessedRun}
           </p>
         ) : (
@@ -658,7 +658,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
 
       <TabPanel id="deductions" idPrefix="run" active={tab}>
         {!processed ? (
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
             {HR_MESSAGES.registerNeedsProcessedRun}
           </p>
         ) : (

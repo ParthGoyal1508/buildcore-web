@@ -260,7 +260,7 @@ export default function DisposeModal({
               className={clsx(
                 'h-11 rounded-lg border text-sm font-medium',
                 type === t
-                  ? 'border-blue-600 bg-blue-50 text-blue-800'
+                  ? 'border-brand-600 bg-brand-50 text-brand-800'
                   : 'border-gray-300 bg-white text-gray-700',
               )}
             >

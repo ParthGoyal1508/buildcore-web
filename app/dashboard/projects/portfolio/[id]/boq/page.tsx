@@ -86,9 +86,9 @@ export default function ProjectBoqPage() {
               aria-selected={schedule === tab.key}
               aria-controls={`boq-schedule-panel-${tab.key}`}
               onClick={() => setSchedule(tab.key)}
-              className={`-mb-px rounded-t-md border-b-2 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+              className={`-mb-px rounded-t-md border-b-2 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
                 schedule === tab.key
-                  ? 'border-blue-600 font-semibold text-blue-700'
+                  ? 'border-brand-600 font-semibold text-brand-700'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >

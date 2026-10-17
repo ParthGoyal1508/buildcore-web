@@ -13,7 +13,7 @@ export default function NewProjectPage() {
       <nav aria-label="Breadcrumb" className="mb-2 text-sm text-gray-600">
         <Link
           href={ROUTES.projectsPortfolio}
-          className="hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           Portfolio
         </Link>

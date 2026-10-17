@@ -206,7 +206,7 @@ export default function BankPaymentSheet() {
                     </span>
                     <Link
                       href={ROUTES.hrEmployee(l.employeeId)}
-                      className="text-xs text-blue-700 underline"
+                      className="text-xs text-brand-700 underline"
                     >
                       Fix bank details
                     </Link>

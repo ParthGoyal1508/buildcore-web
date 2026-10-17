@@ -288,7 +288,7 @@ export default function ProjectOverviewPage() {
             >
               <Link
                 href={ROUTES.projectsProjectDocuments(project.id)}
-                className="text-blue-600 hover:underline"
+                className="text-brand-600 hover:underline"
               >
                 {outstandingDocuments === null
                   ? PROJECT_SHELL_COPY.documentsNoneRequired
@@ -565,7 +565,7 @@ export default function ProjectOverviewPage() {
           <Link
             key={tile.href}
             href={tile.href}
-            className="rounded-lg border border-gray-200 p-4 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="rounded-lg border border-gray-200 p-4 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             <p className="text-xs uppercase tracking-wide text-gray-500">
               {tile.label}

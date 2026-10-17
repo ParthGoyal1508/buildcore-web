@@ -31,7 +31,7 @@ const STATUS_CLASS: Record<ReimbursementClaim['status'], string> = {
   submitted: 'bg-amber-100 text-amber-800',
   approved: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
-  paid: 'bg-blue-100 text-blue-800',
+  paid: 'bg-brand-100 text-brand-800',
   withdrawn: 'bg-gray-100 text-gray-600',
 };
 
@@ -218,7 +218,7 @@ export default function ReimbursementClaims() {
                     Withdraw while the claim is still pending review. */}
                 <RowAction
                   type="button"
-                  className="text-blue-600"
+                  className="text-brand-600"
                   disabled={submit.isPending}
                   loading={submit.isPending && submit.variables === row.id}
                   onClick={() => submit.mutate(row.id)}

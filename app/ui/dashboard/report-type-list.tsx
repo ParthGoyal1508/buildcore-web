@@ -26,9 +26,9 @@ export default function ReportTypeList({
               onClick={() => type.isAvailable && onSelect(type)}
               disabled={!type.isAvailable}
               aria-pressed={selected}
-              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
                 selected
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-brand-500 bg-brand-50'
                   : 'border-gray-200 bg-white hover:bg-gray-50'
               } ${type.isAvailable ? '' : 'cursor-not-allowed opacity-70'}`}
             >

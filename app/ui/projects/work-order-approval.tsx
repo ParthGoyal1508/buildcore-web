@@ -56,7 +56,7 @@ export default function WorkOrderApproval({
   };
 
   return (
-    <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-3">
+    <div className="mt-2 rounded-md border border-brand-200 bg-brand-50 p-3">
       <ActionReview
         state={approval}
         entityLabel={`work order ${label}`}

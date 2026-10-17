@@ -237,8 +237,8 @@ export default function BillLifecycle({
 
       {/* ── Inline approval ───────────────────────────────────────────── */}
       {awaiting && approval && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
-          <p className="mb-2 text-sm text-blue-900">
+        <div className="rounded-md border border-brand-200 bg-brand-50 p-3">
+          <p className="mb-2 text-sm text-brand-900">
             Sent for approval
             {pkg.submittedAt ? ` on ${dateLabel(pkg.submittedAt)}` : ''}
             {approval.levelLabel
@@ -499,9 +499,9 @@ function Steps({ pkg }: { pkg: BillPackage }) {
             className={clsx(
               'rounded-full px-2 py-0.5 font-medium',
               reached.has(step.key)
-                ? 'bg-blue-600 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-gray-100 text-gray-500',
-              step.key === pkg.status && 'ring-2 ring-blue-300 ring-offset-1',
+              step.key === pkg.status && 'ring-2 ring-brand-300 ring-offset-1',
             )}
             aria-current={step.key === pkg.status ? 'step' : undefined}
           >
@@ -604,7 +604,7 @@ function CertifiedCopy({
       {isViewableFile(null, copy.fileName) && (
         <button
           type="button"
-          className="font-medium text-blue-700 underline hover:text-blue-900"
+          className="font-medium text-brand-700 underline hover:text-brand-900"
           onClick={() =>
             void view({
               title: `Certified copy — ${pkg.label}`,
@@ -618,7 +618,7 @@ function CertifiedCopy({
       )}
       <button
         type="button"
-        className="font-medium text-blue-700 underline hover:text-blue-900 disabled:opacity-50"
+        className="font-medium text-brand-700 underline hover:text-brand-900 disabled:opacity-50"
         onClick={() => void download()}
         disabled={busy}
       >
@@ -993,7 +993,7 @@ function CertifyForm({
           {lineMode && (
             <button
               type="button"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-brand-600 hover:underline"
               onClick={() => setMode('amount')}
             >
               Certify as a single amount

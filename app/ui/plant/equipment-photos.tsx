@@ -153,7 +153,7 @@ export function EquipmentPhotoGallery({
           type="button"
           disabled={!main || opening === main?.id}
           onClick={() => main && void open(main.id)}
-          className="block aspect-[4/3] w-full overflow-hidden rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-default"
+          className="block aspect-[4/3] w-full overflow-hidden rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-default"
           aria-label={main ? 'Open the main photo' : 'No photo yet'}
         >
           <EquipmentThumb
@@ -174,7 +174,7 @@ export function EquipmentPhotoGallery({
                     onClick={() => void open(photo.id)}
                     disabled={opening === photo.id}
                     className={clsx(
-                      'relative block aspect-square overflow-hidden rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                      'relative block aspect-square overflow-hidden rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
                       photo.isMain && 'ring-2 ring-accent-500',
                     )}
                     aria-label={`Open photo${photo.fileName ? ` ${photo.fileName}` : ''}, added ${dateLabel(photo.uploadedAt)}`}

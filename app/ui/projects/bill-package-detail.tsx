@@ -152,7 +152,7 @@ export default function BillPackageDetail({
           {shellProjectId && (
             <Link
               href={ROUTES.projectsBillPackages(shellProjectId)}
-              className="text-sm font-medium text-blue-700 underline"
+              className="text-sm font-medium text-brand-700 underline"
             >
               Back to the bills on this project
             </Link>
@@ -313,7 +313,7 @@ export default function BillPackageDetail({
           at what rate; approved daily work decides how much — and that fact is nowhere on this
           screen unless it is said. */}
       {nothingProposed && (
-        <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+        <p className="rounded-md bg-brand-50 p-3 text-sm text-brand-900">
           Every line proposes 0.000, because no approved daily work falls in{' '}
           {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}. Quantities
           come from approved daily reports, not from the award — the award sets
@@ -355,7 +355,7 @@ export default function BillPackageDetail({
             <button
               type="button"
               onClick={() => setShowEveryLine(true)}
-              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             >
               Show every schedule line
             </button>
@@ -366,7 +366,7 @@ export default function BillPackageDetail({
             <button
               type="button"
               onClick={() => setShowEveryLine(false)}
-              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             >
               Show only what was claimed
             </button>
@@ -384,7 +384,7 @@ export default function BillPackageDetail({
               <button
                 type="button"
                 onClick={() => setShowEveryLine(true)}
-                className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="text-xs font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
               >
                 Show every schedule line
               </button>
@@ -768,7 +768,7 @@ function ClaimRow({
           <button
             type="button"
             onClick={onToggleSheet}
-            className="font-medium text-blue-700 hover:underline"
+            className="font-medium text-brand-700 hover:underline"
             aria-expanded={sheetOpen}
           >
             {claim.boqNo}
@@ -785,7 +785,7 @@ function ClaimRow({
             <button
               type="button"
               onClick={() => setEditingItem(true)}
-              className="ml-2 text-xs font-medium text-blue-700 underline"
+              className="ml-2 text-xs font-medium text-brand-700 underline"
             >
               Edit item
             </button>

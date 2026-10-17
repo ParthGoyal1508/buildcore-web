@@ -97,7 +97,7 @@ function Action({ href, children }: { href: string; children: string }) {
   return (
     <Link
       href={href}
-      className="whitespace-nowrap font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      className="whitespace-nowrap font-medium text-brand-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
     >
       {children}
     </Link>

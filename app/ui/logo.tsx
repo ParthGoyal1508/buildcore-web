@@ -17,7 +17,7 @@ const INTRINSIC = { width: 530, height: 137 };
  * still fail offline.
  *
  * `knockout` renders it white for the blue brand panels. The mark is navy on
- * transparent, which does not read on `bg-blue-600`, and a white knockout is the
+ * transparent, which does not read on `bg-brand-600`, and a white knockout is the
  * standard treatment for that rather than a second file to keep in sync. It works
  * because the mark is effectively two-tone; a future multi-colour logo would need a
  * real white variant instead, which is why this is a named prop and not a bare filter

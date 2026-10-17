@@ -66,7 +66,7 @@ export function Button({
         // every screen without each call site remembering, `shadow-sm` so the primary action
         // lifts off the new tinted page ground, and the focus ring in the accent — a navy ring
         // around a navy button was all but invisible.
-        'flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-medium text-white shadow-sm sm:h-10 sm:justify-start transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-blue-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600',
+        'flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm sm:h-10 sm:justify-start transition-colors hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-600',
         className,
       )}
     >

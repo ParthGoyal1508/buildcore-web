@@ -105,7 +105,7 @@ function StockLedgerBody() {
         <PageHeader title="Stock ledger" />
         <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
           Open a ledger from the <strong>Ledger</strong> button on a row of the{' '}
-          <Link href={ROUTES.inventoryStock} className="text-blue-700 hover:underline">
+          <Link href={ROUTES.inventoryStock} className="text-brand-700 hover:underline">
             Stock
           </Link>{' '}
           screen.
@@ -196,7 +196,7 @@ function StockLedgerBody() {
           </p>
           <Link
             href={ROUTES.inventoryStock}
-            className="text-sm text-blue-700 hover:underline"
+            className="text-sm text-brand-700 hover:underline"
           >
             Back to stock
           </Link>

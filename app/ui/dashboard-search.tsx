@@ -257,7 +257,7 @@ export default function DashboardSearch() {
                           }}
                           className={
                             activeRow?.id === row.id
-                              ? 'cursor-pointer bg-blue-50 px-3 py-2'
+                              ? 'cursor-pointer bg-brand-50 px-3 py-2'
                               : 'cursor-pointer px-3 py-2 hover:bg-gray-50'
                           }
                         >

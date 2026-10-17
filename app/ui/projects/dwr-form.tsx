@@ -716,7 +716,7 @@ export default function DwrForm({
 
       {offeredDraft && (
         <div
-          className="flex flex-col gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-2 rounded-md border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 sm:flex-row sm:items-center sm:justify-between"
           role="status"
         >
           <p>
@@ -1169,7 +1169,7 @@ function LineEditor({
                                 ),
                               })
                             }
-                            className="min-h-11 px-2 text-sm text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                            className="min-h-11 px-2 text-sm text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                             aria-label={`Remove measurement ${rowIndex + 1}`}
                           >
                             Remove
@@ -1525,7 +1525,7 @@ function LineFiles({
     // input is a focus target the browser scrolls an ancestor to reveal, and in a table wider than
     // the page that ancestor turned out to be the shell — which clips without a scrollbar, so the
     // layout shifted and stayed shifted. 44 px tall (036 I8): this is tapped on a phone on site.
-    <label className="relative inline-flex min-h-[44px] cursor-pointer items-center rounded-md px-2 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
+    <label className="relative inline-flex min-h-[44px] cursor-pointer items-center rounded-md px-2 text-xs font-medium text-brand-700 hover:bg-brand-50 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500">
       {label}
       <input
         type="file"

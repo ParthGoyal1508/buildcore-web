@@ -335,7 +335,7 @@ export default function IndentForm({ onClose }: { onClose: () => void }) {
           </div>
         </fieldset>
 
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900">
           {MESSAGES.approvalDoesNotReserve}
         </p>
 

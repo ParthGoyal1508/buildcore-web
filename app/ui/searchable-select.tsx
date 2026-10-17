@@ -213,7 +213,7 @@ export default function SearchableSelect({
                 }}
                 onMouseEnter={() => setActive(index)}
                 className={`cursor-pointer px-3 py-2 text-sm ${
-                  index === active ? 'bg-blue-50' : ''
+                  index === active ? 'bg-brand-50' : ''
                 } ${row.id === value ? 'font-medium' : ''}`}
               >
                 <span className="flex items-baseline gap-2">

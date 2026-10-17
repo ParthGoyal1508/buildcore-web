@@ -233,7 +233,7 @@ export default function AssetModal({
             That serial number belongs to{' '}
             <Link
               href={ROUTES.assetsRegister}
-              className="text-blue-700 underline hover:text-blue-900"
+              className="text-brand-700 underline hover:text-brand-900"
             >
               {duplicateCode}
             </Link>

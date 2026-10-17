@@ -292,7 +292,7 @@ export default function StockTable({
               type="checkbox"
               checked={filters.below}
               onChange={(event) => setFilters({ below: event.target.checked })}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+              className="h-4 w-4 rounded border-gray-300 text-brand-600"
             />
             Below reorder level only
           </label>

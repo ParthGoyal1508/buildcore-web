@@ -545,7 +545,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
                         shouldDirty: true,
                       })
                     }
-                    className="h-4 w-4 border-gray-300 text-blue-600"
+                    className="h-4 w-4 border-gray-300 text-brand-600"
                   />
                   {option.label}
                 </label>
@@ -734,7 +734,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
           {DOCUMENT_COPY.editFiledElsewhere}{' '}
           <Link
             href={ROUTES.projectsProjectDocuments(project.id)}
-            className="font-medium text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             {DOCUMENT_COPY.editFiledElsewhereLink}
           </Link>

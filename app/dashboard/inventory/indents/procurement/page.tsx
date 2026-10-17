@@ -48,7 +48,7 @@ export default function ProcurementNeededPage() {
       render: (row) => (
         <Link
           href={ROUTES.inventoryIndent(row.indentId)}
-          className="font-medium text-blue-700 hover:underline"
+          className="font-medium text-brand-700 hover:underline"
         >
           {row.indentNumber}
         </Link>

@@ -156,7 +156,7 @@ export default function AttendanceImportPanel() {
           className={
             nothingValid
               ? 'rounded-md bg-red-50 px-3 py-2 text-sm text-red-700'
-              : 'rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800'
+              : 'rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800'
           }
           role="status"
         >

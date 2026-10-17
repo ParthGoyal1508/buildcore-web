@@ -199,7 +199,7 @@ export function CheckboxField({
         id={id}
         type="checkbox"
         {...rest}
-        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-accent-500"
+        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-accent-500"
       />
       <div>
         <label htmlFor={id} className="text-sm text-gray-700">

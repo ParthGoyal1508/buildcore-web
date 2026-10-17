@@ -55,7 +55,7 @@ export default function ApprovalUpcoming() {
             {row.href ? (
               <Link
                 href={row.href}
-                className="text-blue-700 hover:text-blue-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="text-brand-700 hover:text-brand-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
               >
                 {row.subject}
               </Link>

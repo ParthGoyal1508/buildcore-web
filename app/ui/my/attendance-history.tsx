@@ -28,7 +28,7 @@ const STATUS_LABEL: Record<AttendanceDay['status'], string> = {
 const STATUS_CLASS: Record<AttendanceDay['status'], string> = {
   present: 'bg-green-100 text-green-800',
   absent: 'bg-red-100 text-red-800',
-  on_leave: 'bg-blue-100 text-blue-800',
+  on_leave: 'bg-brand-100 text-brand-800',
   weekly_off: 'bg-gray-100 text-gray-600',
   holiday: 'bg-purple-100 text-purple-800',
 };

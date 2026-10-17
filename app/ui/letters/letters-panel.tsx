@@ -852,7 +852,7 @@ export function LetterComposer({
       )}
       {notice && (
         <p
-          className="rounded-md bg-blue-50 p-3 text-sm text-blue-900"
+          className="rounded-md bg-brand-50 p-3 text-sm text-brand-900"
           role="status"
         >
           {notice}

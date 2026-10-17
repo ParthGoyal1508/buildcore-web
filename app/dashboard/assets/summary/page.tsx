@@ -196,9 +196,9 @@ export default function AssetSummaryPage() {
             type="button"
             onClick={() => setGrouping(id)}
             aria-current={grouping === id ? 'true' : undefined}
-            className={`rounded-md border px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+            className={`rounded-md border px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
               grouping === id
-                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                ? 'border-brand-600 bg-brand-50 text-brand-700'
                 : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >

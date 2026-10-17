@@ -68,7 +68,7 @@ export default function AssetRegisterPage() {
       render: (row) => (
         <Link
           href={ROUTES.assetsAsset(row.id)}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
         >
           {row.assetCode}
         </Link>

@@ -130,7 +130,7 @@ function SupervisorCard({
                 className={clsx(
                   'flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-500',
                   on
-                    ? 'border-blue-600 bg-blue-50 text-blue-800'
+                    ? 'border-brand-600 bg-brand-50 text-brand-800'
                     : 'border-gray-300 bg-white text-gray-700',
                 )}
               >

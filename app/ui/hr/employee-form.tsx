@@ -506,7 +506,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
               <button
                 type="button"
                 onClick={() => setTab(candidate.id)}
-                className="font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
               >
                 {candidate.label}
               </button>

@@ -450,7 +450,7 @@ export default function PunchClock() {
       {notice && (
         <p
           role="status"
-          className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+          className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800"
         >
           {notice}
         </p>
@@ -464,11 +464,11 @@ export default function PunchClock() {
         <p
           role="status"
           aria-live="polite"
-          className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+          className="flex items-center gap-2 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800"
         >
           <span
             aria-hidden="true"
-            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700"
+            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-300 border-t-brand-700"
           />
           {phase === 'locating'
             ? MESSAGES.punchLocating

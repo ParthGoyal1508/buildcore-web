@@ -96,7 +96,7 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
       </div>
       <FormError message={exportError} />
       {expected ? (
-        <p className="rounded-lg bg-blue-50 px-4 py-6 text-sm text-blue-800">
+        <p className="rounded-lg bg-brand-50 px-4 py-6 text-sm text-brand-800">
           {expected}
         </p>
       ) : (

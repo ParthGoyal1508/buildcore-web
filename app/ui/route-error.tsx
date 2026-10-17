@@ -85,7 +85,7 @@ export default function RouteError({
         <button
           type="button"
           onClick={() => (chunk ? window.location.reload() : retry())}
-          className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+          className="h-10 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {chunk ? 'Reload' : 'Try again'}
         </button>

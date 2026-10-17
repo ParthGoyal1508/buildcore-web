@@ -402,7 +402,7 @@ export default function LineItemsEditor({
       <button
         type="button"
         onClick={addOther}
-        className="text-sm font-medium text-blue-700 hover:underline"
+        className="text-sm font-medium text-brand-700 hover:underline"
       >
         {fromBoq
           ? '+ Add an item not in the BOQ'
