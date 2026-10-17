@@ -320,7 +320,7 @@ export default function LabourAttendancePage() {
               placeholder="Search name, code or father's name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="block min-h-11 w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="block min-h-11 w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm placeholder:text-gray-400 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
             />
           </div>
 
@@ -688,7 +688,7 @@ function GroupPhotoDialog({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="e.g. Morning gang at block C"
-          className="mb-3 block min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="mb-3 block min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
         {save.isPending ? (
           <div className="flex flex-col items-center gap-3 py-10" role="status">

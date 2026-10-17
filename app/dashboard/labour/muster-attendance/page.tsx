@@ -878,7 +878,7 @@ function CorrectionModal({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="e.g. Phone had no signal at punch out; gate register shows 6:10 pm"
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Kept in the edit history with the old and new time, your name and when.
