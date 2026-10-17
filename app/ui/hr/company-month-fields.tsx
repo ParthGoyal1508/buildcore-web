@@ -1,7 +1,9 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { listActiveCompanies } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
@@ -20,6 +22,10 @@ export function yearMonthOf(value: string): { year: number; month: number } {
 /**
  * Month and Year, and Company for someone who works across companies (2026-10-17). Everyone else
  * works in their own company, which the server applies, so they are not asked.
+ *
+ * The company is always a named one, starting on the company selected in the header (or the first
+ * company when none is): "the company I am working in" left people guessing which file they would
+ * get.
  */
 export function CompanyMonthFields({
   idPrefix,
@@ -41,6 +47,13 @@ export function CompanyMonthFields({
     queryFn: listActiveCompanies,
     enabled: crossCompany,
   });
+  const selected = useSelectedCompanyId();
+  useEffect(() => {
+    if (!crossCompany || companyId || !companies.data?.length) return;
+    const start =
+      companies.data.find((c) => c.id === selected)?.id ?? companies.data[0].id;
+    onCompany(start);
+  }, [crossCompany, companyId, companies.data, selected, onCompany]);
   return (
     <>
       <TextField
@@ -58,7 +71,7 @@ export function CompanyMonthFields({
           value={companyId}
           onChange={(e) => onCompany(e.target.value)}
         >
-          <option value="">The company I am working in</option>
+          {!companyId && <option value="">Loading companies…</option>}
           {companies.data?.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

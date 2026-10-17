@@ -2353,3 +2353,38 @@ export async function downloadSalaryBankSheet(
   );
   return { blob, filename: filename ?? `Salary_Bank_Sheet_${query.year}_${query.month}.xlsx` };
 }
+
+const bankSheetExportSchema = z.object({
+  id: z.string(),
+  period: z.string(),
+  debitAccount: z.string(),
+  employeeCount: z.number(),
+  transferTotal: z.number(),
+  leftOffCount: z.number(),
+  fileName: z.string(),
+  generatedBy: z.string().nullable(),
+  generatedAt: z.string(),
+});
+export type BankSheetExport = z.infer<typeof bankSheetExportSchema>;
+
+/** Bank sheets generated for a company, newest first (2026-10-17). */
+export async function getBankSheetHistory(query: {
+  companyId?: string;
+  year?: number;
+  month?: number;
+}): Promise<BankSheetExport[]> {
+  const data = await authFetch<unknown>(
+    `/hr/payroll/bank-sheet/history${qs({ ...query })}`,
+  );
+  return z.array(bankSheetExportSchema).parse(data);
+}
+
+/** The exact file a history entry gave the bank. */
+export async function downloadBankSheetHistoryFile(
+  entry: BankSheetExport,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/hr/payroll/bank-sheet/history/${entry.id}/file`,
+  );
+  return { blob, filename: filename ?? entry.fileName };
+}

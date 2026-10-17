@@ -4,7 +4,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -26,6 +26,7 @@ import {
   thisMonth,
   yearMonthOf,
 } from '@/app/ui/hr/company-month-fields';
+import BankSheetHistory from '@/app/ui/hr/bank-sheet-history';
 import SubmitRunApproval from '@/app/ui/hr/submit-run-approval';
 import {
   FormError,
@@ -42,6 +43,7 @@ import {
  * reads every row as a payment.
  */
 export default function BankPaymentSheet() {
+  const queryClient = useQueryClient();
   const [month, setMonth] = useState(thisMonth);
   const [companyId, setCompanyId] = useState('');
   const [debitAccount, setDebitAccount] = useState('');
@@ -73,7 +75,10 @@ export default function BankPaymentSheet() {
 
   const download = useMutation({
     mutationFn: () => downloadSalaryBankSheet(query()),
-    onSuccess: ({ blob, filename }) => saveBlob(blob, filename),
+    onSuccess: ({ blob, filename }) => {
+      saveBlob(blob, filename);
+      void queryClient.invalidateQueries({ queryKey: ['hr', 'bank-sheet-history'] });
+    },
     onError: (e) => setError(messageOf(e, 'Could not create the bank sheet.')),
   });
 
@@ -245,6 +250,7 @@ export default function BankPaymentSheet() {
           </div>
         </div>
       )}
+      <BankSheetHistory companyId={companyId} />
     </section>
   );
 }

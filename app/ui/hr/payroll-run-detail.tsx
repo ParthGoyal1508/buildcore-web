@@ -96,6 +96,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
     mutationFn: async () => {
       const { blob, filename } = await downloadBankSheet(runId);
       saveBlob(blob, filename);
+      void queryClient.invalidateQueries({ queryKey: ['hr', 'bank-sheet-history'] });
     },
     onError: (err: Error) => {
       setError(err.message);
