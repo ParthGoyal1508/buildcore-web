@@ -98,6 +98,8 @@ function InterviewsInner() {
         status: query.status,
         page: query.page,
         pageSize: PAGE_SIZE,
+        // Open rounds soonest first; finished ones most recent first.
+        order: query.status === 'scheduled' ? 'asc' : 'desc',
       }),
     placeholderData: keepPreviousData,
   });

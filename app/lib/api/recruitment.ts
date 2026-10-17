@@ -402,6 +402,8 @@ export async function getInterviews(
     status?: string;
     page?: number;
     pageSize?: number;
+    /** `desc` for newest first (the Completed and Cancelled tabs). */
+    order?: 'asc' | 'desc';
   } = {},
 ) {
   return z
