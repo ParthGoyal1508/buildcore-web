@@ -3,15 +3,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import { approveIndent, type Indent } from '@/app/lib/api/inventory';
 import { MESSAGES } from '@/app/lib/constants';
+import { quantity as formatQuantity } from '@/app/lib/format';
+import { Button } from '@/app/ui/button';
 import {
   FormError,
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * Approve an indent, line by line.
@@ -30,6 +33,7 @@ export default function ApproveIndentModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [decisions, setDecisions] = useState(
     indent.lines.map((line) => ({
       lineId: line.id,
@@ -51,6 +55,16 @@ export default function ApproveIndentModal({
     (decision) =>
       Number(decision.approvedQuantity) > requestedFor(decision.lineId),
   );
+  const blank = decisions.some(
+    (decision) =>
+      decision.approvedQuantity === '' ||
+      !(Number(decision.approvedQuantity) >= 0),
+  );
+  const changed = decisions.some(
+    (decision) =>
+      Number(decision.approvedQuantity) !== requestedFor(decision.lineId) ||
+      decision.reductionReason !== '',
+  );
 
   const save = useMutation({
     mutationFn: () =>
@@ -65,14 +79,13 @@ export default function ApproveIndentModal({
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success(`${indent.indentNumber} approved`);
       onClose();
     },
+    // The decisions stay as entered; a 403 (the requester approving their own indent, 036 M8)
+    // carries its own explanation.
     onError: (err) =>
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not approve this indent.',
-      ),
+      setError(errorMessage(err, 'Could not approve this indent.')),
   });
 
   return (
@@ -80,19 +93,22 @@ export default function ApproveIndentModal({
       title={`Approve ${indent.indentNumber}`}
       onClose={onClose}
       wide
+      isDirty={changed}
+      pending={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
+        <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <SecondaryButton
+          <Button
             type="submit"
             form="approve-form"
-            disabled={missingReason || overApproved || save.isPending}
+            disabled={missingReason || overApproved || blank}
+            loading={save.isPending}
           >
-            {save.isPending ? 'Approving…' : 'Approve'}
-          </SecondaryButton>
-        </div>
+            Approve
+          </Button>
+        </>
       }
     >
       <form
@@ -122,20 +138,22 @@ export default function ApproveIndentModal({
                   {line.itemName}
                 </p>
                 <p className="text-xs text-gray-500">
-                  Requested {line.requestedQuantity} {line.unit}
+                  Requested {formatQuantity(line.requestedQuantity)} {line.unit}
                 </p>
               </div>
 
               <TextField
                 id={`approve-qty-${line.id}`}
-                label="Approve"
+                label={`Approve (${line.unit}) *`}
                 type="number"
+                inputMode="decimal"
+                required
                 min={0}
                 step="any"
                 value={decision.approvedQuantity}
                 error={
                   over
-                    ? `Cannot approve more than the ${line.requestedQuantity} requested.`
+                    ? `Cannot approve more than the ${formatQuantity(line.requestedQuantity)} requested.`
                     : undefined
                 }
                 onChange={(event) =>
@@ -153,7 +171,9 @@ export default function ApproveIndentModal({
                 <div className="sm:col-span-2">
                   <TextField
                     id={`approve-reason-${line.id}`}
-                    label="Reason for the reduction"
+                    label="Reason for the reduction *"
+                    required
+                    maxLength={500}
                     value={decision.reductionReason}
                     error={
                       decision.reductionReason.trim()
