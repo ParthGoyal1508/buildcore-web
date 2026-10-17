@@ -9,8 +9,11 @@ import {
   getBillingRates,
   setBillingRates,
 } from '@/app/lib/api/settings';
+import { errorMessage } from '@/app/lib/api/client';
 import { Button } from '@/app/ui/button';
+import QueryError from '@/app/ui/query-error';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { toast } from '@/app/ui/toast';
 
 /**
  * The four statutory rates a running-account bill is computed at (025 US4, FR-021 to FR-024).
@@ -42,13 +45,27 @@ const FIELDS: { key: keyof BillingRates; label: string }[] = [
   { key: 'tdsFraction', label: 'Income-tax TDS (%)' },
 ];
 
+/**
+ * A stored fraction as the percentage typed. Rounded to six decimal places and trimmed (036 C12):
+ * `0.14 * 100` is `14.000000000000002` in floating point, which is what the box showed.
+ */
 const asPercent = (fraction: string): string =>
-  String(Number(fraction) * 100);
+  String(Number((Number(fraction) * 100).toFixed(6)));
+
+/** A typed percentage, or why it cannot be saved (036 C12): "abc" used to be sent as null. */
+function percentError(raw: string | undefined): string | undefined {
+  const text = raw?.trim() ?? '';
+  if (text === '') return 'Enter a rate';
+  if (!/^\d+(\.\d+)?$/.test(text)) return 'Enter a number, e.g. 9 or 2.5';
+  const value = Number(text);
+  if (value < 0 || value > 100) return 'Must be between 0 and 100';
+  return undefined;
+}
 
 export function BillingRatesScreen() {
   const companyId = useSelectedCompanyId();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['billing-rates', companyId],
     queryFn: () => getBillingRates(companyId as string),
     enabled: !!companyId,
@@ -61,7 +78,13 @@ export function BillingRatesScreen() {
     return <p className="text-sm text-gray-500">Loading the rates…</p>;
   }
   if (isError || !data) {
-    return <FormError message="The rates could not be loaded." />;
+    return (
+      <QueryError
+        error={error}
+        onRetry={refetch}
+        fallback="The rates could not be loaded."
+      />
+    );
   }
 
   // Keyed on the company, so switching company remounts the form rather than leaving one
@@ -83,29 +106,38 @@ function RatesForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const fieldErrors = Object.fromEntries(
+    FIELDS.map(({ key }) => [key, percentError(draft[key])]),
+  );
+  const invalid = Object.values(fieldErrors).some(Boolean);
 
   const save = useMutation({
     mutationFn: () =>
       setBillingRates(
         companyId,
         Object.fromEntries(
-          FIELDS.filter(({ key }) => draft[key]?.trim() !== '').map(
-            ({ key }) => [key, Number(draft[key]) / 100],
-          ),
+          // Divided and rounded back to the fraction's own precision, so 14 is sent as 0.14 and
+          // not as 0.14000000000000001.
+          FIELDS.map(({ key }) => [
+            key,
+            Number((Number(draft[key]) / 100).toFixed(8)),
+          ]),
         ),
       ),
     onSuccess: () => {
       setError(null);
       setSaved(true);
+      toast.success('Billing rates saved.');
       void queryClient.invalidateQueries({
         queryKey: ['billing-rates', companyId],
       });
     },
     // The server bounds each rate at 1 and says so. 9 meaning nine per cent would multiply every
     // tax on every bill by a hundred, so its refusal is worth reading rather than replacing.
-    onError: (err: Error) => {
+    onError: (err: unknown) => {
       setSaved(false);
-      setError(err.message);
+      setError(errorMessage(err, 'The rates could not be saved.'));
     },
   });
 
@@ -114,6 +146,8 @@ function RatesForm({
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
+        setTouched(true);
+        if (invalid) return;
         save.mutate();
       }}
     >
@@ -131,10 +165,14 @@ function RatesForm({
             id={`rate-${key}`}
             label={label}
             inputMode="decimal"
+            aria-required="true"
             value={draft[key] ?? ''}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, [key]: event.target.value }))
-            }
+            error={touched ? fieldErrors[key] : undefined}
+            onChange={(event) => {
+              // "Saved" described the values before this edit, not these (036 C12).
+              setSaved(false);
+              setDraft((current) => ({ ...current, [key]: event.target.value }));
+            }}
           />
         ))}
       </div>
@@ -147,8 +185,8 @@ function RatesForm({
       )}
 
       <div>
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save the rates'}
+        <Button type="submit" loading={save.isPending}>
+          Save the rates
         </Button>
       </div>
     </form>
