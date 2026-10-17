@@ -18,7 +18,7 @@ export default function RoleList() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['roles'],
     queryFn: listRoles,
   });
@@ -81,7 +81,8 @@ export default function RoleList() {
         rows={data ?? []}
         rowKey={(r) => r.id}
         isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        error={isError ? error : null}
+        onRetry={refetch}
         actions={(role) => (
           <>
             {/* The Super Admin role is immutable server-side; disabling here just

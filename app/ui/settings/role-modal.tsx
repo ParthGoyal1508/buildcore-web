@@ -1,8 +1,8 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   Role,
   createRole,
@@ -18,7 +18,10 @@ import {
   ROLE_LEVELS,
   permissionLabel,
 } from '@/app/lib/constants';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { Button } from '@/app/ui/button';
+import { mayGrant } from '@/app/ui/settings/grant-ceiling';
+import { toast } from '@/app/ui/toast';
 import Modal from '@/app/ui/settings/modal';
 import {
   CheckboxField,
@@ -107,6 +110,8 @@ function PermissionRow({
   writable,
   onToggle,
   onLevel,
+  canGrantRead = true,
+  canGrantWrite = true,
 }: {
   permission: string;
   description?: string;
@@ -114,14 +119,22 @@ function PermissionRow({
   writable: boolean;
   onToggle: () => void;
   onLevel: (level: 'read' | 'write') => void;
+  /** 036 C10: whether the caller may grant this area at all, and at write — mirroring the API. */
+  canGrantRead?: boolean;
+  canGrantWrite?: boolean;
 }) {
+  const beyond = !canGrantRead
+    ? 'Your own role does not include this, so you cannot grant it.'
+    : undefined;
   return (
     <div>
       <CheckboxField
         id={`permission-${permission}`}
         label={permissionLabel(permission)}
-        description={description}
+        description={beyond ?? description}
         checked={checked}
+        // Unticking is always allowed: taking a grant away hands nothing over.
+        disabled={!canGrantRead && !checked}
         onChange={onToggle}
       />
       {checked && (
@@ -142,6 +155,7 @@ function PermissionRow({
                 name={`level-${permission}`}
                 value={level}
                 checked={level === 'write' ? writable : !writable}
+                disabled={level === 'write' && !canGrantWrite && !writable}
                 onChange={() => onLevel(level)}
                 className="h-3.5 w-3.5 border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               />
@@ -199,6 +213,24 @@ export default function RoleModal({
   const [nameError, setNameError] = useState<string | undefined>();
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  // 036 C10: the caller's own grants, so areas beyond them are shown as not grantable up front
+  // instead of refused (GRANT_EXCEEDS_CALLER) after Save.
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  const canRead = (permission: string) => mayGrant(me, permission, 'read');
+  const canWrite = (permission: string) => mayGrant(me, permission, 'write');
+
+  const initialSelected = role?.permissions ?? [];
+  const initialWrite = initialWritable(role);
+  const isDirty =
+    name !== (role?.name ?? '') ||
+    homeModule !== (role?.homeModule ?? '') ||
+    selected.length !== initialSelected.length ||
+    selected.some((p) => !initialSelected.includes(p)) ||
+    writable.size !== initialWrite.length ||
+    initialWrite.some((p) => !writable.has(p));
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -215,8 +247,9 @@ export default function RoleModal({
             grants: grantsFor(selected, writable),
             homeModule: homeModule || null,
           }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      toast.success(role ? `${saved.name} saved.` : `${saved.name} added.`);
       onClose();
     },
     onError: (error: unknown) => {
@@ -224,9 +257,7 @@ export default function RoleModal({
         setNameError(error.message);
         return;
       }
-      setServerError(
-        error instanceof ApiError ? error.message : MESSAGES.saveFailed,
-      );
+      setServerError(errorMessage(error, MESSAGES.saveFailed));
     },
   });
 
@@ -243,7 +274,8 @@ export default function RoleModal({
     setWritable((current) => {
       const next = new Set(current);
       if (removing) next.delete(permission);
-      else next.add(permission);
+      // Added at write only when the caller may grant write (036 C10); otherwise view only.
+      else if (canWrite(permission)) next.add(permission);
       return next;
     });
   }
@@ -277,13 +309,19 @@ export default function RoleModal({
     <Modal
       title={role ? `Edit ${role.name}` : 'Add role'}
       onClose={onClose}
+      isDirty={isDirty}
+      pending={mutation.isPending}
       footer={
         <>
-          <SecondaryButton type="button" onClick={onClose}>
+          <SecondaryButton
+            type="button"
+            onClick={onClose}
+            disabled={mutation.isPending}
+          >
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="role-form" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Saving…' : 'Save'}
+          <Button type="submit" form="role-form" loading={mutation.isPending}>
+            Save
           </Button>
         </>
       }
@@ -342,6 +380,8 @@ export default function RoleModal({
                   writable={writable.has(permission)}
                   onToggle={() => toggle(permission)}
                   onLevel={(level) => setLevel(permission, level)}
+                  canGrantRead={canRead(permission)}
+                  canGrantWrite={canWrite(permission)}
                 />
               );
             })}
@@ -364,6 +404,8 @@ export default function RoleModal({
                 writable={writable.has(permission)}
                 onToggle={() => toggle(permission)}
                 onLevel={(level) => setLevel(permission, level)}
+                canGrantRead={canRead(permission)}
+                canGrantWrite={canWrite(permission)}
               />
             ))}
           </div>
