@@ -337,6 +337,7 @@ export default function PaymentSheetDetailPage() {
           description={
             s.siteName ?? <>{labourLabel(s.engagementType)} engagement</>
           }
+          breadcrumbs={[{ label: 'Payment sheets', href: ROUTES.labourPaymentSheets }]}
         />
         <StatusBadge status={s.status} label={labourLabel(s.status)} />
       </div>

@@ -14,7 +14,7 @@ import {
   type IndentLine,
 } from '@/app/lib/api/inventory';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, inventoryLabel, overdueLabel } from '@/app/lib/constants';
+import { MESSAGES, ROUTES, inventoryLabel, overdueLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { promptDialog } from '@/app/ui/dialogs';
 import ApproveIndentModal from '@/app/ui/inventory/approve-indent-modal';
@@ -210,7 +210,10 @@ export default function IndentDetailPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <PageHeader title={data.indentNumber} />
+          <PageHeader
+            title={data.indentNumber}
+            breadcrumbs={[{ label: 'Indents', href: ROUTES.inventoryIndents }]}
+          />
           <p className="text-sm text-gray-600">
             {data.siteName}
             {data.department ? ` · ${data.department}` : ''} · required by{' '}

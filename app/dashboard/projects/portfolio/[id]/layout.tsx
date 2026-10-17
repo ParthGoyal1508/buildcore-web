@@ -1,7 +1,6 @@
 'use client';
 
 import { LockClosedIcon } from '@heroicons/react/24/outline';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -14,7 +13,7 @@ import {
   PROJECT_SHELL_COPY,
   ROUTES,
 } from '@/app/lib/constants';
-import PageHeader from '@/app/ui/page-header';
+import PageHeader, { Breadcrumbs } from '@/app/ui/page-header';
 import SectionTabs from '@/app/ui/section-tabs';
 import StatusBadge from '@/app/ui/status-badge';
 import { visibleProjectDetailSections } from '@/app/ui/projects/project-detail-sections';
@@ -128,14 +127,9 @@ export default function ProjectShellLayout({
   if (isError || !detail) {
     return (
       <main>
-        <nav aria-label="Breadcrumb" className="mb-2 text-sm text-gray-600">
-          <Link
-            href={ROUTES.projectsPortfolio}
-            className="hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
-          >
-            {PROJECT_SHELL_COPY.breadcrumb}
-          </Link>
-        </nav>
+        <Breadcrumbs
+          items={[{ label: PROJECT_SHELL_COPY.breadcrumb, href: ROUTES.projectsPortfolio }]}
+        />
         <p role="alert" className="text-sm text-red-600">
           {PROJECT_SHELL_COPY.loadFailed}
         </p>
@@ -150,16 +144,10 @@ export default function ProjectShellLayout({
     <ProjectShellProvider detail={detail}>
       <ProjectLockProvider projectId={project.id} isLocked={project.isLocked}>
         <main>
-          <nav aria-label="Breadcrumb" className="mb-2 text-sm text-gray-600">
-            <Link
-              href={ROUTES.projectsPortfolio}
-              className="hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
-            >
-              {PROJECT_SHELL_COPY.breadcrumb}
-            </Link>
-            <span aria-hidden="true"> / </span>
-            <span className="text-gray-900">{project.name}</span>
-          </nav>
+          {/* The shared trail (036 A23); the project's name is the heading just below. */}
+          <Breadcrumbs
+            items={[{ label: PROJECT_SHELL_COPY.breadcrumb, href: ROUTES.projectsPortfolio }]}
+          />
 
           <PageHeader
             title={

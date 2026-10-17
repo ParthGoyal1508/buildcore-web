@@ -12,7 +12,7 @@ import {
   type MusterLine,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { labourLabel } from '@/app/lib/constants';
+import { ROUTES, labourLabel } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { confirmDialog } from '@/app/ui/dialogs';
@@ -148,6 +148,7 @@ export default function MusterDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageHeader
           title={<>Muster — {dateLabel(m.date)}</>}
+          breadcrumbs={[{ label: 'Musters', href: ROUTES.labourMusters }]}
           description={
             <>
               {m.siteName ?? 'Unknown site'} · Supervisor{' '}

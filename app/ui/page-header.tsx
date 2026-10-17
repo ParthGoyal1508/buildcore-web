@@ -1,4 +1,6 @@
+import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import clsx from 'clsx';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import AreaChip from '@/app/ui/area-chip';
@@ -25,10 +27,44 @@ import { lusitana } from '@/app/ui/fonts';
  * them changing, and so it cannot disagree with the sidebar: both resolve the module by the same
  * longest-prefix rule (`areaForPath`). A path no module claims simply gets no chip.
  */
+/** One step above the current page in a breadcrumb trail. */
+export interface Crumb {
+  label: ReactNode;
+  href: string;
+}
+
+/**
+ * The trail above a detail page's title (036 A23): "Plant › Equipment", then the machine's name as
+ * the heading. It replaces the ~25 hand-built "Back to the register" / "← Purchase orders" links,
+ * which sat in four different places with four different looks, and says where the page sits as
+ * well as how to leave it. Only the ancestors are links — the heading below is the current page,
+ * so it is not repeated here.
+ */
+export function Breadcrumbs({ items }: { items: readonly Crumb[] }) {
+  return (
+    <nav aria-label="Breadcrumb" className="mb-2">
+      <ol className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
+        {items.map((item) => (
+          <li key={item.href} className="flex items-center gap-1">
+            <Link
+              href={item.href}
+              className="rounded hover:text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+            >
+              {item.label}
+            </Link>
+            <ChevronRightIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-500" />
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 export default function PageHeader({
   title,
   description,
   actions,
+  breadcrumbs,
   className,
 }: {
   title: ReactNode;
@@ -36,13 +72,15 @@ export default function PageHeader({
   description?: ReactNode;
   /** Buttons or controls belonging to the screen as a whole, not to its content. */
   actions?: ReactNode;
+  /** The pages above this one, outermost first — for a detail page (036 A23). */
+  breadcrumbs?: readonly Crumb[];
   className?: string;
 }) {
-  return (
+  const header = (
     <div
       className={clsx(
         'flex flex-wrap items-start justify-between gap-x-4 gap-y-3',
-        className,
+        !breadcrumbs && className,
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
@@ -61,6 +99,13 @@ export default function PageHeader({
       {actions ? (
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
       ) : null}
+    </div>
+  );
+  if (!breadcrumbs?.length) return header;
+  return (
+    <div className={className}>
+      <Breadcrumbs items={breadcrumbs} />
+      {header}
     </div>
   );
 }

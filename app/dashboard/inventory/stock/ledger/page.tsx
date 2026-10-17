@@ -188,18 +188,15 @@ function StockLedgerBody() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <PageHeader title="Stock ledger" />
+          <PageHeader
+            title="Stock ledger"
+            breadcrumbs={[{ label: 'Stock', href: ROUTES.inventoryStock }]}
+          />
           <p className="text-sm text-gray-600">
             {data
               ? `${data.itemName} (${data.itemCode}) at ${data.siteName}`
               : ' '}
           </p>
-          <Link
-            href={ROUTES.inventoryStock}
-            className="text-sm text-brand-700 hover:underline"
-          >
-            Back to stock
-          </Link>
         </div>
         <SecondaryButton
           type="button"

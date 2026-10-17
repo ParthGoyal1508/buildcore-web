@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
@@ -10,9 +9,9 @@ import {
   PO_STATUS_LABELS,
   type PurchaseOrderDetail,
 } from '@/app/lib/api/inventory';
-import { inventoryLabel } from '@/app/lib/constants';
+import { ROUTES, inventoryLabel } from '@/app/lib/constants';
 import { dateLabel, quantity, rupees } from '@/app/lib/format';
-import PageHeader from '@/app/ui/page-header';
+import PageHeader, { Breadcrumbs } from '@/app/ui/page-header';
 import QueryError from '@/app/ui/query-error';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
@@ -36,12 +35,10 @@ export default function PurchaseOrderTracePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        href="/dashboard/inventory/purchase-orders"
-        className="self-start text-sm text-brand-700 hover:underline"
-      >
-        ← Purchase orders
-      </Link>
+      {/* The trail on its own, above the states, so it is there while the order loads or fails too. */}
+      <Breadcrumbs
+        items={[{ label: 'Purchase orders', href: ROUTES.inventoryPurchaseOrders }]}
+      />
       {po.isPending ? (
         <ListSkeleton
           headers={['Line', 'Item', 'Ordered', 'Received', 'Billed', 'Paid']}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -83,18 +82,15 @@ export default function HireOrderPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <PageHeader title={`Work order ${o.code}`} />
+          <PageHeader
+            title={`Work order ${o.code}`}
+            breadcrumbs={[{ label: 'Hire orders', href: ROUTES.plantHireOrders }]}
+          />
           <p className="mt-1 text-sm text-gray-600">
             {o.vendorName} · {dateLabel(o.date)}
             {o.referenceNo && ` · Ref ${o.referenceNo}`}
           </p>
         </div>
-        <Link
-          href={ROUTES.plantHireOrders}
-          className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
-        >
-          Back to hire orders
-        </Link>
       </div>
 
       <div className="flex flex-wrap gap-2">

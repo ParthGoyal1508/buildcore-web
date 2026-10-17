@@ -269,6 +269,7 @@ export default function EquipmentDetailPage() {
                   {data.code} · {data.name}
                 </>
               }
+              breadcrumbs={[{ label: 'Equipment', href: ROUTES.plantEquipment }]}
             />
             <div className="mt-2 flex items-center gap-2">
               <StatusBadge status={data.status} label={plantLabel(data.status)} />
@@ -283,12 +284,6 @@ export default function EquipmentDetailPage() {
             </div>
           </div>
         </div>
-        <Link
-          href={ROUTES.plantEquipment}
-          className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
-        >
-          Back to the register
-        </Link>
       </div>
 
       {/*

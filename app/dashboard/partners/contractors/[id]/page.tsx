@@ -172,7 +172,11 @@ export default function ContractorDetailPage() {
   return (
     <main>
       <div className="mb-6">
-        <PageHeader title={data.vendorName ?? 'Contractor'} className="mb-1" />
+        <PageHeader
+          title={data.vendorName ?? 'Contractor'}
+          breadcrumbs={[{ label: 'Contractors', href: ROUTES.partnersContractors }]}
+          className="mb-1"
+        />
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
           <span>{data.vendorCode}</span>
           <StatusBadge status={data.complianceStatus} />

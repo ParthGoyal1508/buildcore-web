@@ -93,11 +93,7 @@ export default function SiteDetailPage() {
             <StatusBadge status={row.status} />
           </span>
         }
-        description={
-          <Link href={ROUTES.projectsSites} className="text-brand-700 underline">
-            Sites
-          </Link>
-        }
+        breadcrumbs={[{ label: 'Sites', href: ROUTES.projectsSites }]}
         actions={<Button onClick={() => setEditing(true)}>Edit site</Button>}
       />
 

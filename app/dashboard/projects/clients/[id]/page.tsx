@@ -91,14 +91,7 @@ export default function ClientDetailPage() {
             <StatusBadge status={row.status} />
           </span>
         }
-        description={
-          <Link
-            href={ROUTES.projectsClients}
-            className="text-brand-700 underline"
-          >
-            Clients
-          </Link>
-        }
+        breadcrumbs={[{ label: 'Clients', href: ROUTES.projectsClients }]}
         actions={<Button onClick={() => setEditing(true)}>Edit client</Button>}
       />
 

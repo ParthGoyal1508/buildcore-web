@@ -226,6 +226,7 @@ export default function AssetDetailPage() {
                 {row.assetCode} — {row.name}
               </>
             }
+            breadcrumbs={[{ label: 'Asset register', href: ROUTES.assetsRegister }]}
           />
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
             <StatusBadge status={row.status} label={assetsLabel(row.status)} />
