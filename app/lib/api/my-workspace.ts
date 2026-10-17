@@ -165,7 +165,13 @@ export const salarySlipSchema = z.object({
     pt: z.number(),
     tds: z.number(),
     loanEmi: z.number(),
+    // The advance actually recovered on this slip (036 G2 / B-side): stored on the slip now, not
+    // re-derived from the advance's schedule, so it matches the line on the PDF.
     advanceRecovery: z.number(),
+    // 036 G2: fuel lost on a machine, recovered from its operator (020 FR-007). The API always sent
+    // it and counted it in `total`, but the schema stripped it, so the rows on screen did not add
+    // up to the deductions total whenever there was a recovery.
+    fuelRecovery: z.number().default(0),
   }),
   employerContributions: moneyGroupSchema({
     pf: z.number(),

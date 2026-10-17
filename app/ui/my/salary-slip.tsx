@@ -11,13 +11,11 @@ import {
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
-import {
-  FormError,
-  SecondaryButton,
-  SelectField,
-} from '@/app/ui/settings/form-fields';
+import QueryError from '@/app/ui/query-error';
+import { SecondaryButton, SelectField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
-import { money, periodLabel } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
+import { money, periodLabel, rupees } from '@/app/lib/format';
 
 
 function AmountRows({
@@ -47,7 +45,7 @@ function AmountRows({
 
 export default function SalarySlipPanel() {
   const [chosenPeriod, setChosenPeriod] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   // The payslip read in the page, without saving it (2026-10-14).
   const { view, viewer } = useFileViewer();
@@ -56,6 +54,8 @@ export default function SalarySlipPanel() {
     data: periods,
     isLoading: periodsLoading,
     isError: periodsError,
+    error: periodsFailure,
+    refetch: refetchPeriods,
   } = useQuery({
     queryKey: ['my', 'salary-periods'],
     queryFn: getAvailablePeriods,
@@ -68,7 +68,13 @@ export default function SalarySlipPanel() {
   // them pick it first would be a step with one sensible answer.
   const period = chosenPeriod ?? periods?.[0] ?? null;
 
-  const { data: slip, isLoading: slipLoading } = useQuery({
+  const {
+    data: slip,
+    isLoading: slipLoading,
+    isError: slipError,
+    error: slipFailure,
+    refetch: refetchSlip,
+  } = useQuery({
     queryKey: ['my', 'salary', period],
     queryFn: () => getSalarySlip(period as string),
     enabled: period !== null,
@@ -76,7 +82,6 @@ export default function SalarySlipPanel() {
 
   async function download() {
     if (!period) return;
-    setDownloadError(null);
     setIsDownloading(true);
     try {
       const blob = await downloadSalarySlipPdf(period);
@@ -89,9 +94,9 @@ export default function SalarySlipPanel() {
       // download in some browsers before it has read the blob.
       setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
-      setDownloadError(
-        error instanceof Error ? error.message : MESSAGES.loadFailed,
-      );
+      // 036 G2: a toast rather than a banner above the month picker, which pushed the slip down
+      // and stayed after the next successful download.
+      toast.error(error instanceof Error ? error.message : MESSAGES.loadFailed);
     } finally {
       setIsDownloading(false);
     }
@@ -104,11 +109,15 @@ export default function SalarySlipPanel() {
       </p>
     );
   }
+  // 036 G2: with a Retry. It was a red line and nothing else, so a dropped connection on the way
+  // in meant reloading the whole page.
   if (periodsError) {
     return (
-      <p className="text-sm text-red-600" role="alert">
-        {MESSAGES.loadFailed}
-      </p>
+      <QueryError
+        error={periodsFailure}
+        fallback={MESSAGES.loadFailed}
+        onRetry={refetchPeriods}
+      />
     );
   }
   // T030: an employee whose first payroll has not run yet, which is a normal state
@@ -136,12 +145,20 @@ export default function SalarySlipPanel() {
         ))}
       </SelectField>
 
-      <FormError message={downloadError} />
-
       {slipLoading && (
         <p className="text-sm text-gray-500" role="status">
           Loading payslip…
         </p>
+      )}
+
+      {/* 036 G2: the slip's own failure had no state at all — the panel showed the month picker
+          and two disabled buttons and nothing to say why. */}
+      {slipError && (
+        <QueryError
+          error={slipFailure}
+          fallback={MESSAGES.loadFailed}
+          onRetry={refetchSlip}
+        />
       )}
 
       {slip && <SlipBody slip={slip} />}
@@ -164,8 +181,10 @@ export default function SalarySlipPanel() {
         </SecondaryButton>
         <Button
           type="button"
+          intent="read"
           onClick={download}
-          disabled={isDownloading || !slip}
+          loading={isDownloading}
+          disabled={!slip}
         >
           {isDownloading ? 'Preparing…' : 'Download PDF'}
         </Button>
@@ -222,6 +241,10 @@ function SlipBody({ slip }: { slip: Slip }) {
               ['TDS', slip.deductions.tds],
               ['Loan EMI', slip.deductions.loanEmi],
               ['Advance recovery', slip.deductions.advanceRecovery],
+              // 036 G2: counted in the total all along but never listed, so a slip with a fuel
+              // recovery showed rows that summed to less than "Total deductions". Same wording
+              // as the PDF.
+              ['Fuel recovery', slip.deductions.fuelRecovery],
             ]}
           />
         </div>
@@ -229,7 +252,7 @@ function SlipBody({ slip }: { slip: Slip }) {
 
       <div className="rounded-md bg-blue-50 px-3 py-3">
         <p className="text-lg font-semibold text-blue-900">
-          Net pay: ₹{money(slip.netPay)}
+          Net pay: {rupees(slip.netPay)}
         </p>
         <p className="text-xs text-blue-800">{slip.netPayInWords}</p>
       </div>
