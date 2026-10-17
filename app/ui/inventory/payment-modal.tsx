@@ -16,8 +16,9 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { useVendors } from './use-inventory-refs';
+import { todayIso } from '@/app/lib/format';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * Record a payment to a vendor.

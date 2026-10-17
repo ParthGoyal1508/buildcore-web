@@ -10,7 +10,7 @@ import {
   getStockHint,
 } from '@/app/lib/api/inventory';
 import { MESSAGES } from '@/app/lib/constants';
-import { quantity as formatQuantity } from '@/app/lib/format';
+import { quantity as formatQuantity, todayIso } from '@/app/lib/format';
 import {
   FormError,
   SecondaryButton,
@@ -20,7 +20,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import { useSites } from './use-inventory-refs';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * Move material between stores.

@@ -27,14 +27,9 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import { todayIso } from '@/app/lib/format';
 
 const MAX_BYTES = 10 * 1024 * 1024;
-
-const todayIso = () => {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 
 /** A rupee amount typed into a field, or undefined when blank. */
 const amountOf = (value: string) =>

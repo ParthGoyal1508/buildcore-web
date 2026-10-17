@@ -14,7 +14,7 @@ import {
 } from '@/app/lib/api/bill-packages';
 import { downloadDebitNote } from '@/app/lib/api/billing';
 import { saveBlob } from '@/app/lib/download-file';
-import { dateLabel } from '@/app/lib/format';
+import { dateLabel, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
 import Modal from '@/app/ui/settings/modal';
@@ -252,7 +252,7 @@ const blankLine = (key: number): LineDraft => ({
   rate: '',
 });
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * The form behind "Raise a debit note" — the fields of the client's format that are not already on

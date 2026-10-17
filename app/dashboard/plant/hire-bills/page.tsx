@@ -33,6 +33,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import { todayIso } from '@/app/lib/format';
 
 export default function HireBillsPage() {
   const queryClient = useQueryClient();
@@ -92,7 +93,7 @@ export default function HireBillsPage() {
       paymentReference: string;
     }) =>
       payHireBill(id, {
-        paymentDate: new Date().toISOString().slice(0, 10),
+        paymentDate: todayIso(),
         paymentReference,
       }),
     onSuccess: () => {

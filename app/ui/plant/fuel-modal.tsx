@@ -20,6 +20,7 @@ import {
   usePlantSites,
   usePlantVendors,
 } from './use-plant-refs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Record fuel drawn.
@@ -50,7 +51,7 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
    * is transferred.
    */
   const [siteId, setSiteId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayIso());
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
   const [amountPaid, setAmountPaid] = useState('');

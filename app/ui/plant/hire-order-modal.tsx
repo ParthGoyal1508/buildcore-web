@@ -28,6 +28,7 @@ import {
   usePlantVendors,
 } from './use-plant-refs';
 import VendorOptions from './vendor-options';
+import { todayIso } from '@/app/lib/format';
 
 interface LineDraft {
   key: number;
@@ -90,7 +91,7 @@ export default function HireOrderModal({
   });
 
   const [date, setDate] = useState(
-    order?.date.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+    order?.date.slice(0, 10) ?? todayIso(),
   );
   const [referenceNo, setReferenceNo] = useState(order?.referenceNo ?? '');
   const [vendorId, setVendorId] = useState(order?.vendorId ?? '');

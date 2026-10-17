@@ -27,6 +27,7 @@ import {
   usePlantCompanyId,
   usePlantVendors,
 } from './use-plant-refs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Add or edit a spare part.
@@ -236,7 +237,7 @@ export function ReceivePartModal({
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
   const [receiptDate, setReceiptDate] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [vendorId, setVendorId] = useState('');
   const [billReference, setBillReference] = useState('');

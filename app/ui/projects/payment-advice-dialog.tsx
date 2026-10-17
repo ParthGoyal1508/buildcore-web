@@ -23,6 +23,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { FileIcon } from '@/app/ui/file-icons';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Generating a payment advice for a certified subcontractor bill (2026-10-13).
@@ -57,7 +58,7 @@ export default function PaymentAdviceDialog({
   });
 
   const [paidOn, setPaidOn] = useState(() =>
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [amount, setAmount] = useState(
     outstanding && outstanding > 0 ? outstanding.toFixed(2) : '',

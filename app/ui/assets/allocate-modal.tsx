@@ -25,6 +25,7 @@ import {
   useAssetSites,
   useAssetsCompanyId,
 } from './use-asset-refs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Allocate an asset to a project site (spec US4).
@@ -59,7 +60,7 @@ export default function AllocateModal({
   const [custodianEmployeeId, setCustodianEmployeeId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [allocatedFrom, setAllocatedFrom] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [remarks, setRemarks] = useState('');

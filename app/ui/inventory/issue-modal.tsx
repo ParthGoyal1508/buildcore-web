@@ -12,7 +12,7 @@ import {
   type IssueInput,
 } from '@/app/lib/api/inventory';
 import { CONTRACTOR_VENDOR_TYPES, MESSAGES } from '@/app/lib/constants';
-import { quantity as formatQuantity } from '@/app/lib/format';
+import { quantity as formatQuantity, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -23,7 +23,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import { useProjects, useSites, useVendors } from './use-inventory-refs';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * Issue material from a store.

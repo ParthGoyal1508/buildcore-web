@@ -31,6 +31,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { useEmployees } from '@/app/ui/recruitment/use-employees';
 import { LoadingText } from '@/app/ui/spinner';
+import { todayIso, businessDate } from '@/app/lib/format';
 
 export default function InterviewsPage() {
   const queryClient = useQueryClient();
@@ -47,7 +48,7 @@ export default function InterviewsPage() {
     queryClient.invalidateQueries({ queryKey: ['interviews'] });
 
   const list = interviews.data ?? [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const open = list.filter((i) => i.status === 'scheduled');
   // Grouped by what is left to do (2026-10-14). The three date groups held only rounds still to
   // happen, so a completed one from an earlier day fell into none of them — and its feedback, the
@@ -55,10 +56,10 @@ export default function InterviewsPage() {
   const groups = {
     'Awaiting feedback': open.filter((i) => i.overdue),
     Today: open.filter(
-      (i) => !i.overdue && i.scheduledAt.slice(0, 10) === today,
+      (i) => !i.overdue && businessDate(i.scheduledAt) === today,
     ),
     Upcoming: open.filter(
-      (i) => !i.overdue && i.scheduledAt.slice(0, 10) > today,
+      (i) => !i.overdue && businessDate(i.scheduledAt) > today,
     ),
     Completed: list
       .filter((i) => i.status !== 'scheduled')

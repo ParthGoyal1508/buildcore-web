@@ -110,17 +110,34 @@ export function dateTimeLabel(value: string | null | undefined): string {
  * same string.
  */
 export function todayIso(): string {
+  return businessDate(new Date());
+}
+
+/**
+ * The `YYYY-MM-DD` date an instant falls on in the business timezone.
+ *
+ * For comparing a timestamp with `todayIso()`: slicing the ISO string of `2026-10-18T01:00+05:30`
+ * gives the 17th, so an interview at 01:00 IST was neither "today" nor "upcoming" once today was
+ * read in IST. Both sides of a comparison have to be in the same zone (036 A19).
+ */
+export function businessDate(instant: Date | string): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: BUSINESS_TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
+  }).format(typeof instant === 'string' ? new Date(instant) : instant);
 }
 
-/** The current `YYYY-MM` period key. */
+/**
+ * The current `YYYY-MM` period key, in the business timezone.
+ *
+ * Taken from `todayIso` for the reason that helper exists: the UTC slice it replaced named last
+ * month between 00:00 and 05:30 IST on the 1st, so payroll, loans and advances opened on the wrong
+ * period for the first hours of every month (036 A19).
+ */
 export function currentPeriod(): string {
-  return new Date().toISOString().slice(0, 7);
+  return todayIso().slice(0, 7);
 }
 
 /**

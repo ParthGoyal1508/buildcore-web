@@ -27,6 +27,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { usePlantVendors } from './use-plant-refs';
 import { promptDialog } from '@/app/ui/dialogs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Record a third-party service bill against a job.
@@ -50,7 +51,7 @@ function ServiceBillModal({
   const [vendorId, setVendorId] = useState('');
   const [billNumber, setBillNumber] = useState('');
   const [billDate, setBillDate] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [grossAmount, setGrossAmount] = useState('');
   const [taxAmount, setTaxAmount] = useState('');
@@ -254,7 +255,7 @@ export default function ServiceBillPanel({ job }: { job: MaintenanceJob }) {
       paymentReference: string;
     }) =>
       payServiceBill(id, {
-        paidOn: new Date().toISOString().slice(0, 10),
+        paidOn: todayIso(),
         paidAmount,
         paymentReference,
       }),

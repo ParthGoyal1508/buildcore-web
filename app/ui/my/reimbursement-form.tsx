@@ -18,6 +18,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { todayIso } from '@/app/lib/format';
 
 /** Matches the backend's DECIMAL(12,2): more precision would be silently rounded. */
 const AMOUNT_STEP = '0.01';
@@ -199,7 +200,7 @@ export default function ReimbursementForm({
         label="Expense date"
         type="date"
         // A claim cannot be for money not yet spent.
-        max={new Date().toISOString().slice(0, 10)}
+        max={todayIso()}
         value={form.expenseDate}
         onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
       />

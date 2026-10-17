@@ -16,8 +16,9 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { useSites } from './use-inventory-refs';
+import { todayIso } from '@/app/lib/format';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * The Daily Issue Register in the client's format (2026-10-15) — S.No., date, item code,

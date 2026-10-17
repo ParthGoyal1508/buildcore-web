@@ -10,11 +10,12 @@ import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
+import { currentPeriod } from '@/app/lib/format';
 
 /** `YYYY-MM` of the current month — the latest a filing can be recorded for. */
 function currentMonth(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  // IST, not UTC: the UTC month refused the current month's filing before 05:30 on the 1st (036 A19).
+  return currentPeriod();
 }
 
 export default function ComplianceModal({

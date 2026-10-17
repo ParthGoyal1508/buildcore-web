@@ -12,7 +12,7 @@ import {
   type ProjectDocument,
 } from '@/app/lib/api/project-documents';
 import { DOCUMENT_COPY, MESSAGES } from '@/app/lib/constants';
-import { dateLabel, dateTimeLabel } from '@/app/lib/format';
+import { dateLabel, dateTimeLabel, todayIso } from '@/app/lib/format';
 import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { Button } from '@/app/ui/button';
@@ -57,13 +57,13 @@ import { LoadingText } from '@/app/ui/spinner';
 function hasLapsed(document: { expiresAt?: string | null }): boolean {
   if (!document.expiresAt) return false;
   return (
-    document.expiresAt.slice(0, 10) < new Date().toISOString().slice(0, 10)
+    document.expiresAt.slice(0, 10) < todayIso()
   );
 }
 
 /** Whole days from today until a document's expiry; negative once it has lapsed. */
 function daysToExpiry(expiresAt: string): number {
-  const today = new Date(new Date().toISOString().slice(0, 10));
+  const today = new Date(todayIso());
   const until = new Date(expiresAt.slice(0, 10));
   return Math.round((until.getTime() - today.getTime()) / 86_400_000);
 }

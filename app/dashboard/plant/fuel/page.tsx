@@ -27,6 +27,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
+import { currentPeriod } from '@/app/lib/format';
 
 export default function FuelPage() {
   const equipment = usePlantEquipment();
@@ -42,7 +43,7 @@ export default function FuelPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [varianceOnly, setVarianceOnly] = useState(false);
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(currentPeriod());
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
 

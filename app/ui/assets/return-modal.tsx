@@ -16,6 +16,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import { useConditionGrades } from './use-asset-refs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Record the return of an allocated asset (spec US4, FR-012).
@@ -47,7 +48,7 @@ export default function ReturnModal({
   const grades = useConditionGrades();
 
   const [actualReturnDate, setActualReturnDate] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [conditionOnReturnId, setConditionOnReturnId] = useState('');
   const [remarks, setRemarks] = useState(allocation.remarks ?? '');

@@ -12,12 +12,11 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { todayIso } from '@/app/lib/format';
 
 /** Today as `YYYY-MM-DD`, for the date input's floor. */
 function today(): string {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
+  return todayIso();
 }
 
 /**

@@ -19,6 +19,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { useItems, useSites, useVendors } from './use-inventory-refs';
+import { todayIso } from '@/app/lib/format';
 
 /** Reads a file as base64 without the data-URL prefix, which is what the API takes. */
 function readAsBase64(file: File): Promise<string> {
@@ -33,7 +34,7 @@ function readAsBase64(file: File): Promise<string> {
   });
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 const EMPTY_GRN = {
   challanNo: '',

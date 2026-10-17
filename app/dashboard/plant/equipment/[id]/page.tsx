@@ -40,6 +40,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
+import { todayIso } from '@/app/lib/format';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -502,7 +503,7 @@ function PaperExpiry({ paper }: { paper: RegistrationPaper }) {
   if (paper.status !== 'held') return <>—</>;
   if (!paper.expiresAt) return <>Not recorded</>;
   const date = paper.expiresAt.slice(0, 10);
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = todayIso();
   const days = Math.round(
     (Date.parse(date) - Date.parse(today)) / (24 * 60 * 60 * 1000),
   );

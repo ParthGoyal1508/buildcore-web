@@ -17,6 +17,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { usePlantEquipment } from './use-plant-refs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Record a day in the logbook.
@@ -45,7 +46,7 @@ export default function LogbookModal({ onClose }: { onClose: () => void }) {
   });
 
   const [equipmentId, setEquipmentId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayIso());
   const [openingReading, setOpeningReading] = useState('');
   const [closingReading, setClosingReading] = useState('');
   const [fuelConsumed, setFuelConsumed] = useState('');

@@ -35,6 +35,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import DocumentDownloads from './document-downloads';
 import { usePlantEquipment } from './use-plant-refs';
+import { todayIso } from '@/app/lib/format';
 
 /** The card's single-value fields, held as strings while editing. */
 const TEXT_FIELDS = [
@@ -237,7 +238,7 @@ function JobCardForm({
     const initial = Object.fromEntries(
       TEXT_FIELDS.map((key) => [key, str(card?.[key])]),
     ) as Record<TextKey, string>;
-    if (!initial.date) initial.date = new Date().toISOString().slice(0, 10);
+    if (!initial.date) initial.date = todayIso();
     return initial;
   });
   const [inspections, setInspections] = useState<InspectionDraft[]>(() =>

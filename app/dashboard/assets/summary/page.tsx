@@ -22,6 +22,7 @@ import {
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
+import { todayIso } from '@/app/lib/format';
 
 type Grouping = 'category' | 'status' | 'project';
 
@@ -70,7 +71,7 @@ export default function AssetSummaryPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `asset-register-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.download = `asset-register-${todayIso()}.xlsx`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {

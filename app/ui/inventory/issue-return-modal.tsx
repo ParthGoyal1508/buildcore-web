@@ -12,8 +12,9 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import { todayIso } from '@/app/lib/format';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * Material coming back to the store against an issue (2026-10-15) — the Daily Issue Register's
