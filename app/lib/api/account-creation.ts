@@ -16,6 +16,8 @@ import { authFetch } from '@/app/lib/session';
 export const unlinkedEmployeeSchema = z.object({
   id: z.string(),
   employeeCode: z.string(),
+  /** 036 C18. Defaulted so a server predating it still parses. */
+  name: z.string().default(''),
 });
 export type UnlinkedEmployee = z.infer<typeof unlinkedEmployeeSchema>;
 
@@ -125,6 +127,22 @@ export async function getUnlinkedEmployees(
     `/account-creation/employees/unlinked?${params.toString()}`,
   );
   return z.array(unlinkedEmployeeSchema).parse(raw);
+}
+
+/** One page of unlinked employees for the searchable picker (036 C18): name or code, 25 a page. */
+export async function searchUnlinkedEmployees(
+  companyId: string,
+  search: string,
+  page: number,
+): Promise<{ items: UnlinkedEmployee[]; total: number }> {
+  const params = new URLSearchParams({ companyId, page: String(page) });
+  if (search.trim()) params.set('search', search.trim());
+  const raw = await authFetch<unknown>(
+    `/account-creation/employees/unlinked?${params.toString()}`,
+  );
+  return z
+    .object({ items: z.array(unlinkedEmployeeSchema), total: z.number() })
+    .parse(raw);
 }
 
 export async function createUser(
