@@ -19,6 +19,10 @@ import {
   permissionLabel,
 } from '@/app/lib/constants';
 import { getCurrentUser } from '@/app/lib/api/users';
+import {
+  useSelectedCompany,
+  useSelectedCompanyId,
+} from '@/app/lib/api/company-selection';
 import { Button } from '@/app/ui/button';
 import { mayGrant } from '@/app/ui/settings/grant-ceiling';
 import { toast } from '@/app/ui/toast';
@@ -219,6 +223,18 @@ export default function RoleModal({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
+  // 036 C10: where the role lives. A custom role belongs to the company it was made in; a group
+  // administrator with no company selected makes one every company shares.
+  const selectedCompany = useSelectedCompany();
+  const selectedCompanyId = useSelectedCompanyId();
+  const crossCompany = me?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false;
+  const scopeHint = role
+    ? role.companyId === null
+      ? 'Shared by every company.'
+      : `Belongs to ${role.companyName ?? 'one company'}; only its accounts can hold it.`
+    : crossCompany && !selectedCompanyId
+      ? 'No company is selected, so this role will be shared by every company. Select a company first to make one of its own.'
+      : `Belongs to ${selectedCompany?.name ?? 'your company'} only; other companies will not see it.`;
   const canRead = (permission: string) => mayGrant(me, permission, 'read');
   const canWrite = (permission: string) => mayGrant(me, permission, 'write');
 
@@ -333,6 +349,7 @@ export default function RoleModal({
           label="Role name"
           value={name}
           error={nameError}
+          hint={scopeHint}
           onChange={(event) => setName(event.target.value)}
         />
 

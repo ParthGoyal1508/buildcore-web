@@ -23,6 +23,7 @@ import {
   UserSummary,
   deleteUser,
   listRoles,
+  roleFitsCompany,
   listUsersPage,
   updateUser,
 } from '@/app/lib/api/settings';
@@ -75,6 +76,12 @@ function UserModal({
   const isSelf = user.id === me?.id;
 
   const roles = useQuery({ queryKey: ['roles'], queryFn: listRoles });
+  // Another company's own role cannot be held by this account (036 C10); one already held stays
+  // listed so it can be removed.
+  const assignableRoles = (roles.data ?? []).filter(
+    (role) =>
+      roleFitsCompany(role, user.companyId) || initialRoles.includes(role.id),
+  );
 
   const rolesChanged =
     roleIds.length !== initialRoles.length ||
@@ -171,7 +178,7 @@ function UserModal({
             />
           ) : (
             <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-3">
-              {(roles.data ?? []).map((role) => {
+              {assignableRoles.map((role) => {
                 const held = initialRoles.includes(role.id);
                 // A role the caller could not grant stays as it is: ticked if held (the server
                 // leaves a held role alone), unavailable to add (036 C10 — refused up front, not

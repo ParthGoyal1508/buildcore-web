@@ -198,10 +198,25 @@ export const roleSchema = z.object({
   /** Active accounts holding the role in the caller's company (036 C11). Optional: a server
    * predating it still parses, and the screens then say nothing rather than "0 holders". */
   activeHolderCount: z.number().optional(),
+  /**
+   * The company a custom role belongs to; null for a system role every company shares (036 C10).
+   * Defaulted so a server predating the field still parses — every role was global then.
+   */
+  companyId: z.string().nullable().default(null),
+  /** That company's name, on the list only. */
+  companyName: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Role = z.infer<typeof roleSchema>;
+
+/** Whether an account of `companyId` may hold the role: a global one, or its own company's. */
+export function roleFitsCompany(
+  role: Pick<Role, 'companyId'>,
+  companyId: string | null | undefined,
+): boolean {
+  return role.companyId === null || role.companyId === (companyId ?? null);
+}
 
 export async function listRoles(): Promise<Role[]> {
   return z.array(roleSchema).parse(await authFetch('/settings/roles'));

@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { Role, deleteRole, listRoles } from '@/app/lib/api/settings';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, permissionLabel } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
@@ -22,6 +24,15 @@ export default function RoleList() {
     queryKey: ['roles'],
     queryFn: listRoles,
   });
+  // 036 C10: a custom role belongs to its company. A group administrator with no company selected
+  // sees every company's roles, so the list says whose each one is.
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  const selected = useSelectedCompanyId();
+  const showCompany =
+    (me?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false) && !selected;
 
   const removal = useMutation({
     mutationFn: (role: Role) => deleteRole(role.id),
@@ -65,6 +76,20 @@ export default function RoleList() {
       ),
       className: 'max-w-md',
     },
+    ...(showCompany
+      ? [
+          {
+            key: 'company',
+            header: 'Company',
+            render: (r: Role) =>
+              r.companyId === null ? (
+                <span className="text-gray-500">All companies</span>
+              ) : (
+                (r.companyName ?? 'Another company')
+              ),
+          },
+        ]
+      : []),
     { key: 'users', header: 'Users', render: (r) => r.assignedUserCount },
   ];
 
