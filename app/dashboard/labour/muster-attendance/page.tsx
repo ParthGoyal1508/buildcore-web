@@ -4,7 +4,7 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
@@ -30,10 +30,13 @@ import {
   ROUTES,
 } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
+import { urlEnum, urlString, useUrlState } from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
 import PageHeader from '@/app/ui/page-header';
+import QueryError from '@/app/ui/query-error';
 import Modal from '@/app/ui/settings/modal';
 import {
+  CheckboxField,
   FormError,
   RowAction,
   SecondaryButton,
@@ -43,7 +46,14 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import { LoadingText } from '@/app/ui/spinner';
-import { clockTime, dateTimeLabel } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
+import {
+  businessDate,
+  clockTime,
+  dateLabel,
+  dateTimeLabel,
+  todayIso,
+} from '@/app/lib/format';
 
 /** The badge colour for each day status: a missing punch reads as a warning, not as absent. */
 const STATUS_TONE: Record<string, string> = {
@@ -66,18 +76,24 @@ const FILTERS: { value: MusterFilter | ''; label: string }[] = [
 ];
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const localToday = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+/** Times are India time throughout (036 O5): the API reads a correction's `HH:mm` in the company's
+ * zone, and the form used to prefill it in the browser's — a laptop on another zone saved the
+ * wrong time. `clockTime` is IST, and so is `todayIso`. */
 const timeOf = (iso: string) => clockTime(iso);
-/** `HH:mm` in the browser's zone — the site's zone, for the office that runs it. */
-const hhmmOf = (iso: string) => {
-  const d = new Date(iso);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 const messageOf = (e: unknown, fallback: string) =>
   e instanceof ApiError && e.status < 500 ? e.message : fallback;
+
+/** A worker row matches the search box by name or labour code (036 O7). */
+function matches(row: { fullName: string; labourCode: string }, q: string): boolean {
+  const term = q.trim().toLowerCase();
+  if (!term) return true;
+  return (
+    row.fullName.toLowerCase().includes(term) ||
+    row.labourCode.toLowerCase().includes(term)
+  );
+}
+
+const FILTER_VALUES = FILTERS.map((f) => f.value);
 
 /**
  * Muster attendance from punch times (034). The daily view lists every labour with their punch in
@@ -86,12 +102,27 @@ const messageOf = (e: unknown, fallback: string) =>
  * HR office with "Correct labour punches" adds or fixes a punch with a reason, and every edit is
  * kept. Nobody marks a status by hand: it comes from the hours and the company's day rules.
  */
-export default function MusterAttendancePage() {
-  const [view, setView] = useState<'daily' | 'monthly'>('daily');
-  const [siteId, setSiteId] = useState('');
-  const [date, setDate] = useState(localToday);
-  const [month, setMonth] = useState(() => localToday().slice(0, 7));
-  const [filter, setFilter] = useState<MusterFilter | ''>('');
+function MusterAttendanceBody() {
+  // 036 O7 / A14: the view, site, date, month, filter and search live in the URL, so Back from a
+  // worker keeps them and a supervisor can send the exact view as a link.
+  const [state, setState] = useUrlState(
+    {
+      view: urlEnum(['daily', 'monthly'] as const, 'daily'),
+      site: urlString(),
+      date: urlString(todayIso()),
+      month: urlString(todayIso().slice(0, 7)),
+      show: urlEnum(FILTER_VALUES, ''),
+      q: urlString(),
+    },
+    { debounce: ['q'] },
+  );
+  const view = state.view;
+  const siteId = state.site;
+  const date = state.date;
+  const month = state.month;
+  const filter = state.show;
+  const setView = (v: 'daily' | 'monthly') => setState({ view: v });
+  const setFilter = (f: MusterFilter | '') => setState({ show: f });
   const [correcting, setCorrecting] = useState<{
     row: { workerId: string; fullName: string; labourCode: string };
     day: MusterDay;
@@ -113,7 +144,11 @@ export default function MusterAttendancePage() {
 
   const download = useMutation({
     mutationFn: () => {
-      const [year, m] = month.split('-').map(Number);
+      // 036 O7: the month on screen — the viewed date's month in the daily view. It used to take
+      // the monthly view's hidden month, so the Excel was for a month nobody was looking at.
+      const [year, m] = (view === 'daily' ? date.slice(0, 7) : month)
+        .split('-')
+        .map(Number);
       return downloadLabourAttendanceSheet({ ...(siteId ? { siteId } : {}), year, month: m });
     },
     onSuccess: ({ blob, filename }) => saveBlob(blob, filename),
@@ -181,7 +216,7 @@ export default function MusterAttendancePage() {
           id="ma-site"
           label="Site"
           value={siteId}
-          onChange={(e) => setSiteId(e.target.value)}
+          onChange={(e) => setState({ site: e.target.value })}
           disabled={sites.isPending}
         >
           <option value="">{multiSite ? 'All my sites' : sites.data?.[0]?.name ?? 'Site'}</option>
@@ -199,8 +234,8 @@ export default function MusterAttendancePage() {
               label="Date"
               type="date"
               value={date}
-              max={localToday()}
-              onChange={(e) => setDate(e.target.value)}
+              max={todayIso()}
+              onChange={(e) => setState({ date: e.target.value || todayIso() })}
             />
             <SelectField
               id="ma-filter"
@@ -221,10 +256,20 @@ export default function MusterAttendancePage() {
             label="Month"
             type="month"
             value={month}
-            max={localToday().slice(0, 7)}
-            onChange={(e) => setMonth(e.target.value)}
+            max={todayIso().slice(0, 7)}
+            onChange={(e) =>
+              setState({ month: e.target.value || todayIso().slice(0, 7) })
+            }
           />
         )}
+        <TextField
+          id="ma-search"
+          label="Search"
+          type="search"
+          placeholder="Name or labour code"
+          value={state.q}
+          onChange={(e) => setState({ q: e.target.value })}
+        />
       </div>
 
       {sites.data?.length === 0 ? (
@@ -236,6 +281,7 @@ export default function MusterAttendancePage() {
           siteId={siteId}
           date={date}
           filter={filter}
+          search={state.q}
           showSite={multiSite && !siteId}
           canCorrect={canCorrect}
           onFilter={setFilter}
@@ -245,6 +291,7 @@ export default function MusterAttendancePage() {
         <MonthlyView
           siteId={siteId}
           month={month}
+          search={state.q}
           showSite={multiSite && !siteId}
           canCorrect={canCorrect}
           onCorrect={(row, day) => setCorrecting({ row, day })}
@@ -269,8 +316,13 @@ export default function MusterAttendancePage() {
       )}
       {showRules && (
         <DayRulesModal
+          // Remounted when the rules arrive, so the fields start from the company's values — not
+          // from the 8/4/8 defaults a modal opened early used to show and then save (036 O6).
+          key={rules.data ? 'loaded' : 'loading'}
           rules={rules.data ?? null}
-          loadError={rules.isError}
+          loading={rules.isPending}
+          loadError={rules.isError ? rules.error : null}
+          onRetry={rules.refetch}
           canEdit={canSetRules}
           onClose={() => setShowRules(false)}
         />
@@ -279,10 +331,26 @@ export default function MusterAttendancePage() {
   );
 }
 
+export default function MusterAttendancePage() {
+  // `useUrlState` reads `useSearchParams`, which needs a Suspense boundary.
+  return (
+    <Suspense
+      fallback={
+        <p className="text-sm text-gray-500" role="status">
+          <LoadingText />
+        </p>
+      }
+    >
+      <MusterAttendanceBody />
+    </Suspense>
+  );
+}
+
 function DailyView({
   siteId,
   date,
   filter,
+  search,
   showSite,
   canCorrect,
   onFilter,
@@ -291,6 +359,7 @@ function DailyView({
   siteId: string;
   date: string;
   filter: MusterFilter | '';
+  search: string;
   showSite: boolean;
   canCorrect: boolean;
   onFilter: (f: MusterFilter | '') => void;
@@ -436,11 +505,16 @@ function DailyView({
       )}
       <ResponsiveList
         columns={columns}
-        rows={daily.data?.items ?? []}
+        rows={(daily.data?.items ?? []).filter((r) => matches(r, search))}
         rowKey={(r) => `${r.workerId}|${r.siteId}`}
         isLoading={daily.isPending}
-        error={daily.isError ? messageOf(daily.error, 'Could not load the muster.') : undefined}
-        emptyMessage={filter ? 'Nobody matches this filter.' : 'No labour at this site yet.'}
+        error={daily.error}
+        onRetry={daily.refetch}
+        emptyMessage={
+          filter || search.trim()
+            ? 'Nobody matches this filter.'
+            : 'No labour at this site yet.'
+        }
         actions={(r) =>
           r.manual ? null : (
             <RowAction intent="read" onClick={() => onCorrect(r)}>
@@ -475,12 +549,14 @@ function PunchCell({ punch }: { punch: PunchFact | null }) {
 function MonthlyView({
   siteId,
   month,
+  search,
   showSite,
   canCorrect,
   onCorrect,
 }: {
   siteId: string;
   month: string;
+  search: string;
   showSite: boolean;
   canCorrect: boolean;
   onCorrect: (row: MusterMonthRow, day: MusterDay) => void;
@@ -500,9 +576,16 @@ function MonthlyView({
     );
   }
   if (monthly.isError) {
-    return <FormError message={messageOf(monthly.error, 'Could not load the month.')} />;
+    return (
+      <QueryError
+        error={monthly.error}
+        onRetry={monthly.refetch}
+        fallback="Could not load the month."
+      />
+    );
   }
   const data = monthly.data;
+  const items = data.items.filter((row) => matches(row, search));
   const days = Array.from({ length: data.daysInMonth }, (_, i) => i + 1);
   const dateOf = (d: number) => `${month}-${pad(d)}`;
 
@@ -545,14 +628,16 @@ function MonthlyView({
             </tr>
           </thead>
           <tbody>
-            {data.items.length === 0 && (
+            {items.length === 0 && (
               <tr>
                 <td colSpan={days.length + 8} className="px-3 py-6 text-center text-sm text-gray-500">
-                  No labour at this site this month.
+                  {search.trim()
+                    ? 'Nobody matches this search.'
+                    : 'No labour at this site this month.'}
                 </td>
               </tr>
             )}
-            {data.items.map((row) => (
+            {items.map((row) => (
               <tr key={`${row.workerId}|${row.siteId}`} className="border-t border-gray-100">
                 <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-1.5">
                   <span className="text-sm text-gray-900">{row.fullName}</span>
@@ -653,10 +738,15 @@ function CorrectionModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const initialIn = day.punchIn ? hhmmOf(day.punchIn.at) : '';
-  const initialOut = day.punchOut ? hhmmOf(day.punchOut.at) : '';
+  const toast = useToast();
+  const initialIn = day.punchIn ? timeOf(day.punchIn.at) : '';
+  const initialOut = day.punchOut ? timeOf(day.punchOut.at) : '';
+  // 036 O5: a punch out recorded on the day after is a night shift.
+  const initialNextDay =
+    !!day.punchOut && businessDate(day.punchOut.at) !== day.date;
   const [punchIn, setPunchIn] = useState(initialIn);
   const [punchOut, setPunchOut] = useState(initialOut);
+  const [nextDay, setNextDay] = useState(initialNextDay);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -666,8 +756,12 @@ function CorrectionModal({
   });
 
   const changedIn = punchIn !== '' && punchIn !== initialIn;
-  const changedOut = punchOut !== '' && punchOut !== initialOut;
-  const outBeforeIn = punchIn !== '' && punchOut !== '' && punchOut <= punchIn;
+  // Ticking "next day" moves the recorded out-time a day, so it is sent again with the flag even
+  // when the time itself is unchanged.
+  const changedOut =
+    punchOut !== '' && (punchOut !== initialOut || nextDay !== initialNextDay);
+  const outBeforeIn =
+    !nextDay && punchIn !== '' && punchOut !== '' && punchOut <= punchIn;
 
   const save = useMutation({
     mutationFn: () =>
@@ -675,10 +769,13 @@ function CorrectionModal({
         workerId: worker.workerId,
         date: day.date,
         ...(changedIn ? { punchIn } : {}),
-        ...(changedOut ? { punchOut } : {}),
+        ...(changedOut
+          ? { punchOut, ...(nextDay ? { punchOutNextDay: true } : {}) }
+          : {}),
         reason: reason.trim(),
       }),
     onSuccess: () => {
+      toast.success('Correction saved.');
       void queryClient.invalidateQueries({ queryKey: ['labour'] });
       onClose();
     },
@@ -688,28 +785,34 @@ function CorrectionModal({
   const editable = canCorrect && !day.manual;
   return (
     <Modal
-      title={`${worker.fullName} · ${day.date}`}
+      title={`${worker.fullName} · ${dateLabel(day.date)}`}
       onClose={onClose}
+      isDirty={changedIn || changedOut || reason.trim() !== ''}
+      pending={save.isPending}
       footer={
         editable ? (
           <>
-            <SecondaryButton type="button" onClick={onClose}>
+            <SecondaryButton
+              type="button"
+              onClick={onClose}
+              disabled={save.isPending}
+            >
               Cancel
             </SecondaryButton>
             <Button
               type="button"
               disabled={
-                save.isPending ||
                 (!changedIn && !changedOut) ||
                 outBeforeIn ||
                 reason.trim().length < 3
               }
+              loading={save.isPending}
               onClick={() => {
                 setError(null);
                 save.mutate();
               }}
             >
-              {save.isPending ? 'Saving…' : 'Save correction'}
+              Save correction
             </Button>
           </>
         ) : (
@@ -729,20 +832,31 @@ function CorrectionModal({
             <div className="grid grid-cols-2 gap-3">
               <TextField
                 id="corr-in"
-                label="Punch in"
+                label="Punch in (IST)"
                 type="time"
                 value={punchIn}
                 onChange={(e) => setPunchIn(e.target.value)}
               />
               <TextField
                 id="corr-out"
-                label="Punch out"
+                label="Punch out (IST)"
                 type="time"
                 value={punchOut}
                 onChange={(e) => setPunchOut(e.target.value)}
-                error={outBeforeIn ? 'Must be after the punch in.' : undefined}
+                error={
+                  outBeforeIn
+                    ? 'Must be after the punch in — or tick "next day" for a night shift.'
+                    : undefined
+                }
               />
             </div>
+            <CheckboxField
+              id="corr-next-day"
+              label="Punch out next day"
+              description="A night shift that ended after midnight. At most 16 hours after the punch in."
+              checked={nextDay}
+              onChange={(e) => setNextDay(e.target.checked)}
+            />
             <div>
               <label htmlFor="corr-reason" className="mb-1 block text-sm font-medium text-gray-700">
                 Reason <span className="text-red-600">*</span>
@@ -769,7 +883,12 @@ function CorrectionModal({
               <LoadingText />
             </p>
           ) : history.isError ? (
-            <FormError message="Could not load the history." />
+            <QueryError
+              compact
+              error={history.error}
+              onRetry={history.refetch}
+              fallback="Could not load the history."
+            />
           ) : history.data.length === 0 ? (
             <p className="text-sm text-gray-500">No corrections to this day.</p>
           ) : (
@@ -798,12 +917,17 @@ function CorrectionModal({
 /** The company's thresholds; the HR office (`LABOUR_APPROVE`) changes them. */
 function DayRulesModal({
   rules,
+  loading,
   loadError,
+  onRetry,
   canEdit,
   onClose,
 }: {
   rules: LabourDayRules | null;
-  loadError: boolean;
+  /** 036 O6: Save stays off until the company's own rules are in the fields. */
+  loading: boolean;
+  loadError: unknown;
+  onRetry: () => unknown;
   canEdit: boolean;
   onClose: () => void;
 }) {
@@ -824,6 +948,13 @@ function DayRulesModal({
       ? 'Half day hours must be fewer than full day hours.'
       : null;
 
+  const ready = !!rules && !loading && !loadError;
+  const dirty =
+    !!rules &&
+    (values.fullDayHours !== rules.fullDayHours ||
+      values.halfDayHours !== rules.halfDayHours ||
+      values.standardHours !== rules.standardHours);
+
   const save = useMutation({
     mutationFn: () => setLabourDayRules(values),
     onSuccess: (r) => {
@@ -839,21 +970,28 @@ function DayRulesModal({
     <Modal
       title="Day rules"
       onClose={onClose}
+      isDirty={dirty && !done}
+      pending={save.isPending}
       footer={
         canEdit && !loadError && !done ? (
           <>
-            <SecondaryButton type="button" onClick={onClose}>
+            <SecondaryButton
+              type="button"
+              onClick={onClose}
+              disabled={save.isPending}
+            >
               Cancel
             </SecondaryButton>
             <Button
               type="button"
-              disabled={!!invalid || save.isPending}
+              disabled={!ready || !!invalid}
+              loading={save.isPending}
               onClick={() => {
                 setError(null);
                 save.mutate();
               }}
             >
-              {save.isPending ? 'Saving…' : 'Save'}
+              Save
             </Button>
           </>
         ) : (
@@ -869,7 +1007,21 @@ function DayRulesModal({
           the daily rate ÷ standard shift hours × the company&rsquo;s overtime multiplier.
         </p>
         {loadError ? (
-          <FormError message="Pick a company first to see its day rules." />
+          // A cross-company caller with no company chosen gets a 400 here; anything else is a
+          // failed load worth retrying.
+          loadError instanceof ApiError && loadError.status === 400 ? (
+            <FormError message="Pick a company first to see its day rules." />
+          ) : (
+            <QueryError
+              error={loadError}
+              onRetry={onRetry}
+              fallback="Could not load the day rules."
+            />
+          )
+        ) : loading ? (
+          <p className="text-sm text-gray-500" role="status">
+            <LoadingText />
+          </p>
         ) : (
           <>
             <FormError message={error ?? (canEdit ? invalid : null)} />
