@@ -185,9 +185,14 @@ function refreshOnce(): Promise<string> {
     })();
     // Cleared however it settles: a failed renewal must not pin a rejected promise
     // that every later request would then inherit forever.
-    refreshInFlight.finally(() => {
-      refreshInFlight = null;
-    });
+    // The `.catch` is for this derived chain only — callers still receive the rejection through
+    // `refreshInFlight` itself. Without it, `.finally` produced a second promise that rejected with
+    // nothing attached, and every failed renewal logged "Uncaught (in promise)" (036 A25).
+    refreshInFlight
+      .catch(() => undefined)
+      .finally(() => {
+        refreshInFlight = null;
+      });
   }
   return refreshInFlight;
 }
