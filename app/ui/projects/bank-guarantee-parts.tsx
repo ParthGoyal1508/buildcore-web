@@ -83,7 +83,9 @@ export function GuaranteeSummary({ bg }: { bg: BgGuaranteeSummary }) {
       </span>
       {(bg.issueDate || bg.expiryDate) && (
         <span className="text-xs tabular-nums text-gray-600">
-          {dateLabel(bg.issueDate)} → {dateLabel(bg.expiryDate)}
+          {/* Each date kept whole: a narrow cell broke "02-12-2027" after the month. */}
+          <span className="whitespace-nowrap">{dateLabel(bg.issueDate)}</span> →{' '}
+          <span className="whitespace-nowrap">{dateLabel(bg.expiryDate)}</span>
         </span>
       )}
       <span className="mt-0.5">

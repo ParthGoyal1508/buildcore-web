@@ -335,7 +335,7 @@ function GuaranteeCard({
             guaranteeId={bg.id}
             onUploaded={(saved) => {
               apply(saved);
-              setTitle('');
+              setTitle('BG copy');
               toast.success('Document attached.');
             }}
           />
@@ -443,7 +443,17 @@ function UploadDocument({
   onUploaded: (tender: BgTender) => void;
 }) {
   const canWrite = useCanWrite();
+  const [open, setOpen] = useState(false);
   if (!canWrite) return null;
+  // Behind a button: an always-open name-and-file panel on every guarantee made the page
+  // mostly upload boxes.
+  if (!open) {
+    return (
+      <div className="mt-2">
+        <RowAction onClick={() => setOpen(true)}>Attach document</RowAction>
+      </div>
+    );
+  }
   return (
     <div className="mt-3 grid gap-2 rounded-md bg-gray-50 p-3">
       <TextField
@@ -466,8 +476,16 @@ function UploadDocument({
             fileName: file.fileName,
           })
         }
-        onUploaded={(result) => onUploaded(result as BgTender)}
+        onUploaded={(result) => {
+          onUploaded(result as BgTender);
+          setOpen(false);
+        }}
       />
+      <div>
+        <RowAction intent="read" onClick={() => setOpen(false)}>
+          Cancel
+        </RowAction>
+      </div>
     </div>
   );
 }
