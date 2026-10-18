@@ -127,6 +127,9 @@ export const ROUTES = {
    */
   projectsClient: (id: string) => `/dashboard/projects/clients/${id}`,
   projectsSites: '/dashboard/projects/sites',
+  /** 037: tenders with their EMD and PBG bank guarantees, and the tender page with documents. */
+  projectsBankGuarantees: '/dashboard/projects/bank-guarantees',
+  projectsBankGuarantee: (id: string) => `/dashboard/projects/bank-guarantees/${id}`,
   /** One site: its geofence, its address and the project it belongs to. */
   projectsSite: (id: string) => `/dashboard/projects/sites/${id}`,
 
@@ -2152,6 +2155,16 @@ export const PERMISSIONS = [
    */
   'ASSETS',
   'ASSETS_APPROVE',
+  /**
+   * Added to the api's enum by 031, 033, 034 and 036 but never listed here, so the Roles screen
+   * had no checkbox for them and no way to grant them (found 2026-10-18 while adding 037).
+   */
+  'LABOUR_PUNCH_CORRECT',
+  'MACHINERY_DISPOSE',
+  'CASH_ENTRY',
+  'PROJECT_LOCK',
+  /** 037: the Bank Guarantees register under Projects, and its 30-day expiry alerts. */
+  'BANK_GUARANTEES',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -2370,6 +2383,9 @@ export const PROJECTS_PERMISSIONS = {
   // they check `PROJECT_FINANCIALS` on the page, which is the same arrangement the
   // portfolio's document tab already uses.
   pnl: 'PROJECT_FINANCIALS',
+  // 037. Its own permission: who keeps the BG register (and gets its expiry alerts) is not
+  // everyone who can open projects.
+  'bank-guarantees': 'BANK_GUARANTEES',
 } as const;
 
 export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;
@@ -2489,7 +2505,8 @@ export const NAV_MODULES = [
     href: ROUTES.projects,
     guardPrefix: ROUTES.projects,
     guardsSubtree: true,
-    permissions: ['PROJECTS'],
+    // Any-of: someone who keeps only the BG register (037) still reaches Projects for it.
+    permissions: ['PROJECTS', 'BANK_GUARANTEES'],
   },
   {
     id: 'plant',

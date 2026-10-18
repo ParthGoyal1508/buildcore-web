@@ -1,4 +1,5 @@
 import {
+  BanknotesIcon,
   BuildingOffice2Icon,
   ChartBarIcon,
   MapPinIcon,
@@ -58,6 +59,14 @@ export const PROJECT_SECTIONS: {
     description:
       'Revenue, cost and margin per project, with the company total.',
     icon: ChartBarIcon,
+  },
+  {
+    // 037. The client's "TENDER BG DETAILS" register, gated on `BANK_GUARANTEES`.
+    key: 'bank-guarantees',
+    href: ROUTES.projectsBankGuarantees,
+    title: 'Bank Guarantees',
+    description: 'EMD and performance guarantees per tender, with expiry alerts.',
+    icon: BanknotesIcon,
   },
 ];
 
