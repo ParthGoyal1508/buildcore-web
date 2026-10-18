@@ -141,7 +141,9 @@ export default function MonthlyAttendanceDownload() {
             </option>
           ))}
         </SelectField>
-        <div className="flex items-end">
+        {/* Level with the inputs, not the row's bottom: the Company column carries a hint line
+            beneath it, so `items-end` dropped the button below the fields (2026-10-18). */}
+        <div className="flex items-start sm:pt-6">
           <SecondaryButton
             className="w-full justify-center"
             disabled={!month}

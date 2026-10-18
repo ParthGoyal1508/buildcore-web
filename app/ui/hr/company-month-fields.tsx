@@ -58,7 +58,7 @@ export function CompanyMonthFields({
             {selected.name}
           </span>
           <span className="text-xs text-gray-500">
-            Change the company from the header.
+            Switch it in the header.
           </span>
         </div>
       )}
