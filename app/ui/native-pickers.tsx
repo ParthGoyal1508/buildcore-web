@@ -528,9 +528,34 @@ function Calendar({
   while (cells.length % 7) cells.push(null);
   const today = monthOnly ? todayIso().slice(0, 7) : todayIso();
   const decade = Math.floor(view.y / 12) * 12;
+  // The arrows stop where `min` / `max` do (2026-10-18): the months past `max` were greyed out,
+  // but Next still paged on to 2031, so a picker capped at this month looked broken rather than
+  // capped. A page is out of reach only when every month on it is.
+  const monthAt = (offset: number) => {
+    const total = view.y * 12 + view.m + offset;
+    return isoMonth(Math.floor(total / 12), ((total % 12) + 12) % 12);
+  };
+  const maxMonth = max.slice(0, 7);
+  const minMonth = min.slice(0, 7);
+  const prevBlocked = Boolean(
+    min &&
+      (mode === 'days'
+        ? monthAt(-1) < minMonth
+        : mode === 'months'
+          ? String(view.y - 1) < min.slice(0, 4)
+          : String(decade - 1) < min.slice(0, 4)),
+  );
+  const nextBlocked = Boolean(
+    max &&
+      (mode === 'days'
+        ? monthAt(1) > maxMonth
+        : mode === 'months'
+          ? String(view.y + 1) > max.slice(0, 4)
+          : String(decade + 12) > max.slice(0, 4)),
+  );
 
   const nav =
-    'flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500';
+    'flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   return createPortal(
     <div
@@ -547,6 +572,7 @@ function Calendar({
           type="button"
           aria-label="Previous"
           className={nav}
+          disabled={prevBlocked}
           onClick={() =>
             mode === 'days'
               ? shift(-1)
@@ -574,6 +600,7 @@ function Calendar({
           type="button"
           aria-label="Next"
           className={nav}
+          disabled={nextBlocked}
           onClick={() =>
             mode === 'days'
               ? shift(1)

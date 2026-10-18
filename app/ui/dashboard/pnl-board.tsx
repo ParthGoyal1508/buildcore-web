@@ -69,7 +69,13 @@ export default function PnlBoard() {
           <input
             type="month"
             value={period}
-            onChange={(event) => setPeriod(event.target.value)}
+            // A P&L is of what has happened: no month after this one (2026-10-18). A typed later
+            // month is ignored rather than fetched.
+            max={currentPeriod()}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next && next <= currentPeriod()) setPeriod(next);
+            }}
             // 44px below `sm`: a director changing the month on a phone is the use this screen was
             // named for.
             className="h-11 w-full rounded border border-gray-300 px-3 text-sm sm:h-10 sm:w-auto"

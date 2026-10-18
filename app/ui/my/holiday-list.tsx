@@ -22,7 +22,10 @@ const TYPE_LABELS: Record<string, string> = {
  * date, with the next one marked and past ones dimmed; a year switcher for planning ahead.
  */
 export default function HolidayList() {
-  const [year, setYear] = useState(() => new Date().getFullYear());
+  // This year and next only (2026-10-18): past years are history nobody plans by, and a company
+  // rarely declares beyond next year. The business timezone's year, not the browser's.
+  const thisYear = Number(todayIso().slice(0, 4));
+  const [year, setYear] = useState(thisYear);
   const { data, isPending, isError } = useQuery({
     queryKey: ['my', 'holidays', year],
     queryFn: () => getMyHolidays(year),
@@ -36,7 +39,8 @@ export default function HolidayList() {
         <IconButton
           label="Previous year"
           className="border border-gray-200 bg-white"
-          onClick={() => setYear((y) => y - 1)}
+          disabled={year <= thisYear}
+          onClick={() => setYear((y) => Math.max(thisYear, y - 1))}
         >
           ‹
         </IconButton>
@@ -46,7 +50,8 @@ export default function HolidayList() {
         <IconButton
           label="Next year"
           className="border border-gray-200 bg-white"
-          onClick={() => setYear((y) => y + 1)}
+          disabled={year >= thisYear + 1}
+          onClick={() => setYear((y) => Math.min(thisYear + 1, y + 1))}
         >
           ›
         </IconButton>
