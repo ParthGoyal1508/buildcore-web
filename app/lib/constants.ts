@@ -4137,9 +4137,9 @@ export const DIRECTOR_FINAL_MESSAGES = {
   intro:
     'Which actions cannot take effect until the Director approves them. Changes here are themselves submitted for the Director’s approval — they do not take effect when you save.',
   stateLabels: {
-    final: 'Director required',
-    not_final_by_decision: 'Not required — decided',
-    not_configured: 'Nobody has decided',
+    final: 'Needs Director approval',
+    not_final_by_decision: 'No Director approval needed',
+    not_configured: 'Not set — default applies',
   } as Record<string, string>,
   stateHints: {
     final: 'This cannot take effect until the Director approves it.',
@@ -4164,8 +4164,12 @@ export const DIRECTOR_FINAL_MESSAGES = {
   /** FR-019. Shown to every reader so two people do not submit the same edit. */
   pendingLocked:
     'While this is outstanding, no further change can be submitted for this company.',
-  inForce: 'In force today',
-  proposed: 'Proposed',
+  /** Prefix on the badge for the rule that applies now (2026-10-18: "In force today" was not understood). */
+  inForce: 'Now',
+  /** Prefix on the badge for an unsaved edit, which still needs the Director's approval. */
+  proposed: 'After approval',
+  /** The checkbox: an action, not a repeat of the badge beside it. */
+  requireLabel: 'Require Director approval',
   /**
    * The one entry that cannot be changed. Rendered as an explanation rather than a disabled
    * control, because "why can I not change this" is the question it should answer.

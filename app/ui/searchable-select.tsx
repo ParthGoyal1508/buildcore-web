@@ -175,7 +175,7 @@ export default function SearchableSelect({
           setActive(0);
         }}
         onKeyDown={onKeyDown}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 disabled:bg-gray-100"
       />
 
       {/* Closed, the full description of the chosen line, which the single-line box cannot hold. */}
@@ -191,7 +191,7 @@ export default function SearchableSelect({
           ref={listRef}
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-gray-200 bg-white text-gray-900 shadow-lg"
         >
           {matches.length === 0 ? (
             <li className="px-3 py-2 text-sm text-gray-500" role="status">

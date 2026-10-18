@@ -12,7 +12,7 @@ import {
 import { MESSAGES, MY_ATTENDANCE_MESSAGES } from '@/app/lib/constants';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
-import { clockTime, dateLabel, dateTimeLabel } from '@/app/lib/format';
+import { clockTime, dateLabel, dateTimeLabel, todayIso } from '@/app/lib/format';
 
 const STATUS_LABEL: Record<AttendanceDay['status'], string> = {
   present: 'Present',
@@ -280,7 +280,9 @@ export default function AttendanceHistory() {
 
       <ResponsiveList
         columns={columns}
-        rows={data ?? []}
+        // Days after today are not absences yet — the server fills the whole month, and a list of
+        // red "Absent" rows for next week read as a warning about days nobody has worked.
+        rows={(data ?? []).filter((day) => day.date <= todayIso())}
         rowKey={(day) => day.date}
         detail={(day) =>
           day.modifications.length > 0 ? (

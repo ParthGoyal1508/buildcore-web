@@ -318,7 +318,7 @@ function DirectorFinalRow({
               onChange={(event) => onChange(event.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            {DIRECTOR_FINAL_MESSAGES.stateLabels.final}
+            {DIRECTOR_FINAL_MESSAGES.requireLabel}
           </label>
         )}
       </div>

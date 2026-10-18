@@ -69,6 +69,53 @@ import StatusBadge from "@/app/ui/status-badge";
  * by the module that issues it, and Recruitment → Templates shows only its own two. It used to be
  * Recruitment's page alone, and listed the relieving letter beside the offer letter.
  */
+/**
+ * T024, belt and braces. The api refuses to *declare* a path naming regulated personal data, so a
+ * restricted field should not exist to be offered — this filters a malformed or stale response
+ * anyway, because the cost of offering an Aadhaar token in a letter template is legal.
+ *
+ * Checked on the source path, as the api checks it (036 follow-up, 2026-10-18). Checking the token
+ * as well hid typed-in fields the api allows — the vendor's PAN on a work order, the IFSC and
+ * account number on a payment advice — and "pan" as a substring of "com**pan**y" hid every company
+ * field, so every shipped template reported variables as undeclared. "pan" matches a whole word.
+ */
+const RESTRICTED_FRAGMENTS = ["aadhaar", "aadhar", "bankaccount", "accountnumber", "ifsc", "biometric", "faceembedding"];
+const RESTRICTED_WORDS = new Set(["pan"]);
+
+function isRestrictedPath(sourcePath?: string | null): boolean {
+  if (!sourcePath) return false;
+  const words = sourcePath
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((word) => word.toLowerCase());
+  const squashed = words.join("");
+  return (
+    words.some((word) => RESTRICTED_WORDS.has(word)) ||
+    RESTRICTED_FRAGMENTS.some((fragment) => squashed.includes(fragment))
+  );
+}
+
+/**
+ * Tokens the api fills in when a letter is rendered, so no kind declares them — its
+ * `SUPPLIED_TOKENS` (`src/letters/standard-letter-templates.ts`). Kept in step by hand; the api
+ * accepts the same set at save.
+ */
+const SUPPLIED_TOKENS = new Set([
+  "issueDate",
+  "referenceNo",
+  "designationArticle",
+  "lineItemsTable",
+  "basicAmount",
+  "basicAmountInWords",
+  "taxAmount",
+  "totalAmount",
+  "totalAmountInWords",
+  "contractValue",
+  "contractValueInWords",
+]);
+
 export default function LetterTemplatesManager({
   kindKeys,
   groups,
@@ -242,27 +289,16 @@ function TemplateEditor({
    * restricted field should not exist to be offered — this filters a malformed or stale response
    * anyway, because the cost of offering an Aadhaar token in a letter template is legal.
    */
-  const RESTRICTED = [
-    "aadhaar",
-    "aadhar",
-    "pan",
-    "bankaccount",
-    "accountnumber",
-    "ifsc",
-  ];
-  const offered = (fields.data ?? []).filter((field) => {
-    const haystack = `${field.token} ${field.sourcePath ?? ""}`
-      .toLowerCase()
-      .replace(/[^a-z]/g, "");
-    return !RESTRICTED.some((fragment) => haystack.includes(fragment));
-  });
+  const offered = (fields.data ?? []).filter(
+    (field) => !isRestrictedPath(field.sourcePath),
+  );
 
   const declared = new Set(offered.map((field) => field.token));
   // T135. Computed here so the author sees it while typing rather than on save — and the server
   // refuses the same thing anyway, naming the same tokens, so the two cannot disagree about what
   // is valid.
   const undeclared = templateTokens(body).filter(
-    (token) => !declared.has(token),
+    (token) => !declared.has(token) && !SUPPLIED_TOKENS.has(token),
   );
 
   const insert = (token: string) => {

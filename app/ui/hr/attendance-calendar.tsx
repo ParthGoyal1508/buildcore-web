@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { getEmployeeAttendanceMonth } from '@/app/lib/api/hr-payroll';
 import { MESSAGES, STATUS_BADGE_CLASSES, hrLabel } from '@/app/lib/constants';
-import { timeLabel, periodLabel } from '@/app/lib/format';
+import { currentPeriod, timeLabel, periodLabel, todayIso } from '@/app/lib/format';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -33,9 +33,15 @@ export default function AttendanceCalendar({
 }: {
   employeeId: string;
 }) {
-  const now = new Date();
-  const [month, setMonth] = useState(now.getUTCMonth() + 1);
-  const [year, setYear] = useState(now.getUTCFullYear());
+  // The business timezone's month, not the browser's UTC one — on the 1st before 05:30 IST
+  // UTC is still in the previous month.
+  const thisPeriod = currentPeriod();
+  const today = todayIso();
+  const [month, setMonth] = useState(Number(thisPeriod.slice(5, 7)));
+  const [year, setYear] = useState(Number(thisPeriod.slice(0, 4)));
+  const period = `${year}-${String(month).padStart(2, '0')}`;
+  // Attendance is a record of what happened: there is nothing to show after this month.
+  const isCurrentMonth = period >= thisPeriod;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'attendanceMonth', employeeId, month, year],
@@ -44,11 +50,13 @@ export default function AttendanceCalendar({
 
   function shift(by: number) {
     const next = new Date(Date.UTC(year, month - 1 + by, 1));
+    const nextPeriod = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
+    if (nextPeriod > thisPeriod) return;
     setMonth(next.getUTCMonth() + 1);
     setYear(next.getUTCFullYear());
   }
 
-  const label = periodLabel(`${year}-${String(month).padStart(2, '0')}`);
+  const label = periodLabel(period);
 
   const days = data?.days ?? [];
   // Blank cells so the 1st lands under the right weekday.
@@ -62,7 +70,12 @@ export default function AttendanceCalendar({
           <SecondaryButton type="button" onClick={() => shift(-1)}>
             Previous
           </SecondaryButton>
-          <SecondaryButton type="button" onClick={() => shift(1)}>
+          <SecondaryButton
+            type="button"
+            onClick={() => shift(1)}
+            disabled={isCurrentMonth}
+            title={isCurrentMonth ? 'This is the current month' : undefined}
+          >
             Next
           </SecondaryButton>
         </div>
@@ -94,19 +107,28 @@ export default function AttendanceCalendar({
               {Array.from({ length: leadingBlanks }).map((_, index) => (
                 <div key={`blank-${index}`} aria-hidden="true" />
               ))}
-              {days.map((day) => (
+              {days.map((day) => {
+                // A day that has not happened yet is not an absence. Holidays, weekly offs and
+                // approved leave are known in advance and still show; "absent" is the server's
+                // fallback for a working day with no punch, which says nothing about tomorrow.
+                const upcoming = day.date > today && day.status === 'absent';
+                return (
                 <div
                   key={day.date}
                   className={clsx(
                     'rounded-md p-2 text-xs',
-                    STATUS_BADGE_CLASSES[day.status] ??
-                      'bg-gray-100 text-gray-700',
+                    upcoming
+                      ? 'border border-dashed border-gray-200 text-gray-500'
+                      : (STATUS_BADGE_CLASSES[day.status] ??
+                          'bg-gray-100 text-gray-700'),
                   )}
                 >
                   <div className="font-medium tabular-nums">
                     {Number(day.date.slice(-2))}
                   </div>
-                  <div className="mt-0.5">{hrLabel(day.status)}</div>
+                  <div className="mt-0.5">
+                    {upcoming ? 'Upcoming' : hrLabel(day.status)}
+                  </div>
                   {(day.inTime || day.outTime) && (
                     <div className="mt-0.5 tabular-nums opacity-80">
                       {timeLabel(day.inTime)} – {timeLabel(day.outTime)}
@@ -116,7 +138,8 @@ export default function AttendanceCalendar({
                     <div className="mt-0.5 opacity-80">OT {day.otHours}h</div>
                   ) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

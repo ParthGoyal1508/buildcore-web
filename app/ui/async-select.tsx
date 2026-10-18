@@ -235,7 +235,7 @@ export default function AsyncSelect({
         }}
         onKeyDown={onKeyDown}
         className={clsx(
-          'w-full rounded-md border px-3 py-2 pr-8 disabled:bg-gray-100',
+          'w-full rounded-md border bg-white px-3 py-2 pr-8 text-gray-900 disabled:bg-gray-100',
           invalid ? 'border-red-400' : 'border-gray-300',
         )}
       />
@@ -251,7 +251,7 @@ export default function AsyncSelect({
       )}
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-gray-200 bg-white text-gray-900 shadow-lg">
           <ul
             ref={listRef}
             id={listboxId}
