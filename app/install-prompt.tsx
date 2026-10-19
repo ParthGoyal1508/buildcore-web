@@ -1,50 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
+import { promptInstall, useInstallState } from '@/app/lib/pwa-install';
 import { Button, SecondaryButton } from '@/app/ui/button';
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-}
-
+/**
+ * The floating install offer, shown when the browser has one. "Later" only hides this card: the
+ * offer itself stays in `pwa-install`, where the Install App card in Settings can still use it.
+ */
 export default function InstallPrompt() {
-  const [promptEvent, setPromptEvent] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const state = useInstallState();
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    const onBeforeInstallPrompt = (event: Event) => {
-      const prompt = event as BeforeInstallPromptEvent;
-      event.preventDefault();
-      setPromptEvent(prompt);
-      setIsVisible(true);
-    };
-
-    const onAppInstalled = () => {
-      setIsVisible(false);
-      setPromptEvent(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    if (!promptEvent) return;
-
-    promptEvent.prompt();
-    await promptEvent.userChoice;
-    setPromptEvent(null);
-    setIsVisible(false);
-  };
-
-  if (!isVisible) return null;
+  if (state.kind !== 'promptable' || dismissed) return null;
 
   return (
     <div className="fixed inset-x-4 bottom-20 z-50 md:bottom-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg md:left-auto md:right-4 md:max-w-sm">
@@ -56,7 +25,7 @@ export default function InstallPrompt() {
         <SecondaryButton
           type="button"
           size="sm"
-          onClick={() => setIsVisible(false)}
+          onClick={() => setDismissed(true)}
         >
           Later
         </SecondaryButton>
@@ -64,7 +33,7 @@ export default function InstallPrompt() {
           type="button"
           intent="read"
           size="sm"
-          onClick={handleInstall}
+          onClick={() => void promptInstall()}
         >
           Install
         </Button>
