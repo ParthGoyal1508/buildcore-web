@@ -309,7 +309,7 @@ export default function DwrReportPage() {
                               .map(([label, value]) => `${label} ${value}`)
                               .join(' × ') ||
                               'nothing entered — counted as one'}
-                            <span className="block text-gray-400">
+                            <span className="block text-gray-500">
                               a blank factor counts as one
                             </span>
                           </>
@@ -360,6 +360,7 @@ export default function DwrReportPage() {
         <DwrAttachments
           dwrId={params.dwrId}
           sealed={report.status === 'approved'}
+          removable={report.status === 'draft' || report.status === 'returned'}
           attachments={(report.attachments ?? []).filter((a) => !a.taskId)}
         />
       </div>

@@ -10,13 +10,13 @@ import {
   CREDITED_LEAVE_TYPES,
   getLeaveBalances,
   getLeaveLedger,
-  listEmployees,
   type CreditedLeaveType,
   type LeaveLedgerEntry,
 } from '@/app/lib/api/hr-payroll';
 import { MESSAGES, hrLabel } from '@/app/lib/constants';
 import { dateLabel, financialYearOf, periodLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import EmployeePicker from '@/app/ui/hr/employee-picker';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import {
   FormError,
@@ -41,10 +41,6 @@ type BalanceRow = Awaited<ReturnType<typeof getLeaveBalances>>[number];
 export default function LeaveBalanceTable() {
   const [employeeId, setEmployeeId] = useState('');
 
-  const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 100 }],
-    queryFn: () => listEmployees({ pageSize: 100 }),
-  });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'leaveBalances', employeeId],
@@ -90,22 +86,13 @@ export default function LeaveBalanceTable() {
   return (
     <div className="flex flex-col gap-4">
       <div className="max-w-md">
-        <SelectField
+        <EmployeePicker
           id="balance-employee"
           label="Employee"
           value={employeeId}
-          onChange={(event) => setEmployeeId(event.target.value)}
-        >
-          <option value="">Select an employee</option>
-          {employees?.items.map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName]
-                .filter(Boolean)
-                .join(' ')}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setEmployeeId(id)}
+          required
+        />
       </div>
 
       {employeeId ? (
@@ -286,8 +273,8 @@ function LeaveHistory({ employeeId }: { employeeId: string }) {
               {entry.reason && (
                 <p className="text-xs text-gray-500">{entry.reason}</p>
               )}
-              <p className="text-xs text-gray-400">
-                {dateLabel(entry.createdAt.slice(0, 10))}
+              <p className="text-xs text-gray-500">
+                {dateLabel(entry.createdAt)}
               </p>
             </div>
             <span

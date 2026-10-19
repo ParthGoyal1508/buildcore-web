@@ -12,7 +12,7 @@ import {
   type FaceEnrolmentStatus,
 } from '@/app/lib/api/my-workspace';
 import { ENROLMENT_PHOTO_RANGE, MESSAGES } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import {
   CheckboxField,
   FormError,
@@ -21,6 +21,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import CameraCapture from '@/app/ui/my/camera-capture';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 /** A captured shot plus the object URL its thumbnail is rendered from. */
 interface Shot {
@@ -173,19 +174,20 @@ export default function FaceEnrolmentStatusPanel() {
                   alt={`Captured photo ${index + 1}`}
                   className="h-20 w-20 rounded-md object-cover"
                 />
-                <button
-                  type="button"
+                <IconButton
+                  size="xs"
+                  tone="overlay"
+                  label={`Remove photo ${index + 1}`}
+                  className="absolute -right-1 -top-1"
                   onClick={() => {
                     URL.revokeObjectURL(shot.url);
                     setShots((current) =>
                       current.filter((s) => s.url !== shot.url),
                     );
                   }}
-                  aria-label={`Remove photo ${index + 1}`}
-                  className="absolute -right-1 -top-1 rounded-full bg-gray-800 px-1.5 text-xs text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 >
                   ×
-                </button>
+                </IconButton>
               </li>
             ))}
           </ul>
@@ -207,7 +209,7 @@ export default function FaceEnrolmentStatusPanel() {
         </span>
         {data.enrolledAt && (
           <span className="text-sm text-gray-500">
-            Since {new Date(data.enrolledAt).toLocaleDateString()}
+            Since {dateLabel(data.enrolledAt)}
           </span>
         )}
       </div>
@@ -310,7 +312,7 @@ export default function FaceEnrolmentStatusPanel() {
               <>
                 {' '}
                 — this approval expires{' '}
-                {new Date(reEnrolment.unlockExpiresAt).toLocaleDateString()}
+                {dateLabel(reEnrolment.unlockExpiresAt)}
               </>
             )}
             .

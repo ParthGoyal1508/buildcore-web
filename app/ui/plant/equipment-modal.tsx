@@ -26,7 +26,7 @@ import {
   SETTABLE_EQUIPMENT_STATUSES,
   plantLabel,
 } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -42,9 +42,8 @@ import {
   usePlantCategories,
   usePlantCompanyId,
   usePlantDocTypes,
-  usePlantSites,
-  usePlantVendors,
 } from './use-plant-refs';
+import { SitePicker, VendorPicker } from './pickers';
 
 /**
  * Add or edit a machine.
@@ -70,8 +69,6 @@ export default function EquipmentModal({
   const queryClient = useQueryClient();
   const companyId = usePlantCompanyId();
   const categories = usePlantCategories();
-  const vendors = usePlantVendors();
-  const sites = usePlantSites();
   const docTypes = usePlantDocTypes();
   // Set once a new machine is saved (2026-10-15). If a paper's file then fails to upload, the
   // form stays open, and saving again must update that machine rather than register a second.
@@ -436,22 +433,19 @@ export default function EquipmentModal({
           </SelectField>
 
           {!isOwned && (
-            <SelectField
+            <VendorPicker
               id="equipment-vendor"
               label={isHired ? 'Hire vendor' : 'Lessor'}
               required={isHired}
               value={vendorId}
-              onChange={(event) => setVendorId(event.target.value)}
-            >
-              <option value="">
-                {isHired ? 'Select a vendor' : 'Not recorded'}
-              </option>
-              {(vendors.data ?? []).map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>
-                  {vendor.name}
-                </option>
-              ))}
-            </SelectField>
+              emptyLabel={isHired ? 'Select a vendor' : 'Not recorded'}
+              selectedOption={
+                equipment?.vendorId
+                  ? { id: equipment.vendorId, label: equipment.vendorName ?? '' }
+                  : null
+              }
+              onChange={(id) => setVendorId(id)}
+            />
           )}
 
           <TextField
@@ -469,19 +463,21 @@ export default function EquipmentModal({
             hint="Whose name the RC stands in."
           />
 
-          <SelectField
+          <SitePicker
             id="equipment-site"
             label="Deployed at"
             value={deployedSiteId}
-            onChange={(event) => setDeployedSiteId(event.target.value)}
-          >
-            <option value="">Not deployed</option>
-            {(sites.data ?? []).map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.name}
-              </option>
-            ))}
-          </SelectField>
+            emptyLabel="Not deployed"
+            selectedOption={
+              equipment?.deployedSiteId
+                ? {
+                    id: equipment.deployedSiteId,
+                    label: equipment.siteName ?? '',
+                  }
+                : null
+            }
+            onChange={(id) => setDeployedSiteId(id)}
+          />
           <TextField
             id="equipment-operator"
             label="Operator / in-charge"
@@ -802,20 +798,20 @@ function PaperFile({
         <span className="truncate text-gray-800" title={file.name}>
           {file.name}
         </span>
-        <button
-          type="button"
-          aria-label={`Remove the ${label} file`}
-          className="shrink-0 rounded px-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        <IconButton
+          size="sm"
+          label={`Remove the ${label} file`}
+          className="shrink-0"
           onClick={() => onFile(undefined)}
         >
           ×
-        </button>
+        </IconButton>
       </div>
     );
   }
   return (
     <div className="flex flex-col">
-      <label className="inline-flex w-fit cursor-pointer items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-blue-500">
+      <label className="inline-flex w-fit cursor-pointer items-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-within:outline focus-within:outline-2 focus-within:outline-accent-500">
         Attach
         <input
           type="file"

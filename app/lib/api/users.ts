@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { setLocalDataOwner } from '@/app/lib/local-data';
 import { authFetch } from '@/app/lib/session';
 
 /**
@@ -109,7 +110,10 @@ export function hasWrite(user: CurrentUser | undefined, permission: string): boo
  */
 export async function getCurrentUser(): Promise<CurrentUser> {
   const raw = await authFetch<unknown>('/users/me');
-  return currentUserSchema.parse(raw);
+  const user = currentUserSchema.parse(raw);
+  // Whose drafts this device may read and write (036 A26).
+  setLocalDataOwner(user.id);
+  return user;
 }
 
 /** Mirrors the backend's own display-name rule (auth.service.ts). */

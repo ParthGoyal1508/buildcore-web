@@ -3,11 +3,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getFormSixteenData, listEmployees } from '@/app/lib/api/hr-payroll';
+import { getFormSixteenData } from '@/app/lib/api/hr-payroll';
 import { MESSAGES } from '@/app/lib/constants';
 import { financialYearOf, rupees } from '@/app/lib/format';
+import EmployeePicker from '@/app/ui/hr/employee-picker';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
-import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import { TextField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 
 type SectionRow = Awaited<
@@ -27,10 +28,6 @@ export default function FormSixteenView() {
   const [employeeId, setEmployeeId] = useState('');
   const [financialYear, setFinancialYear] = useState(financialYearOf());
 
-  const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 100 }],
-    queryFn: () => listEmployees({ pageSize: 100 }),
-  });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['hr', 'formSixteen', employeeId, financialYear],
@@ -82,22 +79,14 @@ export default function FormSixteenView() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid max-w-xl gap-3 sm:grid-cols-2">
-        <SelectField
+        <EmployeePicker
           id="form16-employee"
           label="Employee"
           value={employeeId}
-          onChange={(event) => setEmployeeId(event.target.value)}
-        >
-          <option value="">Select an employee</option>
-          {employees?.items.map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName]
-                .filter(Boolean)
-                .join(' ')}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setEmployeeId(id)}
+          allowLeavers
+          required
+        />
         <TextField
           id="form16-fy"
           label="Financial year"

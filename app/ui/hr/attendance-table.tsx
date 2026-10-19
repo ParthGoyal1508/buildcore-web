@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   getDailyAttendance,
@@ -18,7 +18,7 @@ import {
   hrLabel,
 } from '@/app/lib/constants';
 import { timeLabel, todayIso } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -28,6 +28,9 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import ToneBadge from '@/app/ui/status-badge';
+
+const ATTENDANCE_PAGE_SIZE = 50;
 
 /** Shifts the selected date by whole days, for the arrow controls. */
 function shiftDate(iso: string, days: number): string {
@@ -191,17 +194,41 @@ export default function AttendanceTable() {
 
   // Cleared when the view moves: the notice is about the submission just made, and leaving it
   // up over a different date or site would attach it to rows it has nothing to do with.
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const changeView = (apply: () => void) => {
     setSubmitted(false);
+    setPage(1);
     apply();
   };
 
   const { data: sites } = useQuery({ queryKey: ['sites'], queryFn: listSites });
 
-  const { data, isLoading, isError, error } = useQuery({
+  const attendance = useQuery({
     queryKey: ['hr', 'attendance', date, siteId],
     queryFn: () => getDailyAttendance(date, siteId || undefined),
   });
+  const { data, isLoading, isError, error } = attendance;
+
+  // 036 F20: a day's attendance is every employee at once — hundreds of rows, with no way to find
+  // one. The endpoint returns the whole day, so the search and the pages are applied here; the
+  // header stays in view while the rows scroll.
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const rows = data ?? [];
+    if (!term) return rows;
+    return rows.filter(
+      (row) =>
+        row.name.toLowerCase().includes(term) ||
+        row.employeeCode.toLowerCase().includes(term),
+    );
+  }, [data, search]);
+  const lastPage = Math.max(1, Math.ceil(filtered.length / ATTENDANCE_PAGE_SIZE));
+  const currentPage = Math.min(page, lastPage);
+  const pageRows = filtered.slice(
+    (currentPage - 1) * ATTENDANCE_PAGE_SIZE,
+    currentPage * ATTENDANCE_PAGE_SIZE,
+  );
 
   // The API refuses a future date (backend FR-071). The controls below make that
   // unreachable by clicking, but a restored URL or a tab left open past midnight
@@ -229,26 +256,19 @@ export default function AttendanceTable() {
       render: (row) => (
         <span className="flex flex-wrap gap-1.5">
           {row.adminEdited && (
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
-              Edited
-            </span>
+            <ToneBadge tone="info" label={'Edited'} />
           )}
           {row.hasException && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-              Exception
-            </span>
+            <ToneBadge tone="warning" label={'Exception'} />
           )}
           {row.pendingCorrection && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-              {row.pendingCorrection.levelLabel
-                ? HR_MESSAGES.correctionAwaiting(
-                    row.pendingCorrection.levelLabel,
-                  )
-                : HR_MESSAGES.correctionAwaitingUnknown}
-            </span>
+            <ToneBadge
+              tone="warning"
+              label={row.pendingCorrection.levelLabel ? HR_MESSAGES.correctionAwaiting(row.pendingCorrection.levelLabel) : HR_MESSAGES.correctionAwaitingUnknown}
+            />
           )}
           {!row.adminEdited && !row.hasException && !row.pendingCorrection && (
-            <span className="text-gray-400">—</span>
+            <span className="text-gray-500">—</span>
           )}
         </span>
       ),
@@ -267,19 +287,19 @@ export default function AttendanceTable() {
             Date
           </label>
           <div className="flex gap-2">
-            <button
-              type="button"
+            <IconButton
+              size="lg"
+              label="Previous day"
+              className="border border-gray-200"
               onClick={() =>
                 changeView(() => setDate((current) => shiftDate(current, -1)))
               }
-              aria-label="Previous day"
               // `min-h-11 min-w-11` is 44×44px — the touch target Principle VI's mobile-critical
               // standard requires (016 T112). `px-3` alone gave a target about 24px tall: fine with a
               // mouse, and a supervisor on a site with one hand on a phone misses it.
-              className="min-h-11 min-w-11 rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               ‹
-            </button>
+            </IconButton>
             <input
               id="attendance-date"
               type="date"
@@ -296,20 +316,20 @@ export default function AttendanceTable() {
                   ),
                 )
               }
-              className="block min-h-11 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="block min-h-11 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             />
-            <button
-              type="button"
+            <IconButton
+              size="lg"
+              label="Next day"
+              className="border border-gray-200"
               onClick={() =>
                 changeView(() => setDate((current) => shiftDate(current, 1)))
               }
-              aria-label="Next day"
               disabled={isToday}
               title={isToday ? 'Today is the latest date with attendance' : undefined}
-              className="min-h-11 min-w-11 rounded-md border border-gray-200 px-3 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
             >
               ›
-            </button>
+            </IconButton>
           </div>
         </div>
         <SelectField
@@ -325,6 +345,22 @@ export default function AttendanceTable() {
             </option>
           ))}
         </SelectField>
+        <div className="sm:col-span-2">
+          <label htmlFor="attendance-search" className="mb-1 block text-sm font-medium text-gray-700">
+            Search
+          </label>
+          <input
+            id="attendance-search"
+            type="search"
+            value={search}
+            placeholder="Name or code"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            className="block min-h-11 w-full rounded-md border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+          />
+        </div>
       </div>
 
       {submitted && (
@@ -339,11 +375,17 @@ export default function AttendanceTable() {
       <DataTable
         caption="Daily attendance"
         columns={columns}
-        rows={data ?? []}
+        rows={pageRows}
         rowKey={(row) => row.employeeId}
         isLoading={isLoading}
         error={loadError}
-        emptyMessage={HR_MESSAGES.noAttendance}
+        onRetry={() => attendance.refetch()}
+        stickyHeader
+        emptyMessage={
+          search.trim() && (data?.length ?? 0) > 0
+            ? 'No employee matches that search.'
+            : HR_MESSAGES.noAttendance
+        }
         actions={(row) => (
           <RowAction
             type="button"
@@ -359,6 +401,30 @@ export default function AttendanceTable() {
           </RowAction>
         )}
       />
+
+      {filtered.length > ATTENDANCE_PAGE_SIZE && (
+        <nav className="flex items-center justify-between text-sm" aria-label="Attendance pages">
+          <p className="text-gray-600">
+            Page {currentPage} of {lastPage} · {filtered.length} employees
+          </p>
+          <div className="flex gap-2">
+            <SecondaryButton
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Previous
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              disabled={currentPage >= lastPage}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Next
+            </SecondaryButton>
+          </div>
+        </nav>
+      )}
 
       {editing && (
         <MarkAttendanceModal

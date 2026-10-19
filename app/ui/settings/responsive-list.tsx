@@ -3,13 +3,15 @@
 import clsx from 'clsx';
 import { Fragment } from 'react';
 
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import {
   SortHeader,
   TABLE,
-  useSortedRows,
+  useTableSort,
   type SortValue,
+  type TableSort,
 } from '@/app/ui/table';
-import { LoadingText } from '@/app/ui/spinner';
 
 /**
  * One column definition, rendered twice: as a `<td>` on desktop and as a labelled
@@ -39,6 +41,17 @@ export interface Column<T> {
  * Since 2026-10-15 the desktop table shares its look with every other table (`TABLE` in
  * `app/ui/table.tsx`) and its headers sort the loaded rows on a click; the cards follow the same
  * order.
+ *
+ * 036 A4, A13–A16 — all optional, so the 68 existing callers render as before apart from the
+ * skeleton and the error box:
+ * - `onRetry` puts a Retry button on the error (pass the query's `refetch`); `error` may be the
+ *   query's error object itself, and its server message is shown.
+ * - Loading draws `skeletonRows` placeholder rows under the real headers instead of one line.
+ * - `serverPaged` turns header sorting off (it only ever sorted the visible page); `sort` +
+ *   `onSortChange` sort on the server instead — keep the sort in `useUrlState` and send it.
+ * - `isRefreshing` dims the rows while a new page or filter loads. Pair it with React Query's
+ *   `placeholderData: keepPreviousData`, which keeps the old rows on screen meanwhile, so the table
+ *   does not flash empty between pages: `isRefreshing={query.isPlaceholderData}`.
  */
 export default function ResponsiveList<T>({
   columns,
@@ -50,6 +63,12 @@ export default function ResponsiveList<T>({
   emptyMessage = 'Nothing here yet.',
   isLoading = false,
   error,
+  onRetry,
+  skeletonRows = 5,
+  sort,
+  onSortChange,
+  serverPaged = false,
+  isRefreshing = false,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -73,21 +92,50 @@ export default function ResponsiveList<T>({
   detail?: (row: T) => React.ReactNode;
   emptyMessage?: string;
   isLoading?: boolean;
-  error?: string | null;
+  /** A message, or the query's error itself (its server message is shown). */
+  error?: unknown;
+  /** Adds Retry to the error state. */
+  onRetry?: () => unknown;
+  skeletonRows?: number;
+  /** Server-side sort: the current sort, and where a header click sends the next one. */
+  sort?: TableSort;
+  onSortChange?: (sort: TableSort) => void;
+  /** The rows are one page of a server-paged list: header sorting is off unless `onSortChange`. */
+  serverPaged?: boolean;
+  /** A new page or filter is loading over the rows shown. */
+  isRefreshing?: boolean;
 }) {
-  const { sorted, sort, toggle } = useSortedRows(rows, columns);
+  const {
+    sorted,
+    sort: activeSort,
+    toggle,
+    enabled: sortEnabled,
+  } = useTableSort(rows, columns, { sort, onSortChange, serverPaged });
   if (isLoading) {
+    const headers = columns.map((column) => column.header);
     return (
-      <p className={TABLE.empty} role="status">
-        <LoadingText />
-      </p>
+      <div role="status">
+        <span className="sr-only">Loading…</span>
+        <ListSkeleton
+          headers={headers}
+          rows={skeletonRows}
+          cards
+          className="md:hidden"
+        />
+        <ListSkeleton
+          headers={headers}
+          rows={skeletonRows}
+          actions={Boolean(actions)}
+          className="hidden md:block"
+        />
+      </div>
     );
   }
   if (error) {
-    return (
-      <p className={TABLE.failed} role="alert">
-        {error}
-      </p>
+    return typeof error === 'string' ? (
+      <QueryError message={error} onRetry={onRetry} />
+    ) : (
+      <QueryError error={error} onRetry={onRetry} />
     );
   }
   if (rows.length === 0) {
@@ -95,7 +143,10 @@ export default function ResponsiveList<T>({
   }
 
   return (
-    <div>
+    <div
+      aria-busy={isRefreshing || undefined}
+      className={clsx(isRefreshing && 'opacity-60 transition-opacity')}
+    >
       {/* Mobile: one card per row. */}
       <div className="space-y-3 md:hidden">
         {sorted.map((row) => (
@@ -142,9 +193,9 @@ export default function ResponsiveList<T>({
                   key={column.key}
                   label={column.header}
                   columnKey={column.key}
-                  sort={sort}
+                  sort={activeSort}
                   onSort={toggle}
-                  sortable={column.sortable !== false}
+                  sortable={sortEnabled && column.sortable !== false}
                   className={column.className}
                 />
               ))}

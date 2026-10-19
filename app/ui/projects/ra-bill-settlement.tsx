@@ -20,6 +20,8 @@ import PaymentAdviceDialog from '@/app/ui/projects/payment-advice-dialog';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import HiddenAmount from '@/app/ui/hidden-amount';
 import { confirmDialog } from '@/app/ui/dialogs';
+import QueryError from '@/app/ui/query-error';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * What has been paid against one bill (028 FR-021).
@@ -107,6 +109,31 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
         </p>
       )}
 
+      {/* 036 I17 (2026-10-17): this panel used to sit on nothing at all while the read was in flight
+          and stay that way if it failed — "loads forever". A placeholder, then the figures or the
+          failure with a retry. */}
+      {outstanding.isLoading && (
+        <div
+          role="status"
+          aria-label="Loading payments"
+          className="grid animate-pulse gap-3 sm:grid-cols-3"
+        >
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-3 w-20 rounded bg-gray-200" />
+              <div className="h-4 w-28 rounded bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      )}
+      {outstanding.isError && (
+        <QueryError
+          compact
+          error={outstanding.error}
+          onRetry={outstanding.refetch}
+        />
+      )}
+
       {position && (
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           <div>
@@ -140,6 +167,7 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
         </dl>
       )}
 
+      {position && (
       <Payments
         bill={bill}
         payments={position?.payments ?? []}
@@ -147,6 +175,7 @@ export default function RaBillSettlement({ bill }: { bill: RaBill }) {
         onError={setError}
         onChanged={refresh}
       />
+      )}
     </section>
   );
 }
@@ -194,10 +223,12 @@ function Payments({
     }
   };
 
+  const toast = useToast();
   const remove = useMutation({
     mutationFn: (paymentId: string) => removeBillPayment(paymentId),
     onSuccess: () => {
       onError(null);
+      toast.success('The payment was removed.');
       onChanged();
     },
     onError: (err: unknown) => onError(describe(err)),
@@ -272,6 +303,7 @@ function Payments({
               <Button
                 type="button"
                 intent="write"
+                loading={remove.isPending && remove.variables === payment.id}
                 disabled={remove.isPending}
                 onClick={async () => {
                   if (

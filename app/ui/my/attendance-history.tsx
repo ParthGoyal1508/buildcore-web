@@ -12,6 +12,7 @@ import {
 import { MESSAGES, MY_ATTENDANCE_MESSAGES } from '@/app/lib/constants';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
+import { clockTime, dateLabel, dateTimeLabel, todayIso } from '@/app/lib/format';
 
 const STATUS_LABEL: Record<AttendanceDay['status'], string> = {
   present: 'Present',
@@ -27,7 +28,7 @@ const STATUS_LABEL: Record<AttendanceDay['status'], string> = {
 const STATUS_CLASS: Record<AttendanceDay['status'], string> = {
   present: 'bg-green-100 text-green-800',
   absent: 'bg-red-100 text-red-800',
-  on_leave: 'bg-blue-100 text-blue-800',
+  on_leave: 'bg-brand-100 text-brand-800',
   weekly_off: 'bg-gray-100 text-gray-600',
   holiday: 'bg-purple-100 text-purple-800',
 };
@@ -47,13 +48,7 @@ const MONTH_NAMES = [
   'December',
 ];
 
-const timeOnly = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '—';
+const timeOnly = (iso: string | null) => (iso ? clockTime(iso) : '—');
 
 /**
  * A modification snapshot's `HH:mm` rendered in the same zone as the row's own times.
@@ -71,7 +66,7 @@ const snapshotTime = (date: string, hhmm: string | null | undefined) => {
     ? // Not silently blanked: an unparseable value is shown as it arrived, because a blank here
       // would be indistinguishable from "this field was not set".
       hhmm
-    : at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    : clockTime(at);
 };
 
 /** What actually moved between the two sides, in the order the row presents its columns. */
@@ -151,7 +146,7 @@ function DayModifications({
               <p>
                 {MY_ATTENDANCE_MESSAGES.changedBy(
                   modification.actorName,
-                  new Date(modification.at).toLocaleString(),
+                  dateTimeLabel(modification.at),
                 )}
               </p>
               {changes.length > 0 ? (
@@ -220,11 +215,7 @@ export default function AttendanceHistory() {
       header: 'Date',
       render: (day) => (
         <span className="whitespace-nowrap">
-          {new Date(`${day.date}T00:00:00Z`).toLocaleDateString(undefined, {
-            day: '2-digit',
-            month: 'short',
-            timeZone: 'UTC',
-          })}
+          {dateLabel(day.date.slice(0, 10))}
         </span>
       ),
     },
@@ -289,7 +280,9 @@ export default function AttendanceHistory() {
 
       <ResponsiveList
         columns={columns}
-        rows={data ?? []}
+        // Days after today are not absences yet — the server fills the whole month, and a list of
+        // red "Absent" rows for next week read as a warning about days nobody has worked.
+        rows={(data ?? []).filter((day) => day.date <= todayIso())}
         rowKey={(day) => day.date}
         detail={(day) =>
           day.modifications.length > 0 ? (

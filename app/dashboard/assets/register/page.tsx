@@ -29,6 +29,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { dateLabel } from '@/app/lib/format';
 
 export default function AssetRegisterPage() {
   const categories = useAssetCategories();
@@ -67,7 +68,7 @@ export default function AssetRegisterPage() {
       render: (row) => (
         <Link
           href={ROUTES.assetsAsset(row.id)}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {row.assetCode}
         </Link>
@@ -128,7 +129,7 @@ export default function AssetRegisterPage() {
             ? {
                 key: 'inspection',
                 text: 'Inspection due',
-                title: `Due ${row.nextInspectionDue?.slice(0, 10)}`,
+                title: `Due ${dateLabel(row.nextInspectionDue)}`,
               }
             : null,
           // Names *which* paperwork: "something is expiring" sends someone to open
@@ -143,17 +144,16 @@ export default function AssetRegisterPage() {
         ].filter(Boolean) as { key: string; text: string; title: string }[];
 
         if (flags.length === 0) {
-          return <span className="text-sm text-gray-400">—</span>;
+          return <span className="text-sm text-gray-500">—</span>;
         }
         return (
           <span className="flex flex-wrap gap-1">
             {flags.map((flag) => (
-              <span
-                key={flag.key}
-                className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-                title={flag.title}
-              >
-                {flag.text}
+              <span key={flag.key} title={flag.title}>
+                <StatusBadge
+                  tone="warning"
+                  label={flag.text}
+                />
               </span>
             ))}
           </span>

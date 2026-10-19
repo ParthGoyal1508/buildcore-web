@@ -5,11 +5,12 @@ import Link from 'next/link';
 
 import { ProjectListItem } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { formatDateToLocal, formatRupees } from '@/app/lib/utils';
+import { formatRupees } from '@/app/lib/utils';
 import StatusBadge from '@/app/ui/status-badge';
 import { RowAction, RowActionLink } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 /**
  * The portfolio list (spec FR-010, FR-014).
@@ -25,16 +26,26 @@ import { confirmDialog } from '@/app/ui/dialogs';
 export default function ProjectListTable({
   rows,
   isLoading,
-  isError,
+  error,
+  onRetry,
+  filtered = false,
+  isRefreshing = false,
   onDelete,
-  isDeleting,
+  deletingId,
 }: {
   rows: ProjectListItem[];
   isLoading: boolean;
-  isError: boolean;
+  /** The failed query's error, for a message and a Retry (036 I23). */
+  error?: unknown;
+  onRetry?: () => unknown;
+  /** A search or filter is applied, so an empty list means "no match", not "no projects". */
+  filtered?: boolean;
+  isRefreshing?: boolean;
   onDelete: (id: string) => void;
-  isDeleting: boolean;
+  /** The row being deleted, for its button's spinner; every Delete is disabled meanwhile. */
+  deletingId?: string | null;
 }) {
+  const isDeleting = Boolean(deletingId);
   const columns: Column<ProjectListItem>[] = [
     {
       key: 'code',
@@ -55,7 +66,7 @@ export default function ProjectListTable({
           */}
           <Link
             href={ROUTES.projectsProject(row.id)}
-            className="text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {row.name}
           </Link>
@@ -106,7 +117,7 @@ export default function ProjectListTable({
        */
       render: (row) => {
         const readiness = row.documentReadiness;
-        if (!readiness) return <span className="text-gray-400">—</span>;
+        if (!readiness) return <span className="text-gray-500">—</span>;
         if (readiness.required === 0) {
           return <span className="text-xs text-gray-500">None required</span>;
         }
@@ -128,13 +139,13 @@ export default function ProjectListTable({
     {
       key: 'startDate',
       header: 'Start',
-      render: (row) => formatDateToLocal(row.startDate),
+      render: (row) => dateLabel(row.startDate),
     },
     {
       key: 'endDate',
       header: 'Expected end',
       render: (row) =>
-        row.expectedEndDate ? formatDateToLocal(row.expectedEndDate) : '—',
+        row.expectedEndDate ? dateLabel(row.expectedEndDate) : '—',
       hideOnCard: true,
     },
   ];
@@ -145,8 +156,14 @@ export default function ProjectListTable({
       rows={rows}
       rowKey={(row) => row.id}
       isLoading={isLoading}
-      error={isError ? MESSAGES.loadFailed : null}
-      emptyMessage="No projects yet. Add one to start tracking work."
+      error={error}
+      onRetry={onRetry}
+      isRefreshing={isRefreshing}
+      emptyMessage={
+        filtered
+          ? 'No project matches this search or filter.'
+          : 'No projects yet. Add one to start tracking work.'
+      }
       actions={(row) => (
         <>
           {/*
@@ -159,6 +176,7 @@ export default function ProjectListTable({
           </RowActionLink>
           <RowAction
             disabled={row.isLocked || isDeleting}
+            loading={deletingId === row.id}
             title={row.isLocked ? MESSAGES.projectLocked : undefined}
             // It deleted on the click until 2026-10-15, and a project goes with its documents, work
             // orders and bills.
@@ -166,8 +184,11 @@ export default function ProjectListTable({
               if (
                 await confirmDialog({
                   title: `Delete ${row.name}?`,
+                  // 036 I23: what the API actually does. It refuses (409) a project with any BOQ,
+                  // daily report, revenue entry or RA bill rather than cascading them away, and its
+                  // sites survive. The old wording described a cascade that never happens.
                   message:
-                    'The project goes, with its documents, work orders and bills. This cannot be undone.',
+                    'Only a project nothing has been recorded against can be deleted — one with a BOQ, daily reports, revenue or RA bills is refused. Its sites stay. This cannot be undone.',
                   confirmLabel: 'Delete project',
                   tone: 'danger',
                   typeToConfirm: 'DELETE',

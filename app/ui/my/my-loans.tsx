@@ -74,7 +74,7 @@ export default function MyLoans() {
                 </div>
               </dl>
               <details>
-                <summary className="cursor-pointer text-sm text-blue-700">
+                <summary className="cursor-pointer text-sm text-brand-700">
                   EMI schedule
                 </summary>
                 <ul className="mt-2 divide-y divide-gray-100 text-sm">

@@ -20,6 +20,16 @@ const optionalText = z
   .optional()
   .transform((v) => (v === '' ? undefined : v));
 
+/**
+ * Trimmed and upper-cased (036 N2, 2026-10-17). GSTINs, PANs and IFSCs are printed in capitals
+ * but typed in whatever case the keyboard was in, and the form used to refuse `27aapfu0939f1zv`
+ * as "not a valid GSTIN" — a correct number, in the wrong case, which the form can fix itself.
+ */
+const optionalCode = optionalText.transform((v) => v?.toUpperCase());
+
+/** Digits with the usual separators: `+91 98200 12345`, `022-2345 6789` (036 N2). */
+const PHONE_PATTERN = /^\+?[0-9][0-9 ()-]{5,18}[0-9]$/;
+
 export const GSTIN_PATTERN =
   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 export const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
@@ -27,10 +37,10 @@ export const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 export const vendorFormSchema = z.object({
   name: z.string().trim().min(1, 'Vendor name is required').max(200),
   type: z.enum(VENDOR_TYPES),
-  gstin: optionalText.refine((v) => v === undefined || GSTIN_PATTERN.test(v), {
+  gstin: optionalCode.refine((v) => v === undefined || GSTIN_PATTERN.test(v), {
     message: 'Not a valid 15-character GSTIN',
   }),
-  pan: optionalText.refine((v) => v === undefined || PAN_PATTERN.test(v), {
+  pan: optionalCode.refine((v) => v === undefined || PAN_PATTERN.test(v), {
     message: 'Not a valid 10-character PAN',
   }),
   tdsSection: optionalText,
@@ -60,22 +70,36 @@ export const vendorFormSchema = z.object({
     { message: 'Account number must be 6 to 34 letters or digits' },
   ),
   bankAccountHolderName: optionalText,
-  ifscCode: optionalText.refine(
-    (v) => v === undefined || /^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(v),
+  ifscCode: optionalCode.refine(
+    (v) => v === undefined || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v),
     { message: 'IFSC looks like BARB0DEOLIX — four letters, a zero, six characters' },
   ),
   categoryIds: z.array(z.string()),
   contacts: z.array(
     z.object({
       name: z.string().trim().min(1, 'Contact name is required'),
-      phone: optionalText,
+      phone: optionalText.refine(
+        (v) => v === undefined || (v.length <= 20 && PHONE_PATTERN.test(v)),
+        { message: 'Not a valid phone number' },
+      ),
       email: optionalText.refine(
         (v) => v === undefined || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
         { message: 'Not a valid email address' },
       ),
     }),
   ),
-});
+})
+  // A GSTIN embeds the holder's PAN as characters 3–12, so when both are given and disagree
+  // one of them is a typo — usually caught only when a TDS return bounces (036 N2).
+  .superRefine((values, ctx) => {
+    if (values.gstin && values.pan && values.gstin.slice(2, 12) !== values.pan) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['pan'],
+        message: `Doesn't match the GSTIN, whose PAN is ${values.gstin.slice(2, 12)}`,
+      });
+    }
+  });
 
 export type VendorFormValues = z.input<typeof vendorFormSchema>;
 export type VendorFormOutput = z.output<typeof vendorFormSchema>;

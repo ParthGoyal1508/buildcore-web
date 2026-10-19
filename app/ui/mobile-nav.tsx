@@ -31,6 +31,7 @@ import ApprovalBadge, {
 } from '@/app/ui/dashboard/approval-badge';
 import NavLinks from '@/app/ui/dashboard/nav-links';
 import ReminderBadge from '@/app/ui/dashboard/reminder-badge';
+import { IconButton } from '@/app/ui/button';
 
 /**
  * The phone navigation, the same in every shell (2026-10-15).
@@ -194,7 +195,7 @@ function MobileBottomBar({ sections }: { sections: Registered | null }) {
                   href={tab.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={clsx(
-                    'flex h-full min-h-[56px] flex-col items-center gap-1 px-1 pb-1.5 pt-2 text-center text-[11px] font-medium leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500',
+                    'flex h-full min-h-[56px] flex-col items-center gap-1 px-1 pb-1.5 pt-2 text-center text-xs font-medium leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500',
                     isActive
                       ? 'text-brand-700'
                       : 'text-gray-500 hover:text-brand-700',
@@ -219,12 +220,12 @@ function MobileBottomBar({ sections }: { sections: Registered | null }) {
               aria-expanded={menuOpen}
               aria-haspopup="dialog"
               onClick={() => setOpenOn(pathname)}
-              className="relative flex h-full min-h-[56px] w-full flex-col items-center gap-1 px-1 pb-1.5 pt-2 text-[11px] font-medium leading-tight text-gray-500 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
+              className="relative flex h-full min-h-[56px] w-full flex-col items-center gap-1 px-1 pb-1.5 pt-2 text-xs font-medium leading-tight text-gray-500 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
             >
               <span className="relative flex h-7 w-12 items-center justify-center">
                 <Bars3Icon className="h-6 w-6" aria-hidden="true" />
                 {approvals > 0 && (
-                  <span className="absolute -top-1 right-0 min-w-[18px] rounded-full bg-green-600 px-1 text-[10px] font-semibold leading-[18px] text-white tabular-nums">
+                  <span className="absolute -top-1 right-0 min-w-[18px] rounded-full bg-green-600 px-1 text-xs font-semibold leading-[18px] text-white tabular-nums">
                     <span aria-hidden="true">{approvals}</span>
                     <span className="sr-only">
                       , {approvals} awaiting your approval
@@ -291,15 +292,13 @@ function MenuSheet({
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900">Menu</h2>
-          <button
+          <IconButton
+            label="Close menu"
             ref={closeRef}
-            type="button"
             onClick={onClose}
-            aria-label="Close menu"
-            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
           >
             <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="flex flex-col gap-5 overflow-y-auto px-3 py-4">
@@ -357,7 +356,7 @@ function SheetGroup({
 }) {
   return (
     <section>
-      <h3 className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+      <h3 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
         {title}
       </h3>
       {children}

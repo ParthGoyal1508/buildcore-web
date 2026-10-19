@@ -8,7 +8,8 @@ import {
   getDeploymentReport,
   type DeploymentReport,
 } from '@/app/lib/api/labour';
-import { getProjects } from '@/app/lib/api/projects';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import { ProjectPicker } from '@/app/ui/plant/pickers';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { TABLE } from '@/app/ui/table';
@@ -19,7 +20,13 @@ type DeploymentGroup = DeploymentReport['groups'][number];
 
 // Keys match the group's own fields, so each column sorts by the raw figure.
 const COLUMNS: Column<DeploymentGroup>[] = [
-  { key: 'key', header: 'Group', render: (g) => g.key },
+  {
+    key: 'key',
+    header: 'Group',
+    // 036 O8: the site, contractor or skill name from the API instead of its id.
+    sortValue: (g) => g.label ?? g.key,
+    render: (g) => g.label ?? 'Unknown',
+  },
   {
     key: 'headcount',
     header: 'Headcount',
@@ -39,36 +46,37 @@ export default function DeploymentReportPage() {
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
   const [groupBy, setGroupBy] = useState('skill');
-  const [submitted, setSubmitted] = useState(false);
+  // 036 O8: the report runs on what was last *Run*, not on every keystroke in the filters. The
+  // query used to refetch the moment a date changed after the first Run.
+  const [params, setParams] = useState<{
+    projectId: string;
+    periodFrom: string;
+    periodTo: string;
+    groupBy: string;
+  } | null>(null);
+  const companyId = useSelectedCompanyId();
 
-  const projects = useQuery({
-    queryKey: ['projects', 'all'],
-    queryFn: () => getProjects({ pageSize: 200 }),
-  });
   const report = useQuery({
-    queryKey: ['report-deployment', projectId, periodFrom, periodTo, groupBy],
-    queryFn: () =>
-      getDeploymentReport({ projectId, periodFrom, periodTo, groupBy }),
-    enabled: submitted && !!projectId && !!periodFrom && !!periodTo,
+    queryKey: ['report-deployment', companyId, params],
+    queryFn: () => getDeploymentReport(params!),
+    enabled: !!params,
   });
+  const rangeError =
+    periodFrom && periodTo && periodTo < periodFrom
+      ? 'The "to" date must be on or after the "from" date.'
+      : undefined;
 
   return (
     <div className="space-y-4">
       <PageHeader title="Deployment Report" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-        <SelectField
+        {/* Searched on the server: one page of 200 hid the 201st project (036 follow-up). */}
+        <ProjectPicker
           id="dep-project"
           label="Project"
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {projects.data?.items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setProjectId(id)}
+        />
         <TextField
           id="dep-from"
           label="From"
@@ -82,6 +90,7 @@ export default function DeploymentReportPage() {
           type="date"
           value={periodTo}
           onChange={(e) => setPeriodTo(e.target.value)}
+          error={rangeError}
         />
         <SelectField
           id="dep-group"
@@ -94,10 +103,19 @@ export default function DeploymentReportPage() {
           <option value="contractor">Contractor</option>
         </SelectField>
         <div className="flex items-end">
-          <Button
+          <Button intent="read"
             className="w-full justify-center"
-            onClick={() => setSubmitted(true)}
-            disabled={!projectId || !periodFrom || !periodTo}
+            onClick={() => {
+              const next = { projectId, periodFrom, periodTo, groupBy };
+              // Running the same filters again fetches again, as a person pressing Run expects.
+              if (params && JSON.stringify(params) === JSON.stringify(next)) {
+                void report.refetch();
+              } else {
+                setParams(next);
+              }
+            }}
+            disabled={!projectId || !periodFrom || !periodTo || !!rangeError}
+            loading={report.isFetching}
           >
             Run
           </Button>
@@ -105,14 +123,18 @@ export default function DeploymentReportPage() {
       </div>
 
       {/* The shared table: sortable by any column; the total stays below the rows (2026-10-15). */}
-      {report.data && (
+      {params && (
         <DataTable<DeploymentGroup>
           caption="Deployment by group"
-          rows={report.data.groups}
+          rows={report.data?.groups ?? []}
+          isLoading={report.isPending}
+          error={report.error}
+          onRetry={report.refetch}
           rowKey={(g) => g.key}
           columns={COLUMNS}
           emptyMessage="No approved musters in this period."
           footer={
+            report.data && (
             <tr>
               <td className={TABLE.td}>Total</td>
               <td className={TABLE.td} />
@@ -120,6 +142,7 @@ export default function DeploymentReportPage() {
                 {report.data.totalManDays}
               </td>
             </tr>
+            )
           }
         />
       )}

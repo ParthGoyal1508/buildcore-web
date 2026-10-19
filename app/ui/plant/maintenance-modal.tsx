@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   closeMaintenanceJob,
   createMaintenanceJob,
@@ -19,7 +19,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { usePlantEquipment } from './use-plant-refs';
+import { EquipmentPicker } from './pickers';
 
 /**
  * Open a maintenance job.
@@ -31,7 +31,6 @@ import { usePlantEquipment } from './use-plant-refs';
  */
 export function OpenJobModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
 
   const [equipmentId, setEquipmentId] = useState('');
   const [type, setType] = useState<string>('breakdown');
@@ -46,9 +45,6 @@ export function OpenJobModal({ onClose }: { onClose: () => void }) {
     enabled: equipmentId !== '',
   });
 
-  const available = (equipment.data ?? []).filter(
-    (row) => row.status !== 'under_maintenance',
-  );
 
   const save = useMutation({
     mutationFn: () =>
@@ -63,7 +59,7 @@ export function OpenJobModal({ onClose }: { onClose: () => void }) {
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(errorMessage(err, MESSAGES.plantSaveFailed)),
   });
 
   return (
@@ -75,8 +71,13 @@ export function OpenJobModal({ onClose }: { onClose: () => void }) {
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="job-form" disabled={save.isPending}>
-            {save.isPending ? 'Opening…' : 'Open job'}
+          <Button
+            type="submit"
+            form="job-form"
+            loading={save.isPending}
+            disabled={equipmentId === ''}
+          >
+            Open job
           </Button>
         </>
       }
@@ -92,26 +93,21 @@ export function OpenJobModal({ onClose }: { onClose: () => void }) {
       >
         <FormError message={error} />
 
-        <SelectField
+        {/* 036 K15: server-searched; a machine already under maintenance is not offered. */}
+        <EquipmentPicker
           id="job-equipment"
           label="Machine"
           required
           value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
+          filterRow={(row) => row.status !== 'under_maintenance'}
+          onChange={(id) => {
+            setEquipmentId(id);
             // Clearing here rather than in an effect: a schedule belonging to the
             // previous machine would be rejected on save.
             setLinkedServiceScheduleId('');
           }}
           hint="Opening a job puts this machine under maintenance until the job is closed."
-        >
-          <option value="">Select a machine</option>
-          {available.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+        />
 
         <SelectField
           id="job-type"
@@ -194,7 +190,7 @@ export function CloseJobModal({
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+      setError(errorMessage(err, MESSAGES.plantSaveFailed)),
   });
 
   return (
@@ -206,8 +202,8 @@ export function CloseJobModal({
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="close-job-form" disabled={save.isPending}>
-            {save.isPending ? 'Closing…' : 'Close job'}
+          <Button type="submit" form="close-job-form" loading={save.isPending}>
+            Close job
           </Button>
         </>
       }
@@ -232,7 +228,7 @@ export function CloseJobModal({
           step="0.001"
           value={closingReading}
           onChange={(event) => setClosingReading(event.target.value)}
-          hint="Where the meter stands now. Only ever taken forward — a lower reading is left alone."
+          hint="Where the meter stands now. It cannot be below the machine's current reading (036 K11)."
         />
 
         <TextField

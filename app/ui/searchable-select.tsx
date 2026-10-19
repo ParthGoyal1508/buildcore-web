@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
+import { useLayer } from '@/app/lib/layers';
+
 export interface SearchableOption {
   id: string;
   /** What identifies the row — a BOQ number, a code. Shown first and matched first. */
@@ -110,8 +112,15 @@ export default function SearchableSelect({
     setOpen(false);
   };
 
+  // Open, the list is a layer (036 A8): Escape closes it, not the modal around the field.
+  useLayer(() => {
+    setOpen(false);
+    setTerm('');
+  }, open);
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
+      if (open) event.preventDefault();
       setOpen(false);
       setTerm('');
       return;
@@ -166,7 +175,7 @@ export default function SearchableSelect({
           setActive(0);
         }}
         onKeyDown={onKeyDown}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 disabled:bg-gray-100"
       />
 
       {/* Closed, the full description of the chosen line, which the single-line box cannot hold. */}
@@ -182,7 +191,7 @@ export default function SearchableSelect({
           ref={listRef}
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-gray-200 bg-white text-gray-900 shadow-lg"
         >
           {matches.length === 0 ? (
             <li className="px-3 py-2 text-sm text-gray-500" role="status">
@@ -204,7 +213,7 @@ export default function SearchableSelect({
                 }}
                 onMouseEnter={() => setActive(index)}
                 className={`cursor-pointer px-3 py-2 text-sm ${
-                  index === active ? 'bg-blue-50' : ''
+                  index === active ? 'bg-brand-50' : ''
                 } ${row.id === value ? 'font-medium' : ''}`}
               >
                 <span className="flex items-baseline gap-2">

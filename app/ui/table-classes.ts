@@ -19,7 +19,7 @@ export const TABLE = {
   /** A cell pinned while the table scrolls sideways: opaque, so the rest does not show through it,
    * and the same tint as its row on hover (brand-50 at 60% over white, made opaque). */
   stickyCell:
-    'sticky left-0 z-10 bg-white transition-colors group-hover/row:bg-[#f5fafd]',
+    'sticky left-0 z-10 bg-white transition-colors group-hover/row:bg-brand-wash',
   td: 'px-3 py-3 align-middle',
   tfoot: 'border-t-2 border-gray-200 bg-gray-50 font-semibold',
   /** Loading, empty and failed states, in the table's place. */

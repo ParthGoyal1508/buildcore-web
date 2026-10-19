@@ -34,7 +34,8 @@ import {
   fieldClass,
 } from '@/app/ui/settings/form-fields';
 import DocumentDownloads from './document-downloads';
-import { usePlantEquipment } from './use-plant-refs';
+import { EquipmentPicker } from './pickers';
+import { todayIso } from '@/app/lib/format';
 
 /** The card's single-value fields, held as strings while editing. */
 const TEXT_FIELDS = [
@@ -228,7 +229,6 @@ function JobCardForm({
   onCreated: (jobId: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
   const isNew = view === null;
   const card = view?.card;
 
@@ -237,7 +237,7 @@ function JobCardForm({
     const initial = Object.fromEntries(
       TEXT_FIELDS.map((key) => [key, str(card?.[key])]),
     ) as Record<TextKey, string>;
-    if (!initial.date) initial.date = new Date().toISOString().slice(0, 10);
+    if (!initial.date) initial.date = todayIso();
     return initial;
   });
   const [inspections, setInspections] = useState<InspectionDraft[]>(() =>
@@ -276,12 +276,6 @@ function JobCardForm({
   );
   const [prefilling, setPrefilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // A machine already under maintenance has an open job and the API refuses a second (409),
-  // so a new card offers only the others.
-  const machines = (equipment.data ?? []).filter(
-    (row) => !isNew || row.status !== 'under_maintenance',
-  );
 
   const bind = (key: TextKey) => ({
     value: values[key],
@@ -448,13 +442,28 @@ function JobCardForm({
         )}
 
         <Section n={1} title="Job Card & Equipment Details">
-          <SelectField
+          <EquipmentPicker
             id="jc-equipment"
             label="Machine"
             required
             disabled={!isNew}
             value={equipmentId}
-            onChange={(event) => void pickMachine(event.target.value)}
+            emptyLabel="Select a machine"
+            selectedOption={
+              equipmentId && card
+                ? {
+                    id: equipmentId,
+                    label: card.assetNo || card.machineName || 'Machine',
+                    sublabel: (card.assetNo && card.machineName) || undefined,
+                  }
+                : null
+            }
+            // A machine already under maintenance has an open job and the API refuses a second
+            // (409), so a new card offers only the others.
+            filterRow={
+              isNew ? (row) => row.status !== 'under_maintenance' : undefined
+            }
+            onChange={(id) => void pickMachine(id)}
             hint={
               isNew
                 ? prefilling
@@ -462,14 +471,7 @@ function JobCardForm({
                   : 'Picking a machine fills its details below. Saving opens a maintenance job on it.'
                 : undefined
             }
-          >
-            <option value="">Select a machine</option>
-            {machines.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.code} · {row.name}
-              </option>
-            ))}
-          </SelectField>
+          />
           {projectHeading && (
             <p className="text-xs text-gray-500">
               Printed under the project heading:{' '}

@@ -14,12 +14,16 @@ import {
   PASSWORD_INCORRECT,
   type PasswordConfirmation,
 } from '@/app/lib/api/auth';
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompany } from '@/app/lib/api/company-selection';
 import { getCashVisibility, setCashVisibility } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, SETTINGS_PERMISSIONS } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import QueryError from '@/app/ui/query-error';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
+import { toast } from '@/app/ui/toast';
+import { clockTime } from '@/app/lib/format';
 
 /**
  * The cash visibility toggle (019 FR-012 to FR-015 — `bugs.md` item 16), in Settings only and
@@ -64,6 +68,10 @@ export default function CashVisibility() {
   const isSuperAdmin =
     user?.permissions.includes(SETTINGS_PERMISSIONS['personal-settings']) ??
     false;
+  // 036 C13: the setting is per company, and the screen did not say whose. The API applies it to
+  // the selected company, or the caller's own when none is selected.
+  const company = useSelectedCompany();
+  const companyLabel = company?.name ?? 'your own company';
 
   // Drop the confirmation when it expires, so the toggle hides itself on time rather than
   // waiting for the next click to be refused.
@@ -108,6 +116,11 @@ export default function CashVisibility() {
       setCashVisibility(hide, confirmation?.confirmationToken ?? ''),
     onSuccess: (next) => {
       queryClient.setQueryData(['cash-visibility'], next);
+      toast.success(
+        next.hideCashTransactions
+          ? `Cash amounts are now hidden for ${companyLabel}.`
+          : `Cash amounts are now shown for ${companyLabel}.`,
+      );
       // FR-015. Every open screen is holding figures the server shaped under the old setting, so
       // the whole cache goes rather than a list of the modules that hold cash.
       void queryClient.invalidateQueries();
@@ -122,7 +135,7 @@ export default function CashVisibility() {
         setError('Your confirmation has expired. Enter your password again.');
         return;
       }
-      setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed);
+      setError(errorMessage(err, MESSAGES.saveFailed));
     },
   });
 
@@ -181,6 +194,20 @@ export default function CashVisibility() {
     );
   }
 
+  // 036 C13: a failed load used to fall through to "shown" with a working switch — one click from
+  // a state nobody had read. Nothing is offered until the real setting has loaded.
+  if (current.isError) {
+    return (
+      <section className="max-w-xl">
+        <QueryError
+          error={current.error}
+          onRetry={current.refetch}
+          fallback="The current setting could not be loaded."
+        />
+      </section>
+    );
+  }
+
   const hidden = current.data?.hideCashTransactions ?? false;
   const busy = current.isPending || save.isPending;
 
@@ -208,7 +235,7 @@ export default function CashVisibility() {
       <div className="mt-4 flex flex-col gap-3">
         <FormError message={error} />
         <label className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800">
-          <span>Hide cash amounts for this company</span>
+          <span>Hide cash amounts for {companyLabel}</span>
           {/* A real checkbox drawn as a switch: keyboard and screen-reader behaviour come from the
               input, the look from the sibling span. */}
           <span className="relative inline-flex shrink-0 items-center">
@@ -216,7 +243,7 @@ export default function CashVisibility() {
               type="checkbox"
               role="switch"
               checked={hidden}
-              disabled={busy}
+              disabled={busy || !current.data}
               onChange={(event) => {
                 setError(null);
                 save.mutate(event.target.checked);
@@ -239,10 +266,7 @@ export default function CashVisibility() {
                 : 'cash amounts are shown'}
           </span>
           . Confirmed until{' '}
-          {new Date(confirmation.expiresAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {clockTime(confirmation.expiresAt)}
           .
         </p>
       </div>

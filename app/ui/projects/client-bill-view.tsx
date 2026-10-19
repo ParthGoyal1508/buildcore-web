@@ -19,8 +19,14 @@ import { BILLING_COPY, ROUTES } from '@/app/lib/constants';
 import { openStoredFile } from '@/app/lib/download-file';
 import { isViewableFile, useFileViewer } from '@/app/ui/pdf-viewer';
 import { percentLabel } from '@/app/lib/bill-totals';
-import { dateLabel, rupees, unitRate } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { dateLabel, quantity3, rupees, unitRate } from '@/app/lib/format';
+import { Button, TextButton } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   SecondaryButton,
@@ -36,6 +42,8 @@ import { TABLE } from '@/app/ui/table';
  */
 const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
 const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
+/** A certified quantity as typed: digits, at most one point, at most three decimals. */
+const CERTIFIED_QTY_PATTERN = /^\d*(\.\d{0,3})?$/;
 
 /**
  * One client bill, read, with the two acts it still accepts (027).
@@ -71,6 +79,8 @@ export default function ClientBillView({
   bill: ClientBill;
 }) {
   const queryClient = useQueryClient();
+  const { isLocked } = useProjectLock();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [certifying, setCertifying] = useState(false);
   const [certifiedAmount, setCertifiedAmount] = useState('');
@@ -85,6 +95,19 @@ export default function ClientBillView({
   const [certifiedQtys, setCertifiedQtys] = useState<Record<string, string>>(
     {},
   );
+  /**
+   * Kept exactly as typed (036 follow-up, as I14 did for the RA sheet): a `type="number"` field
+   * hands back `''` for "10." mid-typing, and some locales' keyboards cannot type the point at all.
+   * Digits, one point and at most three decimals — the API stores 3dp.
+   */
+  const qtyInvalid = (raw: string | undefined) => {
+    const value = raw?.trim() ?? '';
+    // A lone "." matches the pattern but is not a number.
+    return (
+      value !== '' && (!CERTIFIED_QTY_PATTERN.test(value) || value === '.')
+    );
+  };
+  const anyQtyInvalid = Object.values(certifiedQtys).some(qtyInvalid);
   /** Line by line, or a single figure. Line by line is what frees uncertified scope. */
   const [perLine, setPerLine] = useState(true);
   const [certificate, setCertificate] = useState<File | null>(null);
@@ -103,11 +126,21 @@ export default function ClientBillView({
 
   const submit = useMutation({
     mutationFn: () => submitClientBill(bill.id),
-    onSuccess: refresh,
-    onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : BILLING_COPY.submitFailed,
-      ),
+    onSuccess: () => {
+      toast.success(`${bill.billNumber} was submitted.`);
+      refresh();
+    },
+    onError: (err) => {
+      // A second submit (double click, second tab) is refused 409 BILL_NOT_DRAFT: the bill did go,
+      // so say so and refetch rather than report a failure (036 Wave 3, 2026-10-17).
+      if (err instanceof ApiError && err.code === 'BILL_NOT_DRAFT') {
+        toast.info('This bill has already been submitted.');
+        refresh();
+        return;
+      }
+      // A 423 reads as the lock, not "could not be submitted".
+      setError(projectErrorMessage(err, BILLING_COPY.submitFailed));
+    },
   });
 
   const certify = useMutation({
@@ -120,7 +153,7 @@ export default function ClientBillView({
                 .filter(([, value]) => value.trim() !== '')
                 .map(([lineId, value]) => ({
                   lineId,
-                  certifiedQty: Number(value),
+                  certifiedQty: Number(value.trim()),
                 })),
             }
           : { certifiedAmount: Number(certifiedAmount) }),
@@ -131,12 +164,11 @@ export default function ClientBillView({
       setCertifiedAmount('');
       setCertifiedQtys({});
       setCertificate(null);
+      toast.success('The certification was recorded.');
       refresh();
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : BILLING_COPY.submitFailed,
-      ),
+      setError(projectErrorMessage(err, BILLING_COPY.submitFailed)),
   });
 
   // A PDF or scanned certificate opens in the page's own viewer (2026-10-14) rather than a new tab
@@ -320,7 +352,7 @@ export default function ClientBillView({
                             'text-gray-900',
                           )}
                         >
-                          {line.quantity}
+                          {quantity3(Number(line.quantity))}
                         </td>
                         <td
                           className={clsx(
@@ -330,7 +362,7 @@ export default function ClientBillView({
                           )}
                         >
                           {/* The schedule's rate, frozen at composition. Never today's BOQ rate. */}
-                          {rupees(line.rate)}
+                          {unitRate(line.rate)}
                         </td>
                         {quoted && (
                           <td
@@ -370,15 +402,15 @@ export default function ClientBillView({
             <p className="text-xs text-gray-500">
               {BILLING_COPY.linesHidden(hidden, billed.length)}
             </p>
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="underline"
               onClick={() => setShowAllLines((current) => !current)}
-              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               {showAllLines
                 ? BILLING_COPY.showBilledLines
                 : BILLING_COPY.showAllLines}
-            </button>
+            </TextButton>
           </div>
         )}
         {quoted && (
@@ -455,27 +487,19 @@ export default function ClientBillView({
         {viewer}
         {bill.certificate && (
           <p className="text-sm">
-            <button
-              type="button"
-              className="text-blue-600 hover:underline"
-              onClick={() => void openCertificate()}
-            >
+            <TextButton onClick={() => void openCertificate()}>
               {BILLING_COPY.certifyCopyOpen} — {bill.certificate.fileName}
-            </button>
+            </TextButton>
           </p>
         )}
 
         {certifying && (
           <div className="space-y-3">
-            <button
-              type="button"
-              className="text-sm text-blue-600 hover:underline"
-              onClick={() => setPerLine((on) => !on)}
-            >
+            <TextButton onClick={() => setPerLine((on) => !on)}>
               {perLine
                 ? BILLING_COPY.certifyAmountOnly
                 : BILLING_COPY.certifyLinesInstead}
-            </button>
+            </TextButton>
 
             {perLine ? (
               <div className="space-y-2">
@@ -505,14 +529,22 @@ export default function ClientBillView({
                             </span>
                           </td>
                           <td className={clsx(DENSE_TD, TABLE.numeric)}>
-                            {line.quantity} {line.unit}
+                            {quantity3(Number(line.quantity))} {line.unit}
                           </td>
                           <td className={clsx(DENSE_TD, 'text-right')}>
                             <input
-                              type="number"
-                              step="0.001"
-                              min="0"
+                              type="text"
                               inputMode="decimal"
+                              pattern="\d*(\.\d{0,3})?"
+                              autoComplete="off"
+                              aria-invalid={
+                                qtyInvalid(certifiedQtys[line.id]) || undefined
+                              }
+                              title={
+                                qtyInvalid(certifiedQtys[line.id])
+                                  ? 'A quantity, with up to three decimals — for example 10.05'
+                                  : undefined
+                              }
                               aria-label={`${BILLING_COPY.certifyCertifiedQty} — ${line.boqNo}`}
                               // Blank, never pre-filled with the billed quantity: a
                               // prefilled field is one somebody accepts, and accepting
@@ -525,7 +557,12 @@ export default function ClientBillView({
                                   [line.id]: event.target.value,
                                 }))
                               }
-                              className="w-28 rounded border border-gray-300 px-2 py-1 text-right tabular-nums"
+                              className={clsx(
+                                'w-28 rounded border px-2 py-1 text-right tabular-nums',
+                                qtyInvalid(certifiedQtys[line.id])
+                                  ? 'border-red-500 bg-red-50'
+                                  : 'border-gray-300',
+                              )}
                             />
                           </td>
                         </tr>
@@ -579,12 +616,13 @@ export default function ClientBillView({
               </SecondaryButton>
               <Button
                 type="button"
+                loading={certify.isPending}
                 disabled={
-                  certify.isPending ||
                   // Line by line needs at least one figure; a single amount needs the
                   // amount. Neither path should post an empty certification.
                   (perLine
-                    ? !Object.values(certifiedQtys).some(
+                    ? anyQtyInvalid ||
+                      !Object.values(certifiedQtys).some(
                         (value) => value.trim() !== '',
                       )
                     : certifiedAmount === '')
@@ -609,18 +647,28 @@ export default function ClientBillView({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={ROUTES.projectsBillPackage(projectId, bill.package.id)}
-            className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 sm:min-h-0"
+            className="inline-flex min-h-11 items-center rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 sm:min-h-0"
           >
             Open {bill.package.label} — approve, issue and certify
           </Link>
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {bill.status === 'draft' && (
+          {/* Write controls are absent on a locked project (036 Wave 3): the server refuses 423. */}
+          {bill.status === 'draft' && !isLocked && (
             <Button
               type="button"
-              disabled={submit.isPending}
-              onClick={() => {
+              loading={submit.isPending}
+              onClick={async () => {
+                if (
+                  !(await confirmDialog({
+                    title: 'Submit this bill?',
+                    message: `${bill.billNumber} is sent to the client. It cannot be edited as a draft afterwards.`,
+                    confirmLabel: 'Submit',
+                  }))
+                ) {
+                  return;
+                }
                 setError(null);
                 submit.mutate();
               }}
@@ -633,7 +681,7 @@ export default function ClientBillView({
           {/* **Also once it is certified (2026-10-11)**: re-certifying is how a
             certification is corrected, which is what was asked for. The server accepts
             an already-certified bill and replaces what it holds. */}
-          {bill.status !== 'draft' && !certifying && (
+          {bill.status !== 'draft' && !certifying && !isLocked && (
             <SecondaryButton
               type="button"
               onClick={() => {

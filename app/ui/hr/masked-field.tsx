@@ -10,6 +10,7 @@ import {
   PII_REVEAL_TIMEOUT_MS,
   type PiiField,
 } from '@/app/lib/constants';
+import { RowAction } from '@/app/ui/button';
 
 /**
  * A regulated identifier, masked by default (spec FR-003).
@@ -74,7 +75,7 @@ export default function MaskedField({
   }
 
   if (!maskedValue) {
-    return <span className="text-sm text-gray-400">Not recorded</span>;
+    return <span className="text-sm text-gray-500">Not recorded</span>;
   }
 
   return (
@@ -82,8 +83,12 @@ export default function MaskedField({
       <span className="font-mono text-sm tabular-nums">
         {revealed ?? maskedValue}
       </span>
-      <button
+      {/* A row action's shape since 036 A21. `intent="read"`: revealing changes nothing, and the
+          reveal endpoint is what checks the permission. */}
+      <RowAction
         type="button"
+        intent="read"
+        icon={revealed ? EyeSlashIcon : EyeIcon}
         onClick={revealed ? hide : reveal}
         disabled={isRevealing}
         // The accessible name carries the field, so a screen-reader user tabbing
@@ -92,15 +97,9 @@ export default function MaskedField({
           revealed ? `Hide ${fieldLabel}` : `Reveal full ${fieldLabel}`
         }
         title={revealed ? undefined : HR_MESSAGES.revealPiiHint(fieldLabel)}
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 px-2 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50"
       >
-        {revealed ? (
-          <EyeSlashIcon className="w-4" aria-hidden="true" />
-        ) : (
-          <EyeIcon className="w-4" aria-hidden="true" />
-        )}
         {isRevealing ? 'Revealing…' : revealed ? 'Hide' : 'Reveal'}
-      </button>
+      </RowAction>
       {/* Announced politely so the reveal isn't silent for a screen reader. */}
       <span className="sr-only" role="status">
         {revealed ? `${fieldLabel} revealed` : ''}

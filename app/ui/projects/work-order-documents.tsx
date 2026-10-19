@@ -313,8 +313,15 @@ export default function WorkOrderDocuments({
         </>
       )}
 
-      {mine.length > 0 && (
-        <LetterTable letters={mine} isLoading={false} emptyMessage="" />
+      {/* 036 J1/I17 (2026-10-17): a failed letters read shows Retry rather than nothing at all. */}
+      {(mine.length > 0 || letters.isError) && (
+        <LetterTable
+          letters={mine}
+          isLoading={false}
+          error={letters.error}
+          onRetry={letters.refetch}
+          emptyMessage=""
+        />
       )}
 
       {/* The NOCs that follow each document (2026-10-15): one place once the LOI is generated,

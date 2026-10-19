@@ -200,7 +200,7 @@ export default function LetterKindFields({
                 </p>
               </div>
               {isShipped ? (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-500">
                   {LETTER_FIELD_COPY.notEditable}
                 </span>
               ) : (

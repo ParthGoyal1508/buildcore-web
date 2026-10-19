@@ -7,6 +7,7 @@ import { getReconciliation, repairReconciliation } from '@/app/lib/api/dwr';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { promptDialog } from '@/app/ui/dialogs';
+import { boqKeys } from '@/app/lib/api/projects';
 
 type ReconciliationLine = Awaited<
   ReturnType<typeof getReconciliation>
@@ -84,7 +85,7 @@ export default function DwrReconciliation({
         queryKey: ['dwr-reconciliation', projectId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
     },
     onError: (err: Error) => {

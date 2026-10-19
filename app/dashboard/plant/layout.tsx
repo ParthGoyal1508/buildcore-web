@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, PLANT_PERMISSIONS, ROUTES } from '@/app/lib/constants';
+import { PLANT_PERMISSIONS, ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import PlantNav from '@/app/ui/plant/plant-nav';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -37,6 +38,9 @@ const SECTION_PERMISSIONS: { prefix: string; permission: string }[] = [
   { prefix: ROUTES.plantHireBills, permission: PLANT_PERMISSIONS.hireBills },
   { prefix: ROUTES.plantMasters, permission: PLANT_PERMISSIONS.masters },
   { prefix: ROUTES.plantDisposals, permission: PLANT_PERMISSIONS.equipment },
+  // 036 K17: the hire orders API is gated by MACHINERY; without this entry a role lacking it
+  // reached the screen and met a raw 403 on the first request instead of this page's message.
+  { prefix: ROUTES.plantHireOrders, permission: PLANT_PERMISSIONS.equipment },
 ];
 
 export default function PlantLayout({
@@ -76,7 +80,7 @@ export default function PlantLayout({
   }
 
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   if (required && !user.permissions.includes(required.permission as never)) {

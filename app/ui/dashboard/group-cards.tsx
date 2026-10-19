@@ -20,7 +20,7 @@ import type {
   StatutoryDueItem,
 } from '@/app/lib/api/dashboard';
 import type { SelectableCompany } from '@/app/lib/api/company-selection';
-import { dateLabel, rupees } from '@/app/lib/format';
+import { dateLabel, quantity, rupees, shortPeriodLabel } from '@/app/lib/format';
 import { CompanyMark } from '@/app/ui/company-logo';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import {
@@ -47,13 +47,7 @@ import {
 function shortPeriod(period: string): string {
   const [year, month] = period.split('-').map(Number);
   if (!year || !month) return period;
-  // `en-US` for "Sep": `en-IN` and `en-GB` now abbreviate September to "Sept", which
-  // is the only month that breaks the column of three-letter months.
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-US', {
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return shortPeriodLabel(`${year}-${String(month).padStart(2, '0')}`);
 }
 
 /** "Sep 2026", or "Sep – Oct 2026" when the companies' latest runs differ. */
@@ -75,7 +69,7 @@ function metricsFor(card: GroupCompanyCard | GroupTotal): Metric[] {
       key: 'headcount',
       label: 'Headcount',
       icon: UsersIcon,
-      value: card.headcount.toLocaleString('en-IN'),
+      value: quantity(card.headcount),
       hint: 'active employees',
     },
   ];
@@ -86,7 +80,7 @@ function metricsFor(card: GroupCompanyCard | GroupTotal): Metric[] {
         key: 'projects',
         label: 'Active projects',
         icon: BuildingOffice2Icon,
-        value: card.activeProjects.count.toLocaleString('en-IN'),
+        value: quantity(card.activeProjects.count),
         hint: 'ongoing',
       },
       {
@@ -203,7 +197,7 @@ export function CompanyCard({
           >
             {card.name}
           </h2>
-          <span className="mt-0.5 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-[11px] font-semibold tracking-wide text-brand-600">
+          <span className="mt-0.5 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-brand-600">
             {card.shortCode}
           </span>
         </div>
@@ -287,7 +281,7 @@ const SCHEME_LABEL: Record<string, string> = {
 
 function amountLabel(item: StatutoryDueItem): React.ReactNode {
   return item.amount === null ? (
-    <span className="text-gray-400">Run not processed</span>
+    <span className="text-gray-500">Run not processed</span>
   ) : (
     rupees(item.amount)
   );

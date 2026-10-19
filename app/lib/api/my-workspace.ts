@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
-import { API_URL } from '@/app/lib/config';
-import { getAccessToken, authFetch } from '@/app/lib/session';
+import type { StoredFile } from '@/app/lib/api/client';
+import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
  * The `/my/*` client (contracts/my-workspace-ui.md).
@@ -165,7 +165,13 @@ export const salarySlipSchema = z.object({
     pt: z.number(),
     tds: z.number(),
     loanEmi: z.number(),
+    // The advance actually recovered on this slip (036 G2 / B-side): stored on the slip now, not
+    // re-derived from the advance's schedule, so it matches the line on the PDF.
     advanceRecovery: z.number(),
+    // 036 G2: fuel lost on a machine, recovered from its operator (020 FR-007). The API always sent
+    // it and counted it in `total`, but the schema stripped it, so the rows on screen did not add
+    // up to the deductions total whenever there was a recovery.
+    fuelRecovery: z.number().default(0),
   }),
   employerContributions: moneyGroupSchema({
     pf: z.number(),
@@ -445,6 +451,35 @@ export async function getLeaveBalance(
     .parse(await authFetch(`/my/leave/balance${query}`));
 }
 
+/**
+ * How many days a leave range would charge, counted by the server exactly as an application is
+ * (036 G3): the employee's own site weekly off and the site's holidays are excluded, and each
+ * excluded date is listed with why. The apply form used to skip Saturday and Sunday itself, which
+ * on a six-day site week was wrong in both directions.
+ */
+export const leaveDayCountSchema = z.object({
+  days: z.number(),
+  /** 0 = Sunday … 6 = Saturday. */
+  weeklyOffDay: z.number(),
+  excluded: z.array(
+    z.object({
+      date: z.string(),
+      reason: z.enum(['weekly_off', 'holiday']),
+    }),
+  ),
+});
+export type LeaveDayCount = z.infer<typeof leaveDayCountSchema>;
+
+export async function getLeaveDayCount(
+  fromDate: string,
+  toDate: string,
+): Promise<LeaveDayCount> {
+  const query = new URLSearchParams({ fromDate, toDate });
+  return leaveDayCountSchema.parse(
+    await authFetch(`/my/leave/day-count?${query}`),
+  );
+}
+
 export async function getLeaveApplications(): Promise<LeaveApplication[]> {
   return z
     .array(leaveApplicationSchema)
@@ -486,24 +521,16 @@ export async function getSalarySlip(period: string): Promise<SalarySlip> {
 }
 
 /**
- * The payslip PDF (research.md §8).
+ * The payslip PDF (research.md §8), under the server's own name
+ * (`payslip-<code>-<period>.pdf`).
  *
- * Uses raw `fetch` rather than `authFetch`, which parses JSON and would choke on a
- * PDF body. The cost is that this one call does not get `authFetch`'s
- * refresh-on-401 retry — acceptable because it is always a deliberate tap on a
- * screen the user has already loaded through an authenticated request moments
- * earlier, so an expired token here is a re-tap rather than a lost session.
+ * Through `authFetchFile` since 036 (follow-up): it used a raw `fetch`, which skipped the
+ * refresh-on-401 retry, the timeout and the server's error message.
  */
-export async function downloadSalarySlipPdf(period: string): Promise<Blob> {
-  const token = getAccessToken();
-  const res = await fetch(`${API_URL}/my/salary/${period}/pdf`, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) {
-    throw new Error('Could not download the payslip. Please try again.');
-  }
-  return res.blob();
+export async function downloadSalarySlipPdf(
+  period: string,
+): Promise<StoredFile> {
+  return authFetchFile(`/my/salary/${period}/pdf`);
 }
 
 // ---------------------------------------------------------- Reimbursements
@@ -528,10 +555,15 @@ export interface ClaimInput {
   /** `YYYY-MM-DD`. */
   expenseDate: string;
   description: string;
-  /** Base64 image data. Stored server-side in this same request, which is why no
-   * separate upload call exists — a two-step upload would orphan the blob of every
-   * claim the employee then abandons. */
+  /** Base64 photo (JPEG, PNG, WebP) or, since 036 G5, PDF. Stored server-side in this same
+   * request, which is why no separate upload call exists — a two-step upload would orphan the blob
+   * of every claim the employee then abandons. */
   receipt?: string;
+  /**
+   * Edit only: `null` removes the receipt on file; leave it out to keep it. 036 G5: a string is no
+   * longer accepted as a receipt (the server ignores it), so this client never sends one.
+   */
+  receiptRef?: null;
   status?: 'draft' | 'submitted';
 }
 
@@ -570,6 +602,13 @@ export async function withdrawReimbursementClaim(
 
 export async function deleteReimbursementClaim(id: string): Promise<void> {
   await authFetch(`/my/reimbursements/${id}`, { method: 'DELETE' });
+}
+
+/** The claim's receipt, photo or PDF, under the name the server gives it (036 G5). */
+export async function getMyReimbursementReceipt(
+  id: string,
+): Promise<StoredFile> {
+  return authFetchFile(`/my/reimbursements/${id}/receipt`);
 }
 
 // ------------------------------------------- Attendance exceptions (016 T042)

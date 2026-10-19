@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import SideNav from '@/app/ui/dashboard/sidenav';
 import LabourNav from '@/app/ui/labour/labour-nav';
 import { FullPageLoader } from '@/app/ui/shell-gate';
@@ -50,7 +51,7 @@ export default function LabourFieldLayout({
     return <FullPageLoader />;
   }
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
   if (!user.permissions.includes('DAILY_WORKER_REGISTRY')) {
     return (
@@ -64,7 +65,7 @@ export default function LabourFieldLayout({
       <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
         {/* Desktop only, and the same component `/dashboard` mounts, so a supervisor
             who is also an admin keeps every module they can reach. */}
-        <div className="hidden flex-none md:block md:w-64">
+        <div className="hidden flex-none md:block">
           <SideNav />
         </div>
 
@@ -76,7 +77,7 @@ export default function LabourFieldLayout({
                 sections this screen does not have. */}
             <Link
               href={ROUTES.labour}
-              className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:hidden"
+              className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 md:hidden"
             >
               <ArrowLeftIcon className="w-4" aria-hidden="true" />
               Labour

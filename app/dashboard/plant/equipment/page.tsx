@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -23,6 +23,7 @@ import {
 import CategoryOptions from '@/app/ui/plant/category-options';
 import EquipmentImportModal from '@/app/ui/plant/equipment-import-modal';
 import EquipmentModal from '@/app/ui/plant/equipment-modal';
+import { EquipmentThumb } from '@/app/ui/plant/equipment-photos';
 import DisposeModal from '@/app/ui/plant/dispose-modal';
 import { getCurrentUser } from '@/app/lib/api/users';
 import Pager from '@/app/ui/inventory/pager';
@@ -75,9 +76,10 @@ export default function AssetRegisterPage() {
     ...(ownership ? { ownership } : {}),
   };
 
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['plant', 'equipment', filters],
     queryFn: () => getEquipment(filters),
+    placeholderData: keepPreviousData,
   });
 
   /**
@@ -117,6 +119,25 @@ export default function AssetRegisterPage() {
 
   const columns: Column<Equipment>[] = [
     {
+      // 036 K14: the main photo's 320 px thumbnail, or the placeholder icon.
+      key: 'photo',
+      header: 'Photo',
+      render: (row) => (
+        <Link
+          href={ROUTES.plantEquipmentDetail(row.id)}
+          aria-label={`${row.code} · ${row.name}`}
+          className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+        >
+          <EquipmentThumb
+            equipmentId={row.id}
+            photoId={row.mainPhotoId}
+            alt={`${row.code} · ${row.name}`}
+            className="h-12 w-12"
+          />
+        </Link>
+      ),
+    },
+    {
       key: 'code',
       header: 'Code',
       // The registration number under the code (2026-10-15): the vehicle number is what the
@@ -125,7 +146,7 @@ export default function AssetRegisterPage() {
         <span>
           <Link
             href={ROUTES.plantEquipmentDetail(row.id)}
-            className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {row.code}
           </Link>
@@ -204,14 +225,17 @@ export default function AssetRegisterPage() {
       render: (row) => {
         const alerts = row.alertDocumentTypes;
         return alerts.length > 0 ? (
-          <span
-            className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-            title={alerts.join(', ')}
-          >
-            {alerts.join(', ')}
+          <span title={alerts.join(', ')}>
+            {/* A list of paperwork, not a one-word status: it wraps, or on a phone it pushed the
+                whole register wider than the screen (036 Wave 5). */}
+            <StatusBadge
+              tone="warning"
+              label={alerts.join(', ')}
+              className="max-w-full !whitespace-normal"
+            />
           </span>
         ) : (
-          <span className="text-sm text-gray-400">—</span>
+          <span className="text-sm text-gray-500">—</span>
         );
       },
     },
@@ -334,7 +358,10 @@ export default function AssetRegisterPage() {
         rows={data?.items ?? []}
         rowKey={(row) => row.id}
         isLoading={isPending}
-        error={isError ? MESSAGES.plantLoadFailed : undefined}
+        isRefreshing={isFetching && !isPending}
+        error={isError ? error : undefined}
+        onRetry={refetch}
+        serverPaged
         emptyMessage={
           hasFilters
             ? MESSAGES.plantEquipmentEmptyFiltered

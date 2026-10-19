@@ -8,23 +8,23 @@ import {
   getAssetStock,
   type Asset,
 } from '@/app/lib/api/assets';
-import { ApiError } from '@/app/lib/api/client';
-import { EMPLOYEE_PAGE_MAX, listEmployees } from '@/app/lib/api/hr-payroll';
+import { errorMessage } from '@/app/lib/api/client';
 import { MESSAGES, formatAssetQuantity } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
+import {
+  EmployeePicker,
+  ProjectPicker,
+  SitePicker,
+} from '@/app/ui/plant/pickers';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import {
-  useAssetCategories,
-  useAssetProjects,
-  useAssetSites,
-  useAssetsCompanyId,
-} from './use-asset-refs';
+import { useToast } from '@/app/ui/toast';
+import { useAssetCategories, useAssetsCompanyId } from './use-asset-refs';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Allocate an asset to a project site (spec US4).
@@ -40,6 +40,9 @@ import {
  *    appears when the category requires one, and a custodian posted at another site
  *    is refused by the backend with a 400 that this form shows *on the Custodian
  *    field* rather than in a banner, because that is the field to change.
+ *
+ * 036 L2: project, site and custodian are server-searched pickers. The custodian list was a plain
+ * select capped at 100 people, so the 101st person posted at a site could not be given custody.
  */
 export default function AllocateModal({
   asset,
@@ -49,9 +52,8 @@ export default function AllocateModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const companyId = useAssetsCompanyId();
-  const projects = useAssetProjects();
-  const sites = useAssetSites();
   const categories = useAssetCategories();
 
   const [projectId, setProjectId] = useState('');
@@ -59,7 +61,7 @@ export default function AllocateModal({
   const [custodianEmployeeId, setCustodianEmployeeId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [allocatedFrom, setAllocatedFrom] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -87,24 +89,11 @@ export default function AllocateModal({
   const available = stock.data?.[0]?.onHand ?? 0;
   const exceedsAvailable = isBulk && Number(quantity || 0) > available;
 
-  // Only employees posted at the chosen site can hold custody, so the picker is
-  // narrowed rather than left to fail on submit.
-  const employees = useQuery({
-    queryKey: ['assets', 'employees', siteId],
-    // 100 is the endpoint's documented maximum; 200 was a 400, and custody could
-    // not be assigned to anybody.
-    queryFn: () =>
-      listEmployees({ siteId, isActive: true, pageSize: EMPLOYEE_PAGE_MAX }),
-    enabled: custodyRequired && siteId !== '',
-    select: (page) => page.items,
-  });
-
-  // Sites of the chosen project only: the backend refuses a site that belongs
-  // elsewhere, because the allocation would report cost against a project the asset
-  // never went to.
-  const projectSites = (sites.data ?? []).filter(
-    (site) => projectId === '' || site.projectId === projectId,
-  );
+  const isDirty =
+    projectId !== '' ||
+    custodianEmployeeId !== '' ||
+    expectedReturnDate !== '' ||
+    remarks.trim() !== '';
 
   const allocate = useMutation({
     mutationFn: () =>
@@ -123,11 +112,11 @@ export default function AllocateModal({
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
+      toast.success(`${asset.assetCode} allocated.`);
       onClose();
     },
     onError: (err) => {
-      const message =
-        err instanceof ApiError ? err.message : MESSAGES.saveFailed;
+      const message = errorMessage(err, MESSAGES.saveFailed);
       // The one refusal that names a specific field. Routing it there rather than
       // to the banner is the difference between "something is wrong" and "change
       // this".
@@ -154,6 +143,8 @@ export default function AllocateModal({
       title={`Allocate ${asset.assetCode}`}
       onClose={onClose}
       wide
+      isDirty={isDirty}
+      pending={allocate.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
@@ -162,9 +153,10 @@ export default function AllocateModal({
           <Button
             type="submit"
             form="allocate-form"
-            disabled={allocate.isPending || !canSubmit}
+            loading={allocate.isPending}
+            disabled={!canSubmit}
           >
-            {allocate.isPending ? 'Allocating…' : 'Allocate'}
+            Allocate
           </Button>
         </>
       }
@@ -182,47 +174,45 @@ export default function AllocateModal({
       >
         <FormError message={error} />
 
-        <SelectField
+        <ProjectPicker
           id="allocate-project"
           label="Project"
+          required
           value={projectId}
-          onChange={(event) => {
-            setProjectId(event.target.value);
+          onChange={(id) => {
+            setProjectId(id);
             setSiteId('');
             setCustodianEmployeeId('');
           }}
-          required
-        >
-          <option value="">Select a project</option>
-          {(projects.data ?? []).map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.code} — {project.name}
-            </option>
-          ))}
-        </SelectField>
+        />
 
-        <SelectField
+        {/* Sites of the chosen project only: the backend refuses a site that belongs
+            elsewhere, because the allocation would report cost against a project the asset
+            never went to. */}
+        <SitePicker
           id="allocate-site"
           label="Site"
-          value={siteId}
-          onChange={(event) => {
-            setSiteId(event.target.value);
-            setCustodianEmployeeId('');
-          }}
           required
-          hint={
-            asset.trackingMode === 'serialised'
-              ? `${asset.assetCode} is at ${asset.siteName}. Transfer it before allocating it elsewhere.`
+          projectId={projectId || undefined}
+          disabled={projectId === ''}
+          value={siteId}
+          selectedOption={
+            siteId === asset.currentSiteId
+              ? { id: asset.currentSiteId, label: asset.siteName }
               : undefined
           }
-        >
-          <option value="">Select a site</option>
-          {projectSites.map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => {
+            setSiteId(id);
+            setCustodianEmployeeId('');
+          }}
+          hint={
+            projectId === ''
+              ? 'Choose the project first.'
+              : asset.trackingMode === 'serialised'
+                ? `${asset.assetCode} is at ${asset.siteName}. Transfer it before allocating it elsewhere.`
+                : undefined
+          }
+        />
 
         {isBulk && (
           <TextField
@@ -248,25 +238,22 @@ export default function AllocateModal({
         )}
 
         {custodyRequired && (
-          <SelectField
+          // Only employees posted at the chosen site can hold custody, so the picker is
+          // narrowed to them rather than left to fail on submit.
+          <EmployeePicker
             id="allocate-custodian"
             label="Custodian"
-            value={custodianEmployeeId}
-            onChange={(event) => setCustodianEmployeeId(event.target.value)}
             required
+            siteId={siteId || undefined}
+            disabled={siteId === ''}
+            value={custodianEmployeeId}
+            onChange={(id) => {
+              setCustodianEmployeeId(id);
+              setCustodianError(null);
+            }}
             error={custodianError ?? undefined}
             hint={`${category?.name ?? 'This category'} requires somebody to be accountable for the asset while it is out. Only people posted at this site can hold it.`}
-          >
-            <option value="">Select a custodian</option>
-            {(employees.data ?? []).map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {[employee.firstName, employee.lastName]
-                  .filter(Boolean)
-                  .join(' ') || employee.employeeCode}{' '}
-                — {employee.employeeCode}
-              </option>
-            ))}
-          </SelectField>
+          />
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -282,6 +269,7 @@ export default function AllocateModal({
             id="allocate-due"
             label="Expected back by"
             type="date"
+            min={allocatedFrom || undefined}
             value={expectedReturnDate}
             onChange={(event) => setExpectedReturnDate(event.target.value)}
             required

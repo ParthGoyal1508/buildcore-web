@@ -25,8 +25,9 @@ import {
 import {
   usePlantCategories,
   usePlantCompanyId,
-  usePlantVendors,
 } from './use-plant-refs';
+import { VendorPicker } from './pickers';
+import { todayIso } from '@/app/lib/format';
 
 /**
  * Add or edit a spare part.
@@ -231,12 +232,11 @@ export function ReceivePartModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const vendors = usePlantVendors();
 
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
   const [receiptDate, setReceiptDate] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayIso(),
   );
   const [vendorId, setVendorId] = useState('');
   const [billReference, setBillReference] = useState('');
@@ -367,19 +367,13 @@ export function ReceivePartModal({
           onChange={(event) => setReceiptDate(event.target.value)}
         />
 
-        <SelectField
+        <VendorPicker
           id="receive-vendor"
           label="Supplier"
           value={vendorId}
-          onChange={(event) => setVendorId(event.target.value)}
-        >
-          <option value="">Not recorded</option>
-          {(vendors.data ?? []).map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
-        </SelectField>
+          emptyLabel="Not recorded"
+          onChange={(id) => setVendorId(id)}
+        />
 
         <TextField
           id="receive-bill"

@@ -62,6 +62,13 @@ function fromText(text: string): number | string | null {
   if (!t || t === '—' || t === '-') return null;
   const figure = /^[₹Rs.\s]*[-−]?[\d,]+(\.\d+)?\s*%?$/.exec(t);
   if (figure) return Number(t.replace(/[^\d.\-−]/g, '').replace('−', '-'));
+  // DD-MM-YYYY (and DD-MM-YYYY HH:mm), the app’s one date format since 036 A18 — read as a date
+  // rather than compared as text, which would order it by day of month.
+  const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/.exec(t);
+  if (ddmmyyyy) {
+    const [, d, m, y, hh = '0', mm = '0'] = ddmmyyyy;
+    return Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm));
+  }
   const fraction = /^(\d+)\s*\/\s*(\d+)/.exec(t);
   if (fraction) return Number(fraction[1]) / Math.max(1, Number(fraction[2]));
   if (/^\d{4}-\d{2}-\d{2}/.test(t) || (MONTH.test(t) && /\d{4}/.test(t))) {
@@ -117,16 +124,56 @@ export function useSortedRows<T>(rows: T[], columns: SortableColumn<T>[]) {
     return keyed.map((k) => k.row);
   }, [rows, columns, sort]);
 
-  const toggle = (key: string) =>
-    setSort((current) =>
-      current?.key !== key
-        ? { key, dir: 'asc' }
-        : current.dir === 'asc'
-          ? { key, dir: 'desc' }
-          : null,
-    );
+  const toggle = (key: string) => setSort((current) => nextSort(current, key));
 
   return { sorted, sort, toggle };
+}
+
+export type TableSort = { key: string; dir: SortDirection } | null;
+
+/** The sort a click on `key` moves to: ascending, then descending, then none. */
+export function nextSort(current: TableSort, key: string): TableSort {
+  if (current?.key !== key) return { key, dir: 'asc' };
+  return current.dir === 'asc' ? { key, dir: 'desc' } : null;
+}
+
+/**
+ * How a shared list sorts, decided once for `ResponsiveList` and `DataTable` (036 A13).
+ *
+ * - **Client** (the default): the rows on screen, in the browser — right when every row is loaded.
+ * - **Server**: `onSortChange` given. The header asks; the caller puts the sort in its query and
+ *   the rows come back in that order, so the list does not reorder them again.
+ * - **Off**: `serverPaged` without `onSortChange`. Sorting one page of twenty in the browser looked
+ *   like sorting the list and was not — the "highest" amount was the highest of the page — so the
+ *   headers stop offering it until the endpoint can sort.
+ */
+export function useTableSort<T>(
+  rows: T[],
+  columns: SortableColumn<T>[],
+  {
+    sort,
+    onSortChange,
+    serverPaged = false,
+  }: {
+    sort?: TableSort;
+    onSortChange?: (sort: TableSort) => void;
+    serverPaged?: boolean;
+  } = {},
+) {
+  const local = useSortedRows(rows, columns);
+  if (onSortChange) {
+    const current = sort ?? null;
+    return {
+      sorted: rows,
+      sort: current,
+      toggle: (key: string) => onSortChange(nextSort(current, key)),
+      enabled: true,
+    };
+  }
+  if (serverPaged) {
+    return { sorted: rows, sort: null, toggle: () => {}, enabled: false };
+  }
+  return { ...local, enabled: true };
 }
 
 /**

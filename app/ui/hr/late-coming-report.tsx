@@ -13,6 +13,8 @@ import { MESSAGES } from '@/app/lib/constants';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import type { z } from 'zod';
+import { monthName } from '@/app/lib/format';
+import StatusBadge from '@/app/ui/status-badge';
 
 type LateRow = z.infer<typeof lateComingRowSchema>;
 
@@ -101,11 +103,9 @@ export default function LateComingReport() {
       header: 'Repeat',
       render: (row) =>
         row.repeatLateComer ? (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-            Repeat late-comer
-          </span>
+          <StatusBadge tone="danger" label={'Repeat late-comer'} />
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-gray-500">—</span>
         ),
     },
   ];
@@ -121,10 +121,7 @@ export default function LateComingReport() {
         >
           {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
             <option key={value} value={value}>
-              {new Date(Date.UTC(2000, value - 1, 1)).toLocaleDateString(undefined, {
-                month: 'long',
-                timeZone: 'UTC',
-              })}
+              {monthName(value)}
             </option>
           ))}
         </SelectField>
@@ -164,7 +161,7 @@ export default function LateComingReport() {
       </div>
 
       {data?.note && (
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+        <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
           {data.note} Repeat late-comers are flagged at{' '}
           {data.repeatLateComerThreshold} late days in the month.
         </p>

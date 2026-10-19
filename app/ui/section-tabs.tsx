@@ -1,10 +1,19 @@
 'use client';
 
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import type { ComponentType, SVGProps } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type SVGProps,
+} from 'react';
 
+import { IconButton } from '@/app/ui/button';
 import { activeTabHref, useMobileSections } from '@/app/ui/mobile-nav';
 
 export interface SectionTab {
@@ -60,42 +69,125 @@ export default function SectionTabs({
   useMobileSections(label, tabs, mobile);
 
   const activeHref = activeTabHref(pathname, tabs);
+  const { navRef, canLeft, canRight, scrollBy } = useOverflowCues(activeHref);
 
   if (stripHidden) return null;
 
   return (
-    <nav
-      aria-label={label}
-      className={clsx(
-        'overflow-x-auto',
-        mobile && 'hidden md:block',
-        className,
+    <div className={clsx('relative', mobile && 'hidden md:block', className)}>
+      <nav ref={navRef} aria-label={label} className="overflow-x-auto">
+        <ul className="flex min-w-max gap-1 border-b border-gray-200">
+          {tabs.map((tab) => {
+            const isActive = tab.href === activeHref;
+            return (
+              <li key={tab.href}>
+                <Link
+                  href={tab.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  data-active={isActive || undefined}
+                  className={clsx(
+                    // 2026-10-14 colour pass: the active tab keeps its underline and gains a
+                    // tinted face, in the accent rather than the near-black navy, so the
+                    // current section is findable at a glance on a busy screen.
+                    '-mb-px block whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500',
+                    isActive
+                      ? 'border-accent-600 bg-accent-50 text-brand-700'
+                      : 'border-transparent text-gray-600 hover:border-gray-300 hover:bg-white hover:text-gray-900',
+                  )}
+                >
+                  {tab.name}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      {/* Overflow cues (036 A23): Settings has fifteen sections and HR eleven, and the strip used
+          to scroll with nothing to say that it could. A fade and an arrow on whichever edge has
+          more. The arrows are a pointer convenience, out of the tab order and hidden from
+          assistive tech — a keyboard moving through the links scrolls the strip by itself. */}
+      {canLeft && (
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex w-12 items-center bg-gradient-to-r from-gray-50 via-gray-50/90 to-transparent pb-px">
+          <IconButton
+            size="sm"
+            label="Scroll the sections left"
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={() => scrollBy(-1)}
+            className="pointer-events-auto"
+          >
+            <ChevronLeftIcon aria-hidden="true" className="h-5 w-5" />
+          </IconButton>
+        </div>
       )}
-    >
-      <ul className="flex min-w-max gap-1 border-b border-gray-200">
-        {tabs.map((tab) => {
-          const isActive = tab.href === activeHref;
-          return (
-            <li key={tab.href}>
-              <Link
-                href={tab.href}
-                aria-current={isActive ? 'page' : undefined}
-                className={clsx(
-                  // 2026-10-14 colour pass: the active tab keeps its underline and gains a
-                  // tinted face, in the accent rather than the near-black navy, so the
-                  // current section is findable at a glance on a busy screen.
-                  '-mb-px block whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
-                  isActive
-                    ? 'border-accent-600 bg-accent-50 text-brand-700'
-                    : 'border-transparent text-gray-600 hover:border-gray-300 hover:bg-white hover:text-gray-900',
-                )}
-              >
-                {tab.name}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+      {canRight && (
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex w-12 items-center justify-end bg-gradient-to-l from-gray-50 via-gray-50/90 to-transparent pb-px">
+          <IconButton
+            size="sm"
+            label="Scroll the sections right"
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={() => scrollBy(1)}
+            className="pointer-events-auto"
+          >
+            <ChevronRightIcon aria-hidden="true" className="h-5 w-5" />
+          </IconButton>
+        </div>
+      )}
+    </div>
   );
+}
+
+/**
+ * Whether the strip has more to either side, kept current through scrolling and resizing, and the
+ * active tab brought into view when it changes — a section near the end of fifteen was otherwise
+ * off the edge on arrival. `scrollLeft` is set on the strip itself, never `scrollIntoView`, which
+ * would also scroll the shell's clipped columns (see `app/dashboard/layout.tsx`).
+ */
+function useOverflowCues(activeHref: string | undefined) {
+  const navRef = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ canLeft: false, canRight: false });
+
+  const measure = useCallback(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const canLeft = nav.scrollLeft > 1;
+    const canRight = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1;
+    setEdges((current) =>
+      current.canLeft === canLeft && current.canRight === canRight
+        ? current
+        : { canLeft, canRight },
+    );
+  }, []);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    measure();
+    nav.addEventListener('scroll', measure, { passive: true });
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => {
+      nav.removeEventListener('scroll', measure);
+      observer.disconnect();
+    };
+  }, [measure]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[data-active]');
+    if (!nav || !active) return;
+    const left = active.offsetLeft;
+    const right = left + active.offsetWidth;
+    if (left < nav.scrollLeft || right > nav.scrollLeft + nav.clientWidth) {
+      nav.scrollLeft = left - (nav.clientWidth - active.offsetWidth) / 2;
+    }
+  }, [activeHref]);
+
+  const scrollBy = (direction: -1 | 1) => {
+    const nav = navRef.current;
+    nav?.scrollBy({ left: direction * nav.clientWidth * 0.6, behavior: 'smooth' });
+  };
+
+  return { navRef, ...edges, scrollBy };
 }

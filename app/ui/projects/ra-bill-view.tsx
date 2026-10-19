@@ -5,8 +5,9 @@ import { useState } from 'react';
 
 import { type RaBill } from '@/app/lib/api/billing';
 import { BILLING_COPY } from '@/app/lib/constants';
-import { dateLabel, rupees } from '@/app/lib/format';
+import { dateLabel, quantity3, rupees, unitRate } from '@/app/lib/format';
 import { TABLE } from '@/app/ui/table';
+import { TextButton } from '@/app/ui/button';
 
 /**
  * One subcontractor bill, read-only (027).
@@ -98,12 +99,12 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
                   >
                     {/* What this bill measured — not the to-date figure, which belongs to the
                         sheet where somebody is deciding what to add to it. */}
-                    {line.thisPeriodQty}
+                    {quantity3(Number(line.thisPeriodQty))}
                   </td>
                   <td
                     className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}
                   >
-                    {rupees(line.rate)}
+                    {unitRate(line.rate)}
                   </td>
                   <td
                     className={clsx(TABLE.td, TABLE.numeric, 'text-gray-900')}
@@ -122,15 +123,15 @@ export default function RaBillView({ bill }: { bill: RaBill }) {
           <p className="text-xs text-gray-500">
             {BILLING_COPY.linesHidden(hidden, measured.length)}
           </p>
-          <button
-            type="button"
+          <TextButton
+            size="xs"
+            className="underline"
             onClick={() => setShowAllLines((current) => !current)}
-            className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
             {showAllLines
               ? BILLING_COPY.showBilledLines
               : BILLING_COPY.showAllLines}
-          </button>
+          </TextButton>
         </div>
       )}
 

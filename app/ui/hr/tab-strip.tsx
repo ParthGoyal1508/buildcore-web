@@ -68,9 +68,9 @@ export default function TabStrip<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tab.id)}
             className={clsx(
-              'whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+              'whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
               selected
-                ? 'border-blue-500 text-blue-700'
+                ? 'border-brand-500 text-brand-700'
                 : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900',
             )}
           >
@@ -101,7 +101,7 @@ export function TabPanel({
       id={`${idPrefix}-panel-${id}`}
       aria-labelledby={`${idPrefix}-tab-${id}`}
       tabIndex={0}
-      className="py-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      className="py-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
     >
       {children}
     </div>

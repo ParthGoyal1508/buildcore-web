@@ -1,16 +1,6 @@
 'use client';
 
 import clsx from 'clsx';
-import Link from 'next/link';
-
-import { useCanWrite } from '@/app/lib/write-access';
-import {
-  ActionGlyph,
-  labelText,
-  type Icon as ActionIcon,
-} from '@/app/ui/action-icons';
-import { FileGlyph } from '@/app/ui/file-icons';
-import { Spinner } from '@/app/ui/spinner';
 
 /**
  * The box every field shares (2026-10-14 consistency pass).
@@ -57,38 +47,121 @@ export const inlineSelectClass = `block min-h-10 min-w-[10rem] py-2 pl-3 pr-9 ${
 /** A select inside a dense table cell, where a full-height field would grow the row. */
 export const compactSelectClass = `block w-full py-1 pl-2 pr-7 ${FIELD_BOX}`;
 
+/**
+ * A field's label, with the required marker built in (036 A22).
+ *
+ * The audit found required fields with no `*` and no `aria-required`, so the first a user heard of
+ * a required field was the error after submitting. The asterisk is visual only — hidden from
+ * assistive tech, because the control itself carries `aria-required` (and, where the form uses it,
+ * the native `required`), which a screen reader already announces as "required". Saying it in the
+ * label as well would announce it twice.
+ */
+export function FieldLabel({
+  htmlFor,
+  label,
+  required,
+}: {
+  htmlFor: string;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-gray-700">
+      {label}
+      {required && (
+        <span className="ml-0.5 text-red-600" aria-hidden="true">
+          *
+        </span>
+      )}
+    </label>
+  );
+}
+
+/** The ids a field's hint and error get, joined for `aria-describedby`. */
+function describedBy(id: string, error?: string, hint?: string) {
+  return (
+    [error && `${id}-error`, hint && `${id}-hint`].filter(Boolean).join(' ') ||
+    undefined
+  );
+}
+
 /** A labelled text input. Native `<label htmlFor>` so clicking the label focuses the
- * field and screen readers announce it (spec FR-024). */
+ * field and screen readers announce it (spec FR-024).
+ *
+ * `required` shows the marker and sets `aria-required`, and still reaches the input as the native
+ * attribute, exactly as before. A react-hook-form field validated by its schema, where the browser's
+ * own bubble is unwanted, passes `aria-required` alone and gets the marker all the same.
+ *
+ * `error` sets `aria-invalid` and is linked by `aria-describedby`, as is `hint` — so the message is
+ * read with the field rather than only from a banner at the top of the form. */
 export function TextField({
   id,
   label,
   error,
   hint,
+  trailing,
   ...rest
 }: React.InputHTMLAttributes<HTMLInputElement> & {
   id: string;
   label: string;
   error?: string;
   hint?: string;
+  /**
+   * A control inside the field's right edge — the sign-in form's show-password toggle (036 A29).
+   * The input keeps clear of it with right padding sized for a 32px `IconButton`.
+   */
+  trailing?: React.ReactNode;
 }) {
-  const describedBy = [error && `${id}-error`, hint && `${id}-hint`]
-    .filter(Boolean)
-    .join(' ');
+  const required = isRequired(rest);
+  const input = (
+    <input
+      id={id}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy(id, error, hint)}
+      aria-required={required || undefined}
+      {...rest}
+      className={clsx(fieldClass, error && 'border-red-500', trailing && 'pr-11')}
+    />
+  );
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1 block text-sm font-medium text-gray-700"
-      >
-        {label}
-      </label>
-      <input
-        id={id}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy || undefined}
-        {...rest}
-        className={clsx(fieldClass, error && 'border-red-500')}
-      />
+      <FieldLabel htmlFor={id} label={label} required={required} />
+      {trailing ? (
+        <div className="relative">
+          {input}
+          <div className="absolute inset-y-0 right-1 flex items-center">{trailing}</div>
+        </div>
+      ) : (
+        input
+      )}
+      <FieldMessages id={id} error={error} hint={hint} />
+    </div>
+  );
+}
+
+/** `required`, or an explicit `aria-required` — either way the field gets its marker. */
+function isRequired(props: {
+  required?: boolean;
+  'aria-required'?: boolean | 'true' | 'false';
+}) {
+  return (
+    !!props.required ||
+    props['aria-required'] === true ||
+    props['aria-required'] === 'true'
+  );
+}
+
+function FieldMessages({
+  id,
+  error,
+  hint,
+}: {
+  id: string;
+  error?: string;
+  hint?: string;
+}) {
+  return (
+    <>
       {hint && (
         <p id={`${id}-hint`} className="mt-1 text-xs text-gray-500">
           {hint}
@@ -103,7 +176,7 @@ export function TextField({
           {error}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
@@ -143,40 +216,21 @@ export function SelectField({
    * say *why* under itself, not leave the reader to guess. */
   hint?: string;
 }) {
-  const describedBy = [error && `${id}-error`, hint && `${id}-hint`]
-    .filter(Boolean)
-    .join(' ');
+  const required = isRequired(rest);
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1 block text-sm font-medium text-gray-700"
-      >
-        {label}
-      </label>
+      <FieldLabel htmlFor={id} label={label} required={required} />
       <select
         id={id}
         aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy || undefined}
+        aria-describedby={describedBy(id, error, hint)}
+        aria-required={required || undefined}
         {...rest}
         className={clsx(selectClass, error && 'border-red-500')}
       >
         {children}
       </select>
-      {hint && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-gray-500">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p
-          id={`${id}-error`}
-          className="mt-1 text-xs text-red-600"
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
+      <FieldMessages id={id} error={error} hint={hint} />
     </div>
   );
 }
@@ -199,7 +253,7 @@ export function CheckboxField({
         id={id}
         type="checkbox"
         {...rest}
-        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-accent-500"
+        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-accent-500"
       />
       <div>
         <label htmlFor={id} className="text-sm text-gray-700">
@@ -211,104 +265,11 @@ export function CheckboxField({
   );
 }
 
-/** Secondary action button, matching `app/ui/button.tsx`'s focus treatment. */
-export function SecondaryButton({
-  children,
-  className,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      {...rest}
-      className={clsx(
-        // 44px below `sm`, the design's 40px above it — see `Button`, which does the same for the
-        // same reason. A Cancel that is hard to hit is how somebody submits a form they meant to
-        // abandon.
-        // 2026-10-14: the same `gap-2`, shadow and accent focus as `Button`, and a border that
-        // picks up the brand on hover so it reads as a control rather than a box.
-        'flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:h-10 sm:justify-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-50',
-        className,
-      )}
-    >
-      {rest.disabled && labelText(children).trim().endsWith('…') ? (
-        <Spinner />
-      ) : (
-        // "Excel", "PDF", "Word" on a button get their format's mark (2026-10-15).
-        <FileGlyph label={labelText(children)} />
-      )}
-      {children}
-    </button>
-  );
-}
-
 /**
- * Small inline action used in list rows.
- *
- * **Gated on write access by default** (019 FR-009, FR-007). Nearly every row action in this app
- * changes something — Edit, Delete, Approve, Disburse, Reverse — so the default that is right 65
- * times out of 70 is the one that hides. A read-only holder sees the list and no way to act on it,
- * and nothing had to be remembered at each of the 65 call sites for that to be true.
- *
- * `intent="read"` for the handful that only look: Open, Download, View. Spelling it out at those
- * call sites is the trade this makes — and it is the right way round, because forgetting `read`
- * hides a harmless control, while forgetting `write` would leave a destructive one on screen for
- * somebody who may not use it.
- *
- * Removed, not disabled: FR-007 says so, and a disabled button still advertises an action its
- * viewer cannot take, inviting the support call that asks why it does nothing.
- *
- * The server refuses either way. This is the affordance; `PermissionsGuard` is the boundary.
+ * The secondary and row-action buttons moved to `app/ui/button.tsx` with the rest of the button
+ * variants (036 A21). Re-exported here so the ~200 imports from this module keep working.
  */
-// Row actions carry an icon beside their label since 2026-10-15 (`app/ui/action-icons.tsx`).
-const ROW_ACTION =
-  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-40';
-
-const DESTRUCTIVE = /^(delete|remove|discard)\b/i;
-
-export function RowAction({
-  children,
-  className,
-  intent = 'write',
-  icon,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  intent?: 'write' | 'read';
-  /** The icon beside the label; chosen from the label's verb when not given, `null` for none. */
-  icon?: ActionIcon | null;
-}) {
-  const canWrite = useCanWrite();
-  if (intent === 'write' && !canWrite) return null;
-  return (
-    <button
-      {...rest}
-      className={clsx(
-        ROW_ACTION,
-        // A destructive action warns on hover rather than inviting like the others.
-        DESTRUCTIVE.test(labelText(children).trim()) &&
-          'hover:border-red-300 hover:bg-red-50 hover:text-red-700',
-        className,
-      )}
-    >
-      <ActionGlyph label={children} icon={icon} />
-      {children}
-    </button>
-  );
-}
-
-/** A row action that navigates — Open, Edit — drawn exactly like `RowAction`. */
-export function RowActionLink({
-  children,
-  className,
-  icon,
-  ...rest
-}: React.ComponentProps<typeof Link> & { icon?: ActionIcon | null }) {
-  return (
-    <Link {...rest} className={clsx(ROW_ACTION, className)}>
-      <ActionGlyph label={children} icon={icon} />
-      {children}
-    </Link>
-  );
-}
+export { RowAction, RowActionLink, SecondaryButton } from '@/app/ui/button';
 
 /** Server-rejection banner shown at the top of a form, leaving entered data intact
  * (spec FR-022). */

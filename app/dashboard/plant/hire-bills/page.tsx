@@ -1,111 +1,134 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
-import { payHireBill, verifyHireBill } from '@/app/lib/api/plant';
+import { errorMessage } from '@/app/lib/api/client';
+import {
+  downloadHireBillsExport,
+  getEquipmentDetail,
+  verifyHireBill,
+} from '@/app/lib/api/plant';
 import {
   downloadHireBill,
   getHireBillsFull,
   type HireBillFull,
 } from '@/app/lib/api/plant-hire';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { HIRE_BILL_STATUSES, MESSAGES, plantLabel } from '@/app/lib/constants';
-import { formatRupees } from '@/app/lib/utils';
+import { saveBlob } from '@/app/lib/download-file';
+import { dateLabel, quantity3, rupees } from '@/app/lib/format';
+import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
+import { confirmDialog } from '@/app/ui/dialogs';
 import Pager from '@/app/ui/inventory/pager';
+import PageHeader from '@/app/ui/page-header';
 import DocumentDownloads from '@/app/ui/plant/document-downloads';
 import HireBillModal, {
   HireBillCorrectionModal,
 } from '@/app/ui/plant/hire-bill-modal';
+import PayHireBillModal from '@/app/ui/plant/pay-hire-bill-modal';
 import {
-  usePlantEquipment,
-  usePlantVendors,
-  usePlantCompanyId,
-} from '@/app/ui/plant/use-plant-refs';
+  EquipmentPicker,
+  VendorPicker,
+  equipmentOption,
+} from '@/app/ui/plant/pickers';
+import { usePlantCompanyId } from '@/app/ui/plant/use-plant-refs';
 import {
-  FormError,
   RowAction,
   SecondaryButton,
   SelectField,
+  TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
-import PageHeader from '@/app/ui/page-header';
-import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 
+/** `+12.5 h`, `−3 km` — a variance with its sign and unit (036 K9). */
+function signed(value: number, unit: string): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${quantity3(Math.abs(value))} ${unit}`;
+}
+const unitOf = (bill: HireBillFull) => (bill.meterType === 'km' ? 'km' : 'h');
+
+/**
+ * Hire bills.
+ *
+ * 036: filters (machine, vendor, status and, new, the billing period) live in the URL; machine and
+ * vendor are server-searched pickers; the filtered list downloads as Excel (K9); figures carry
+ * their units; Verify is hidden from the bill's own creator, whom the API refuses (K8); Pay asks
+ * for the payment date as well as the reference.
+ */
 export default function HireBillsPage() {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
-  const vendors = usePlantVendors();
-
-  const searchParams = useSearchParams();
-  // Seeded from the URL so the machine detail page can link straight to this list
-  // already filtered. Read once as the initial value rather than kept in sync: the
-  // dropdown below owns the filter after first render, and re-syncing would fight
-  // a user who changed it.
-  const [equipmentId, setEquipmentId] = useState(
-    searchParams.get('equipmentId') ?? '',
+  const toast = useToast();
+  const [filters, setFilters, query] = useUrlState(
+    {
+      equipmentId: urlString(),
+      vendorId: urlString(),
+      status: urlString(),
+      periodFrom: urlString(),
+      periodTo: urlString(),
+      page: urlNumber(1),
+    },
+    { resetPage: 'page' },
   );
-  const [vendorId, setVendorId] = useState('');
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [correcting, setCorrecting] = useState<HireBillFull | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [paying, setPaying] = useState<HireBillFull | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const companyId = usePlantCompanyId();
+  const me = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
 
-  const filters = {
-    page,
+  const filterQuery = {
     ...(companyId ? { companyId } : {}),
-    ...(equipmentId ? { equipmentId } : {}),
-    ...(vendorId ? { vendorId } : {}),
-    ...(status ? { status } : {}),
+    ...(query.equipmentId ? { equipmentId: query.equipmentId } : {}),
+    ...(query.vendorId ? { vendorId: query.vendorId } : {}),
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.periodFrom ? { periodFrom: query.periodFrom } : {}),
+    ...(query.periodTo ? { periodTo: query.periodTo } : {}),
   };
+  const listQuery = { ...filterQuery, page: query.page };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['plant', 'hire-bills', filters],
+  const { data, isPending, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ['plant', 'hire-bills', listQuery],
     // The fuller row (2026-10-15): basis, readings, deduction and hold for the client's
     // VEHICLE HIRING BILL, read from the same list endpoint.
-    queryFn: () => getHireBillsFull(filters),
+    queryFn: () => getHireBillsFull(listQuery),
+    placeholderData: keepPreviousData,
+  });
+
+  const machine = useQuery({
+    queryKey: ['plant', 'equipment', query.equipmentId],
+    queryFn: () => getEquipmentDetail(query.equipmentId),
+    enabled: Boolean(query.equipmentId),
   });
 
   const verify = useMutation({
     mutationFn: (id: string) => verifyHireBill(id),
-    onSuccess: () => {
-      setError(null);
+    onSuccess: (bill) => {
+      toast.success(`${bill.equipmentCode}: bill verified.`);
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
     },
     onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : 'Could not verify that bill.',
-      ),
+      toast.error(errorMessage(err, 'Could not verify that bill.')),
   });
 
-  const pay = useMutation({
-    mutationFn: ({
-      id,
-      paymentReference,
-    }: {
-      id: string;
-      paymentReference: string;
-    }) =>
-      payHireBill(id, {
-        paymentDate: new Date().toISOString().slice(0, 10),
-        paymentReference,
-      }),
-    onSuccess: () => {
-      setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['plant'] });
-    },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not record that payment.',
-      ),
-  });
+  async function exportList() {
+    setExporting(true);
+    try {
+      const { blob, filename } = await downloadHireBillsExport(filterQuery);
+      saveBlob(blob, filename);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not download the hire bills.'));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const columns: Column<HireBillFull>[] = [
     {
@@ -136,8 +159,8 @@ export default function HireBillsPage() {
         <span className="flex flex-col">
           <span>{row.basis === 'monthly' ? 'Monthly rent' : 'By hours'}</span>
           <span className="text-xs text-gray-500">
-            {formatRupees(row.monthlyRate ?? row.rate)}
-            {row.basis === 'monthly' ? ' / month' : ' / unit'}
+            {rupees(row.monthlyRate ?? row.rate)}
+            {row.basis === 'monthly' ? ' / month' : ` / ${unitOf(row)}`}
           </span>
         </span>
       ),
@@ -147,8 +170,8 @@ export default function HireBillsPage() {
       header: 'Period',
       render: (row) => (
         <span className="whitespace-nowrap">
-          {row.billingPeriodFrom.slice(0, 10)} →<br />
-          {row.billingPeriodTo.slice(0, 10)}
+          {dateLabel(row.billingPeriodFrom)} →<br />
+          {dateLabel(row.billingPeriodTo)}
         </span>
       ),
     },
@@ -159,8 +182,9 @@ export default function HireBillsPage() {
       // comparing them. A variance is recorded, never blocked — an admin decides.
       render: (row) => (
         <span className="flex flex-col">
-          <span>
-            {row.billedHours} / {row.logbookHours}
+          <span className="tabular-nums">
+            {quantity3(row.billedHours)} / {quantity3(row.logbookHours)}{' '}
+            {unitOf(row)}
           </span>
           {row.variance !== 0 && (
             <span
@@ -170,8 +194,7 @@ export default function HireBillsPage() {
                   : 'text-xs text-gray-500'
               }
             >
-              {row.variance > 0 ? '+' : ''}
-              {row.variance} vs logbook
+              {signed(row.variance, unitOf(row))} vs logbook
             </span>
           )}
         </span>
@@ -181,7 +204,7 @@ export default function HireBillsPage() {
       key: 'gross',
       header: 'Gross',
       hideOnCard: true,
-      render: (row) => formatRupees(row.grossAmount),
+      render: (row) => rupees(row.grossAmount),
     },
     {
       key: 'tds',
@@ -190,19 +213,19 @@ export default function HireBillsPage() {
       render: (row) =>
         row.tdsRate === null
           ? '—'
-          : `${formatRupees(row.tdsAmount)} (${row.tdsRate}%)`,
+          : `${rupees(row.tdsAmount)} (${row.tdsRate}%)`,
     },
     {
       key: 'deductions',
       header: 'Deduction / hold',
       hideOnCard: true,
       render: (row) =>
-        `${formatRupees(row.deductionAmount ?? 0)} / ${formatRupees(row.holdAmount ?? 0)}`,
+        `${rupees(row.deductionAmount ?? 0)} / ${rupees(row.holdAmount ?? 0)}`,
     },
     {
       key: 'net',
       header: 'Net payable',
-      render: (row) => formatRupees(row.netPayable),
+      render: (row) => rupees(row.netPayable),
     },
     {
       key: 'status',
@@ -217,63 +240,48 @@ export default function HireBillsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Hire Bills" />
-        <SecondaryButton type="button" onClick={() => setShowModal(true)}>
-          Raise a bill
-        </SecondaryButton>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryButton
+            type="button"
+            loading={exporting}
+            onClick={() => void exportList()}
+          >
+            Excel
+          </SecondaryButton>
+          <SecondaryButton type="button" onClick={() => setShowModal(true)}>
+            Raise a bill
+          </SecondaryButton>
+        </div>
       </div>
 
       {data && (
         <p className="text-sm text-gray-600">
           {data.pendingVerificationCount} awaiting verification ·{' '}
-          {formatRupees(data.unpaidTotal)} unpaid
+          {rupees(data.unpaidTotal)} unpaid
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SelectField
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <EquipmentPicker
           id="hire-filter-equipment"
           label="Machine"
-          value={equipmentId}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
-            // Back to the first page: narrowing the list while on page three
-            // would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
-        >
-          <option value="">All machines</option>
-          {(equipment.data ?? [])
-            .filter((row) => row.ownership !== 'owned')
-            .map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.code} · {row.name}
-              </option>
-            ))}
-        </SelectField>
-        <SelectField
+          emptyLabel="All machines"
+          value={filters.equipmentId}
+          selectedOption={machine.data ? equipmentOption(machine.data) : null}
+          onChange={(id) => setFilters({ equipmentId: id })}
+        />
+        <VendorPicker
           id="hire-filter-vendor"
           label="Vendor"
-          value={vendorId}
-          onChange={(event) => {
-            setVendorId(event.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All vendors</option>
-          {(vendors.data ?? []).map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
-        </SelectField>
+          emptyLabel="All vendors"
+          value={filters.vendorId}
+          onChange={(id) => setFilters({ vendorId: id })}
+        />
         <SelectField
           id="hire-filter-status"
           label="Status"
-          value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
+          value={filters.status}
+          onChange={(event) => setFilters({ status: event.target.value })}
         >
           <option value="">Any status</option>
           {HIRE_BILL_STATUSES.map((value) => (
@@ -282,16 +290,34 @@ export default function HireBillsPage() {
             </option>
           ))}
         </SelectField>
+        <TextField
+          id="hire-filter-from"
+          label="Period from"
+          type="date"
+          max={filters.periodTo || undefined}
+          value={filters.periodFrom}
+          onChange={(event) => setFilters({ periodFrom: event.target.value })}
+        />
+        <TextField
+          id="hire-filter-to"
+          label="Period to"
+          type="date"
+          min={filters.periodFrom || undefined}
+          value={filters.periodTo}
+          onChange={(event) => setFilters({ periodTo: event.target.value })}
+          hint="Bills whose period overlaps these dates."
+        />
       </div>
-
-      <FormError message={error} />
 
       <ResponsiveList
         columns={columns}
         rows={data?.items ?? []}
         rowKey={(row) => row.id}
         isLoading={isPending}
-        error={isError ? MESSAGES.plantLoadFailed : undefined}
+        isRefreshing={isFetching && !isPending}
+        error={isError ? error : undefined}
+        onRetry={refetch}
+        serverPaged
         emptyMessage={MESSAGES.plantHireBillsEmpty}
         actions={(row) => (
           // Wrapping, so the three downloads and the row's own actions fit a phone card —
@@ -299,15 +325,18 @@ export default function HireBillsPage() {
           <div className="flex flex-wrap justify-end gap-2">
             <DocumentDownloads
               load={(format) => downloadHireBill(row, format)}
-              onError={setError}
+              onError={(message) => toast.error(message)}
             />
             {/* Correctable only until verified: after that the figures are what was approved. */}
             {row.status === 'pending_verification' && (
               <RowAction onClick={() => setCorrecting(row)}>Edit</RowAction>
             )}
-            {row.status === 'pending_verification' && (
+            {/* 036 K8: never offered to the person who raised the bill — the API refuses
+                them (403), and someone else must check it. */}
+            {row.status === 'pending_verification' &&
+              row.createdByUserId !== me.data?.id && (
               <RowAction
-                disabled={verify.isPending}
+                loading={verify.isPending && verify.variables === row.id}
                 onClick={async () => {
                   // The variance is surfaced in the confirmation rather than
                   // blocking: verification is an admin decision, not a gate.
@@ -316,7 +345,7 @@ export default function HireBillsPage() {
                     (await confirmDialog({
                       title: 'Verify this hire bill?',
                       message: MESSAGES.plantConfirmVerifyHireBill(
-                        `${row.variance > 0 ? '+' : ''}${row.variance}`,
+                        signed(row.variance, unitOf(row)),
                       ),
                       confirmLabel: 'Verify',
                       tone: 'default',
@@ -327,29 +356,22 @@ export default function HireBillsPage() {
                 Verify
               </RowAction>
             )}
+            {row.status === 'pending_verification' &&
+              row.createdByUserId !== null &&
+              row.createdByUserId === me.data?.id && (
+                <span className="self-center text-xs text-gray-500">
+                  Raised by you — someone else verifies
+                </span>
+              )}
             {row.status !== 'paid' && (
               <RowAction
-                disabled={row.status !== 'verified' || pay.isPending}
+                disabled={row.status !== 'verified'}
                 title={
                   row.status !== 'verified'
                     ? MESSAGES.plantUnverifiedPay
                     : undefined
                 }
-                onClick={async () => {
-                  const reference = await promptDialog({
-                    title: 'Mark this hire bill paid',
-                    message: 'Payment reference:',
-                    required: true,
-                    confirmLabel: 'Mark paid',
-                    tone: 'default',
-                  });
-                  if (reference && reference.trim()) {
-                    pay.mutate({
-                      id: row.id,
-                      paymentReference: reference.trim(),
-                    });
-                  }
-                }}
+                onClick={() => setPaying(row)}
               >
                 Pay
               </RowAction>
@@ -362,11 +384,14 @@ export default function HireBillsPage() {
         total={data?.total ?? 0}
         page={data?.page ?? 1}
         pageSize={data?.pageSize ?? 25}
-        onPageChange={setPage}
+        onPageChange={(page) => setFilters({ page })}
         noun="bill"
       />
 
       {showModal && <HireBillModal onClose={() => setShowModal(false)} />}
+      {paying && (
+        <PayHireBillModal bill={paying} onClose={() => setPaying(null)} />
+      )}
       {correcting && (
         <HireBillCorrectionModal
           bill={correcting}

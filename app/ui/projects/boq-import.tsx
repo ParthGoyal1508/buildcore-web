@@ -11,11 +11,17 @@ import {
   validateBOQImport,
   validateEstimateImport,
   type BoqImportReport,
+  boqKeys,
 } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
+import { formatBytes, MAX_UPLOAD_BYTES } from '@/app/lib/files';
 import { rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
-import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import {
+  isProjectLockedError,
+  PROJECT_LOCKED_MESSAGE,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
 
@@ -80,7 +86,7 @@ export default function BoqImport({
       setReport(null);
       setRefusal(null);
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
       void queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'boq-alerts'],
@@ -141,8 +147,26 @@ export default function BoqImport({
             disabled={read.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];
+              // 036 I13 (2026-10-17): cleared on every pick, success or failure. A file input only
+              // fires `change` when its value changes, so after a refused workbook, re-picking the
+              // same (now fixed) file did nothing at all — the person saw the old refusal and
+              // assumed the fix had not worked. The `File` object is already in hand.
+              event.target.value = '';
               setDone(null);
-              if (file) read.mutate(file);
+              if (!file) return;
+              // Checked before reading: the API refuses more than 10 MB (`boqImport.maxFileBytes`,
+              // BOQ_FILE_TOO_LARGE) — the same as MAX_UPLOAD_BYTES — but only after the browser has
+              // base64-encoded the whole thing and sent it over a site connection.
+              if (file.size > MAX_UPLOAD_BYTES) {
+                setReport(null);
+                setRefusal(
+                  `This file is ${formatBytes(file.size)}. The limit is ${formatBytes(
+                    MAX_UPLOAD_BYTES,
+                  )} — a BOQ schedule is normally well under 1 MB, so a file this size usually holds something other than a schedule.`,
+                );
+                return;
+              }
+              read.mutate(file);
             }}
           />
           {read.isPending && (
@@ -185,6 +209,8 @@ export default function BoqImport({
 
 /** The sentence for this refusal, by code — never a generic one where a code is known (FR-029). */
 function messageFor(error: Error): string {
+  // A project locked after the screen loaded (036 Wave 3): the lock sentence, not "something failed".
+  if (isProjectLockedError(error)) return PROJECT_LOCKED_MESSAGE;
   if (
     error instanceof ApiError &&
     error.code &&
@@ -291,7 +317,7 @@ function Report({ report }: { report: BoqImportReport }) {
               {/* As typed (FR-030), with the count rather than the normalised form: the client is
                   reading this against their own sheet, not against our matching rule. */}
               {unit.asTyped}
-              <span className="ml-1 text-gray-400 tabular-nums">
+              <span className="ml-1 text-gray-500 tabular-nums">
                 ×{unit.lines}
               </span>
             </li>

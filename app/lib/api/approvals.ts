@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authFetch } from '@/app/lib/session';
+import { authFetch, authFetchBlob } from '@/app/lib/session';
 
 /**
  * Every `/approvals/*` call to `buildcore-api` (feature 016).
@@ -148,6 +148,8 @@ const approvalStateObjectSchema = z.object({
 
   /** The level deciding now. Null once the chain has finished. */
   levelLabel: z.string().nullable(),
+  /** That level is the chain's final authority (036 D4). Defaulted for an older API. */
+  isFinalAuthority: z.boolean().default(false),
   awaitingRoleName: z.string().nullable(),
   /** Named only when exactly one person could act; null when several could, or none. */
   awaitingUserName: z.string().nullable(),
@@ -217,6 +219,8 @@ const queueEntrySchema = z.object({
   ageHours: z.number(),
   currentPosition: z.number(),
   levelLabel: z.string(),
+  /** The caller's level is the chain's final authority (036 D4). Defaulted for an older API. */
+  isFinalAuthority: z.boolean().default(false),
 });
 
 const queuePageSchema = z.object({
@@ -350,6 +354,9 @@ const historyEntrySchema = z.object({
   requestedByName: z.string(),
   requestedAt: z.string(),
   closedAt: z.string().nullable(),
+  /** When anything last happened to it — the decision once decided (036 D2). The list is sorted
+   * and date-filtered by this. Optional so a server predating it still parses. */
+  lastActionAt: z.string().optional(),
   awaitingLabel: z.string().nullable(),
   delegatedToName: z.string().nullable(),
   steps: z.array(historyStepSchema),
@@ -390,6 +397,11 @@ export interface ApprovalHistoryQuery {
   /** `visible` — everything the caller may read; `mine` — only what they took part in. */
   scope?: 'visible' | 'mine';
   module?: string;
+  /** 036 D1: inclusive `YYYY-MM-DD` days on the latest action, a search, and who raised it. */
+  from?: string;
+  to?: string;
+  q?: string;
+  requestedBy?: string;
   page?: number;
   pageSize?: number;
 }
@@ -405,6 +417,13 @@ export async function getApprovalHistoryList(
 ): Promise<ApprovalHistoryPage> {
   const raw = await authFetch<unknown>(`/approvals/history${qs({ ...query })}`);
   return historyPageSchema.parse(raw);
+}
+
+/** The same filtered history as a CSV file (036 D1) — at most 5,000 rows, newest action first. */
+export async function exportApprovalHistory(
+  query: Omit<ApprovalHistoryQuery, 'page' | 'pageSize'> = {},
+): Promise<Blob> {
+  return authFetchBlob(`/approvals/history/export${qs({ ...query })}`);
 }
 
 export interface DecideInput {
@@ -505,6 +524,36 @@ export async function putSlotMapping(input: {
   return authFetch<unknown>('/approvals/slot-mappings', {
     method: 'PUT',
     body: JSON.stringify(input),
+  });
+}
+
+/** A chain's levels as the editor saves them (036 C11). */
+export interface ChainLevelInput {
+  position: number;
+  slotKey: string;
+  isFinalAuthority?: boolean;
+  label?: string;
+}
+
+/**
+ * Replaces one chain's levels (036 C11). Requires `SETTINGS`.
+ *
+ * The API supersedes rather than edits: the chain is deactivated and a new one written, so an
+ * item part-way through keeps the levels it entered with. Refused when positions are not
+ * contiguous, when more than one level is the final authority, or when the levels would resolve
+ * to the same role twice (`APPROVAL_CHAIN_UNSATISFIABLE`) — shown verbatim.
+ */
+export async function replaceApprovalChain(
+  chain: Pick<ApprovalChain, 'id' | 'actionType' | 'isFinalAuthorityRequired'>,
+  levels: ChainLevelInput[],
+): Promise<unknown> {
+  return authFetch<unknown>(`/approvals/chains/${chain.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      actionType: chain.actionType,
+      isFinalAuthorityRequired: chain.isFinalAuthorityRequired,
+      levels,
+    }),
   });
 }
 

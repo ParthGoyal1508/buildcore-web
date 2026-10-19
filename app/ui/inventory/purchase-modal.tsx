@@ -1,16 +1,23 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   createPurchase,
+  getItem,
+  getOpenPurchaseOrderLines,
   GRN_CONDITIONS,
   type GrnDetails,
   type PurchaseInput,
 } from '@/app/lib/api/inventory';
-import { formatRupees } from '@/app/lib/utils';
+import { getSite } from '@/app/lib/api/projects';
+import { quantity as qty, rupees, todayIso } from '@/app/lib/format';
+import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
+import { Button } from '@/app/ui/button';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
 import {
   FormError,
   SecondaryButton,
@@ -18,22 +25,23 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
-import { useItems, useSites, useVendors } from './use-inventory-refs';
+import { useToast } from '@/app/ui/toast';
+import {
+  itemOption,
+  searchItems,
+  searchSites,
+  searchVendors,
+  siteOption,
+} from './inventory-search';
 
-/** Reads a file as base64 without the data-URL prefix, which is what the API takes. */
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.onload = () => {
-      const result = String(reader.result);
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.readAsDataURL(file);
-  });
-}
+/** Photos only, for the delivery photograph (the API refuses anything else with 415). */
+const ACCEPT_PHOTOS =
+  'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
+/** The bill: the vendor's PDF or a photo of the paper bill (036 M11). */
+const ACCEPT_BILL =
+  'application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 const EMPTY_GRN = {
   challanNo: '',
@@ -84,20 +92,58 @@ export default function PurchaseModal({
   defaults?: Partial<PurchaseInput>;
 }) {
   const queryClient = useQueryClient();
-  const sites = useSites();
-  const vendors = useVendors();
-  const items = useItems();
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
 
   const [siteId, setSiteId] = useState(defaults?.siteId ?? '');
   const [itemId, setItemId] = useState(defaults?.itemId ?? '');
   const [vendorId, setVendorId] = useState('');
+  const [chosen, setChosen] = useState<{
+    site?: SearchableOption | null;
+    item?: SearchableOption | null;
+    vendor?: SearchableOption | null;
+  }>({});
+  const [poLineId, setPoLineId] = useState('');
+  const [billFile, setBillFile] = useState<PreparedFile | null>(null);
+  const [photoFile, setPhotoFile] = useState<PreparedFile | null>(null);
   const [date, setDate] = useState(today());
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [grnDraft, setGrnDraft] = useState(EMPTY_GRN);
   const [error, setError] = useState<string | null>(null);
+
+  // An indent line fixes the store and the item (the API refuses any other, 036 M2), and a form
+  // opened on known ids needs their names: the pickers no longer hold every row (036 M5).
+  const fixed = Boolean(indentLineId);
+  const defaultSite = useQuery({
+    queryKey: ['inventory', 'site', defaults?.siteId],
+    queryFn: () => getSite(defaults?.siteId ?? ''),
+    enabled: Boolean(defaults?.siteId),
+  });
+  const defaultItem = useQuery({
+    queryKey: ['inventory', 'item', defaults?.itemId],
+    queryFn: () => getItem(defaults?.itemId ?? ''),
+    enabled: Boolean(defaults?.itemId),
+  });
+  const siteSelected =
+    chosen.site ?? (defaultSite.data ? siteOption(defaultSite.data) : null);
+  const itemSelected =
+    chosen.item ?? (defaultItem.data ? itemOption(defaultItem.data) : null);
+
+  // 036 M9: the issued POs' open lines for this vendor and item. Receiving against one links the
+  // GRN to the PO, so the PO shows what arrived; the server refuses more than is left.
+  const poLines = useQuery({
+    queryKey: ['inventory', 'purchase-orders', 'open-lines', vendorId, itemId],
+    queryFn: () => getOpenPurchaseOrderLines({ vendorId, itemId }),
+    enabled: Boolean(vendorId && itemId),
+  });
+  const poLine = (poLines.data ?? []).find((line) => line.id === poLineId);
+  const overPo =
+    poLine !== undefined &&
+    quantity !== '' &&
+    Math.round(Number(quantity) * 1000) >
+      Math.round(poLine.remainingQuantity * 1000);
 
   // Live, because the number a storekeeper is really checking is the total on the
   // vendor's bill — not the two figures it came from (009 FR-002).
@@ -132,23 +178,26 @@ export default function PurchaseModal({
       };
       const grn = grnFrom(grnDraft);
       if (grn) input.grn = grn;
-      if (file) {
-        input.billFile = await readAsBase64(file);
-        input.billContentType = file.type || 'application/octet-stream';
+      if (poLine) input.purchaseOrderLineId = poLine.id;
+      // Prepared by FileUpload: type-checked, size-checked and photos compressed before sending.
+      if (billFile) {
+        input.billFile = billFile.base64;
+        input.billContentType = billFile.mimeType;
       }
+      if (photoFile) input.photoFile = photoFile.base64;
       return createPurchase(input);
     },
-    onSuccess: () => {
+    onSuccess: (purchase) => {
       // Every stock figure on every open screen is now stale.
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success(
+        `Purchase recorded${purchase.grnNumber ? ` — ${purchase.grnNumber}` : ''}`,
+      );
       onClose();
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not record this purchase.',
-      ),
+    // The form stays as typed, so a refused purchase (over the PO, a rate that differs from the
+    // agreed one, an inactive vendor) is corrected rather than re-entered.
+    onError: (err) => setError(errorMessage(err, 'Could not record this purchase.')),
   });
 
   const ready =
@@ -158,25 +207,38 @@ export default function PurchaseModal({
     date &&
     Number(quantity) > 0 &&
     rate !== '' &&
-    !grnMismatch;
+    !grnMismatch &&
+    !overPo;
+
+  const pickerLabel = (htmlFor: string, text: string) => (
+    <label htmlFor={htmlFor} className="font-medium text-gray-700">
+      {text} <span className="text-red-600">*</span>
+    </label>
+  );
 
   return (
     <Modal
       title="New purchase"
       onClose={onClose}
+      wide
+      isDirty={Boolean(
+        vendorId || quantity || rate || remarks || billFile || photoFile,
+      )}
+      pending={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
+        <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <SecondaryButton
+          <Button
             type="submit"
             form="purchase-form"
-            disabled={!ready || save.isPending}
+            disabled={!ready}
+            loading={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Record purchase'}
-          </SecondaryButton>
-        </div>
+            Record purchase
+          </Button>
+        </>
       }
     >
       <form
@@ -188,70 +250,122 @@ export default function PurchaseModal({
           save.mutate();
         }}
       >
-        <SelectField
-          id="purchase-site"
-          label="Store"
-          value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
-        >
-          <option value="">Select…</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          {pickerLabel('purchase-site', 'Store')}
+          <AsyncSelect
+            id="purchase-site"
+            value={siteId}
+            onChange={(id, option) => {
+              setSiteId(id);
+              setChosen((c) => ({ ...c, site: option }));
+            }}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={siteSelected}
+            disabled={fixed}
+            placeholder="Search stores"
+          />
+        </div>
 
-        <SelectField
-          id="purchase-item"
-          label="Item"
-          value={itemId}
-          onChange={(event) => setItemId(event.target.value)}
-        >
-          <option value="">Select…</option>
-          {(items.data ?? []).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name} ({item.unit})
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          {pickerLabel('purchase-item', 'Item')}
+          <AsyncSelect
+            id="purchase-item"
+            value={itemId}
+            onChange={(id, option) => {
+              setItemId(id);
+              setPoLineId('');
+              setChosen((c) => ({ ...c, item: option }));
+            }}
+            search={searchItems}
+            cacheKey={['inventory', 'items', 'search', companyId]}
+            selectedOption={itemSelected}
+            disabled={fixed}
+            placeholder="Search items by name or code"
+          />
+        </div>
 
-        <SelectField
-          id="purchase-vendor"
-          label="Vendor"
-          value={vendorId}
-          onChange={(event) => setVendorId(event.target.value)}
-        >
-          <option value="">Select…</option>
-          {(vendors.data ?? []).map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm sm:col-span-2">
+          {pickerLabel('purchase-vendor', 'Vendor')}
+          <AsyncSelect
+            id="purchase-vendor"
+            value={vendorId}
+            onChange={(id, option) => {
+              setVendorId(id);
+              setPoLineId('');
+              setChosen((c) => ({ ...c, vendor: option }));
+            }}
+            search={searchVendors}
+            cacheKey={['inventory', 'vendors', 'search', companyId]}
+            selectedOption={chosen.vendor}
+            placeholder="Search active vendors by name or code"
+          />
+        </div>
+
+        {vendorId && itemId && (poLines.data?.length ?? 0) > 0 && (
+          <div className="sm:col-span-2">
+            <SelectField
+              id="purchase-po-line"
+              label="Against purchase order"
+              value={poLineId}
+              onChange={(event) => {
+                const id = event.target.value;
+                setPoLineId(id);
+                const line = poLines.data?.find((l) => l.id === id);
+                // The PO's rate is what was agreed for this order; offered, still editable.
+                if (line && rate === '') setRate(String(line.rate));
+              }}
+              hint={
+                poLine
+                  ? `${qty(poLine.remainingQuantity)} ${poLine.unit} left to receive of ${qty(poLine.quantity)} ordered at ${rupees(poLine.rate)}.`
+                  : 'Link this delivery to the PO line it fills, so the PO shows what has arrived.'
+              }
+            >
+              <option value="">Not against a PO</option>
+              {(poLines.data ?? []).map((line) => (
+                <option key={line.id} value={line.id}>
+                  {line.referenceNo ?? 'PO'} · line {line.lineNo} —{' '}
+                  {qty(line.remainingQuantity)} {line.unit} left
+                </option>
+              ))}
+            </SelectField>
+          </div>
+        )}
 
         <TextField
           id="purchase-date"
-          label="Date"
+          label="Date *"
           type="date"
+          required
+          max={today()}
           value={date}
           onChange={(event) => setDate(event.target.value)}
         />
 
         <TextField
           id="purchase-quantity"
-          label="Quantity"
+          label="Quantity *"
           type="number"
+          inputMode="decimal"
+          required
           min={0}
+          max={poLine?.remainingQuantity}
           step="any"
           value={quantity}
           onChange={(event) => setQuantity(event.target.value)}
+          error={
+            overPo && poLine
+              ? `Only ${qty(poLine.remainingQuantity)} ${poLine.unit} left on this PO line.`
+              : undefined
+          }
         />
 
         <TextField
           id="purchase-rate"
-          label="Rate"
+          label="Rate (₹) *"
           type="number"
+          inputMode="decimal"
+          required
           min={0}
           step="any"
           value={rate}
@@ -262,29 +376,26 @@ export default function PurchaseModal({
           <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
             Amount:{' '}
             <span className="font-medium">
-              {Number.isNaN(amount) ? '—' : formatRupees(amount)}
+              {Number.isNaN(amount) ? '—' : rupees(amount)}
             </span>
           </p>
         </div>
 
-        <div className="sm:col-span-2">
-          <label
-            htmlFor="purchase-bill"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
-            Bill
-          </label>
-          <input
-            id="purchase-bill"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-gray-700"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Optional. PDF or an image of the vendor&apos;s bill.
-          </p>
-        </div>
+        <FileUpload
+          id="purchase-bill"
+          label="Bill"
+          accept={ACCEPT_BILL}
+          hint="Optional. The vendor's PDF, or a photo of the paper bill (up to 10 MB)."
+          onSelect={setBillFile}
+        />
+
+        <FileUpload
+          id="purchase-photo"
+          label="Delivery photo"
+          accept={ACCEPT_PHOTOS}
+          hint="Optional. The load as it arrived at the gate."
+          onSelect={setPhotoFile}
+        />
 
         <div className="sm:col-span-2">
           <TextField

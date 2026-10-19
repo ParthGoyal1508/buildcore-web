@@ -1,16 +1,26 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import {
   type DwrAttachment,
   addDwrAttachment,
   downloadDwrAttachment,
+  dwrAttachmentThumbnail,
+  removeDwrAttachment,
 } from '@/app/lib/api/dwr';
+import { compressImage, formatBytes } from '@/app/lib/files';
+import { confirmDialog } from '@/app/ui/dialogs';
+import FileUpload from '@/app/ui/file-upload';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
-import { Button } from '@/app/ui/button';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import { RowAction } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * Evidence on a daily work report (025 FR-025).
@@ -32,6 +42,7 @@ export default function DwrAttachments({
   dwrId,
   attachments,
   sealed,
+  removable = false,
 }: {
   dwrId: string;
   /**
@@ -47,22 +58,30 @@ export default function DwrAttachments({
    * refuses the upload as well; this is so nobody is offered an action that would be refused.
    */
   sealed?: boolean;
+  /**
+   * The report is a draft or returned, so a wrong file may be taken off it (036 I9). The API
+   * refuses the removal on any other status; this only decides whether to offer it.
+   */
+  removable?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const input = useRef<HTMLInputElement>(null);
+  const toast = useToast();
+  const { isLocked } = useProjectLock();
   const [error, setError] = useState<string | null>(null);
   // A PDF or a photo opens in the page's own viewer (2026-10-14) rather than a new tab, which most
   // browsers block when it is opened after a fetch; any other file is still saved.
   const { show, viewer } = useFileViewer();
 
-  const upload = useMutation({
-    mutationFn: (file: File) => addDwrAttachment(dwrId, file),
-    onSuccess: () => {
+  const remove = useMutation({
+    mutationFn: (attachment: DwrAttachment) =>
+      removeDwrAttachment(dwrId, attachment.id),
+    onSuccess: (_result, attachment) => {
       setError(null);
+      toast.success(`Removed ${attachment.fileName}.`);
       void queryClient.invalidateQueries({ queryKey: ['dwr', dwrId] });
-      if (input.current) input.current.value = '';
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: unknown) =>
+      setError(projectErrorMessage(err, 'The file could not be removed.')),
   });
 
   const open = async (attachment: DwrAttachment) => {
@@ -74,10 +93,27 @@ export default function DwrAttachments({
         await downloadDwrAttachment(attachment.id),
         attachment.fileName,
       );
-    } catch {
-      setError('That attachment could not be opened.');
+    } catch (err) {
+      // 036 I9: the server's reason, not a blanket "could not be opened".
+      setError(errorMessage(err, 'That attachment could not be opened.'));
     }
   };
+
+  const confirmRemove = async (attachment: DwrAttachment) => {
+    if (
+      await confirmDialog({
+        title: 'Remove this file?',
+        message: `Remove “${attachment.fileName}” from the report? The removal is recorded.`,
+        confirmLabel: 'Remove',
+        tone: 'danger',
+      })
+    ) {
+      remove.mutate(attachment);
+    }
+  };
+
+  const canAdd = !sealed && !isLocked;
+  const canRemove = removable && !sealed && !isLocked;
 
   return (
     <section className="flex flex-col gap-3">
@@ -85,27 +121,29 @@ export default function DwrAttachments({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
           Evidence
         </h3>
-        {sealed ? (
+        {sealed && (
           <span className="text-xs text-gray-500">
             Approved — reverse the report to file anything further.
           </span>
-        ) : (
-          <div className="flex items-center gap-2">
-            <input
-              ref={input}
-              type="file"
-              className="text-sm"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) upload.mutate(file);
-              }}
-            />
-            <Button type="button" disabled={upload.isPending}>
-              {upload.isPending ? 'Attaching…' : 'Attach'}
-            </Button>
-          </div>
         )}
       </div>
+
+      {/* 036 I9: the shared upload control. The old "Attach" button had no onClick — only the
+          bare input beside it worked — a second pick could start while one was uploading, and a
+          failure showed nothing useful. This checks type and size first, shrinks a photo, is
+          disabled while it sends, and says the server's reason when it fails. */}
+      {canAdd && (
+        <FileUpload
+          label="Attach to the report"
+          hint="A photo or PDF for the whole day — the signed measurement sheet, a general site view. Up to 10 MB."
+          onUpload={(file) => addDwrAttachment(dwrId, file.file)}
+          onUploaded={() => {
+            setError(null);
+            toast.success('Attached.');
+            void queryClient.invalidateQueries({ queryKey: ['dwr', dwrId] });
+          }}
+        />
+      )}
 
       {viewer}
       {error && (
@@ -128,9 +166,15 @@ export default function DwrAttachments({
               key={attachment.id}
               className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
             >
-              <span className="truncate">{attachment.fileName}</span>
+              <span className="flex min-w-0 items-center gap-3">
+                <AttachmentThumb
+                  attachment={attachment}
+                  onOpen={() => void open(attachment)}
+                />
+                <span className="truncate">{attachment.fileName}</span>
+              </span>
               <span className="flex items-center gap-3 whitespace-nowrap text-xs text-gray-500">
-                {Math.max(1, Math.round(attachment.sizeBytes / 1024))} KB
+                {formatBytes(attachment.sizeBytes)}
                 <RowAction
                   type="button"
                   intent="read"
@@ -138,6 +182,18 @@ export default function DwrAttachments({
                 >
                   Open
                 </RowAction>
+                {canRemove && (
+                  <RowAction
+                    type="button"
+                    loading={
+                      remove.isPending && remove.variables?.id === attachment.id
+                    }
+                    disabled={remove.isPending}
+                    onClick={() => void confirmRemove(attachment)}
+                  >
+                    Remove
+                  </RowAction>
+                )}
               </span>
             </li>
           ))}
@@ -147,6 +203,49 @@ export default function DwrAttachments({
   );
 }
 
+/**
+ * A photo's thumbnail, 44 px, opening the full file on tap (036 I8).
+ *
+ * Fetched as a blob through the authenticated client — an `<img src>` to the API would carry no
+ * token. Kept for the session (`staleTime: Infinity`): a thumbnail never changes for its id.
+ */
+function AttachmentThumb({
+  attachment,
+  onOpen,
+}: {
+  attachment: DwrAttachment;
+  onOpen: () => void;
+}) {
+  const isImage = attachment.mimeType.startsWith('image/');
+  const thumb = useQuery({
+    queryKey: ['dwr-attachment-thumb', attachment.id],
+    queryFn: async () =>
+      URL.createObjectURL(await dwrAttachmentThumbnail(attachment.id)),
+    enabled: isImage,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  if (!isImage) {
+    return (
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-gray-100 text-xs font-medium text-gray-500">
+        {attachment.mimeType === 'application/pdf' ? 'PDF' : 'FILE'}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Open ${attachment.fileName}`}
+      className="h-11 w-11 shrink-0 overflow-hidden rounded bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
+    >
+      {thumb.data && (
+        // eslint-disable-next-line @next/next/no-img-element -- an authenticated blob URL, not an asset.
+        <img src={thumb.data} alt="" className="h-full w-full object-cover" />
+      )}
+    </button>
+  );
+}
 
 /**
  * The same upload, scoped to one measurement line (2026-10-11).
@@ -178,10 +277,16 @@ export function DwrLinePhotos({
   // browsers block when it is opened after a fetch; any other file is still saved.
   const { show, viewer } = useFileViewer();
 
+  const { isLocked } = useProjectLock();
   const upload = useMutation({
-    mutationFn: (file: File) => addDwrAttachment(dwrId, file, taskId),
+    // 036 I8: shrunk before it is sent, as everywhere else a photo is picked.
+    mutationFn: async (file: File) =>
+      addDwrAttachment(dwrId, await compressImage(file), taskId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['dwr', dwrId] });
+      if (input.current) input.current.value = '';
+    },
+    onError: () => {
       if (input.current) input.current.value = '';
     },
   });
@@ -213,7 +318,7 @@ export function DwrLinePhotos({
       ))}
       {/* Nothing offered on an approved report — not a disabled control, which reads as something
           that might work later. What is already filed above stays openable. */}
-      {!sealed && (
+      {!sealed && !isLocked && (
         /*
           **The input covers the label rather than being `sr-only`** (2026-10-12).
 
@@ -224,7 +329,7 @@ export function DwrLinePhotos({
           back. Sized to the label, the input is already where the person just clicked, so there
           is nothing to scroll to. It stays a real focusable input with its name from the label.
         */
-        <label className="relative cursor-pointer text-xs text-blue-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500">
+        <label className="relative inline-flex min-h-[44px] cursor-pointer items-center text-xs text-brand-600 hover:underline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-500">
           {upload.isPending ? 'Attaching…' : '+ Photo'}
           <input
             ref={input}
@@ -241,7 +346,7 @@ export function DwrLinePhotos({
       )}
       {upload.isError && (
         <span className="text-xs text-red-700" role="alert">
-          Could not attach that file.
+          {projectErrorMessage(upload.error, 'Could not attach that file.')}
         </span>
       )}
     </div>

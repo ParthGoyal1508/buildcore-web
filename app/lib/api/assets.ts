@@ -468,6 +468,9 @@ export const assetStockRowSchema = z.object({
   assetCode: z.string(),
   assetName: z.string(),
   categoryId: z.string(),
+  /** 036 L4: sent with the row, so the stock screen needs no register load to label units. */
+  trackingMode: z.string().optional(),
+  unitOfMeasure: z.string().nullable().optional(),
   siteId: z.string(),
   siteName: z.string(),
   onHand: decimal,
@@ -484,6 +487,41 @@ export async function getAssetStock(
 ): Promise<AssetStockRow[]> {
   const raw = await authFetch<unknown>(`/assets/stock${qs({ ...query })}`);
   return z.array(assetStockRowSchema).parse(raw);
+}
+
+export interface AssetStockQuery {
+  siteId?: string;
+  categoryId?: string;
+  trackingMode?: string;
+  /** Asset code or name contains this. */
+  q?: string;
+  companyId?: string;
+}
+
+export const assetStockPageSchema = z.object({
+  items: z.array(assetStockRowSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type AssetStockPage = z.infer<typeof assetStockPageSchema>;
+
+/** One page of stock rows (036 L4). */
+export async function getAssetStockPage(
+  query: AssetStockQuery & { page: number; pageSize?: number },
+): Promise<AssetStockPage> {
+  const raw = await authFetch<unknown>(`/assets/stock${qs({ ...query })}`);
+  return assetStockPageSchema.parse(raw);
+}
+
+/** The filtered stock as Excel (036 L4). */
+export async function downloadAssetStock(
+  query: AssetStockQuery,
+): Promise<{ blob: Blob; filename: string }> {
+  const { blob, filename } = await authFetchFile(
+    `/assets/stock/export${qs({ ...query })}`,
+  );
+  return { blob, filename: filename ?? 'Asset stock.xlsx' };
 }
 
 const summaryBucketSchema = z.object({

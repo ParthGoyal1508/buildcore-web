@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   deleteEquipmentDocument,
   getEquipmentDetail,
@@ -23,9 +23,14 @@ import {
   plantLabel,
 } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
-import { formatRupees } from '@/app/lib/utils';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import DocumentModal from '@/app/ui/plant/document-modal';
+import {
+  EquipmentPhotoGallery,
+  EquipmentThumb,
+} from '@/app/ui/plant/equipment-photos';
+import QueryError from '@/app/ui/query-error';
+import { useToast } from '@/app/ui/toast';
 import {
   EquipmentDisposalPanel,
   EquipmentHistoryPanel,
@@ -40,11 +45,14 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
+import { todayIso, dateLabel, rupees } from '@/app/lib/format';
+import { TextButton } from '@/app/ui/button';
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [showUpload, setShowUpload] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +61,7 @@ export default function EquipmentDetailPage() {
   // browsers block when it is opened after a fetch; any other file is still saved.
   const { show, viewer } = useFileViewer();
 
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, error: loadError, refetch } = useQuery({
     queryKey: ['plant', 'equipment', id],
     queryFn: () => getEquipmentDetail(id),
   });
@@ -67,9 +75,11 @@ export default function EquipmentDetailPage() {
     mutationFn: (documentId: string) => deleteEquipmentDocument(id, documentId),
     onSuccess: () => {
       setError(null);
+      toast.success('Document removed.');
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
     },
-    onError: () => setError('Could not remove that document.'),
+    onError: (err) =>
+      toast.error(errorMessage(err, 'Could not remove that document.')),
   });
 
   /**
@@ -88,9 +98,7 @@ export default function EquipmentDetailPage() {
         `equipment-document-${documentId}`,
       );
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : 'Could not open that document.',
-      );
+      setError(errorMessage(err, 'Could not open that document.'));
     } finally {
       setOpening(null);
     }
@@ -107,11 +115,7 @@ export default function EquipmentDetailPage() {
         file.filename ?? fileName ?? `equipment-document-${documentId}`,
       );
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not download that document.',
-      );
+      setError(errorMessage(err, 'Could not download that document.'));
     } finally {
       setOpening(null);
     }
@@ -126,9 +130,12 @@ export default function EquipmentDetailPage() {
   }
   if (isError || !data) {
     return (
-      <p className="p-4 text-sm text-red-600" role="alert">
-        {MESSAGES.plantLoadFailed}
-      </p>
+      <QueryError
+        className="m-4"
+        error={loadError}
+        fallback={MESSAGES.plantLoadFailed}
+        onRetry={refetch}
+      />
     );
   }
 
@@ -138,20 +145,19 @@ export default function EquipmentDetailPage() {
       key: 'file',
       header: 'File',
       render: (row) => (
-        <button
-          type="button"
+        <TextButton
+          className="underline"
           onClick={() => void openDocument(row.id)}
           disabled={opening === row.id}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400"
         >
           {opening === row.id ? 'Opening…' : (row.fileName ?? 'View')}
-        </button>
+        </TextButton>
       ),
     },
     {
       key: 'expires',
       header: 'Expires',
-      render: (row) => row.expiresAt?.slice(0, 10) ?? '—',
+      render: (row) => dateLabel(row.expiresAt),
     },
     {
       key: 'alert',
@@ -160,15 +166,11 @@ export default function EquipmentDetailPage() {
       // read as orange rather than red: neither is a failure, both are a task.
       render: (row) =>
         row.expired ? (
-          <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-            Expired
-          </span>
+          <StatusBadge tone="danger" label={'Expired'} />
         ) : row.expiring ? (
-          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
-            Expiring soon
-          </span>
+          <StatusBadge tone="warning" label={'Expiring soon'} />
         ) : (
-          <span className="text-sm text-gray-400">—</span>
+          <span className="text-sm text-gray-500">—</span>
         ),
     },
   ];
@@ -231,16 +233,16 @@ export default function EquipmentDetailPage() {
     { label: 'Utilisation this month', value: `${data.utilizationPercent}%` },
     {
       label: 'Last service',
-      value: data.lastServiceDate?.slice(0, 10) ?? '—',
+      value: dateLabel(data.lastServiceDate),
     },
     data.ownership === 'owned'
       ? {
           label: 'Purchase',
           value: data.purchaseCost
-            ? `${formatRupees(data.purchaseCost)} on ${data.purchaseDate?.slice(0, 10) ?? '—'}`
-            : (data.purchaseDate?.slice(0, 10) ?? '—'),
+            ? `${rupees(data.purchaseCost)} on ${dateLabel(data.purchaseDate)}`
+            : (dateLabel(data.purchaseDate)),
         }
-      : { label: 'Hire date', value: data.purchaseDate?.slice(0, 10) ?? '—' },
+      : { label: 'Hire date', value: dateLabel(data.purchaseDate) },
     {
       label: 'Depreciation',
       value:
@@ -253,32 +255,35 @@ export default function EquipmentDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <PageHeader
-            title={
-              <>
-                {data.code} · {data.name}
-              </>
-            }
+        <div className="flex items-start gap-3">
+          <EquipmentThumb
+            equipmentId={data.id}
+            photoId={data.mainPhotoId}
+            alt={`${data.code} · ${data.name}`}
+            className="h-14 w-14 shrink-0"
           />
-          <div className="mt-2 flex items-center gap-2">
-            <StatusBadge status={data.status} label={plantLabel(data.status)} />
-            {data.openMaintenanceJobId && (
-              <Link
-                href={ROUTES.plantMaintenance}
-                className="text-sm text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-              >
-                Open maintenance job
-              </Link>
-            )}
+          <div>
+            <PageHeader
+              title={
+                <>
+                  {data.code} · {data.name}
+                </>
+              }
+              breadcrumbs={[{ label: 'Equipment', href: ROUTES.plantEquipment }]}
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <StatusBadge status={data.status} label={plantLabel(data.status)} />
+              {data.openMaintenanceJobId && (
+                <Link
+                  href={ROUTES.plantMaintenance}
+                  className="text-sm text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+                >
+                  Open maintenance job
+                </Link>
+              )}
+            </div>
           </div>
         </div>
-        <Link
-          href={ROUTES.plantEquipment}
-          className="text-sm text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-        >
-          Back to the register
-        </Link>
       </div>
 
       {/*
@@ -300,7 +305,7 @@ export default function EquipmentDetailPage() {
           <Link
             key={link.href}
             href={`${link.href}?equipmentId=${id}`}
-            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {link.name}
           </Link>
@@ -311,6 +316,8 @@ export default function EquipmentDetailPage() {
       {viewer}
 
       <EquipmentDisposalPanel equipment={data} />
+
+      <EquipmentPhotoGallery equipment={data} />
 
       <section className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Overview</h2>
@@ -360,7 +367,15 @@ export default function EquipmentDetailPage() {
         <h2 className="text-sm font-semibold text-gray-900">
           Lifetime maintenance cost
         </h2>
-        {cost.data ? (
+        {cost.isError ? (
+          <QueryError
+            compact
+            className="mt-3"
+            error={cost.error}
+            fallback="The maintenance cost could not be loaded."
+            onRetry={cost.refetch}
+          />
+        ) : cost.data ? (
           <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: 'Spare parts', value: cost.data.partsCost },
@@ -373,7 +388,7 @@ export default function EquipmentDetailPage() {
                   {line.label}
                 </dt>
                 <dd className="mt-0.5 text-sm text-gray-900">
-                  {formatRupees(line.value)}
+                  {rupees(line.value)}
                 </dd>
               </div>
             ))}
@@ -423,6 +438,9 @@ export default function EquipmentDetailPage() {
                 Download
               </RowAction>
               <RowAction
+                loading={
+                  removeDocument.isPending && removeDocument.variables === row.id
+                }
                 onClick={async () => {
                   if (
                     await confirmDialog({
@@ -502,22 +520,18 @@ function PaperExpiry({ paper }: { paper: RegistrationPaper }) {
   if (paper.status !== 'held') return <>—</>;
   if (!paper.expiresAt) return <>Not recorded</>;
   const date = paper.expiresAt.slice(0, 10);
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = todayIso();
   const days = Math.round(
     (Date.parse(date) - Date.parse(today)) / (24 * 60 * 60 * 1000),
   );
   if (days < 0) {
     return (
-      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-        {date} · lapsed
-      </span>
+      <StatusBadge tone="danger" label={`${date} · lapsed`} />
     );
   }
   if (days <= 30) {
     return (
-      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-        {date} · {days === 0 ? 'today' : `${days} days`}
-      </span>
+      <StatusBadge tone="warning" label={`${date} · ${days === 0 ? 'today' : `${days} days`}`} />
     );
   }
   return <>{date}</>;

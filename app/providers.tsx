@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { isTransientError } from '@/app/lib/api/client';
+
 /**
  * One `QueryClient` for the whole app (research.md §3).
  *
@@ -20,9 +22,17 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             staleTime: 30_000,
             // A 401 is handled by authFetch's own refresh-and-retry, and a 403
             // will never succeed on retry — neither is worth re-attempting here.
-            retry: false,
+            // 036 A4: a read that failed for want of a network, a timeout or a 5xx is tried twice
+            // more (React Query's backoff: 1 s, then 2 s) before the screen shows its error. A
+            // flaky site connection used to put "Could not load" on screen for a blip that was
+            // over before anyone read it. Never a 4xx: the same request is refused the same way.
+            retry: (failureCount, error) =>
+              failureCount < 2 && isTransientError(error),
             refetchOnWindowFocus: false,
           },
+          // Never retried automatically, whatever the failure: a save that timed out may well
+          // have landed, and repeating it is how a payment is recorded twice.
+          mutations: { retry: false },
         },
       });
 

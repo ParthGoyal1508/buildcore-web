@@ -17,7 +17,7 @@ import {
   CANDIDATE_LETTER_KIND_KEYS,
   recruitmentLabel,
 } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { rupees, todayIso } from '@/app/lib/format';
 import GenerateLetterDialog from '@/app/ui/letters/generate-letter-dialog';
 import { offerLetterSubmit } from '@/app/ui/recruitment/offer-letter-submit';
 import { Button } from '@/app/ui/button';
@@ -140,7 +140,7 @@ export default function OfferModal({
   const [generating, setGenerating] = useState<Offer | null>(null);
   const accept = useMutation({
     mutationFn: (id: string) =>
-      acceptOffer(id, { acceptedOn: new Date().toISOString().slice(0, 10) }),
+      acceptOffer(id, { acceptedOn: todayIso() }),
     onSuccess: invalidate,
     onError: (e) =>
       setError(e instanceof ApiError ? e.message : 'Could not accept.'),

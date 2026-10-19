@@ -19,6 +19,7 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * A GSTIN as the backend's `GSTIN_REGEX` defines it — two state digits, a PAN, an
@@ -52,25 +53,44 @@ export default function ClientModal({
   const [state, setState] = useState(client?.state ?? '');
   const [status, setStatus] = useState<string>(client?.status ?? 'active');
 
+  // Asked before Escape or the X discard typing (036 Wave 2 kit, Modal `isDirty`).
+  const isDirty =
+    name !== (client?.name ?? '') ||
+    contactPerson !== (client?.contactPerson ?? '') ||
+    phone !== (client?.phone ?? '') ||
+    email !== (client?.email ?? '') ||
+    address !== (client?.address ?? '') ||
+    gstin !== (client?.gstin ?? '') ||
+    pan !== (client?.pan ?? '') ||
+    state !== (client?.state ?? '') ||
+    status !== (client?.status ?? 'active');
+
   const [nameError, setNameError] = useState<string | undefined>();
   const [gstinError, setGstinError] = useState<string | undefined>();
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const mutation = useMutation({
     mutationFn: () => {
+      const blank = client ? null : undefined;
       const payload: ClientInput = {
         name: name.trim(),
         contactPerson: contactPerson.trim(),
         phone: phone.trim(),
-        email: email.trim(),
         address: address.trim(),
-        // Sent as undefined rather than '' when blank: the column is unique per
-        // company where present, and an empty string is a value that would collide
-        // with the next GSTIN-less client.
-        gstin: gstin.trim() || undefined,
-        pan: pan.trim() || undefined,
-        state: state.trim() || undefined,
+        // Never '' when blank: the GSTIN column is unique per company where present,
+        // and an empty string would collide with the next GSTIN-less client.
+        //
+        // 036 I19/I20: blank is `undefined` on create (no value) and `null` on edit —
+        // **`undefined` on a PATCH means "leave it"**, so clearing a wrong GSTIN, PAN,
+        // state or email on edit used to change nothing at all. And a blank email went
+        // as `""`, which `@IsEmail` refused, so a client with no email could not be
+        // created.
+        email: email.trim() || blank,
+        gstin: gstin.trim() || blank,
+        pan: pan.trim() || blank,
+        state: state.trim() || blank,
         status,
       };
       return client
@@ -79,6 +99,7 @@ export default function ClientModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects', 'clients'] });
+      toast.success(client ? 'Client saved.' : 'Client added.');
       onClose();
     },
     onError: (error: unknown) => {
@@ -125,12 +146,14 @@ export default function ClientModal({
     <Modal
       title={client ? 'Edit client' : 'Add client'}
       onClose={onClose}
+      isDirty={isDirty}
+      pending={mutation.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="client-form" disabled={mutation.isPending}>
+          <Button type="submit" form="client-form" loading={mutation.isPending}>
             {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
         </>

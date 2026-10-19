@@ -1,14 +1,9 @@
-/**
- * The timezone the business operates in.
- *
- * Every "today" and every calendar-day boundary in this app is this zone's, not the
- * browser's and not UTC. The API is configured the same way (`APP_TIMEZONE`,
- * defaulting to `Asia/Kolkata`), and the two must agree: at UTC+5:30 a UTC-derived
- * "today" is the previous date for the first five and a half hours of every working
- * day, so a client and a server disagreeing about it means a date the user picked
- * being refused as being in the future.
- */
-export const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+import { TONE_CLASSES, type StatusTone } from '@/app/lib/status-tones';
+import { clockTime } from '@/app/lib/format';
+
+// Defined in a leaf module so `app/lib/format.ts` can read it and this file can use the formatters
+// without an import cycle (036 A18).
+export { BUSINESS_TIME_ZONE } from './time-zone';
 
 export const ROUTES = {
   login: '/login',
@@ -132,6 +127,9 @@ export const ROUTES = {
    */
   projectsClient: (id: string) => `/dashboard/projects/clients/${id}`,
   projectsSites: '/dashboard/projects/sites',
+  /** 037: tenders with their EMD and PBG bank guarantees, and the tender page with documents. */
+  projectsBankGuarantees: '/dashboard/projects/bank-guarantees',
+  projectsBankGuarantee: (id: string) => `/dashboard/projects/bank-guarantees/${id}`,
   /** One site: its geofence, its address and the project it belongs to. */
   projectsSite: (id: string) => `/dashboard/projects/sites/${id}`,
 
@@ -1844,12 +1842,7 @@ export const MESSAGES = {
    * last out, so a punch-in made after the last punch-out does not appear in them
    * at all — this is the only thing on screen that accounts for the button. */
   punchOpenSince: (capturedAt: string) =>
-    `You are currently punched in, since ${new Date(
-      capturedAt,
-    ).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    })}. Punch out to close this shift.`,
+    `You are currently punched in, since ${clockTime(capturedAt)}. Punch out to close this shift.`,
   /** Shown in place of the punch control once the day's pair is recorded. */
   punchDayComplete:
     'You have punched in and out for today. Attendance for today is complete.',
@@ -2162,6 +2155,16 @@ export const PERMISSIONS = [
    */
   'ASSETS',
   'ASSETS_APPROVE',
+  /**
+   * Added to the api's enum by 031, 033, 034 and 036 but never listed here, so the Roles screen
+   * had no checkbox for them and no way to grant them (found 2026-10-18 while adding 037).
+   */
+  'LABOUR_PUNCH_CORRECT',
+  'MACHINERY_DISPOSE',
+  'CASH_ENTRY',
+  'PROJECT_LOCK',
+  /** 037: the Bank Guarantees register under Projects, and its 30-day expiry alerts. */
+  'BANK_GUARANTEES',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -2221,9 +2224,6 @@ export const SETTINGS_PERMISSIONS = {
   'personal-settings': 'CROSS_COMPANY_ACCESS',
 } as const;
 
-/** `/dashboard/settings/users` additionally requires one of these roles (FR-010),
- * matching `UsersAdminService.assertMayAdminister()` on the backend. */
-export const USER_ADMIN_ROLES = ['Super Admin', 'HO User'] as const;
 
 /**
  * The backend's 423 response bakes the unlock time into its message as a raw
@@ -2236,7 +2236,7 @@ export function formatLockoutMessage(rawMessage: string): string {
   if (!match) return MESSAGES.lockoutFallback;
   const unlockTime = new Date(match[1]);
   if (Number.isNaN(unlockTime.getTime())) return MESSAGES.lockoutFallback;
-  return `Account temporarily locked. Try again after ${unlockTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+  return `Account temporarily locked. Try again after ${clockTime(unlockTime)}.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2383,6 +2383,9 @@ export const PROJECTS_PERMISSIONS = {
   // they check `PROJECT_FINANCIALS` on the page, which is the same arrangement the
   // portfolio's document tab already uses.
   pnl: 'PROJECT_FINANCIALS',
+  // 037. Its own permission: who keeps the BG register (and gets its expiry alerts) is not
+  // everyone who can open projects.
+  'bank-guarantees': 'BANK_GUARANTEES',
 } as const;
 
 export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;
@@ -2502,7 +2505,8 @@ export const NAV_MODULES = [
     href: ROUTES.projects,
     guardPrefix: ROUTES.projects,
     guardsSubtree: true,
-    permissions: ['PROJECTS'],
+    // Any-of: someone who keeps only the BG register (037) still reaches Projects for it.
+    permissions: ['PROJECTS', 'BANK_GUARANTEES'],
   },
   {
     id: 'plant',
@@ -2863,47 +2867,52 @@ export function hrLabel(value: string): string {
  * Colour is never the only signal — every badge also carries its text label, so a
  * colour-blind reader loses nothing.
  */
-export const STATUS_BADGE_CLASSES: Record<string, string> = {
+export const HR_STATUS_TONES: Record<string, StatusTone> = {
   // Partners (007). `bocw_*` keys are deliberately prefixed: BOCW's `partial` means
   // "part-paid" and reads better in orange, while compliance's `partial` means "one
   // of two challans filed" and is yellow. One key for both would force the same
   // colour on two different meanings.
-  compliant: 'bg-green-100 text-green-800',
-  partially_compliant: 'bg-amber-100 text-amber-800',
-  non_compliant: 'bg-red-100 text-red-800',
-  submitted: 'bg-blue-100 text-blue-800',
-  partial: 'bg-amber-100 text-amber-800',
-  missing: 'bg-red-100 text-red-800',
-  gray: 'bg-gray-100 text-gray-600',
-  bocw_pending: 'bg-red-100 text-red-800',
-  bocw_partial: 'bg-orange-100 text-orange-800',
-  bocw_paid: 'bg-green-100 text-green-800',
-  expiring_soon: 'bg-orange-100 text-orange-800',
-  expired: 'bg-red-100 text-red-800',
+  compliant: 'success',
+  partially_compliant: 'warning',
+  non_compliant: 'danger',
+  submitted: 'info',
+  partial: 'warning',
+  missing: 'danger',
+  gray: 'neutral',
+  bocw_pending: 'danger',
+  bocw_partial: 'warning',
+  bocw_paid: 'success',
+  expiring_soon: 'warning',
+  expired: 'danger',
   // Attendance
-  present: 'bg-green-100 text-green-800',
-  complete: 'bg-green-100 text-green-800',
-  absent: 'bg-red-100 text-red-800',
-  half_day: 'bg-orange-100 text-orange-800',
-  on_leave: 'bg-blue-100 text-blue-800',
-  weekly_off: 'bg-gray-100 text-gray-700',
-  holiday: 'bg-gray-100 text-gray-700',
+  present: 'success',
+  complete: 'success',
+  absent: 'danger',
+  half_day: 'warning',
+  on_leave: 'info',
+  weekly_off: 'neutral',
+  holiday: 'neutral',
   // Workflow
-  pending: 'bg-amber-100 text-amber-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-700',
-  draft: 'bg-gray-100 text-gray-700',
-  processed: 'bg-blue-100 text-blue-800',
-  paid: 'bg-green-100 text-green-800',
-  active: 'bg-blue-100 text-blue-800',
-  closed: 'bg-gray-100 text-gray-700',
-  disbursed: 'bg-indigo-100 text-indigo-800',
-  declared: 'bg-amber-100 text-amber-800',
-  verified: 'bg-green-100 text-green-800',
-  overdue: 'bg-red-100 text-red-800',
-  upcoming: 'bg-gray-100 text-gray-700',
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  cancelled: 'neutral',
+  draft: 'neutral',
+  processed: 'info',
+  paid: 'success',
+  active: 'info',
+  closed: 'neutral',
+  disbursed: 'info',
+  declared: 'warning',
+  verified: 'success',
+  overdue: 'danger',
+  upcoming: 'neutral',
 };
+
+/** The same statuses as classes, for the attendance calendar's day cells (which are not badges). */
+export const STATUS_BADGE_CLASSES: Record<string, string> = Object.fromEntries(
+  Object.entries(HR_STATUS_TONES).map(([status, tone]) => [status, TONE_CLASSES[tone]]),
+);
 
 /**
  * Statutory ceilings per deduction section, mirroring `buildcore-api`'s
@@ -4145,9 +4154,9 @@ export const DIRECTOR_FINAL_MESSAGES = {
   intro:
     'Which actions cannot take effect until the Director approves them. Changes here are themselves submitted for the Director’s approval — they do not take effect when you save.',
   stateLabels: {
-    final: 'Director required',
-    not_final_by_decision: 'Not required — decided',
-    not_configured: 'Nobody has decided',
+    final: 'Needs Director approval',
+    not_final_by_decision: 'No Director approval needed',
+    not_configured: 'Not set — default applies',
   } as Record<string, string>,
   stateHints: {
     final: 'This cannot take effect until the Director approves it.',
@@ -4172,8 +4181,12 @@ export const DIRECTOR_FINAL_MESSAGES = {
   /** FR-019. Shown to every reader so two people do not submit the same edit. */
   pendingLocked:
     'While this is outstanding, no further change can be submitted for this company.',
-  inForce: 'In force today',
-  proposed: 'Proposed',
+  /** Prefix on the badge for the rule that applies now (2026-10-18: "In force today" was not understood). */
+  inForce: 'Now',
+  /** Prefix on the badge for an unsaved edit, which still needs the Director's approval. */
+  proposed: 'After approval',
+  /** The checkbox: an action, not a repeat of the badge beside it. */
+  requireLabel: 'Require Director approval',
   /**
    * The one entry that cannot be changed. Rendered as an explanation rather than a disabled
    * control, because "why can I not change this" is the question it should answer.

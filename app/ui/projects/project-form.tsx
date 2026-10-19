@@ -5,11 +5,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 import { ApiError } from '@/app/lib/api/client';
-import { EMPLOYEE_PAGE_MAX, listEmployees } from '@/app/lib/api/hr-payroll';
+import { getEmployee } from '@/app/lib/api/hr-payroll';
+import { getCurrentUser } from '@/app/lib/api/users';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import ProjectDocumentUploads, {
@@ -20,7 +21,7 @@ import {
   Project,
   ProjectInput,
   createProject,
-  getClients,
+  getClient,
   getNextProjectCode,
   updateProject,
 } from '@/app/lib/api/projects';
@@ -43,6 +44,12 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { confirmDialog } from '@/app/ui/dialogs';
+import AsyncSelect from '@/app/ui/async-select';
+import {
+  employeeName,
+  searchClients,
+  searchEmployees,
+} from '@/app/ui/projects/pickers';
 
 /**
  * The shape a project form must satisfy before it is worth sending (spec FR-002).
@@ -173,26 +180,30 @@ export default function ProjectForm({ project }: { project?: Project }) {
   const requirements = project ? [] : (requirementSet?.requirements ?? []);
   const outstanding = unstagedMandatory(requirements, staged);
 
-  const { data: clients } = useQuery({
-    queryKey: ['projects', 'clients', { pageSize: 200 }],
-    queryFn: () => getClients({ pageSize: 200, status: 'active' }),
+  // 036 I21/I22: the client and project-manager pickers search the server (`AsyncSelect`), so the
+  // 201st client exists and the list is never another screen's cached answer. They used to share
+  // the key `['projects','clients',{pageSize:200}]` with the portfolio filter, which caches *all*
+  // clients while this form wanted *active* ones — whichever screen loaded first decided both. The
+  // current client is always shown, even when it has since been deactivated: it is read by id
+  // here, so the select never empties and Save is never blocked by a value it cannot display.
+  const currentClient = useQuery({
+    queryKey: ['projects', 'clients', 'one', project?.clientId],
+    queryFn: () => getClient(project!.clientId),
+    enabled: Boolean(project?.clientId),
+  });
+  const currentManager = useQuery({
+    queryKey: ['hr', 'employees', 'one', project?.projectManagerEmployeeId],
+    queryFn: () => getEmployee(project!.projectManagerEmployeeId!),
+    enabled: Boolean(project?.projectManagerEmployeeId),
   });
 
-  // The project manager picker. Active employees only — assigning a leaver is
-  // never intended, and the list is long enough without them.
-  //
-  // `EMPLOYEE_PAGE_MAX`, not a guessed number: this asked for 200 against an endpoint
-  // that refuses anything over 100, so the request was a 400 and the control offered
-  // "Not assigned" and nothing else — on creating a project and on editing one.
-  const { data: employees } = useQuery({
-    queryKey: [
-      'hr',
-      'employees',
-      { pageSize: EMPLOYEE_PAGE_MAX, isActive: true },
-    ],
-    queryFn: () =>
-      listEmployees({ pageSize: EMPLOYEE_PAGE_MAX, isActive: true }),
+  // 036 review decision 5: locking and unlocking takes its own permission, `PROJECT_LOCK`. The
+  // control is not shown without it; the server refuses the change regardless (403).
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
   });
+  const canLock = me?.permissions.includes('PROJECT_LOCK') ?? false;
 
   const {
     register,
@@ -292,9 +303,11 @@ export default function ProjectForm({ project }: { project?: Project }) {
         description: values.description,
       };
       if (project) {
+        // `isLocked` only from somebody who may change it (036 decision 5) — sent unchanged it is
+        // harmless, but there is no reason to send a field the caller cannot see.
         return updateProject(project.id, {
           ...payload,
-          isLocked: values.isLocked,
+          ...(canLock ? { isLocked: values.isLocked } : {}),
         });
       }
       // No code is sent: the server numbers every project from the company's series.
@@ -316,7 +329,11 @@ export default function ProjectForm({ project }: { project?: Project }) {
     },
     onError: (error: unknown) => {
       setServerError(
-        error instanceof ApiError ? error.message : MESSAGES.saveFailed,
+        error instanceof ApiError && error.code === 'PROJECT_LOCK_PERMISSION_REQUIRED'
+          ? 'Locking or unlocking a project needs the Lock / unlock projects permission. Ask an administrator.'
+          : error instanceof ApiError
+            ? error.message
+            : MESSAGES.saveFailed,
       );
       // T072: the kinds the server named, kept so each control can say so for itself. Branching on
       // the code rather than on the message text, and reading the ids rather than the labels — two
@@ -407,20 +424,48 @@ export default function ProjectForm({ project }: { project?: Project }) {
             required
             {...register('name')}
           />
-          <SelectField
-            id="project-client"
-            label="Client"
-            error={errors.clientId?.message}
-            required
-            {...register('clientId')}
-          >
-            <option value="">Choose a client…</option>
-            {clients?.items.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </SelectField>
+          <div>
+            <label
+              htmlFor="project-client"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Client <span className="text-red-600">*</span>
+            </label>
+            <Controller
+              control={control}
+              name="clientId"
+              render={({ field }) => (
+                <AsyncSelect
+                  id="project-client"
+                  value={field.value}
+                  onChange={(id) => field.onChange(id)}
+                  search={searchClients('active')}
+                  cacheKey={['projects', 'clients', 'picker', 'active']}
+                  selectedOption={
+                    currentClient.data && currentClient.data.id === field.value
+                      ? {
+                          id: currentClient.data.id,
+                          label: currentClient.data.name,
+                          ...(currentClient.data.status !== 'active'
+                            ? { note: currentClient.data.status }
+                            : {}),
+                        }
+                      : null
+                  }
+                  placeholder="Type to search clients"
+                  invalid={Boolean(errors.clientId)}
+                  aria-describedby={
+                    errors.clientId ? 'project-client-error' : undefined
+                  }
+                />
+              )}
+            />
+            {errors.clientId?.message && (
+              <p id="project-client-error" className="mt-1 text-sm text-red-600">
+                {errors.clientId.message}
+              </p>
+            )}
+          </div>
           <TextField
             id="project-location"
             label="Location"
@@ -500,7 +545,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
                         shouldDirty: true,
                       })
                     }
-                    className="h-4 w-4 border-gray-300 text-blue-600"
+                    className="h-4 w-4 border-gray-300 text-brand-600"
                   />
                   {option.label}
                 </label>
@@ -557,21 +602,44 @@ export default function ProjectForm({ project }: { project?: Project }) {
           Assignment
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            id="project-manager"
-            label="Project manager"
-            error={errors.projectManagerEmployeeId?.message}
-            {...register('projectManagerEmployeeId')}
-          >
-            <option value="">Not assigned</option>
-            {employees?.items.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {[employee.firstName, employee.lastName]
-                  .filter(Boolean)
-                  .join(' ') || employee.employeeCode}
-              </option>
-            ))}
-          </SelectField>
+          <div>
+            <label
+              htmlFor="project-manager"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Project manager
+            </label>
+            <Controller
+              control={control}
+              name="projectManagerEmployeeId"
+              render={({ field }) => (
+                <AsyncSelect
+                  id="project-manager"
+                  value={field.value ?? ''}
+                  onChange={(id) => field.onChange(id)}
+                  search={searchEmployees}
+                  cacheKey={['hr', 'employees', 'picker', 'active']}
+                  emptyLabel="Not assigned"
+                  selectedOption={
+                    currentManager.data &&
+                    currentManager.data.id === field.value
+                      ? {
+                          id: currentManager.data.id,
+                          label: employeeName(currentManager.data),
+                          note: currentManager.data.employeeCode,
+                        }
+                      : null
+                  }
+                  placeholder="Type to search employees"
+                />
+              )}
+            />
+            {errors.projectManagerEmployeeId?.message && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.projectManagerEmployeeId.message}
+              </p>
+            )}
+          </div>
           <SelectField
             id="project-division"
             label="Division"
@@ -618,7 +686,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
         </div>
       </section>
 
-      {project && (
+      {project && canLock && (
         <section className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Lock
@@ -666,7 +734,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
           {DOCUMENT_COPY.editFiledElsewhere}{' '}
           <Link
             href={ROUTES.projectsProjectDocuments(project.id)}
-            className="font-medium text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {DOCUMENT_COPY.editFiledElsewhereLink}
           </Link>

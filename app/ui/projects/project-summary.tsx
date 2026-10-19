@@ -107,7 +107,12 @@ export default function ProjectSummary({
             <input
               type="month"
               value={period}
-              onChange={(event) => setPeriod(event.target.value)}
+              // Up to this month, as on the P&L board (2026-10-18).
+              max={currentPeriod()}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next && next <= currentPeriod()) setPeriod(next);
+              }}
               className="h-11 rounded border border-gray-300 px-3 text-sm sm:h-10"
             />
           </label>

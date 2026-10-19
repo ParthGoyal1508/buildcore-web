@@ -115,6 +115,31 @@ export async function getHireOrders(
   return z.array(hireOrderSchema).parse(raw);
 }
 
+export const hireOrderPageSchema = z.object({
+  items: z.array(hireOrderSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type HireOrderPage = z.infer<typeof hireOrderPageSchema>;
+
+/**
+ * One page of orders (036 K17). The unpaged `getHireOrders` above is silently capped at 200 by
+ * the API; the list screen pages instead.
+ */
+export async function getHireOrdersPage(
+  query: {
+    companyId?: string;
+    vendorId?: string;
+    projectId?: string;
+    page: number;
+    pageSize?: number;
+  },
+): Promise<HireOrderPage> {
+  const raw = await authFetch<unknown>(`/plant/hire-orders${qs(query)}`);
+  return hireOrderPageSchema.parse(raw);
+}
+
 /** One order, for its own page (2026-10-15). */
 export async function getHireOrder(id: string): Promise<HireOrder> {
   const raw = await authFetch<unknown>(`/plant/hire-orders/${id}`);

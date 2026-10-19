@@ -28,6 +28,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateLabel } from '@/app/lib/format';
 
 type View = 'allocations' | 'custody';
 
@@ -79,7 +80,7 @@ export default function AllocationsPage() {
       render: (row) => (
         <Link
           href={ROUTES.assetsAsset(row.assetId)}
-          className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="text-brand-700 underline hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {row.assetCode}
         </Link>
@@ -108,7 +109,7 @@ export default function AllocationsPage() {
       header: 'Due back',
       render: (row) => (
         <span className={row.overdue ? 'font-medium text-red-700' : undefined}>
-          {row.expectedReturnDate.slice(0, 10)}
+          {dateLabel(row.expectedReturnDate)}
           {row.overdue ? ` — ${row.daysOverdue}d overdue` : ''}
         </span>
       ),
@@ -268,9 +269,11 @@ export default function AllocationsPage() {
                   {group.allocations.length} asset(s)
                 </span>
                 {group.overdueCount > 0 && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-                    {group.overdueCount} overdue
-                  </span>
+                  <StatusBadge
+                    tone="danger"
+                    label={`${group.overdueCount} overdue`}
+                    className="ml-2"
+                  />
                 )}
               </h2>
               <ul className="mt-3 divide-y divide-gray-100">
@@ -282,7 +285,7 @@ export default function AllocationsPage() {
                     <span className="text-sm text-gray-900">
                       <Link
                         href={ROUTES.assetsAsset(entry.assetId)}
-                        className="text-blue-700 underline hover:text-blue-900"
+                        className="text-brand-700 underline hover:text-brand-900"
                       >
                         {entry.assetCode}
                       </Link>{' '}
@@ -292,7 +295,7 @@ export default function AllocationsPage() {
                       <span
                         className={`text-sm ${entry.overdue ? 'text-red-700' : 'text-gray-600'}`}
                       >
-                        due {entry.expectedReturnDate.slice(0, 10)}
+                        due {dateLabel(entry.expectedReturnDate)}
                         {entry.overdue ? ` (${entry.daysOverdue}d over)` : ''}
                       </span>
                       <RowAction onClick={() => setReturning(entry)}>

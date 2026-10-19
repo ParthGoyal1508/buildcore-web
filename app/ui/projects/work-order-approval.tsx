@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { decideApproval, resubmitApproval } from '@/app/lib/api/approvals';
 import { getWorkOrderApproval } from '@/app/lib/api/billing';
 import ActionReview from '@/app/ui/approvals/action-review';
+import QueryError from '@/app/ui/query-error';
 
 /**
  * Approve / Reject on the work order itself (2026-10-14), for the person whose turn it is.
@@ -24,10 +25,27 @@ export default function WorkOrderApproval({
   onChanged: () => void;
   onNotice: (message: string) => void;
 }) {
-  const { data: approval, refetch } = useQuery({
+  const {
+    data: approval,
+    refetch,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['workOrderApproval', workOrderId],
     queryFn: () => getWorkOrderApproval(workOrderId),
   });
+  // 036 I17 (2026-10-17): a failed read of the chain used to render nothing, which on a pending
+  // award reads as "nobody needs to act". The failure, with a retry.
+  if (isError)
+    return (
+      <QueryError
+        compact
+        className="mt-2"
+        error={error}
+        fallback="The approval could not be loaded."
+        onRetry={refetch}
+      />
+    );
   if (!approval) return null;
 
   const refresh = () => {
@@ -38,7 +56,7 @@ export default function WorkOrderApproval({
   };
 
   return (
-    <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-3">
+    <div className="mt-2 rounded-md border border-brand-200 bg-brand-50 p-3">
       <ActionReview
         state={approval}
         entityLabel={`work order ${label}`}

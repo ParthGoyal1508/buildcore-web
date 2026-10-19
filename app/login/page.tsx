@@ -28,15 +28,20 @@ const SESSION_ENDED_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ activated?: string; reason?: string; reset?: string }>;
+  searchParams: Promise<{
+    activated?: string;
+    reason?: string;
+    reset?: string;
+    next?: string;
+  }>;
 }) {
-  const { activated, reason, reset } = await searchParams;
+  const { activated, reason, reset, next } = await searchParams;
   const sessionEnded = reason ? SESSION_ENDED_MESSAGES[reason] : undefined;
 
   return (
     <main className="flex items-center justify-center md:h-screen">
       <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
-        <div className="flex h-20 w-full items-center rounded-lg bg-blue-600 p-4 md:h-28">
+        <div className="flex h-20 w-full items-center rounded-lg bg-brand-600 p-4 md:h-28">
           <Logo knockout priority className="h-8 md:h-10" />
         </div>
         {activated === '1' && (
@@ -59,7 +64,7 @@ export default async function LoginPage({
             {sessionEnded}
           </p>
         )}
-        <LoginForm />
+        <LoginForm next={next} />
       </div>
     </main>
   );

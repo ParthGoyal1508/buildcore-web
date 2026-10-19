@@ -5,12 +5,13 @@ import clsx from 'clsx';
 import { useState } from 'react';
 
 import { getItems } from '@/app/lib/api/inventory';
-import { getBOQ } from '@/app/lib/api/projects';
+import { getBOQ, boqKeys } from '@/app/lib/api/projects';
 import { money, rupees, unitRate } from '@/app/lib/format';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
 import { TABLE } from '@/app/ui/table';
+import { IconButton, TextButton } from '@/app/ui/button';
 
 /**
  * The item table of an LOI, work order or purchase order, entered as rows (2026-10-14).
@@ -122,7 +123,7 @@ export default function LineItemsEditor({
   const fromItems = source === 'items';
 
   const boq = useQuery({
-    queryKey: ['boq', projectId],
+    queryKey: boqKeys.project(projectId ?? ''),
     queryFn: () => getBOQ(projectId ?? ''),
     enabled: fromBoq,
   });
@@ -363,16 +364,16 @@ export default function LineItemsEditor({
                       {Number.isFinite(amount) ? money(amount) : '—'}
                     </td>
                     <td className={cell}>
-                      <button
-                        type="button"
-                        aria-label="Remove item"
+                      <IconButton
+                        size="sm"
+                        tone="danger"
+                        label="Remove item"
                         onClick={() =>
                           update(rows.filter((other) => other.key !== row.key))
                         }
-                        className="px-1 text-gray-400 hover:text-red-600"
                       >
                         ×
-                      </button>
+                      </IconButton>
                     </td>
                   </tr>
                 );
@@ -399,17 +400,14 @@ export default function LineItemsEditor({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={addOther}
-        className="text-sm font-medium text-blue-700 hover:underline"
-      >
+      <TextButton
+        onClick={addOther}>
         {fromBoq
           ? '+ Add an item not in the BOQ'
           : fromItems
             ? '+ Add an item not in the master'
             : '+ Add item'}
-      </button>
+      </TextButton>
     </div>
   );
 }

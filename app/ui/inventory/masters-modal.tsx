@@ -1,6 +1,11 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
@@ -15,7 +20,12 @@ import {
   type ItemInput,
 } from '@/app/lib/api/inventory';
 import { ApiError } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { ITEM_UNITS, MESSAGES } from '@/app/lib/constants';
+import { quantity } from '@/app/lib/format';
+import { useDebounced } from '@/app/lib/use-url-state';
+import { Button } from '@/app/ui/button';
+import Pager from './pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import {
   FormError,
@@ -26,6 +36,9 @@ import {
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
+
+const ITEM_PAGE_SIZE = 25;
 
 /**
  * The item and category masters, as a two-tab dialog opened from the Stock screen.
@@ -35,6 +48,10 @@ import { confirmDialog } from '@/app/ui/dialogs';
  * with `INVENTORY` alone must not see them — and a modal with a hidden trigger has
  * no URL for them to reach anyway. `StockTable` renders the button only when the
  * permission is held.
+ *
+ * 036 M5 (2026-10-17): the item list loaded one page of 200, so the 201st item could not be found,
+ * edited, retired or deleted here at all. It is now searched on the server (debounced) and paged.
+ * Categories come back whole from the API and are few, so their search filters in place.
  */
 type Tab = 'items' | 'categories';
 
@@ -49,13 +66,19 @@ function messageFor(error: unknown, fallback: string): string {
 
 function CategoryTab() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [name, setName] = useState('');
+  const [filter, setFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, error: loadError, refetch } = useQuery({
     queryKey: ['inventory', 'categories'],
     queryFn: getCategories,
   });
+  const needle = filter.trim().toLowerCase();
+  const shown = needle
+    ? (data ?? []).filter((row) => row.name.toLowerCase().includes(needle))
+    : (data ?? []);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({
@@ -66,9 +89,10 @@ function CategoryTab() {
 
   const create = useMutation({
     mutationFn: (value: string) => createCategory(value),
-    onSuccess: () => {
+    onSuccess: (category) => {
       setName('');
       setError(null);
+      toast.success(`Category ${category.name} added`);
       invalidate();
     },
     onError: (err) => setError(messageFor(err, 'Could not add this category.')),
@@ -78,6 +102,7 @@ function CategoryTab() {
     mutationFn: (id: string) => deleteCategory(id),
     onSuccess: () => {
       setError(null);
+      toast.success('Category deleted');
       invalidate();
     },
     onError: (err) => setError(messageFor(err, MESSAGES.categoryHasItems)),
@@ -111,20 +136,36 @@ function CategoryTab() {
             hint="Stored in capitals, so one spelling is one category."
           />
         </div>
-        <SecondaryButton type="submit" disabled={create.isPending}>
-          {create.isPending ? 'Adding…' : 'Add'}
-        </SecondaryButton>
+        <Button
+          type="submit"
+          disabled={!name.trim()}
+          loading={create.isPending}
+        >
+          Add
+        </Button>
       </form>
 
       <FormError message={error} />
 
+      <TextField
+        id="category-search"
+        label="Search categories"
+        type="search"
+        autoComplete="off"
+        value={filter}
+        onChange={(event) => setFilter(event.target.value)}
+      />
+
       <ResponsiveList
         columns={columns}
-        rows={data ?? []}
+        rows={shown}
         rowKey={(row) => row.id}
         isLoading={isPending}
-        error={isError ? MESSAGES.inventoryLoadFailed : undefined}
-        emptyMessage={MESSAGES.categoriesEmpty}
+        error={loadError}
+        onRetry={refetch}
+        emptyMessage={
+          needle ? `No category matches “${filter.trim()}”.` : MESSAGES.categoriesEmpty
+        }
         actions={(row) => (
           <RowAction
             onClick={async () => {
@@ -142,6 +183,7 @@ function CategoryTab() {
             // category with items anyway; hiding the control means the refusal is
             // not the first the user hears of it.
             disabled={row.itemCount > 0 || remove.isPending}
+            loading={remove.isPending && remove.variables === row.id}
             title={
               row.itemCount > 0 ? MESSAGES.categoryHasItems : 'Delete category'
             }
@@ -162,6 +204,12 @@ const EMPTY_ITEM: ItemInput = {
 
 function ItemTab() {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const term = useDebounced(search.trim());
   const [draft, setDraft] = useState<ItemInput>(EMPTY_ITEM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -170,9 +218,16 @@ function ItemTab() {
     queryKey: ['inventory', 'categories'],
     queryFn: getCategories,
   });
+  const itemQuery = {
+    search: term || undefined,
+    categoryId: categoryFilter || undefined,
+    page,
+    pageSize: ITEM_PAGE_SIZE,
+  };
   const items = useQuery({
-    queryKey: ['inventory', 'items', {}],
-    queryFn: () => getItems({ pageSize: 200 }),
+    queryKey: ['inventory', 'items', 'masters', companyId, itemQuery],
+    queryFn: () => getItems(itemQuery),
+    placeholderData: keepPreviousData,
   });
 
   const invalidate = () => {
@@ -188,7 +243,8 @@ function ItemTab() {
   const save = useMutation({
     mutationFn: (input: ItemInput) =>
       editingId ? updateItem(editingId, input) : createItem(input),
-    onSuccess: () => {
+    onSuccess: (item) => {
+      toast.success(editingId ? `${item.name} saved` : `${item.name} added`);
       reset();
       invalidate();
     },
@@ -199,6 +255,7 @@ function ItemTab() {
     mutationFn: (id: string) => deleteItem(id),
     onSuccess: () => {
       setError(null);
+      toast.success('Item deleted');
       invalidate();
     },
     onError: (err) => setError(messageFor(err, MESSAGES.itemInUse)),
@@ -206,7 +263,10 @@ function ItemTab() {
 
   const retire = useMutation({
     mutationFn: (item: Item) => updateItem(item.id, { active: !item.active }),
-    onSuccess: invalidate,
+    onSuccess: (item) => {
+      toast.success(item.active ? `${item.name} restored` : `${item.name} retired`);
+      invalidate();
+    },
     onError: (err) => setError(messageFor(err, 'Could not update this item.')),
   });
 
@@ -218,7 +278,8 @@ function ItemTab() {
     {
       key: 'reorderLevel',
       header: 'Reorder level',
-      render: (row) => row.reorderLevel ?? '—',
+      render: (row) =>
+        row.reorderLevel === null ? '—' : quantity(row.reorderLevel),
     },
     {
       key: 'hsnCode',
@@ -250,13 +311,14 @@ function ItemTab() {
       >
         <TextField
           id="item-name"
-          label="Item"
+          label="Item *"
+          maxLength={120}
           value={draft.name}
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
         <SelectField
           id="item-category"
-          label="Category"
+          label="Category *"
           value={draft.categoryId}
           onChange={(event) =>
             setDraft({ ...draft, categoryId: event.target.value })
@@ -271,7 +333,7 @@ function ItemTab() {
         </SelectField>
         <SelectField
           id="item-unit"
-          label="Unit"
+          label="Unit *"
           value={draft.unit}
           onChange={(event) =>
             setDraft({
@@ -307,19 +369,16 @@ function ItemTab() {
         <TextField
           id="item-hsn"
           label="HSN code"
+          maxLength={20}
           value={draft.hsnCode ?? ''}
           onChange={(event) =>
             setDraft({ ...draft, hsnCode: event.target.value })
           }
         />
         <div className="flex items-end gap-2">
-          <SecondaryButton type="submit" disabled={save.isPending}>
-            {save.isPending
-              ? 'Saving…'
-              : editingId
-                ? 'Save changes'
-                : 'Add item'}
-          </SecondaryButton>
+          <Button type="submit" loading={save.isPending}>
+            {editingId ? 'Save changes' : 'Add item'}
+          </Button>
           {editingId && (
             <SecondaryButton type="button" onClick={reset}>
               Cancel
@@ -330,13 +389,49 @@ function ItemTab() {
 
       <FormError message={error} />
 
+      <div className="grid gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2">
+        <TextField
+          id="item-search"
+          label="Search items"
+          type="search"
+          autoComplete="off"
+          placeholder="Name or code"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
+        />
+        <SelectField
+          id="item-category-filter"
+          label="Category"
+          value={categoryFilter}
+          onChange={(event) => {
+            setCategoryFilter(event.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">All categories</option>
+          {categoryOptions.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+
       <ResponsiveList
         columns={columns}
         rows={items.data?.items ?? []}
         rowKey={(row) => row.id}
         isLoading={items.isPending}
-        error={items.isError ? MESSAGES.inventoryLoadFailed : undefined}
-        emptyMessage={MESSAGES.itemsEmpty}
+        error={items.error}
+        onRetry={items.refetch}
+        serverPaged
+        isRefreshing={items.isPlaceholderData}
+        emptyMessage={
+          term || categoryFilter ? 'No item matches this search.' : MESSAGES.itemsEmpty
+        }
         actions={(row) => (
           <div className="flex gap-2">
             <RowAction
@@ -357,6 +452,7 @@ function ItemTab() {
             </RowAction>
             <RowAction
               onClick={() => retire.mutate(row)}
+              loading={retire.isPending && retire.variables?.id === row.id}
               title={
                 row.active
                   ? 'Stop offering this item on new records'
@@ -377,13 +473,21 @@ function ItemTab() {
                 )
                   remove.mutate(row.id);
               }}
-              disabled={remove.isPending}
+              loading={remove.isPending && remove.variables === row.id}
               title={MESSAGES.itemInUse}
             >
               Delete
             </RowAction>
           </div>
         )}
+      />
+
+      <Pager
+        total={items.data?.total ?? 0}
+        page={items.data?.page ?? page}
+        pageSize={items.data?.pageSize ?? ITEM_PAGE_SIZE}
+        onPageChange={setPage}
+        noun="item"
       />
     </div>
   );
@@ -409,8 +513,8 @@ export default function MastersModal({ onClose }: { onClose: () => void }) {
               onClick={() => setTab(value)}
               className={
                 tab === value
-                  ? 'border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-700'
-                  : 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900'
+                  ? 'border-b-2 border-brand-600 px-3 py-2 text-sm font-medium text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
+                  : 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
               }
             >
               {value === 'items' ? 'Items' : 'Categories'}

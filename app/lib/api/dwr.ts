@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import type { StoredFile } from '@/app/lib/api/client';
-import { authFetch, authFetchFile } from '@/app/lib/session';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
+import { fileToBase64 } from '@/app/lib/files';
 
 /**
  * Every daily-work-report call to `buildcore-api` — the fourteen routes under `projects/dwr` (feature 022, 024 FR-001).
@@ -142,6 +143,8 @@ const attachmentSchema = z
      * distinction costs nothing here.
      */
     taskId: z.string().nullable().optional(),
+    /** 036 I8: a 320 px copy exists (photos uploaded from 2026-10-18). */
+    hasThumbnail: z.boolean().optional(),
   })
   .passthrough();
 
@@ -428,10 +431,38 @@ export interface CreateDwrInput {
 // Calls
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function listDwrs(projectId?: string): Promise<DwrSummary[]> {
-  const search = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  const raw = await authFetch<unknown>(`/projects/dwr${search}`);
-  return dwrListSchema.parse(raw).items;
+export interface DwrListQuery {
+  projectId?: string;
+  status?: DwrStatus;
+  /** Inclusive work-date bounds, `YYYY-MM-DD`. */
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export type DwrPage = z.infer<typeof dwrListSchema>;
+
+/** Rows per page on the DWR list (the API allows up to 200, `DWR_PAGE_SIZE_MAX`). */
+export const DWR_PAGE_SIZE = 50;
+
+/**
+ * One page of a project's reports, with the total (036 I6).
+ *
+ * The list was fetched with no page size, so the API's default of 25 applied and every older
+ * report silently did not exist on screen — a project with 300 days showed its last 25 and no hint
+ * of the rest. The status and date filters are the API's own (`ListDwrDto`).
+ */
+export async function listDwrPage(query: DwrListQuery): Promise<DwrPage> {
+  const params = new URLSearchParams();
+  if (query.projectId) params.set('projectId', query.projectId);
+  if (query.status) params.set('status', query.status);
+  if (query.from) params.set('from', query.from);
+  if (query.to) params.set('to', query.to);
+  params.set('page', String(query.page ?? 1));
+  params.set('pageSize', String(query.pageSize ?? DWR_PAGE_SIZE));
+  const raw = await authFetch<unknown>(`/projects/dwr?${params.toString()}`);
+  return dwrListSchema.parse(raw);
 }
 
 export async function getDwr(dwrId: string): Promise<Dwr> {
@@ -544,14 +575,6 @@ export async function downloadDwrAttachment(
   return authFetchFile(`/projects/dwr/attachments/${attachmentId}`);
 }
 
-async function fileToBase64(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-}
-
 const reconciliationSchema = z
   .object({
     lines: z.array(
@@ -606,6 +629,30 @@ export async function repairReconciliation(
 
 export async function deleteDwr(dwrId: string): Promise<void> {
   await authFetch<unknown>(`/projects/dwr/${dwrId}`, { method: 'DELETE' });
+}
+
+/**
+ * Takes a wrong file off a report that is still a draft or returned (036 I9). The API refuses it
+ * once submitted (409 `DWR_WRONG_STATUS`) and on a locked project (423), and audits the removal.
+ */
+export async function removeDwrAttachment(
+  dwrId: string,
+  attachmentId: string,
+): Promise<void> {
+  await authFetch<unknown>(
+    `/projects/dwr/${dwrId}/attachments/${attachmentId}`,
+    { method: 'DELETE' },
+  );
+}
+
+/**
+ * A photo attachment's 320 px thumbnail (036 I8) — the file itself for one uploaded before
+ * thumbnails existed, so this always draws something for an image.
+ */
+export async function dwrAttachmentThumbnail(
+  attachmentId: string,
+): Promise<Blob> {
+  return authFetchBlob(`/projects/dwr/attachments/${attachmentId}/thumbnail`);
 }
 
 /** What a bill proposes its quantities from (022 FR-034 to FR-038). */

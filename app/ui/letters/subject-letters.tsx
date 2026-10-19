@@ -10,11 +10,8 @@ import {
   type IssuedLetter,
   type LetterQuery,
 } from '@/app/lib/api/letters';
-import {
-  GENERATE_LETTER_COPY,
-  LETTER_COPY,
-  MESSAGES,
-} from '@/app/lib/constants';
+import { errorMessage } from '@/app/lib/api/client';
+import { GENERATE_LETTER_COPY, LETTER_COPY } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
 import GenerateLetterDialog, {
   useOfferableLetterKinds,
@@ -22,12 +19,10 @@ import GenerateLetterDialog, {
 } from '@/app/ui/letters/generate-letter-dialog';
 import { LetterList } from '@/app/ui/letters/letter-list';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
-import {
-  FormError,
-  RowAction,
-  SecondaryButton,
-} from '@/app/ui/settings/form-fields';
-import { LoadingText } from '@/app/ui/spinner';
+import QueryError from '@/app/ui/query-error';
+import { RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The letters belonging to one subject, wherever that subject's own screen is (017 US6, T029, T030).
@@ -77,13 +72,13 @@ export default function SubjectLetters({
   };
 }) {
   const [generating, setGenerating] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const toast = useToast();
   const offerable = useOfferableLetterKinds(
     generate?.kindKeys ?? [],
     !!generate,
   );
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     // The query in the key, so switching subject refetches rather than showing the last one's
     // letters — the failure mode that looks like it is working.
     queryKey: ['letters', query, also ?? null],
@@ -110,26 +105,28 @@ export default function SubjectLetters({
     });
 
   const save = async (letter: IssuedLetter) => {
-    setDownloadError(null);
     try {
       saveBlob(await downloadLetter(letter.id), letterFileName(letter));
-    } catch {
-      setDownloadError(GENERATE_LETTER_COPY.downloadFailed);
+    } catch (err) {
+      toast.error(errorMessage(err, GENERATE_LETTER_COPY.downloadFailed));
     }
   };
 
+  // 036 J1 (2026-10-17): placeholder rows while loading, and a failed load with a Retry — it was a
+  // red line with no way back short of reloading the employee's whole page.
   if (isLoading) {
     return (
-      <p className="text-sm text-gray-500" role="status">
-        <LoadingText />
-      </p>
+      <ListSkeleton headers={['Letter', 'Status', 'Issued']} rows={2} cards />
     );
   }
   if (isError) {
     return (
-      <p className="text-sm text-red-600" role="alert">
-        {MESSAGES.loadFailed}
-      </p>
+      <QueryError
+        compact
+        error={error}
+        fallback="The letters could not be loaded."
+        onRetry={refetch}
+      />
     );
   }
 
@@ -143,7 +140,6 @@ export default function SubjectLetters({
           </SecondaryButton>
         )}
       </div>
-      <FormError message={downloadError} />
       {viewer}
       <LetterList
         letters={data ?? []}

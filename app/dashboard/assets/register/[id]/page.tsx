@@ -36,6 +36,7 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 type Tab = 'documents' | 'allocations' | 'stock';
 
@@ -146,7 +147,7 @@ export default function AssetDetailPage() {
                   : undefined
             }
           >
-            {doc.expiryDate.slice(0, 10)}
+            {dateLabel(doc.expiryDate)}
             {doc.expired ? ' — expired' : doc.expiring ? ' — expiring' : ''}
           </span>
         ) : (
@@ -183,7 +184,7 @@ export default function AssetDetailPage() {
       header: 'Due back',
       render: (entry) => (
         <span className={entry.overdue ? 'text-red-700' : undefined}>
-          {entry.expectedReturnDate.slice(0, 10)}
+          {dateLabel(entry.expectedReturnDate)}
           {entry.overdue ? ` — ${entry.daysOverdue}d overdue` : ''}
         </span>
       ),
@@ -193,7 +194,7 @@ export default function AssetDetailPage() {
       header: 'Returned',
       render: (entry) =>
         entry.actualReturnDate
-          ? `${entry.actualReturnDate.slice(0, 10)}${
+          ? `${dateLabel(entry.actualReturnDate)}${
               entry.conditionOnReturnName
                 ? ` — ${entry.conditionOnReturnName}`
                 : ''
@@ -225,6 +226,7 @@ export default function AssetDetailPage() {
                 {row.assetCode} — {row.name}
               </>
             }
+            breadcrumbs={[{ label: 'Asset register', href: ROUTES.assetsRegister }]}
           />
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
             <StatusBadge status={row.status} label={assetsLabel(row.status)} />
@@ -268,7 +270,7 @@ export default function AssetDetailPage() {
                   openAllocation.custodianName
                     ? `, held by ${openAllocation.custodianName}`
                     : ''
-                }, due back ${openAllocation.expectedReturnDate.slice(0, 10)}.`}
+                }, due back ${dateLabel(openAllocation.expectedReturnDate)}.`}
               >
                 Allocate
               </SecondaryButton>
@@ -328,7 +330,7 @@ export default function AssetDetailPage() {
           { label: 'Supplier', value: row.vendorName ?? '—' },
           {
             label: 'Purchased',
-            value: row.purchaseDate?.slice(0, 10) ?? '—',
+            value: dateLabel(row.purchaseDate),
           },
           { label: 'Cost', value: formatRupees(row.purchaseCost) },
           // The register speaks in what the asset is worth, not in accounting terms
@@ -337,7 +339,7 @@ export default function AssetDetailPage() {
           {
             label: 'Next inspection',
             value: row.nextInspectionDue
-              ? `${row.nextInspectionDue.slice(0, 10)}${row.inspectionDue ? ' — due' : ''}`
+              ? `${dateLabel(row.nextInspectionDue)}${row.inspectionDue ? ' — due' : ''}`
               : '—',
           },
         ].map((entry) => (
@@ -355,7 +357,7 @@ export default function AssetDetailPage() {
           Acquired through a recorded purchase —{' '}
           <Link
             href={ROUTES.inventoryPurchases}
-            className="text-blue-700 underline hover:text-blue-900"
+            className="text-brand-700 underline hover:text-brand-900"
           >
             open it in Inventory
           </Link>
@@ -371,9 +373,9 @@ export default function AssetDetailPage() {
                 type="button"
                 aria-current={tab === entry.id ? 'page' : undefined}
                 onClick={() => setTab(entry.id)}
-                className={`-mb-px block whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+                className={`-mb-px block whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
                   tab === entry.id
-                    ? 'border-blue-600 text-blue-700'
+                    ? 'border-brand-600 text-brand-700'
                     : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900'
                 }`}
               >

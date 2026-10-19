@@ -12,7 +12,12 @@ import {
   RESIGNATION_REASON_CATEGORIES,
   RESIGNATION_STATUSES,
 } from '@/app/lib/constants';
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import { totalCountOf } from '@/app/lib/api/client';
+import {
+  authFetch,
+  authFetchBlob,
+  authFetchWithMeta,
+} from '@/app/lib/session';
 
 /**
  * Every `/recruitment/*` and `/recruitment/letter-templates` call to `buildcore-api`
@@ -238,6 +243,9 @@ export interface CandidateQuery {
 export async function getCandidates(
   query: CandidateQuery = {},
 ): Promise<CandidatePage> {
+  // 200 is the server's ceiling (`MAX_PAGE_SIZE`), not a promise that everything fits: the
+  // pipeline pages and searches on the server (036 H1); callers that still ask for a page this
+  // size use it as a lookup, never as "all the candidates".
   return candidatePageSchema.parse(
     await authFetch(
       `/recruitment/candidates${qs({ ...query, pageSize: query.pageSize ?? 200 })}`,
@@ -360,6 +368,15 @@ const interviewSchema = z.object({
   rescheduleCount: z.number(),
   overdue: z.boolean(),
   interviewerEmployeeIds: z.array(z.string()),
+  /**
+   * The panel with names, resolved by the server (036 H4) — `'Former employee'` for somebody who
+   * has since left. The screens resolved ids against the first page of active employees and
+   * printed a raw id for anyone else. Defaults to empty so an older API still parses; read it
+   * through `interviewerName`, which falls back to the id.
+   */
+  interviewers: z
+    .array(z.object({ employeeId: z.string(), name: z.string() }))
+    .default([]),
   feedback: z.array(
     z.object({
       interviewerEmployeeId: z.string(),
@@ -371,13 +388,51 @@ const interviewSchema = z.object({
 });
 export type Interview = z.infer<typeof interviewSchema>;
 
+/** A panel member's name as the server gave it on this interview, else their id. */
+export function interviewerName(interview: Interview, employeeId: string) {
+  return (
+    interview.interviewers.find((i) => i.employeeId === employeeId)?.name ??
+    employeeId
+  );
+}
+
+/**
+ * Rounds, oldest first. Pass `page` (and `pageSize`, at most 100) for one page (036 H4); without
+ * `page` the server caps the list at 500. For a pager that needs the total, `getInterviewsPage`.
+ */
 export async function getInterviews(
-  query: { candidateId?: string; status?: string } = {},
+  query: {
+    candidateId?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+    /** `desc` for newest first (the Completed and Cancelled tabs). */
+    order?: 'asc' | 'desc';
+  } = {},
 ) {
   return z
     .array(interviewSchema)
     .parse(await authFetch(`/recruitment/interviews${qs({ ...query })}`));
 }
+/**
+ * One page of rounds with the server's total (`X-Total-Count`). `total` is null only when the header
+ * did not arrive, and a screen then falls back to "Next while a full page came back".
+ */
+export async function getInterviewsPage(query: {
+  status?: string;
+  page: number;
+  pageSize: number;
+  order?: 'asc' | 'desc';
+}): Promise<{ items: Interview[]; total: number | null }> {
+  const { data, headers } = await authFetchWithMeta<unknown>(
+    `/recruitment/interviews${qs({ ...query })}`,
+  );
+  return {
+    items: z.array(interviewSchema).parse(data),
+    total: totalCountOf(headers),
+  };
+}
+
 export interface ScheduleInterviewInput {
   roundNumber: number;
   roundType: string;
@@ -773,7 +828,10 @@ export async function getNewJoinings(query: {
     }[];
   }>(`/recruitment/reports/new-joinings${qs({ ...query })}`);
 }
-export async function getFunnelReport(query: { requisitionId?: string } = {}) {
+/** `from`/`to` (`YYYY-MM-DD`, inclusive) bound the candidates' application date (036 H5). */
+export async function getFunnelReport(
+  query: { requisitionId?: string; from?: string; to?: string } = {},
+) {
   return authFetch<{
     stageCounts: Record<string, number>;
     conversions: { from: string; to: string; percent: number }[];
@@ -793,6 +851,9 @@ export async function getResignationReport(query: {
     attritionRatePercent: number | null;
     items: {
       employeeId: string;
+      /** Since 036 follow-up; null for an employee the caller cannot read. */
+      employeeCode?: string | null;
+      employeeName?: string | null;
       resignationDate: string;
       lastWorkingDay: string;
       tenureMonths: number | null;

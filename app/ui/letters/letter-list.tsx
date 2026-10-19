@@ -2,6 +2,7 @@ import clsx from 'clsx';
 
 import type { IssuedLetter } from '@/app/lib/api/letters';
 import { LETTER_STATUS_LABELS } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
 
 interface LetterListProps {
   letters: IssuedLetter[];
@@ -13,12 +14,12 @@ interface LetterListProps {
 const STATUS_STYLES: Record<IssuedLetter['status'], string> = {
   // Not red. A composed letter is not an error — it exists and is waiting on a person.
   composed: 'bg-amber-50 text-amber-800 ring-amber-200',
-  issued: 'bg-blue-50 text-blue-800 ring-blue-200',
+  issued: 'bg-brand-50 text-brand-800 ring-brand-200',
   executed: 'bg-green-50 text-green-800 ring-green-200',
 };
 
 const dateText = (value: Date | null) =>
-  value ? value.toISOString().slice(0, 10) : '—';
+  dateLabel(value);
 
 /**
  * Letters for one subject (017 US6, FR-012).

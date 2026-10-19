@@ -1,15 +1,17 @@
 'use client';
 
 import type { Site } from '@/app/lib/api/dashboard';
-import { SelectField, selectClass } from '@/app/ui/settings/form-fields';
+import AsyncSelect from '@/app/ui/async-select';
+
+const PAGE = 25;
 
 /**
- * The site selector for the Site Dashboard (spec FR-013, FR-019 — native select).
+ * The site selector for the Site Dashboard (spec FR-013).
  *
- * Built from the shared `SelectField` rather than its own label-and-select pair,
- * which is what it was: a bare content-width select whose right padding the native
- * chevron drew straight over. Capped rather than full-width because it is a single
- * control on a wide dashboard, not a column in a form.
+ * 036 E4: a searchable picker. A plain select of every site does not scale to a contractor with
+ * forty sites, and its "Select a site…" first option jumped back to the first site when chosen —
+ * there is no "no site" view on this page, so a choice is now mandatory. The sites list is already
+ * loaded whole by the page; it is searched and paged here so nothing is cut off.
  */
 export default function SiteSelector({
   sites,
@@ -26,43 +28,36 @@ export default function SiteSelector({
    */
   compact?: boolean;
 }) {
-  if (compact) {
-    return (
-      <div className="w-full sm:w-64">
-        <label htmlFor="site-dashboard-site" className="sr-only">
-          Site
-        </label>
-        <select
-          id="site-dashboard-site"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={selectClass}
-        >
-          <option value="">Select a site…</option>
-          {sites.map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
+  const selected = sites.find((s) => s.id === value);
   return (
-    <div className="max-w-xs">
-      <SelectField
-        id="site-dashboard-site"
-        label="Site"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <div className={compact ? 'w-full sm:w-64' : 'max-w-xs'}>
+      <label
+        htmlFor="site-dashboard-site"
+        className={compact ? 'sr-only' : 'mb-1 block text-sm font-medium text-gray-700'}
       >
-        <option value="">Select a site…</option>
-        {sites.map((site) => (
-          <option key={site.id} value={site.id}>
-            {site.name}
-          </option>
-        ))}
-      </SelectField>
+        Site
+      </label>
+      <AsyncSelect
+        id="site-dashboard-site"
+        value={value}
+        onChange={(id) => {
+          if (id) onChange(id);
+        }}
+        selectedOption={selected ? { id: selected.id, label: selected.name } : null}
+        placeholder="Search sites"
+        cacheKey={['site-dashboard', 'sites', 'picker', sites.length]}
+        search={async (term, page) => {
+          const matches = sites.filter((s) =>
+            s.name.toLowerCase().includes(term.trim().toLowerCase()),
+          );
+          return {
+            items: matches
+              .slice((page - 1) * PAGE, page * PAGE)
+              .map((s) => ({ id: s.id, label: s.name })),
+            total: matches.length,
+          };
+        }}
+      />
     </div>
   );
 }

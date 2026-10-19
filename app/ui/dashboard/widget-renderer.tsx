@@ -4,16 +4,9 @@ import Link from 'next/link';
 
 import { dateLabel, rupees } from '@/app/lib/format';
 
-/** "23 Sep" this year, "23 Sep 2025" otherwise — short enough for a half-width card. */
+/** DD-MM-YYYY, like every other date (036 A18). Was "23 Sep" in this card alone. */
 function shortDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00Z`);
-  const sameYear = date.getUTCFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  });
+  return dateLabel(iso.slice(0, 10));
 }
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import type { WidgetResult } from '@/app/lib/api/dashboard';
@@ -93,7 +86,7 @@ const cardClass = 'rounded-xl border border-gray-200 bg-white p-4 shadow-sm';
 
 /** The focus ring every link on the dashboard carries — keyboard users must see where they are. */
 const focusRing =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
 
 /**
  * A headline card that is itself the link (2026-10-15).
@@ -117,7 +110,7 @@ function CardShell({
     <Link
       href={href}
       aria-label={label}
-      className={`group block ${cardClass} transition hover:border-blue-300 hover:shadow ${focusRing}`}
+      className={`group block ${cardClass} transition hover:border-brand-300 hover:shadow ${focusRing}`}
     >
       {children}
     </Link>
@@ -160,7 +153,7 @@ function CardHeading({
       </p>
       <Link
         href={href}
-        className={`shrink-0 rounded text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline ${focusRing}`}
+        className={`shrink-0 rounded text-xs font-medium text-brand-700 hover:text-brand-900 hover:underline ${focusRing}`}
         aria-label={`View all — ${title}`}
       >
         View all →
@@ -214,7 +207,7 @@ export function KpiCard({
   }
   return (
     <CardShell href={href} label={`${title}: ${display}`}>
-      <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
+      <p className="text-sm text-gray-500 group-hover:text-brand-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
       {note && <p className="mt-2 text-xs text-amber-800">{note}</p>}
     </CardShell>
@@ -239,7 +232,7 @@ export function StatCard({
   }
   return (
     <CardShell href={href} label={`${title}: ${display}`}>
-      <p className="text-sm text-gray-500 group-hover:text-blue-700">{title}</p>
+      <p className="text-sm text-gray-500 group-hover:text-brand-700">{title}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{display}</p>
     </CardShell>
   );
@@ -451,8 +444,8 @@ export function ComingSoonCard({
   return (
     <div className={`${cardClass} border-dashed`}>
       <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-1 text-sm font-medium text-gray-400">Coming soon</p>
-      <p className="mt-1 text-xs text-gray-400">
+      <p className="mt-1 text-sm font-medium text-gray-500">Coming soon</p>
+      <p className="mt-1 text-xs text-gray-500">
         {note ?? `Waiting on the ${module} module.`}
       </p>
     </div>
@@ -470,7 +463,7 @@ export function UnsupportedWidgetCard({
   return (
     <div className={`${cardClass} border-dashed`}>
       <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-1 text-xs text-gray-400">
+      <p className="mt-1 text-xs text-gray-500">
         Unsupported widget type “{displayType}”.
       </p>
     </div>

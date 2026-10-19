@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { getProcurementNeeded } from '@/app/lib/api/inventory';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
-import { quantity } from '@/app/lib/format';
+import { dateLabel, quantity } from '@/app/lib/format';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
@@ -35,7 +35,8 @@ export default function ProcurementNeededPage() {
     indentLineId?: string;
   } | null>(null);
 
-  const { data, isPending, isError } = useQuery({
+  // 036 M12 (2026-10-17): dates as DD-MM-YYYY, and a failed load offers Retry.
+  const { data, isPending, error, refetch } = useQuery({
     queryKey: ['inventory', 'procurement-needed'],
     queryFn: getProcurementNeeded,
   });
@@ -47,7 +48,7 @@ export default function ProcurementNeededPage() {
       render: (row) => (
         <Link
           href={ROUTES.inventoryIndent(row.indentId)}
-          className="font-medium text-blue-700 hover:underline"
+          className="font-medium text-brand-700 hover:underline"
         >
           {row.indentNumber}
         </Link>
@@ -67,7 +68,9 @@ export default function ProcurementNeededPage() {
     {
       key: 'requiredBy',
       header: 'Required by',
-      render: (row) => row.requiredByDate.slice(0, 10),
+      render: (row) => (
+        <span className="whitespace-nowrap">{dateLabel(row.requiredByDate)}</span>
+      ),
     },
   ];
 
@@ -117,7 +120,8 @@ export default function ProcurementNeededPage() {
           rows={data?.indentDemand ?? []}
           rowKey={(row) => row.lineId}
           isLoading={isPending}
-          error={isError ? MESSAGES.inventoryLoadFailed : undefined}
+          error={error}
+          onRetry={refetch}
           emptyMessage="No indent lines are waiting on a purchase."
           actions={(row) => (
             <SecondaryButton
@@ -147,7 +151,8 @@ export default function ProcurementNeededPage() {
           rows={data?.reorderShortfall ?? []}
           rowKey={(row) => `${row.itemId}:${row.siteId}`}
           isLoading={isPending}
-          error={isError ? MESSAGES.inventoryLoadFailed : undefined}
+          error={error}
+          onRetry={refetch}
           emptyMessage="Nothing is below its reorder level."
           actions={(row) => (
             <SecondaryButton

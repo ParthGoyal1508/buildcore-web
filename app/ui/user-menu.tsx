@@ -182,7 +182,7 @@ export default function UserMenu() {
               )}
               {role && (
                 <span
-                  className={`mt-1 inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-medium ${isError ? 'bg-red-50 text-red-700' : 'bg-brand-100 text-brand-700'}`}
+                  className={`mt-1 inline-block max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium ${isError ? 'bg-red-50 text-red-700' : 'bg-brand-100 text-brand-700'}`}
                 >
                   {role}
                 </span>

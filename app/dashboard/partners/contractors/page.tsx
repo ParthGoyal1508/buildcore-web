@@ -34,7 +34,7 @@ export default function ContractorsPage() {
       render: (row) => (
         <Link
           href={ROUTES.partnersContractor(row.id)}
-          className="font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="font-medium text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           {row.vendorName ?? row.vendorId}
         </Link>
@@ -54,7 +54,7 @@ export default function ContractorsPage() {
     {
       key: 'licence',
       header: 'Licence',
-      render: (row) => row.licenceNumber ?? <span className="text-gray-400">—</span>,
+      render: (row) => row.licenceNumber ?? <span className="text-gray-500">—</span>,
     },
     {
       key: 'documents',

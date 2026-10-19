@@ -7,14 +7,20 @@ import {
   type BillPackageStatus,
 } from '@/app/lib/api/bill-packages';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
+  BILLING_PAGE_SIZE,
   createWorkOrder,
-  getRaBills,
-  getWorkOrders,
+  getRaBillsPage,
+  getWorkOrdersPage,
   updateWorkOrder,
   discardRaBill,
   submitRaBill,
@@ -28,6 +34,10 @@ import { BILLING_COPY, ROUTES, WORK_ORDER_COPY } from '@/app/lib/constants';
 import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import AwardEditor from '@/app/ui/projects/award-editor';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import RaBillSheet from '@/app/ui/projects/ra-bill-sheet';
 import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
 import RaBillView from '@/app/ui/projects/ra-bill-view';
@@ -44,8 +54,11 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 import {
   filterByNoc,
   NocFilterField,
@@ -56,6 +69,45 @@ import {
 
 const TABS = ['award', 'bills', 'retention', 'settings'] as const;
 type Tab = (typeof TABS)[number];
+
+/**
+ * The server's own sentence for a refused work-order or bill write (036 Wave 3, 2026-10-17): the lock
+ * sentence for a 423, the refusal's `message` (some arrive nested under `details`), else `fallback`.
+ */
+function refusalMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.status !== 423) {
+    return (
+      (err.details as { message?: string } | undefined)?.message ??
+      projectErrorMessage(err, fallback)
+    );
+  }
+  return projectErrorMessage(err, fallback);
+}
+
+/** "Showing 50 of 132 · Load more" under a paged list (036 I26). Nothing when it is all loaded. */
+function LoadMore({
+  shown,
+  total,
+  noun,
+  loading,
+  onMore,
+}: {
+  shown: number;
+  total: number;
+  noun: string;
+  loading: boolean;
+  onMore: () => void;
+}) {
+  if (total <= shown) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+      <span>{`Showing ${shown} of ${total} ${noun}`}</span>
+      <SecondaryButton type="button" loading={loading} onClick={onMore}>
+        {loading ? 'Loading…' : 'Load more'}
+      </SecondaryButton>
+    </div>
+  );
+}
 
 /**
  * Subcontractor work orders and the bills measured against them (018 US2 — `bugs.md` item 12).
@@ -100,20 +152,43 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
    */
   const [notice, setNotice] = useState<string | null>(null);
 
-  const orders = useQuery({
-    queryKey: ['workOrders', projectId],
-    queryFn: () => getWorkOrders(projectId),
+  const { isLocked } = useProjectLock();
+
+  /**
+   * 036 I26 (2026-10-17): both lists are paged — `{ items, total }` with "Load more" — rather than
+   * every work order and every bill on the project in one response. Keys sit under
+   * `['workOrders', projectId]` / `['raBills', projectId]`, so every existing invalidation of
+   * those prefixes still refreshes them, while the bill-package composer's own unpaged
+   * `['workOrders', projectId]` array keeps a cache entry of its own shape.
+   *
+   * The project-wide bill pages now feed only the "no work order" section below; the bills tab
+   * reads the chosen order's own pages (`orderBillsQuery`).
+   */
+  const ordersQuery = useInfiniteQuery({
+    queryKey: ['workOrders', projectId, 'pages'],
+    queryFn: ({ pageParam }) => getWorkOrdersPage(projectId, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.page * last.pageSize < last.total ? last.page + 1 : undefined,
   });
+  const orderList = ordersQuery.data?.pages.flatMap((page) => page.items);
+  const ordersTotal = ordersQuery.data?.pages.at(-1)?.total ?? 0;
   // Open until the NOC after the work order is uploaded, then closed (2026-10-17).
   const [nocFilter, setNocFilter] = useState<NocFilter>('');
   const nocStatuses = useNocStatuses(
     'work_order',
-    (orders.data ?? []).map((o) => o.id),
+    (orderList ?? []).map((o) => o.id),
   );
-  const bills = useQuery({
-    queryKey: ['raBills', projectId],
-    queryFn: () => getRaBills(projectId),
+  const billsQuery = useInfiniteQuery({
+    queryKey: ['raBills', projectId, 'pages'],
+    queryFn: ({ pageParam }) =>
+      getRaBillsPage(projectId, pageParam, BILLING_PAGE_SIZE),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.page * last.pageSize < last.total ? last.page + 1 : undefined,
   });
+  const billList = billsQuery.data?.pages.flatMap((page) => page.items);
+  const billsTotal = billsQuery.data?.pages.at(-1)?.total ?? 0;
   const vendors = useVendorOptions();
 
   /**
@@ -131,13 +206,7 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
         queryKey: ['workOrders', projectId],
       });
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError
-          ? ((err.details as { message?: string } | undefined)?.message ??
-              err.message)
-          : WORK_ORDER_COPY.submitFailed,
-      ),
+    onError: (err) => setError(refusalMessage(err, WORK_ORDER_COPY.submitFailed)),
   });
 
   /**
@@ -160,19 +229,30 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
         queryKey: ['workOrders', projectId],
       });
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError
-          ? ((err.details as { message?: string } | undefined)?.message ??
-              err.message)
-          : WORK_ORDER_COPY.reopenFailed,
-      ),
+    onError: (err) => setError(refusalMessage(err, WORK_ORDER_COPY.reopenFailed)),
   });
 
   // Falls back to the first order so the panel is never empty on a project that has one, but only
   // while nothing has been picked — an explicit choice is never overridden.
   const chosen =
-    orders.data?.find((order) => order.id === selected) ?? orders.data?.[0];
+    orderList?.find((order) => order.id === selected) ?? orderList?.[0];
+
+  /**
+   * The chosen work order's own bills, paged on the server (036 follow-up). Filtering the project's
+   * pages here left an order's older bills behind a "Load more" that fetched every other order's
+   * bills first. Under `['raBills', projectId]`, so every existing invalidation refreshes it.
+   */
+  const orderBillsQuery = useInfiniteQuery({
+    queryKey: ['raBills', projectId, 'pages', 'workOrder', chosen?.id ?? null],
+    queryFn: ({ pageParam }) =>
+      getRaBillsPage(projectId, pageParam, BILLING_PAGE_SIZE, chosen?.id),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.page * last.pageSize < last.total ? last.page + 1 : undefined,
+    enabled: Boolean(chosen),
+  });
+  const orderBills = orderBillsQuery.data?.pages.flatMap((page) => page.items);
+  const orderBillsTotal = orderBillsQuery.data?.pages.at(-1)?.total ?? 0;
 
   const vendorName = (partnerId: string | null) =>
     partnerId === null
@@ -187,7 +267,7 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
     setNotice(null);
   };
 
-  const orphanBills = (bills.data ?? []).filter(
+  const orphanBills = (billList ?? []).filter(
     (bill) => bill.workOrderId === null,
   );
 
@@ -209,33 +289,40 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
             <h2 className="text-base font-semibold text-gray-900">
               {WORK_ORDER_COPY.heading}
             </h2>
-            <SecondaryButton
-              type="button"
-              onClick={() => {
-                setRaising(true);
-                setRevising(null);
-                setError(null);
-              }}
-            >
-              {WORK_ORDER_COPY.raiseNew}
-            </SecondaryButton>
+            {/* Absent on a locked project (036 Wave 3): raising is a write the server 423s. */}
+            {!isLocked && (
+              <SecondaryButton
+                type="button"
+                onClick={() => {
+                  setRaising(true);
+                  setRevising(null);
+                  setError(null);
+                }}
+              >
+                {WORK_ORDER_COPY.raiseNew}
+              </SecondaryButton>
+            )}
           </div>
 
-          {orders.isLoading && (
-            <p className="text-sm text-gray-500" role="status">
-              {WORK_ORDER_COPY.loading}
-            </p>
+          {ordersQuery.isLoading && (
+            <div role="status" aria-label={WORK_ORDER_COPY.loading}>
+              <ListSkeleton headers={[WORK_ORDER_COPY.heading]} rows={3} cards />
+            </div>
           )}
-          {orders.isError && (
-            <p className="text-sm text-red-700" role="alert">
-              {WORK_ORDER_COPY.loadFailed}
-            </p>
+          {/* 036 I17: a failed read says so and offers a retry, rather than reading as no orders. */}
+          {ordersQuery.isError && (
+            <QueryError
+              compact
+              error={ordersQuery.error}
+              fallback={WORK_ORDER_COPY.loadFailed}
+              onRetry={ordersQuery.refetch}
+            />
           )}
-          {orders.data?.length === 0 && (
+          {orderList?.length === 0 && (
             <p className="text-sm text-gray-600">{WORK_ORDER_COPY.empty}</p>
           )}
 
-          {(orders.data?.length ?? 0) > 0 && (
+          {(orderList?.length ?? 0) > 0 && (
             <NocFilterField
               id="wo-noc-filter"
               value={nocFilter}
@@ -245,7 +332,7 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
 
           <ul className="space-y-2">
             {filterByNoc(
-              orders.data ?? [],
+              orderList ?? [],
               nocFilter,
               nocStatuses,
               (o) => o.id,
@@ -257,9 +344,9 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   aria-current={
                     !raising && chosen?.id === order.id ? 'true' : undefined
                   }
-                  className={`min-h-11 w-full rounded border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+                  className={`min-h-11 w-full rounded border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
                     !raising && chosen?.id === order.id
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-brand-500 bg-brand-50'
                       : 'border-gray-200 hover:bg-gray-50'
                   }`}
                 >
@@ -283,6 +370,13 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
               </li>
             ))}
           </ul>
+          <LoadMore
+            shown={orderList?.length ?? 0}
+            total={ordersTotal}
+            noun="work orders"
+            loading={ordersQuery.isFetchingNextPage}
+            onMore={() => void ordersQuery.fetchNextPage()}
+          />
         </aside>
 
         <div className="min-w-0">
@@ -336,13 +430,12 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                     order went active on one person's save while the first bill under it needed an
                     approval. Offered on a draft, explained on the other two states — "waiting" and
                     "never sent" need different things done about them. */}
-                {chosen.status === 'draft' && (
+                {chosen.status === 'draft' && !isLocked && (
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <SecondaryButton
                       type="button"
-                      disabled={
-                        submitAward.isPending || chosen.awardLineCount === 0
-                      }
+                      loading={submitAward.isPending}
+                      disabled={chosen.awardLineCount === 0}
                       onClick={() => {
                         setError(null);
                         submitAward.mutate(chosen.id);
@@ -387,11 +480,13 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                 {/* Offered only where it can succeed. A billed award is final — reopening one
                     would move the remaining quantity under bills the subcontractor already holds
                     — and the server refuses it, so a button here would promise what it cannot do. */}
-                {chosen.status !== 'draft' && chosen.billCount === 0 && (
+                {chosen.status !== 'draft' &&
+                  chosen.billCount === 0 &&
+                  !isLocked && (
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <SecondaryButton
                       type="button"
-                      disabled={reopenAward.isPending}
+                      loading={reopenAward.isPending}
                       onClick={async () => {
                         const reason = await promptDialog({
                           title: 'Reopen these rates?',
@@ -442,9 +537,9 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                     aria-selected={tab === name}
                     aria-controls={`wo-panel-${name}`}
                     onClick={() => setTab(name)}
-                    className={`-mb-px min-h-11 border-b-2 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+                    className={`-mb-px min-h-11 border-b-2 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
                       tab === name
-                        ? 'border-blue-600 font-semibold text-blue-700'
+                        ? 'border-brand-600 font-semibold text-brand-700'
                         : 'border-transparent text-gray-600 hover:text-gray-900'
                     }`}
                   >
@@ -490,9 +585,10 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
                   <BillsTab
                     projectId={projectId}
                     order={chosen}
-                    bills={(bills.data ?? []).filter(
-                      (bill) => bill.workOrderId === chosen.id,
-                    )}
+                    billsQuery={orderBillsQuery}
+                    billsTotal={orderBillsTotal}
+                    loadedCount={orderBills?.length ?? 0}
+                    bills={orderBills ?? []}
                     revising={revising}
                     onRevise={setRevising}
                     onCaptureAward={() => setTab('award')}
@@ -520,7 +616,8 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
               </div>
             </section>
           ) : (
-            !orders.isLoading && (
+            !ordersQuery.isLoading &&
+            !ordersQuery.isError && (
               <p className="text-sm text-gray-600">
                 {WORK_ORDER_COPY.pickPrompt}
               </p>
@@ -550,6 +647,14 @@ export default function RaBillsPanel({ projectId }: { projectId: string }) {
               </li>
             ))}
           </ul>
+          {/* These come from the project's own pages, which also hold every work order's bills. */}
+          <LoadMore
+            shown={billList?.length ?? 0}
+            total={billsTotal}
+            noun="bills on this project"
+            loading={billsQuery.isFetchingNextPage}
+            onMore={() => void billsQuery.fetchNextPage()}
+          />
         </section>
       )}
     </div>
@@ -657,6 +762,7 @@ function RaiseForm({
   const [workDetail, setWorkDetail] = useState('');
   const [retention, setRetention] = useState('');
   const [partnerId, setPartnerId] = useState('');
+  const toast = useToast();
 
   const raise = useMutation({
     mutationFn: () =>
@@ -674,11 +780,11 @@ function RaiseForm({
         // award never saw one. The server no longer accepts the field at all — it answers 400 —
         // and an award now reaches `active` only when its approval chain completes.
       }),
-    onSuccess: onRaised,
-    onError: (err) =>
-      onError(
-        err instanceof ApiError ? err.message : WORK_ORDER_COPY.raiseFailed,
-      ),
+    onSuccess: (order) => {
+      toast.success('The work order was raised.');
+      onRaised(order);
+    },
+    onError: (err) => onError(refusalMessage(err, WORK_ORDER_COPY.raiseFailed)),
   });
 
   return (
@@ -716,7 +822,8 @@ function RaiseForm({
           <div className="flex gap-2">
             <Button
               type="button"
-              disabled={!workDetail.trim() || raise.isPending}
+              loading={raise.isPending}
+              disabled={!workDetail.trim()}
               onClick={() => {
                 onError(null);
                 raise.mutate();
@@ -795,6 +902,9 @@ function AwardTab({
 function BillsTab({
   projectId,
   order,
+  billsQuery,
+  billsTotal,
+  loadedCount,
   bills,
   revising,
   onRevise,
@@ -803,6 +913,17 @@ function BillsTab({
 }: {
   projectId: string;
   order: WorkOrder;
+  /** The project's paged bill read, for its loading, error and "Load more" states (036 I17). */
+  billsQuery: {
+    isLoading: boolean;
+    isError: boolean;
+    error: unknown;
+    refetch: () => unknown;
+    isFetchingNextPage: boolean;
+    fetchNextPage: () => unknown;
+  };
+  billsTotal: number;
+  loadedCount: number;
   bills: RaBill[];
   revising: RaBill | null;
   onRevise: (bill: RaBill | null) => void;
@@ -812,15 +933,35 @@ function BillsTab({
   const queryClient = useQueryClient();
   /** Which bills are expanded. A set, because reading two side by side is how they get compared. */
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  const { isLocked } = useProjectLock();
+  const toast = useToast();
+  /**
+   * A submit refusal, shown here above the bills rather than in the panel's banner (036 Wave 3,
+   * 2026-10-17). RA_BILL_EXCEEDS_AWARD names the award line and how far past it the bill goes —
+   * the one thing the biller has to act on — and the banner sat a screen above the button.
+   */
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const submit = useMutation({
     mutationFn: (id: string) => submitRaBill(id),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] }),
-    onError: (err) =>
-      onError(
-        err instanceof ApiError ? err.message : BILLING_COPY.submitFailed,
-      ),
+    onSuccess: (bill) => {
+      setSubmitError(null);
+      toast.success(`${bill.billNumber} was submitted.`);
+      void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] });
+    },
+    onError: (err) => {
+      // A second submit — a double click, or a second tab — is refused 409 BILL_NOT_DRAFT. The bill
+      // *was* submitted, so this says that and refetches, rather than showing a failure that sends
+      // somebody to try a third time.
+      if (err instanceof ApiError && err.code === 'BILL_NOT_DRAFT') {
+        setSubmitError(null);
+        toast.info('This bill has already been submitted.');
+        void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] });
+        return;
+      }
+      // RA_BILL_EXCEEDS_AWARD (400) and every other refusal: the server's own sentence.
+      setSubmitError(refusalMessage(err, BILLING_COPY.submitFailed));
+    },
   });
 
   /**
@@ -840,13 +981,7 @@ function BillsTab({
       });
       void queryClient.invalidateQueries({ queryKey: ['raBills', projectId] });
     },
-    onError: (err) =>
-      onError(
-        err instanceof ApiError
-          ? ((err.details as { message?: string } | undefined)?.message ??
-              err.message)
-          : BILLING_COPY.discardFailed,
-      ),
+    onError: (err) => onError(refusalMessage(err, BILLING_COPY.discardFailed)),
   });
 
   return (
@@ -877,7 +1012,7 @@ function BillsTab({
                 ? `&partnerId=${encodeURIComponent(order.partnerId)}`
                 : ''
             }`}
-            className="inline-flex min-h-11 items-center rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="inline-flex min-h-11 items-center rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             Generate the next bill on this work order
           </Link>
@@ -893,7 +1028,26 @@ function BillsTab({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
           {BILLING_COPY.billsHeading}
         </h3>
-        {bills.length === 0 ? (
+        {submitError && (
+          <p
+            role="alert"
+            className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-900"
+          >
+            {submitError}
+          </p>
+        )}
+        {billsQuery.isLoading ? (
+          <div role="status" aria-label={BILLING_COPY.boqLoading}>
+            <ListSkeleton headers={[BILLING_COPY.billsHeading]} rows={2} cards />
+          </div>
+        ) : billsQuery.isError ? (
+          // 036 I17: this was silent — a failed read showed "no bills yet".
+          <QueryError
+            compact
+            error={billsQuery.error}
+            onRetry={billsQuery.refetch}
+          />
+        ) : bills.length === 0 && loadedCount >= billsTotal ? (
           <p className="text-sm text-gray-600">{BILLING_COPY.billsEmpty}</p>
         ) : (
           <ul className="space-y-2">
@@ -935,24 +1089,39 @@ function BillsTab({
                         ? BILLING_COPY.hideBill
                         : BILLING_COPY.viewBill}
                     </SecondaryButton>
-                    {bill.status === 'draft' && (
+                    {bill.status === 'draft' && !isLocked && (
                       <RowAction
                         type="button"
                         className="min-h-11 justify-center sm:min-h-0"
-                        onClick={() => {
+                        loading={submit.isPending && submit.variables === bill.id}
+                        disabled={submit.isPending}
+                        onClick={async () => {
+                          if (
+                            !(await confirmDialog({
+                              title: 'Submit this bill?',
+                              message: `${bill.billNumber} goes for approval. It cannot be edited as a draft afterwards — only revised, with a reason.`,
+                              confirmLabel: 'Submit',
+                            }))
+                          ) {
+                            return;
+                          }
                           onError(null);
+                          setSubmitError(null);
                           submit.mutate(bill.id);
                         }}
                       >
-                        {BILLING_COPY.submit}
+                        {submit.isPending && submit.variables === bill.id
+                          ? BILLING_COPY.submitting
+                          : BILLING_COPY.submit}
                       </RowAction>
                     )}
                     {/* The way out of a bill raised twice for the same date (2026-10-08). Draft
                       only, and the server refuses anything else — a submitted bill is a claim
                       somebody is reading. Confirmed because it cannot be undone. */}
-                    {bill.status === 'draft' && (
+                    {bill.status === 'draft' && !isLocked && (
                       <SecondaryButton
                         type="button"
+                        loading={discard.isPending && discard.variables === bill.id}
                         disabled={discard.isPending}
                         onClick={async () => {
                           if (
@@ -978,14 +1147,16 @@ function BillsTab({
                     )}
                     {/* A draft is edited; a bill somebody has acted on is revised. Saying "revise"
                       over a draft promised a formality that does not apply to it. */}
-                    <SecondaryButton
-                      type="button"
-                      onClick={() => onRevise(bill)}
-                    >
-                      {bill.status === 'draft'
-                        ? BILLING_COPY.editHeading
-                        : BILLING_COPY.reviseHeading}
-                    </SecondaryButton>
+                    {!isLocked && (
+                      <SecondaryButton
+                        type="button"
+                        onClick={() => onRevise(bill)}
+                      >
+                        {bill.status === 'draft'
+                          ? BILLING_COPY.editHeading
+                          : BILLING_COPY.reviseHeading}
+                      </SecondaryButton>
+                    )}
                   </div>
                 )}
                 {!bill.package && opened.has(bill.id) && (
@@ -1001,6 +1172,16 @@ function BillsTab({
               </li>
             ))}
           </ul>
+        )}
+        {/* Bills load a page at a time across the whole project; this order's may be further on. */}
+        {!billsQuery.isLoading && !billsQuery.isError && (
+          <LoadMore
+            shown={loadedCount}
+            total={billsTotal}
+            noun="bills on this work order"
+            loading={billsQuery.isFetchingNextPage}
+            onMore={() => void billsQuery.fetchNextPage()}
+          />
         )}
       </section>
     </div>
@@ -1099,9 +1280,10 @@ function SettingsTab({
     },
     onError: (err) => {
       setSaved(false);
-      onError(err instanceof ApiError ? err.message : String(err));
+      onError(refusalMessage(err, 'The work order could not be saved.'));
     },
   });
+  const { isLocked } = useProjectLock();
 
   return (
     <form
@@ -1136,9 +1318,12 @@ function SettingsTab({
       />
       <div>
         <FieldLabelSpacer />
-        <Button type="submit" disabled={save.isPending}>
-          {WORK_ORDER_COPY.settingsSave}
-        </Button>
+        {/* Absent on a locked project (036 Wave 3); the fields stay readable. */}
+        {!isLocked && (
+          <Button type="submit" loading={save.isPending}>
+            {WORK_ORDER_COPY.settingsSave}
+          </Button>
+        )}
         {saved && !save.isPending && (
           <p className="mt-1 text-xs text-green-700" role="status">
             {WORK_ORDER_COPY.settingsSaved}

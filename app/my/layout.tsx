@@ -18,6 +18,7 @@ import ShellHeader from '@/app/ui/shell-header';
 import { MobileNavShell } from '@/app/ui/mobile-nav';
 import { MY_SECTIONS } from '@/app/ui/my/sections';
 import SectionTabs from '@/app/ui/section-tabs';
+import { TextButton } from '@/app/ui/button';
 
 /**
  * The My Workspace shell (research.md §1).
@@ -155,7 +156,7 @@ export default function MyWorkspaceLayout({
             <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
               {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
             keeps every module they can reach instead of being stranded in this one. */}
-              <div className="hidden flex-none md:block md:w-64">
+              <div className="hidden flex-none md:block">
                 <SideNav />
               </div>
 
@@ -188,16 +189,17 @@ export default function MyWorkspaceLayout({
                   {syncNotice && (
                     <p
                       role="status"
-                      className="mb-4 flex items-start justify-between gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800"
+                      className="mb-4 flex items-start justify-between gap-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800"
                     >
                       <span>{syncNotice}</span>
-                      <button
-                        type="button"
+                      <TextButton
+                        tone="inherit"
+                        size="xs"
+                        className="underline"
                         onClick={() => setSyncNotice(null)}
-                        className="text-xs font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                       >
                         Dismiss
-                      </button>
+                      </TextButton>
                     </p>
                   )}
                   {employee && !employee.linked && needsEmployee ? (
@@ -235,7 +237,7 @@ function NoEmployeeRecord() {
         The{' '}
         <Link
           href={ROUTES.myHolidays}
-          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="font-medium text-amber-900 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           holiday list
         </Link>{' '}

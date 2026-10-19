@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import * as React from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
@@ -12,15 +12,25 @@ import {
   planBOQItem,
   type BoqGroup,
   type BoqItem,
+  boqKeys,
 } from '@/app/lib/api/projects';
 import { percentLabel, scheduleTotals } from '@/app/lib/bill-totals';
 import { BOQ_COPY } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
-import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import { saveBlob } from '@/app/lib/download-file';
+import { rupees, dateLabel, quantity3 } from '@/app/lib/format';
+import { useDebounced } from '@/app/lib/use-url-state';
+import {
+  isProjectLockedError,
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
-import { RowAction } from '@/app/ui/settings/form-fields';
+import QueryError from '@/app/ui/query-error';
+import { RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import { TABLE } from '@/app/ui/table';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The shared table look at the BOQ's density (2026-10-15): eleven columns over a tender of a few
@@ -29,6 +39,40 @@ import { confirmDialog } from '@/app/ui/dialogs';
  */
 const DENSE_TH = clsx(TABLE.th, '!px-3 !py-2');
 const DENSE_TD = clsx(TABLE.td, '!px-3 !py-2');
+
+/**
+ * 036 I12 (2026-10-17): the header row and the BOQ No. column stay put while a 1,000-line, 60rem-wide
+ * schedule scrolls under them. The wrap gets a height so the header has something to stick within —
+ * `sticky top-0` inside an `overflow-x-auto` box sticks to that box, not to the page — and each
+ * sticky cell is opaque so the rows do not show through it.
+ */
+const STICKY_TH = 'sticky top-0 z-20 bg-gray-50';
+const STICKY_CORNER = 'sticky left-0 top-0 z-30 bg-gray-50';
+
+/** A delete refusal in words that match the cause (036 I12, 2026-10-17). */
+function deleteErrorMessage(err: unknown): string {
+  // Only the "work recorded" refusal says work has been recorded. It is the API's 409 from
+  // `BoqService.deleteItem`, whose own sentence also names what was recorded (so many DWR entries,
+  // so many bill lines); the copy is the fallback for a 409 that arrives without one. Every other
+  // failure — the lock, a line already gone, a dropped connection — used to say "work has been
+  // recorded" too, which sent people looking for work that did not exist.
+  if (err instanceof ApiError && err.status === 409) {
+    return err.message || BOQ_COPY.deleteBlocked;
+  }
+  if (isProjectLockedError(err)) return projectErrorMessage(err);
+  return projectErrorMessage(err, 'The line could not be deleted. Please try again.');
+}
+
+/** True when the line, or its section, matches the search (036 I12): BOQ No. or description. */
+function matches(term: string, ...fields: (string | null | undefined)[]) {
+  return fields.some((field) => field?.toLowerCase().includes(term));
+}
+
+/** One CSV cell: quoted when it has to be, with embedded quotes doubled (RFC 4180). */
+function csvCell(value: string | number | null | undefined): string {
+  const text = value === null || value === undefined ? '' : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
 
 /**
  * The project's BOQ as the two-level schedule its source actually is (008 FR-025, FR-026).
@@ -73,11 +117,37 @@ export default function BoqTree({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [planning, setPlanning] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const term = useDebounced(search.trim().toLowerCase());
+  const toast = useToast();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['projects', projectId, 'boq'],
+  const { data, isLoading, isError, error: loadError, refetch } = useQuery({
+    queryKey: boqKeys.project(projectId),
     queryFn: () => getBOQ(projectId),
   });
+
+  // One read serves both tabs: the query key is the same, so switching tabs costs no request.
+  const groups = useMemo(
+    () => (data ?? []).filter((group) => group.isEstimate === isEstimate),
+    [data, isEstimate],
+  );
+
+  /**
+   * 036 I12 (2026-10-17): the search. Client-side, because the whole schedule is already here — the
+   * tree has always fetched every line. A section whose own number or name matches keeps all its
+   * lines; otherwise it keeps the lines that match, under its heading, so a hit is never shown
+   * without the section it belongs to. Sections with nothing matching drop out.
+   */
+  const visible = useMemo(() => {
+    if (!term) return groups;
+    return groups.flatMap((group) => {
+      if (matches(term, group.boqNo, group.name)) return [group];
+      const items = group.items.filter((item) =>
+        matches(term, item.boqNo, item.taskName),
+      );
+      return items.length > 0 ? [{ ...group, items }] : [];
+    });
+  }, [groups, term]);
 
   /**
    * Giving a line its programme (025 FR-009), in place on the row it belongs to.
@@ -97,7 +167,7 @@ export default function BoqTree({
     }) => planBOQItem(projectId, itemId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
       void queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'boq-alerts'],
@@ -106,24 +176,25 @@ export default function BoqTree({
       setError(null);
     },
     // The server names every refusal it gives — a finish date before the start date says which two
-    // dates contradict each other — so its sentence is worth more than anything written here.
-    onError: (err: Error) => setError(err.message),
+    // dates contradict each other — so its sentence is worth more than anything written here. A 423
+    // gets the lock sentence (036 I12).
+    onError: (err: Error) => setError(projectErrorMessage(err)),
   });
 
   const remove = useMutation({
     mutationFn: (itemId: string) => deleteBOQItem(projectId, itemId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'boq'],
+        queryKey: boqKeys.project(projectId),
       });
       // The alert tabs read the same lines through a different endpoint, so they go stale with it.
       void queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'boq-alerts'],
       });
       setError(null);
+      toast.success('The line was deleted.');
     },
-    onError: (err: Error) =>
-      setError(err instanceof ApiError ? BOQ_COPY.deleteBlocked : err.message),
+    onError: (err: Error) => setError(deleteErrorMessage(err)),
   });
 
   const toggle = (groupId: string) =>
@@ -135,14 +206,28 @@ export default function BoqTree({
     });
 
   if (isLoading)
-    return <p className="text-sm text-gray-500">{BOQ_COPY.loading}</p>;
+    return (
+      <div role="status" aria-label={BOQ_COPY.loading}>
+        <ListSkeleton
+          headers={[
+            BOQ_COPY.columnBoqNo,
+            BOQ_COPY.columnTask,
+            BOQ_COPY.columnUnit,
+            BOQ_COPY.columnScope,
+            BOQ_COPY.rate,
+          ]}
+          rows={8}
+        />
+      </div>
+    );
   if (isError)
-    return <p className="text-sm text-red-700">{BOQ_COPY.loadFailed}</p>;
-
-  // One read serves both tabs: the query key is the same, so switching tabs costs no request.
-  const groups = (data ?? []).filter(
-    (group) => group.isEstimate === isEstimate,
-  );
+    return (
+      <QueryError
+        error={loadError}
+        fallback={BOQ_COPY.loadFailed}
+        onRetry={refetch}
+      />
+    );
 
   if (groups.length === 0) {
     return (
@@ -172,6 +257,62 @@ export default function BoqTree({
     ),
     quotedFraction,
   );
+
+  /**
+   * 036 I12 (2026-10-17): the rows matching the search, as a CSV built here — no new dependency, and
+   * no server round trip for figures already on screen. Folded sections are included: folding is a
+   * reading aid, and an export that silently dropped a section because it was closed would be short.
+   */
+  const exportCsv = () => {
+    const header = isEstimate
+      ? ['Section', 'BOQ No.', 'Item', 'Unit', 'Scope qty', 'Rate', 'Amount']
+      : [
+          'Section',
+          'BOQ No.',
+          'Item',
+          'Unit',
+          'Scope qty',
+          'Rate',
+          'Done',
+          'Pending',
+          'Per day',
+          'Avg / day',
+          'Finish by',
+        ];
+    const lines = [header.map(csvCell).join(',')];
+    for (const group of visible) {
+      for (const item of group.items) {
+        // Plain numbers, not the grouped display strings: "1,420.855" is two cells to a spreadsheet.
+        const base = [
+          `${group.boqNo} ${group.name}`,
+          item.boqNo,
+          item.taskName,
+          item.unit,
+          item.scopeQty,
+          item.rate,
+        ];
+        const rest = isEstimate
+          ? [Math.round(item.scopeQty * item.rate * 100) / 100]
+          : [
+              item.doneQty,
+              item.pendingQty,
+              item.perDayQty,
+              item.avgQtyPerDay,
+              item.finishDate ? dateLabel(item.finishDate) : '',
+            ];
+        lines.push([...base, ...rest].map(csvCell).join(','));
+      }
+    }
+    // A BOM so Excel reads the file as UTF-8 — task names carry "²", "³" and "₹".
+    saveBlob(
+      new Blob(['\uFEFF' + lines.join('\r\n')], {
+        type: 'text/csv;charset=utf-8',
+      }),
+      `boq-${isEstimate ? 'estimate' : 'contract'}${term ? '-filtered' : ''}.csv`,
+    );
+  };
+
+  const visibleLines = visible.reduce((n, group) => n + group.items.length, 0);
 
   return (
     <div className="space-y-2">
@@ -219,59 +360,89 @@ export default function BoqTree({
         </dl>
       )}
 
-      <div className={TABLE.wrap}>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="min-w-0 flex-1 sm:max-w-sm">
+          <span className="sr-only">Search the BOQ</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by BOQ No. or item"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        {term && (
+          <span className="text-xs text-gray-500" role="status">
+            {visibleLines === 0
+              ? 'No lines match.'
+              : `${visibleLines} ${visibleLines === 1 ? 'line' : 'lines'} match`}
+          </span>
+        )}
+        <SecondaryButton
+          type="button"
+          onClick={exportCsv}
+          disabled={visibleLines === 0}
+          className="ml-auto"
+        >
+          Export CSV
+        </SecondaryButton>
+      </div>
+
+      <div className={clsx(TABLE.wrap, 'max-h-[75vh] overflow-y-auto')}>
         <table className={clsx(TABLE.table, 'w-full min-w-[60rem]')}>
           <caption className="sr-only">{BOQ_COPY.heading}</caption>
           <thead className={TABLE.thead}>
             <tr>
-              <th scope="col" className={DENSE_TH}>
+              <th scope="col" className={clsx(DENSE_TH, STICKY_CORNER)}>
                 {BOQ_COPY.columnBoqNo}
               </th>
-              <th scope="col" className={DENSE_TH}>
+              <th scope="col" className={clsx(DENSE_TH, STICKY_TH)}>
                 {BOQ_COPY.columnTask}
               </th>
-              <th scope="col" className={DENSE_TH}>
+              <th scope="col" className={clsx(DENSE_TH, STICKY_TH)}>
                 {BOQ_COPY.columnUnit}
               </th>
-              <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+              <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                 {BOQ_COPY.columnScope}
               </th>
-              <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+              <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                 {BOQ_COPY.rate}
               </th>
               {isEstimate ? (
-                <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                   {BOQ_COPY.columnAmount}
                 </th>
               ) : (
                 <>
-                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                  <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                     {BOQ_COPY.columnDone}
                   </th>
-                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                  <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                     {BOQ_COPY.columnPending}
                   </th>
-                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                  <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                     {BOQ_COPY.columnPerDay}
                   </th>
-                  <th scope="col" className={clsx(DENSE_TH, 'text-right')}>
+                  <th scope="col" className={clsx(DENSE_TH, STICKY_TH, 'text-right')}>
                     {BOQ_COPY.columnAvgPerDay}
                   </th>
-                  <th scope="col" className={DENSE_TH}>
+                  <th scope="col" className={clsx(DENSE_TH, STICKY_TH)}>
                     {BOQ_COPY.columnFinish}
                   </th>
                 </>
               )}
-              {!isLocked && <th scope="col" className={DENSE_TH} />}
+              {!isLocked && <th scope="col" className={clsx(DENSE_TH, STICKY_TH)} />}
             </tr>
           </thead>
           <tbody>
-            {groups.map((group) => (
+            {visible.map((group) => (
               <GroupRows
                 key={group.id}
                 group={group}
                 isEstimate={isEstimate}
-                collapsed={collapsed.has(group.id)}
+                // A search opens every section it matched in: a hit hidden in a folded section is
+                // a search that found nothing, as far as the reader can see.
+                collapsed={!term && collapsed.has(group.id)}
                 onToggle={() => toggle(group.id)}
                 onDelete={isLocked ? null : (itemId) => remove.mutate(itemId)}
                 planningId={planning}
@@ -281,7 +452,7 @@ export default function BoqTree({
               />
             ))}
           </tbody>
-          {isEstimate && (
+          {isEstimate && !term && (
             <tfoot className={TABLE.tfoot}>
               <tr>
                 <th
@@ -348,9 +519,9 @@ function GroupRows({
             type="button"
             onClick={onToggle}
             aria-expanded={!collapsed}
-            className="flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="sticky left-3 flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
-            <span aria-hidden="true" className="text-gray-400">
+            <span aria-hidden="true" className="text-gray-500">
               {collapsed ? '▸' : '▾'}
             </span>
             <span className="text-xs font-normal uppercase tracking-wide text-gray-500">
@@ -373,7 +544,13 @@ function GroupRows({
         group.items.map((item) => (
           <React.Fragment key={item.id}>
             <tr className={TABLE.row}>
-              <td className={clsx(DENSE_TD, 'tabular-nums text-gray-500')}>
+              <td
+                className={clsx(
+                  DENSE_TD,
+                  TABLE.stickyCell,
+                  'tabular-nums text-gray-500',
+                )}
+              >
                 {item.boqNo}
               </td>
               <td className={clsx(DENSE_TD, 'text-gray-900')}>
@@ -394,7 +571,7 @@ function GroupRows({
                 difference they cannot trace against their own sheet. */}
               <td className={clsx(DENSE_TD, 'text-gray-700')}>{item.unit}</td>
               <td className={clsx(DENSE_TD, TABLE.numeric)}>
-                {item.scopeQty.toFixed(3)}
+                {quantity3(item.scopeQty)}
               </td>
               <td className={clsx(DENSE_TD, TABLE.numeric)}>
                 {rupees(item.rate)}
@@ -406,16 +583,16 @@ function GroupRows({
               ) : (
                 <>
                   <td className={clsx(DENSE_TD, TABLE.numeric)}>
-                    {item.doneQty.toFixed(3)}
+                    {quantity3(item.doneQty)}
                   </td>
                   <td className={clsx(DENSE_TD, TABLE.numeric)}>
-                    {item.pendingQty.toFixed(3)}
+                    {quantity3(item.pendingQty)}
                   </td>
                   <Programme value={item.perDayQty} />
                   <Programme value={item.avgQtyPerDay} />
                   <td className={DENSE_TD}>
                     {item.finishDate ? (
-                      new Date(item.finishDate).toLocaleDateString()
+                      dateLabel(item.finishDate)
                     ) : (
                       <Unplanned />
                     )}
@@ -478,7 +655,7 @@ function GroupRows({
 function Programme({ value }: { value: number | null }) {
   return (
     <td className={clsx(DENSE_TD, TABLE.numeric)}>
-      {value === null ? <Unplanned /> : value.toFixed(3)}
+      {value === null ? <Unplanned /> : quantity3(value)}
     </td>
   );
 }
@@ -492,7 +669,7 @@ function Programme({ value }: { value: number | null }) {
  * screen teaches people to ignore its warnings.
  */
 function Unplanned() {
-  return <span className="text-xs text-gray-400">{BOQ_COPY.unplanned}</span>;
+  return <span className="text-xs text-gray-500">{BOQ_COPY.unplanned}</span>;
 }
 
 /**

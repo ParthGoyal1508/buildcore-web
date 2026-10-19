@@ -3,10 +3,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import {
+  useFieldArray,
+  useForm,
+  useWatch,
+  type FieldErrors,
+  type FieldPath,
+} from 'react-hook-form';
 import clsx from 'clsx';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   VendorDetail,
   createVendor,
@@ -19,10 +25,11 @@ import {
   VENDOR_TYPES,
   partnersLabel,
 } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
+import { useToast } from '@/app/ui/toast';
 import {
   vendorFormSchema,
   type VendorFormValues,
@@ -30,6 +37,52 @@ import {
 
 const TABS = ['Details', 'Address', 'Bank', 'Contacts', 'Work detail'] as const;
 type Tab = (typeof TABS)[number];
+
+/**
+ * Which tab each field lives on, in on-screen order (036 N1, 2026-10-17).
+ *
+ * An error on a hidden tab — a bad IFSC on Bank, a contact with no name — used to block Save
+ * with nothing visible: the message was rendered, but on a tab nobody was looking at. Invalid
+ * submits now jump to the first tab with an error, and every tab with one carries a count.
+ */
+const TAB_FIELDS: Record<Tab, (keyof VendorFormValues)[]> = {
+  Details: ['name', 'type', 'gstin', 'pan', 'tdsSection', 'tdsRate', 'active', 'categoryIds'],
+  Address: ['address', 'city', 'state', 'pinCode'],
+  Bank: ['bankName', 'bankBranch', 'bankAccountNumber', 'ifscCode', 'bankAccountHolderName'],
+  Contacts: ['contacts'],
+  'Work detail': [],
+};
+
+/** How many fields on `tab` have an error — each contact row with one counts once. */
+function tabErrorCount(tab: Tab, errors: FieldErrors<VendorFormValues>): number {
+  return TAB_FIELDS[tab].reduce((count, key) => {
+    const error = errors[key];
+    if (!error) return count;
+    if (key === 'contacts' && Array.isArray(error)) {
+      return count + error.filter(Boolean).length;
+    }
+    return count + 1;
+  }, 0);
+}
+
+/** The first field with an error on `tab`, as a path `setFocus` accepts. */
+function firstErrorField(
+  tab: Tab,
+  errors: FieldErrors<VendorFormValues>,
+): FieldPath<VendorFormValues> | null {
+  for (const key of TAB_FIELDS[tab]) {
+    const error = errors[key];
+    if (!error) continue;
+    if (key === 'contacts' && Array.isArray(error)) {
+      const index = error.findIndex(Boolean);
+      const row = error[index] as Record<string, unknown> | undefined;
+      const field = row && (['name', 'phone', 'email'] as const).find((f) => row[f]);
+      return field ? (`contacts.${index}.${field}` as FieldPath<VendorFormValues>) : null;
+    }
+    return key as FieldPath<VendorFormValues>;
+  }
+  return null;
+}
 
 /**
  * Add/Edit vendor.
@@ -53,6 +106,7 @@ export default function VendorModal({
   const [tab, setTab] = useState<Tab>('Details');
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const { data: categories } = useQuery({
     queryKey: ['partners', 'vendor-categories'],
@@ -63,9 +117,13 @@ export default function VendorModal({
     register,
     handleSubmit,
     control,
-    formState: { errors, isSubmitting },
+    setFocus,
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<VendorFormValues>({
     resolver: zodResolver(vendorFormSchema),
+    // Focus is moved by `onInvalid` below, after the right tab is shown: the library's own
+    // focus would aim at an input inside a `hidden` tab, which cannot take it.
+    shouldFocusError: false,
     defaultValues: {
       name: vendor?.name ?? '',
       type: vendor?.type ?? 'material',
@@ -113,22 +171,36 @@ export default function VendorModal({
       };
       return vendor ? updateVendor(vendor.id, payload) : createVendor(payload);
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['partners', 'vendors'] });
+      // Every inventory vendor picker keeps its query under this prefix, so a renamed or
+      // deactivated vendor is current there too, not after the 30 s stale time (036 N3).
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'vendors'] });
+      toast.success(vendor ? `${saved.name} saved.` : `${saved.name} added.`);
       onClose();
     },
+    // The form keeps everything typed; only the banner changes.
     onError: (error: unknown) => {
-      setServerError(
-        error instanceof ApiError ? error.message : MESSAGES.saveFailed,
-      );
+      setServerError(errorMessage(error, MESSAGES.saveFailed));
     },
   });
+
+  const onInvalid = (formErrors: FieldErrors<VendorFormValues>) => {
+    const first = TABS.find((name) => tabErrorCount(name, formErrors) > 0);
+    if (!first) return;
+    setTab(first);
+    const field = firstErrorField(first, formErrors);
+    // After the tab is shown: a `hidden` input cannot take focus.
+    if (field) requestAnimationFrame(() => setFocus(field));
+  };
 
   return (
     <Modal
       title={vendor ? `Edit ${vendor.name}` : 'Add vendor'}
       onClose={onClose}
       wide
+      isDirty={isDirty}
+      pending={mutation.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
@@ -137,7 +209,8 @@ export default function VendorModal({
           <Button
             type="submit"
             form="vendor-form"
-            disabled={isSubmitting || mutation.isPending}
+            disabled={isSubmitting}
+            loading={mutation.isPending}
           >
             {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -149,7 +222,7 @@ export default function VendorModal({
         onSubmit={handleSubmit((values) => {
           setServerError(null);
           mutation.mutate(values);
-        })}
+        }, onInvalid)}
         className="space-y-4"
       >
         {serverError && (
@@ -159,34 +232,47 @@ export default function VendorModal({
         )}
 
         <div role="tablist" aria-label="Vendor details" className="flex gap-1 border-b border-gray-200">
-          {TABS.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              aria-selected={tab === name}
-              onClick={() => setTab(name)}
-              className={clsx(
-                '-mb-px border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
-                tab === name
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-600 hover:text-gray-900',
-              )}
-            >
-              {name}
-            </button>
-          ))}
+          {TABS.map((name) => {
+            const errorCount = tabErrorCount(name, errors);
+            return (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={tab === name}
+                onClick={() => setTab(name)}
+                className={clsx(
+                  '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
+                  tab === name
+                    ? 'border-brand-600 text-brand-700'
+                    : errorCount > 0
+                      ? 'border-transparent text-red-700 hover:text-red-800'
+                      : 'border-transparent text-gray-600 hover:text-gray-900',
+                )}
+              >
+                {name}
+                {errorCount > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-semibold text-white">
+                    {errorCount}
+                    <span className="sr-only">
+                      {errorCount === 1 ? ' error' : ' errors'}
+                    </span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Every tab stays mounted and is hidden with `hidden`, rather than being
             unmounted. Unmounting would drop the inputs' registration and, with it,
             anything typed on a tab the user has navigated away from (FR-011). */}
         <div className={clsx('grid gap-4 sm:grid-cols-2', tab !== 'Details' && 'hidden')}>
-          <Field id="vendor-name" label="Vendor name" error={errors.name?.message}>
-            <TextInput id="vendor-name" {...register('name')} />
+          <Field id="vendor-name" label="Vendor name" required error={errors.name?.message}>
+            <TextInput id="vendor-name" aria-required {...register('name')} />
           </Field>
-          <Field id="vendor-type" label="Type" error={errors.type?.message}>
-            <SelectInput id="vendor-type" {...register('type')}>
+          <Field id="vendor-type" label="Type" required error={errors.type?.message}>
+            <SelectInput id="vendor-type" aria-required {...register('type')}>
               {VENDOR_TYPES.map((type) => (
                 <option key={type} value={type}>
                   {partnersLabel(type)}
@@ -200,10 +286,25 @@ export default function VendorModal({
             error={errors.gstin?.message}
             hint="15 characters, e.g. 27AAPFU0939F1ZV"
           >
-            <TextInput id="vendor-gstin" {...register('gstin')} />
+            <TextInput
+              id="vendor-gstin"
+              autoCapitalize="characters"
+              className="uppercase"
+              {...register('gstin')}
+            />
           </Field>
-          <Field id="vendor-pan" label="PAN" error={errors.pan?.message}>
-            <TextInput id="vendor-pan" {...register('pan')} />
+          <Field
+            id="vendor-pan"
+            label="PAN"
+            error={errors.pan?.message}
+            hint="Characters 3–12 of the GSTIN, when there is one"
+          >
+            <TextInput
+              id="vendor-pan"
+              autoCapitalize="characters"
+              className="uppercase"
+              {...register('pan')}
+            />
           </Field>
           <Field
             id="vendor-tds-section"
@@ -233,7 +334,7 @@ export default function VendorModal({
                     type="checkbox"
                     value={category.id}
                     {...register('categoryIds')}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                   />
                   {category.name}
                 </label>
@@ -249,7 +350,7 @@ export default function VendorModal({
             <input
               type="checkbox"
               {...register('active')}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             />
             Active
           </label>
@@ -289,7 +390,12 @@ export default function VendorModal({
             <TextInput id="vendor-bank-account" {...register('bankAccountNumber')} />
           </Field>
           <Field id="vendor-ifsc" label="IFSC code" error={errors.ifscCode?.message}>
-            <TextInput id="vendor-ifsc" {...register('ifscCode')} />
+            <TextInput
+              id="vendor-ifsc"
+              autoCapitalize="characters"
+              className="uppercase"
+              {...register('ifscCode')}
+            />
           </Field>
           <Field
             id="vendor-bank-holder"
@@ -309,16 +415,24 @@ export default function VendorModal({
               <Field
                 id={`contact-name-${index}`}
                 label="Name"
+                required
                 error={errors.contacts?.[index]?.name?.message}
               >
                 <TextInput
                   id={`contact-name-${index}`}
+                  aria-required
                   {...register(`contacts.${index}.name`)}
                 />
               </Field>
-              <Field id={`contact-phone-${index}`} label="Phone">
+              <Field
+                id={`contact-phone-${index}`}
+                label="Phone"
+                error={errors.contacts?.[index]?.phone?.message}
+              >
                 <TextInput
                   id={`contact-phone-${index}`}
+                  type="tel"
+                  inputMode="tel"
                   {...register(`contacts.${index}.phone`)}
                 />
               </Field>
@@ -333,13 +447,12 @@ export default function VendorModal({
                 />
               </Field>
               <div className="flex items-end">
-                <button
-                  type="button"
+                <TextButton
+                  tone="danger"
                   onClick={() => remove(index)}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 >
                   Remove
-                </button>
+                </TextButton>
               </div>
             </div>
           ))}
@@ -356,7 +469,7 @@ export default function VendorModal({
 
         <div className={clsx('space-y-3', tab !== 'Work detail' && 'hidden')}>
           {supportsHire ? (
-            <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+            <p className="rounded-md bg-brand-50 p-3 text-sm text-brand-800">
               Hire and contract terms for this vendor are recorded on the vendor
               record. Detailed hire terms are not editable from this screen yet.
             </p>

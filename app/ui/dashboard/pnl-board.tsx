@@ -69,7 +69,13 @@ export default function PnlBoard() {
           <input
             type="month"
             value={period}
-            onChange={(event) => setPeriod(event.target.value)}
+            // A P&L is of what has happened: no month after this one (2026-10-18). A typed later
+            // month is ignored rather than fetched.
+            max={currentPeriod()}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next && next <= currentPeriod()) setPeriod(next);
+            }}
             // 44px below `sm`: a director changing the month on a phone is the use this screen was
             // named for.
             className="h-11 w-full rounded border border-gray-300 px-3 text-sm sm:h-10 sm:w-auto"
@@ -104,7 +110,7 @@ export default function PnlBoard() {
                 <div className="flex items-baseline justify-between gap-3">
                   <Link
                     href={ROUTES.projectsSummary(row.projectId)}
-                    className="min-h-11 text-sm font-medium text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                    className="min-h-11 text-sm font-medium text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                   >
                     {row.projectName}
                   </Link>
@@ -235,7 +241,7 @@ function PnlTable({ board }: { board: PnlGroup }) {
               <td className={clsx(TABLE.td, 'text-right')}>
                 <Link
                   href={ROUTES.projectsSummary(row.projectId)}
-                  className="text-sm text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
                 >
                   {PNL_COPY.boardOpen}
                 </Link>

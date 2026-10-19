@@ -8,7 +8,7 @@ import {
   type DeductionSection,
   setDeductionLines,
 } from '@/app/lib/api/bill-packages';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
 import { TABLE } from '@/app/ui/table';
@@ -158,15 +158,16 @@ export default function BillDeductionLines({
                     />
                   </td>
                   <td className={TABLE.td}>
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-red-700 underline"
+                    <TextButton
+                      tone="danger"
+                      size="xs"
+                      className="underline"
                       onClick={() =>
                         setLines(lines.filter((_, i) => i !== index))
                       }
                     >
                       Remove
-                    </button>
+                    </TextButton>
                   </td>
                 </tr>
               ))}
@@ -190,7 +191,7 @@ export default function BillDeductionLines({
           Add a line
         </SecondaryButton>
         {dirty && (
-          <Button onClick={() => void save()} disabled={saving}>
+          <Button onClick={() => void save()} loading={saving}>
             {saving ? 'Saving…' : 'Save lines'}
           </Button>
         )}

@@ -1,6 +1,7 @@
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 
 import { DOCUMENT_COPY } from '@/app/lib/constants';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * Marks a document kind as regulated personal data (017 FR-013a, backend FR-024).
@@ -16,12 +17,12 @@ import { DOCUMENT_COPY } from '@/app/lib/constants';
  */
 export function RestrictedBadge() {
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200"
-      title={DOCUMENT_COPY.restrictedNotice}
-    >
-      <LockClosedIcon className="h-3 w-3" aria-hidden="true" />
-      Restricted
+    <span title={DOCUMENT_COPY.restrictedNotice}>
+      <StatusBadge
+        tone="warning"
+        label={'Restricted'}
+        icon={LockClosedIcon}
+      />
     </span>
   );
 }

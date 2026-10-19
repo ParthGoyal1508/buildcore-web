@@ -209,6 +209,13 @@ const notificationRowSchema = z.object({
   subtitle: z.string(),
   actionLink: z.string(),
   occurredAt: z.string(),
+  /**
+   * The inbox state (036 D6). `id` is what Mark as read names; `read` is whether this person has
+   * read it since it last changed. Optional/defaulted so a server predating the inbox still parses
+   * (every row then reads as unread and cannot be marked).
+   */
+  id: z.string().optional(),
+  read: z.boolean().default(false),
 });
 
 export type NotificationRow = z.infer<typeof notificationRowSchema>;
@@ -220,9 +227,25 @@ export async function getNotifications(): Promise<NotificationRow[]> {
   return z.array(notificationRowSchema).parse(raw);
 }
 
+/** The bell badge: **unread** notifications since 036 D6. */
 export async function getNotificationCount(): Promise<number> {
   const raw = await authFetch<unknown>('/notifications/count');
   return notificationCountSchema.parse(raw).count;
+}
+
+/** Marks one notification read (036 D6). In-app only — nothing is emailed. */
+export async function markNotificationRead(id: string): Promise<void> {
+  await authFetch<unknown>(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: 'POST',
+  });
+}
+
+/** Marks every current notification read (036 D6). */
+export async function markAllNotificationsRead(): Promise<{ updated: number }> {
+  const raw = await authFetch<unknown>('/notifications/read-all', {
+    method: 'POST',
+  });
+  return z.object({ updated: z.number() }).parse(raw);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +278,29 @@ export type ActivityLogFeed = z.infer<typeof activityLogFeedSchema>;
 export interface ActivityLogQuery {
   module?: string;
   timeRange?: string;
+  /** 036 E3: a custom inclusive `YYYY-MM-DD` range (overrides `timeRange`), one user, a search. */
+  from?: string;
+  to?: string;
+  userId?: string;
+  q?: string;
   page?: number;
+}
+
+/**
+ * Accounts for a User filter (036 E3, D1), searched by name or email, 25 a page — the people the
+ * Activity Log already names on its rows. Gated on DASHBOARD, which every employee holds.
+ */
+export async function searchActivityUsers(
+  q: string,
+  page: number,
+): Promise<{ items: { id: string; name: string }[]; total: number }> {
+  const raw = await authFetch<unknown>(`/activity-log/users${qs({ q, page })}`);
+  return z
+    .object({
+      items: z.array(z.object({ id: z.string(), name: z.string() })),
+      total: z.number(),
+    })
+    .parse(raw);
 }
 
 export async function getActivityLog(
@@ -467,8 +512,29 @@ const reportTypeSchema = z.object({
 });
 export type ReportType = z.infer<typeof reportTypeSchema>;
 
+/**
+ * How a report column's values are shown (036 E1). Absent, or a type this client does not know, is
+ * text — so a server adding a new type cannot break parsing.
+ */
+export const REPORT_COLUMN_TYPES = [
+  'text',
+  'number',
+  'money',
+  'quantity',
+  'percent',
+  'date',
+  'boolean',
+] as const;
+export type ReportColumnType = (typeof REPORT_COLUMN_TYPES)[number];
+
 const reportDataSchema = z.object({
-  columns: z.array(z.object({ key: z.string(), label: z.string() })),
+  columns: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+      type: z.enum(REPORT_COLUMN_TYPES).optional().catch(undefined),
+    }),
+  ),
   rows: z.array(z.record(z.string(), z.unknown())),
   /**
    * Why there is nothing to show, or what is missing from what is.

@@ -15,6 +15,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useLayer } from '@/app/lib/layers';
+
 /**
  * The app's own popups for every native `<select>` and date field (2026-10-15).
  *
@@ -266,6 +268,8 @@ function SelectMenu({
   const [active, setActive] = useState(() => Math.max(0, el.selectedIndex));
   const { style, above } = usePlacement(el, panel, onClose, true);
   const typed = useRef({ text: '', at: 0 });
+  // A layer (036 A8): Escape closes this menu, never the modal the field sits in.
+  useLayer(onClose);
 
   const choose = useCallback(
     (choice: Choice) => {
@@ -377,7 +381,7 @@ function SelectMenu({
           return (
             <li key={choice.index} role="presentation">
               {header && (
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   {header}
                 </p>
               )}
@@ -464,6 +468,8 @@ function Calendar({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const { style, above } = usePlacement(el, panel, onClose);
+  // A layer (036 A8): Escape closes this calendar, never the modal the field sits in.
+  useLayer(onClose);
   // A month field (`type="month"`, 2026-10-15) gets the same panel opened on its month grid, and
   // a month chosen there is the answer rather than a step towards a day.
   const monthOnly = el.type === 'month';
@@ -522,9 +528,34 @@ function Calendar({
   while (cells.length % 7) cells.push(null);
   const today = monthOnly ? todayIso().slice(0, 7) : todayIso();
   const decade = Math.floor(view.y / 12) * 12;
+  // The arrows stop where `min` / `max` do (2026-10-18): the months past `max` were greyed out,
+  // but Next still paged on to 2031, so a picker capped at this month looked broken rather than
+  // capped. A page is out of reach only when every month on it is.
+  const monthAt = (offset: number) => {
+    const total = view.y * 12 + view.m + offset;
+    return isoMonth(Math.floor(total / 12), ((total % 12) + 12) % 12);
+  };
+  const maxMonth = max.slice(0, 7);
+  const minMonth = min.slice(0, 7);
+  const prevBlocked = Boolean(
+    min &&
+      (mode === 'days'
+        ? monthAt(-1) < minMonth
+        : mode === 'months'
+          ? String(view.y - 1) < min.slice(0, 4)
+          : String(decade - 1) < min.slice(0, 4)),
+  );
+  const nextBlocked = Boolean(
+    max &&
+      (mode === 'days'
+        ? monthAt(1) > maxMonth
+        : mode === 'months'
+          ? String(view.y + 1) > max.slice(0, 4)
+          : String(decade + 12) > max.slice(0, 4)),
+  );
 
   const nav =
-    'flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900';
+    'flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   return createPortal(
     <div
@@ -541,6 +572,7 @@ function Calendar({
           type="button"
           aria-label="Previous"
           className={nav}
+          disabled={prevBlocked}
           onClick={() =>
             mode === 'days'
               ? shift(-1)
@@ -556,7 +588,7 @@ function Calendar({
               mode === 'days' ? 'months' : mode === 'months' ? 'years' : mode,
             )
           }
-          className="rounded-lg px-2 py-1 font-semibold text-gray-900 transition-colors hover:bg-brand-50 hover:text-brand-700"
+          className="rounded-lg px-2 py-1 font-semibold text-gray-900 transition-colors hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           {mode === 'days'
             ? `${MONTHS[view.m]} ${view.y}`
@@ -568,6 +600,7 @@ function Calendar({
           type="button"
           aria-label="Next"
           className={nav}
+          disabled={nextBlocked}
           onClick={() =>
             mode === 'days'
               ? shift(1)
@@ -580,7 +613,7 @@ function Calendar({
 
       {mode === 'days' && (
         <div key={`${view.y}-${view.m}`} className="animate-fade-in">
-          <div className="grid grid-cols-7 text-center text-[11px] font-semibold uppercase text-gray-400">
+          <div className="grid grid-cols-7 text-center text-xs font-semibold uppercase text-gray-500">
             {WEEKDAYS.map((d) => (
               <span key={d} className="py-1">
                 {d}
@@ -599,7 +632,7 @@ function Calendar({
                   disabled={off}
                   onClick={() => pick(day)}
                   className={clsx(
-                    'flex h-9 items-center justify-center rounded-lg tabular-nums transition-colors',
+                    'flex h-9 items-center justify-center rounded-lg tabular-nums transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
                     day === value
                       ? 'bg-brand-600 font-semibold text-white shadow-sm hover:bg-brand-500'
                       : day === today
@@ -632,7 +665,7 @@ function Calendar({
                 setMode('days');
               }}
               className={clsx(
-                'rounded-lg py-2.5 transition-colors disabled:cursor-not-allowed disabled:opacity-30',
+                'rounded-lg py-2.5 transition-colors disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
                 (monthOnly ? value === isoMonth(view.y, m) : m === view.m)
                   ? 'bg-brand-600 font-semibold text-white'
                   : monthOnly && today === isoMonth(view.y, m)
@@ -657,7 +690,7 @@ function Calendar({
                 setMode('months');
               }}
               className={clsx(
-                'rounded-lg py-2.5 tabular-nums transition-colors',
+                'rounded-lg py-2.5 tabular-nums transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
                 y === view.y
                   ? 'bg-brand-600 font-semibold text-white'
                   : 'text-gray-800 hover:bg-brand-50 hover:text-brand-700',
@@ -680,7 +713,7 @@ function Calendar({
             el.focus();
           }}
           className={clsx(
-            'rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800',
+            'rounded-md px-2 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500',
             (el.required || !value) && 'invisible',
           )}
         >
@@ -690,7 +723,7 @@ function Calendar({
           type="button"
           disabled={outOfRange(today)}
           onClick={() => pick(today)}
-          className="rounded-md px-2 py-1 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 disabled:opacity-40"
+          className="rounded-md px-2 py-1 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           {monthOnly ? 'This month' : 'Today'}
         </button>

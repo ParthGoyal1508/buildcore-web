@@ -5,7 +5,8 @@ import { useState } from 'react';
 
 import { getBOQAlerts, type BoqAlerts, type BoqItem } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
-import { dateLabel } from '@/app/lib/format';
+import { dateLabel, quantity3 } from '@/app/lib/format';
+import QueryError from '@/app/ui/query-error';
 
 type TabKey = keyof BoqAlerts;
 
@@ -33,13 +34,22 @@ const TABS: { key: TabKey; label: string }[] = [
 export default function BoqAlertTabs({ projectId }: { projectId: string }) {
   const [active, setActive] = useState<TabKey>('today');
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['projects', projectId, 'boq-alerts'],
     queryFn: () => getBOQAlerts(projectId),
   });
 
   if (isLoading) return <p className="text-sm text-gray-500">{BOQ_COPY.loading}</p>;
-  if (isError || !data) return <p className="text-sm text-red-700">{BOQ_COPY.loadFailed}</p>;
+  // 036 I17 (2026-10-17): the failure with a retry.
+  if (isError || !data)
+    return (
+      <QueryError
+        compact
+        error={error}
+        fallback={BOQ_COPY.loadFailed}
+        onRetry={refetch}
+      />
+    );
 
   const rows = data[active];
 
@@ -57,9 +67,9 @@ export default function BoqAlertTabs({ projectId }: { projectId: string }) {
             aria-selected={active === tab.key}
             aria-controls={`boq-panel-${tab.key}`}
             onClick={() => setActive(tab.key)}
-            className={`rounded-t-md border-b-2 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+            className={`rounded-t-md border-b-2 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
               active === tab.key
-                ? 'border-blue-600 font-semibold text-blue-700'
+                ? 'border-brand-600 font-semibold text-brand-700'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -105,7 +115,7 @@ function AlertRow({ item }: { item: BoqItem }) {
         {item.taskName}
       </span>
       <span className="text-xs text-gray-600 tabular-nums">
-        {item.pendingQty.toFixed(3)} {item.unit}
+        {quantity3(item.pendingQty)} {item.unit}
         {item.finishDate ? ` · ${dateLabel(item.finishDate)}` : ` · ${BOQ_COPY.unplanned}`}
       </span>
     </li>

@@ -9,6 +9,7 @@ import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { hasModuleAccess, homeRoute, landingRoute } from '@/app/lib/permissions';
 import { canWriteAt, isWriteByNature } from '@/app/lib/write-access';
 import AccessDenied from '@/app/ui/access-denied';
+import WorkspaceLoadError from '@/app/ui/workspace-load-error';
 import RedirectHome from '@/app/ui/redirect-home';
 import { LoadingText } from '@/app/ui/spinner';
 
@@ -71,7 +72,7 @@ export default function ModuleGuard({
   // Can't confirm who this is, so can't confirm they may be here. The API would refuse
   // them anyway; this just avoids rendering the page first.
   if (isError || !user) {
-    return <AccessDenied detail={MESSAGES.loadFailed} />;
+    return <WorkspaceLoadError />;
   }
 
   if (redirectTo) {

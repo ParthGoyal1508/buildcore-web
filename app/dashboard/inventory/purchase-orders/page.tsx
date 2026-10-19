@@ -3,19 +3,27 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import Link from 'next/link';
+
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import {
+  getPurchaseOrders,
+  PO_STATUS_LABELS,
+  type PurchaseOrderSummary,
+} from '@/app/lib/api/inventory';
 import { getLetters } from '@/app/lib/api/letters';
 import { getVendor } from '@/app/lib/api/partners';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { inventoryLabel } from '@/app/lib/constants';
+import { rupees } from '@/app/lib/format';
+import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
-import { useVendors } from '@/app/ui/inventory/use-inventory-refs';
+import { searchVendors } from '@/app/ui/inventory/inventory-search';
 import {
   LetterComposer,
   LetterTable,
   useLetterKinds,
 } from '@/app/ui/letters/letters-panel';
 import PageHeader from '@/app/ui/page-header';
-import SearchableSelect from '@/app/ui/searchable-select';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
 import {
@@ -44,6 +52,8 @@ const PURCHASE_ORDER = 'letter_purchase_order';
 
 export default function PurchaseOrdersPage() {
   const [vendorId, setVendorId] = useState('');
+  const [chosen, setChosen] = useState<SearchableOption | null>(null);
+  const companyId = useSelectedCompanyId();
   const [nocFor, setNocFor] = useState<{ id: string; label: string } | null>(
     null,
   );
@@ -51,7 +61,6 @@ export default function PurchaseOrdersPage() {
 
   const kinds = useLetterKinds([PURCHASE_ORDER]);
   const kind = kinds.offered[0];
-  const vendors = useVendors();
   const vendor = useQuery({
     queryKey: ['vendor', vendorId],
     queryFn: () => getVendor(vendorId),
@@ -70,7 +79,16 @@ export default function PurchaseOrdersPage() {
     .map((letter) => letter.id);
   const nocStatuses = useNocStatuses('purchase_order', issuedIds);
 
-  const chosen = (vendors.data ?? []).find((v) => v.id === vendorId);
+  // 036 M9: what each issued PO has had delivered, billed and paid against it — the structure
+  // behind the letter, read back by the letter's id. The letter, its list and its PDF are unchanged.
+  const structured = useQuery({
+    queryKey: ['inventory', 'purchase-orders', companyId],
+    queryFn: () => getPurchaseOrders(),
+    enabled: issuedIds.length > 0,
+  });
+  const traceOf = new Map<string, PurchaseOrderSummary>(
+    (structured.data ?? []).map((po) => [po.letterId, po]),
+  );
 
   /** The vendor's details and the person raising it, as the PO prints them. */
   const initialValues = (): Record<string, string> => {
@@ -82,11 +100,11 @@ export default function PurchaseOrdersPage() {
     const contact = detail?.contacts[0];
     const me = user.data;
     return {
-      vendorName: detail?.name ?? chosen?.name ?? '',
+      vendorName: detail?.name ?? chosen?.label ?? '',
       vendorAddress: detail?.pinCode
         ? `${place}${place ? ' - ' : ''}${detail.pinCode}`
         : place,
-      vendorCode: detail?.code ?? chosen?.code ?? '',
+      vendorCode: detail?.code ?? '',
       vendorAttention: contact
         ? [contact.name, contact.phone].filter(Boolean).join(', ')
         : '',
@@ -100,6 +118,7 @@ export default function PurchaseOrdersPage() {
   const close = () => {
     setStarting(false);
     setVendorId('');
+    setChosen(null);
   };
 
   // The composer opens once the vendor's record is read (or could not be), because the item and
@@ -134,32 +153,26 @@ export default function PurchaseOrdersPage() {
               <span className="mb-1 block text-sm font-medium text-gray-700">
                 Vendor
               </span>
-              <SearchableSelect
+              {/* Searched on the server, active vendors only (036 M5): the 201st vendor was not
+                  offered at all when this loaded one page. */}
+              <AsyncSelect
                 value={vendorId}
-                onChange={setVendorId}
-                options={(vendors.data ?? []).map((v) => ({
-                  id: v.id,
-                  label: v.name,
-                  sublabel: v.city ?? undefined,
-                  note: `${v.code} · ${inventoryLabel(v.type)}`,
-                }))}
-                placeholder={
-                  vendors.isLoading
-                    ? 'Loading vendors…'
-                    : 'Search the Partners register'
-                }
-                disabled={vendors.isLoading || vendorId !== ''}
+                onChange={(id, option) => {
+                  setVendorId(id);
+                  setChosen(option);
+                }}
+                search={searchVendors}
+                cacheKey={['inventory', 'vendors', 'search', companyId]}
+                selectedOption={chosen}
+                placeholder="Search the Partners register"
+                disabled={vendorId !== ''}
+                aria-label="Vendor"
               />
             </div>
             <SecondaryButton type="button" onClick={close}>
               {vendorId ? 'Start over' : 'Cancel'}
             </SecondaryButton>
           </div>
-          {vendors.isError && (
-            <p className="text-sm text-red-700" role="alert">
-              The vendors could not be loaded.
-            </p>
-          )}
           {vendor.isError && (
             <p className="text-xs text-gray-500">
               The vendor&rsquo;s address could not be read — type it below.
@@ -170,7 +183,7 @@ export default function PurchaseOrdersPage() {
             <LetterComposer
               key={vendorId}
               kind={kind}
-              title={`Purchase order — ${chosen?.name ?? 'vendor'}`}
+              title={`Purchase order — ${chosen?.label ?? 'vendor'}`}
               subjectType="vendor"
               subjectId={vendorId}
               itemsSource="items"
@@ -206,25 +219,52 @@ export default function PurchaseOrdersPage() {
                     nocStatuses,
                     (letter) => letter.id,
                   )
-                : orders.data ?? []
+                : (orders.data ?? [])
             }
-            statusExtra={(letter) => (
-              <NocStatusBadge status={nocStatuses?.get(letter.id)} labelled />
-            )}
+            statusExtra={(letter) => {
+              const trace = traceOf.get(letter.id);
+              return (
+                <>
+                  <NocStatusBadge
+                    status={nocStatuses?.get(letter.id)}
+                    labelled
+                  />
+                  {trace && (
+                    <span className="block text-xs text-gray-600">
+                      {PO_STATUS_LABELS[trace.status]} ·{' '}
+                      {rupees(trace.receivedValue)} of{' '}
+                      {rupees(trace.orderedValue)} received ·{' '}
+                      {rupees(trace.paidAmount)} paid
+                    </span>
+                  )}
+                </>
+              );
+            }}
             isLoading={orders.isLoading}
             emptyMessage="No purchase order has been raised yet."
             // The supplier's NOC against an issued purchase order (2026-10-15).
             extraActions={(letter) => (
-              <Button
-                onClick={() =>
-                  setNocFor({
-                    id: letter.id,
-                    label: letter.referenceNo ?? letter.letterKindLabel,
-                  })
-                }
-              >
-                NOC
-              </Button>
+              <>
+                {traceOf.has(letter.id) && (
+                  // Ordered → received (GRNs) → billed → paid, line by line (036 M9).
+                  <Link
+                    href={`/dashboard/inventory/purchase-orders/${letter.id}`}
+                    className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+                  >
+                    Trace
+                  </Link>
+                )}
+                <Button
+                  onClick={() =>
+                    setNocFor({
+                      id: letter.id,
+                      label: letter.referenceNo ?? letter.letterKindLabel,
+                    })
+                  }
+                >
+                  NOC
+                </Button>
+              </>
             )}
           />
         </>

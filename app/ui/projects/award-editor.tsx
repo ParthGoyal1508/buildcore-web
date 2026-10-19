@@ -13,13 +13,20 @@ import {
 import { ApiError } from '@/app/lib/api/client';
 import { earnedRate } from '@/app/lib/bill-totals';
 import { WORK_ORDER_COPY } from '@/app/lib/constants';
-import { rupees, unitRate } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { quantity3, rupees, unitRate } from '@/app/lib/format';
+import { Button, IconButton } from '@/app/ui/button';
+import {
+  PROJECT_LOCKED_MESSAGE,
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
+import QueryError from '@/app/ui/query-error';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The shared table look at sheet density (2026-10-15): a 231-line schedule of inputs at the
@@ -87,7 +94,7 @@ export default function AwardEditor({
    * things done about them: a bill exists (permanent), it is under review, or it is approved and
    * must be reopened. The server refuses all three; this says which before the attempt.
    */
-  lockedBecause,
+  lockedBecause: orderLock,
   onSaved,
   onError,
 }: {
@@ -98,6 +105,11 @@ export default function AwardEditor({
   onError: (message: string | null) => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  // A locked project is a fourth reason, and it outranks the other three (036 Wave 3, 2026-10-17):
+  // the award PUT is lock-guarded, so the editing controls are absent and the lock sentence says why.
+  const { isLocked } = useProjectLock();
+  const lockedBecause = isLocked ? PROJECT_LOCKED_MESSAGE : orderLock;
 
   const award = useQuery({
     queryKey: ['raAward', workOrderId, null],
@@ -185,7 +197,7 @@ export default function AwardEditor({
         // from the list reads as a BOQ number that does not exist.
         note: used.has(item.id)
           ? `${item.unit} · ${WORK_ORDER_COPY.awardBoqAlreadyAdded}`
-          : `${item.unit} · ${item.scopeQty}`,
+          : `${item.unit} · ${quantity3(item.scopeQty)}`,
       })),
     [boqItems, used],
   );
@@ -277,12 +289,24 @@ export default function AwardEditor({
       void queryClient.invalidateQueries({
         queryKey: ['raAward', workOrderId],
       });
+      toast.success('The rates were saved.');
       onSaved();
     },
     onError: (err) =>
-      onError(err instanceof ApiError ? err.message : String(err)),
+      onError(projectErrorMessage(err, 'The rates could not be saved.')),
   });
 
+  // 036 I17 (2026-10-17): `rows === null` on a failed read held the loading line for ever.
+  if (award.isError) {
+    return (
+      <QueryError
+        compact
+        error={award.error}
+        fallback="The award could not be loaded."
+        onRetry={award.refetch}
+      />
+    );
+  }
   if (award.isLoading || rows === null) {
     return (
       <p className="text-sm text-gray-500" role="status">
@@ -358,7 +382,7 @@ export default function AwardEditor({
           </div>
 
           <details className="text-sm">
-            <summary className="cursor-pointer text-blue-700">
+            <summary className="cursor-pointer text-brand-700">
               {WORK_ORDER_COPY.awardPasteDisclosure}
             </summary>
             <div className="mt-2 space-y-2">
@@ -531,19 +555,18 @@ export default function AwardEditor({
                     </td>
                     {lockedBecause === null && (
                       <td className={clsx(DENSE_TD, 'text-right')}>
-                        <button
-                          type="button"
-                          aria-label={WORK_ORDER_COPY.awardRemoveRow}
-                          title={WORK_ORDER_COPY.awardRemoveRow}
+                        <IconButton
+                          size="sm"
+                          tone="danger"
+                          label={WORK_ORDER_COPY.awardRemoveRow}
                           onClick={() =>
                             edit((current) =>
                               current.filter((other) => other.key !== row.key),
                             )
                           }
-                          className="rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                         >
                           ✕
-                        </button>
+                        </IconButton>
                       </td>
                     )}
                   </tr>
@@ -569,7 +592,7 @@ export default function AwardEditor({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            disabled={save.isPending}
+            loading={save.isPending}
             onClick={() => {
               onError(null);
               save.mutate();

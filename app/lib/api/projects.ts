@@ -9,6 +9,7 @@ import {
 } from '@/app/lib/constants';
 import { authFetch } from '@/app/lib/session';
 import { projectReadinessSchema } from '@/app/lib/api/project-documents';
+import { fileToBase64 } from '@/app/lib/files';
 
 /**
  * Every `/dashboard/projects/*` call to `buildcore-api` (feature 008).
@@ -152,11 +153,13 @@ export interface ClientInput {
   name: string;
   contactPerson?: string;
   phone?: string;
-  email?: string;
+  /** `null` clears it (036 I19/I20); a blank must never be sent as `""` to `@IsEmail`. */
+  email?: string | null;
   address?: string;
-  gstin?: string;
-  pan?: string;
-  state?: string;
+  /** `null` clears it on edit — `undefined` means "unchanged", so a wrong GSTIN stayed for ever. */
+  gstin?: string | null;
+  pan?: string | null;
+  state?: string | null;
   status?: string;
 }
 
@@ -713,6 +716,19 @@ export interface BoqItemInput {
   perDayQty?: string;
 }
 
+/**
+ * The one cache key for a project's BOQ (036 I11).
+ *
+ * The same `getBOQ` answer was cached under two keys — `['boq', id]` by the daily work form and the
+ * letters line picker, `['projects', id, 'boq']` by the BOQ tree — so approving a DWR refreshed one
+ * and left the tree's done/pending figures stale, and an import refreshed the other and left the DWR
+ * line picker offering yesterday's schedule. Every reader and every invalidation uses this now.
+ * Under `['projects', id]`, so invalidating a whole project refreshes its BOQ too.
+ */
+export const boqKeys = {
+  project: (projectId: string) => ['projects', projectId, 'boq'] as const,
+};
+
 export async function getBOQ(projectId: string): Promise<BoqGroup[]> {
   const raw = await authFetch<unknown>(`/projects/${projectId}/boq`);
   return z.array(boqGroupSchema).parse(raw);
@@ -839,16 +855,3 @@ export async function confirmBOQImport(
   });
 }
 
-/** The data portion only — the API decodes bytes, not a data URL. */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('The file could not be read.'));
-    reader.onload = () => {
-      const result = String(reader.result);
-      const comma = result.indexOf(',');
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.readAsDataURL(file);
-  });
-}

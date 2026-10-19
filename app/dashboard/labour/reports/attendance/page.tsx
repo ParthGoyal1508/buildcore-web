@@ -3,11 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   getAttendanceReport,
+  getMyLabourSites,
   type AttendanceReport,
 } from '@/app/lib/api/labour';
-import { getSites } from '@/app/lib/api/projects';
+import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
@@ -17,7 +19,20 @@ type AttendanceRow = AttendanceReport['workers'][number];
 
 // Keys match the row's own fields, so each column sorts by the raw figure.
 const COLUMNS: Column<AttendanceRow>[] = [
-  { key: 'workerId', header: 'Worker', render: (w) => w.workerId },
+  {
+    key: 'workerId',
+    header: 'Worker',
+    // 036 O8: names from the API instead of the raw worker id.
+    sortValue: (w) => w.workerName ?? w.labourCode ?? '',
+    render: (w) => (
+      <>
+        {w.workerName ?? 'Unknown worker'}
+        {w.labourCode && (
+          <span className="ml-1 text-xs text-gray-500">{w.labourCode}</span>
+        )}
+      </>
+    ),
+  },
   {
     key: 'daysPresent',
     header: 'Present',
@@ -49,22 +64,28 @@ export default function AttendanceReportPage() {
   const [siteId, setSiteId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  // 036 O8: the report runs on what was last *Run*, not on every keystroke in the filters. The
+  // query used to refetch the moment a date changed after the first Run.
+  const [params, setParams] = useState<{
+    siteId: string;
+    periodFrom: string;
+    periodTo: string;
+  } | null>(null);
+  const companyId = useSelectedCompanyId();
 
   const sites = useQuery({
-    queryKey: ['sites', 'all'],
-    queryFn: () => getSites({ pageSize: 200 }),
+    queryKey: ['labour', 'my-sites', companyId],
+    queryFn: getMyLabourSites,
   });
   const report = useQuery({
-    queryKey: ['report-attendance', siteId, periodFrom, periodTo],
-    queryFn: () =>
-      getAttendanceReport({
-        siteId,
-        periodFrom,
-        periodTo,
-      }),
-    enabled: submitted && !!siteId && !!periodFrom && !!periodTo,
+    queryKey: ['report-attendance', companyId, params],
+    queryFn: () => getAttendanceReport(params!),
+    enabled: !!params,
   });
+  const rangeError =
+    periodFrom && periodTo && periodTo < periodFrom
+      ? 'The "to" date must be on or after the "from" date.'
+      : undefined;
 
   return (
     <div className="space-y-4">
@@ -77,7 +98,7 @@ export default function AttendanceReportPage() {
           onChange={(e) => setSiteId(e.target.value)}
         >
           <option value="">Select…</option>
-          {sites.data?.items.map((s) => (
+          {sites.data?.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
             </option>
@@ -96,12 +117,22 @@ export default function AttendanceReportPage() {
           type="date"
           value={periodTo}
           onChange={(e) => setPeriodTo(e.target.value)}
+          error={rangeError}
         />
         <div className="flex items-end">
-          <Button
+          <Button intent="read"
             className="w-full justify-center"
-            onClick={() => setSubmitted(true)}
-            disabled={!siteId || !periodFrom || !periodTo}
+            onClick={() => {
+              const next = { siteId, periodFrom, periodTo };
+              // Running the same filters again fetches again, as a person pressing Run expects.
+              if (params && JSON.stringify(params) === JSON.stringify(next)) {
+                void report.refetch();
+              } else {
+                setParams(next);
+              }
+            }}
+            disabled={!siteId || !periodFrom || !periodTo || !!rangeError}
+            loading={report.isFetching}
           >
             Run
           </Button>
@@ -109,12 +140,22 @@ export default function AttendanceReportPage() {
       </div>
 
       {/* The shared table: sortable by any column (2026-10-15). */}
-      {report.data && (
+      {params && report.data && (
+        <p className="text-sm text-gray-600">
+          {report.data.siteName ?? 'Site'} · {dateLabel(params.periodFrom)} to{' '}
+          {dateLabel(params.periodTo)} · {report.data.totalMusterDays} muster day
+          {report.data.totalMusterDays === 1 ? '' : 's'}
+        </p>
+      )}
+      {params && (
         <DataTable<AttendanceRow>
           caption="Attendance by worker"
-          rows={report.data.workers}
+          rows={report.data?.workers ?? []}
           rowKey={(w) => w.workerId}
           columns={COLUMNS}
+          isLoading={report.isPending}
+          error={report.error}
+          onRetry={report.refetch}
           emptyMessage="No approved musters for this site in the period."
         />
       )}

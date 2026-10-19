@@ -4,12 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { getPaymentRegister, type PaymentRegister } from '@/app/lib/api/labour';
-import { getProjects } from '@/app/lib/api/projects';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import { ProjectPicker } from '@/app/ui/plant/pickers';
 import { labourLabel } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { dateLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
-import { SelectField, TextField } from '@/app/ui/settings/form-fields';
+import { TextField } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 
@@ -17,7 +18,40 @@ type RegisterLine = PaymentRegister['lines'][number] & { rowKey: string };
 
 // Keys match the line's own fields, so each column sorts by the raw figure.
 const COLUMNS: Column<RegisterLine>[] = [
-  { key: 'workerId', header: 'Worker', render: (l) => l.workerId },
+  {
+    key: 'workerId',
+    header: 'Worker',
+    // 036 O8: names, and the sheet's site and dates, from the API instead of raw ids.
+    sortValue: (l) => l.workerName ?? l.labourCode ?? '',
+    render: (l) => (
+      <>
+        {l.workerName ?? 'Unknown worker'}
+        {l.labourCode && (
+          <span className="ml-1 text-xs text-gray-500">{l.labourCode}</span>
+        )}
+        {l.kind === 'carry_forward' && (
+          <span className="block text-xs text-amber-800">
+            Balance carried forward
+          </span>
+        )}
+      </>
+    ),
+  },
+  {
+    key: 'siteName',
+    header: 'Sheet',
+    sortValue: (l) => l.periodFrom ?? '',
+    render: (l) => (
+      <>
+        {l.siteName ?? '—'}
+        {l.periodFrom && l.periodTo && (
+          <span className="block text-xs text-gray-500">
+            {dateLabel(l.periodFrom)} → {dateLabel(l.periodTo)}
+          </span>
+        )}
+      </>
+    ),
+  },
   {
     key: 'daysWorked',
     header: 'Days',
@@ -52,40 +86,36 @@ export default function PaymentRegisterPage() {
   const [projectId, setProjectId] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  // 036 O8: the report runs on what was last *Run*, not on every keystroke in the filters. The
+  // query used to refetch the moment a date changed after the first Run.
+  const [params, setParams] = useState<{
+    projectId: string;
+    periodFrom: string;
+    periodTo: string;
+  } | null>(null);
+  const companyId = useSelectedCompanyId();
 
-  const projects = useQuery({
-    queryKey: ['projects', 'all'],
-    queryFn: () => getProjects({ pageSize: 200 }),
-  });
   const report = useQuery({
-    queryKey: ['report-register', projectId, periodFrom, periodTo],
-    queryFn: () =>
-      getPaymentRegister({
-        projectId,
-        periodFrom,
-        periodTo,
-      }),
-    enabled: submitted && !!projectId && !!periodFrom && !!periodTo,
+    queryKey: ['report-register', companyId, params],
+    queryFn: () => getPaymentRegister(params!),
+    enabled: !!params,
   });
+  const rangeError =
+    periodFrom && periodTo && periodTo < periodFrom
+      ? 'The "to" date must be on or after the "from" date.'
+      : undefined;
 
   return (
     <div className="space-y-4">
       <PageHeader title="Payment Register" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-        <SelectField
+        {/* Searched on the server: one page of 200 hid the 201st project (036 follow-up). */}
+        <ProjectPicker
           id="reg-project"
           label="Project"
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          <option value="">Select…</option>
-          {projects.data?.items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setProjectId(id)}
+        />
         <TextField
           id="reg-from"
           label="From"
@@ -99,13 +129,23 @@ export default function PaymentRegisterPage() {
           type="date"
           value={periodTo}
           onChange={(e) => setPeriodTo(e.target.value)}
+          error={rangeError}
         />
         <div className="flex items-end">
           <Button
             intent="read"
             className="w-full justify-center"
-            onClick={() => setSubmitted(true)}
-            disabled={!projectId || !periodFrom || !periodTo}
+            onClick={() => {
+              const next = { projectId, periodFrom, periodTo };
+              // Running the same filters again fetches again, as a person pressing Run expects.
+              if (params && JSON.stringify(params) === JSON.stringify(next)) {
+                void report.refetch();
+              } else {
+                setParams(next);
+              }
+            }}
+            disabled={!projectId || !periodFrom || !periodTo || !!rangeError}
+            loading={report.isFetching}
           >
             Run
           </Button>
@@ -113,11 +153,14 @@ export default function PaymentRegisterPage() {
       </div>
 
       {/* The shared table: sortable by any column (2026-10-15). */}
-      {report.data && (
+      {params && (
         <DataTable<RegisterLine>
           caption="Payment register"
+          isLoading={report.isPending}
+          error={report.error}
+          onRetry={report.refetch}
           // A worker can appear twice on one sheet's register, so the position keeps keys unique.
-          rows={report.data.lines.map((l, i) => ({
+          rows={(report.data?.lines ?? []).map((l, i) => ({
             ...l,
             rowKey: `${l.sheetId}-${l.workerId}-${i}`,
           }))}

@@ -23,6 +23,8 @@ import { useFileViewer } from '@/app/ui/pdf-viewer';
 import DisposeModal from '@/app/ui/plant/dispose-modal';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import { dateTimeLabel } from '@/app/lib/format';
+import { TextButton } from '@/app/ui/button';
 
 /**
  * A machine's disposal on its detail page (2026-10-17): the Dispose action while it is in service,
@@ -191,13 +193,12 @@ export function DisposalFacts({
       ))}
       {disposal.hasAttachment && (
         <div className="sm:col-span-2">
-          <button
-            type="button"
+          <TextButton
+            className="underline"
             onClick={onOpenAttachment}
-            className="text-sm text-blue-700 underline hover:text-blue-900"
           >
             {disposal.attachmentName ?? 'View attachment'}
-          </button>
+          </TextButton>
         </div>
       )}
     </dl>
@@ -227,10 +228,7 @@ export function EquipmentHistoryPanel({ equipmentId }: { equipmentId: string }) 
             <li key={event.id} className="text-sm">
               <p className="text-gray-900">{event.summary}</p>
               <p className="text-xs text-gray-500">
-                {new Date(event.at).toLocaleString('en-IN', {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
+                {dateTimeLabel(event.at)}
                 {event.actorName ? ` · ${event.actorName}` : ''}
               </p>
             </li>

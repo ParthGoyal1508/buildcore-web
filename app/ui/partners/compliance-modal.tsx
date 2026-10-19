@@ -3,30 +3,35 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import { createCompliance, getContractors } from '@/app/lib/api/partners';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
+import { currentPeriod } from '@/app/lib/format';
+import { useToast } from '@/app/ui/toast';
 
 /** `YYYY-MM` of the current month — the latest a filing can be recorded for. */
 function currentMonth(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  // IST, not UTC: the UTC month refused the current month's filing before 05:30 on the 1st (036 A19).
+  return currentPeriod();
 }
 
 export default function ComplianceModal({
   contractorId,
+  month,
   onClose,
 }: {
   contractorId?: string;
+  /** Prefilled from the screen's month filter — a RAG cell lands there with it set (036 N6). */
+  month?: string;
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
     contractorProfileId: contractorId ?? '',
-    month: '',
+    month: month && month <= currentMonth() ? month : '',
     pfChallanNumber: '',
     pfAmount: '',
     pfDate: '',
@@ -36,6 +41,16 @@ export default function ComplianceModal({
   });
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
+  // Anything typed beyond the prefilled contractor and month.
+  const isDirty = [
+    form.pfChallanNumber,
+    form.pfAmount,
+    form.pfDate,
+    form.esicChallanNumber,
+    form.esicAmount,
+    form.esicDate,
+  ].some((value) => value !== '');
 
   const { data: contractors } = useQuery({
     queryKey: ['partners', 'contractors', ''],
@@ -57,10 +72,12 @@ export default function ComplianceModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['partners', 'compliance'] });
       queryClient.invalidateQueries({ queryKey: ['partners', 'contractors'] });
+      queryClient.invalidateQueries({ queryKey: ['partners', 'contractor'] });
+      queryClient.invalidateQueries({ queryKey: ['partners', 'rag'] });
+      toast.success('Filing recorded.');
       onClose();
     },
-    onError: (err: unknown) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed),
+    onError: (err: unknown) => setError(errorMessage(err, MESSAGES.saveFailed)),
   });
 
   const set =
@@ -73,12 +90,14 @@ export default function ComplianceModal({
       title="Record a monthly filing"
       onClose={onClose}
       wide
+      isDirty={isDirty}
+      pending={mutation.isPending}
       footer={
         <>
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <Button type="submit" form="compliance-form" disabled={mutation.isPending}>
+          <Button type="submit" form="compliance-form" loading={mutation.isPending}>
             {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
         </>
@@ -102,9 +121,10 @@ export default function ComplianceModal({
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="compliance-contractor" label="Contractor">
+          <Field id="compliance-contractor" label="Contractor" required>
             <SelectInput
               id="compliance-contractor"
+              aria-required
               value={form.contractorProfileId}
               onChange={set('contractorProfileId')}
             >
@@ -129,10 +149,12 @@ export default function ComplianceModal({
           <Field
             id="compliance-month"
             label="Month"
+            required
             hint="A filing cannot be recorded for a month that has not happened."
           >
             <TextInput
               id="compliance-month"
+              aria-required
               type="month"
               max={currentMonth()}
               value={form.month}

@@ -3,17 +3,24 @@
 import { getCurrentUser } from '@/app/lib/api/users';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import { ApiError } from '@/app/lib/api/client';
+import { useState } from 'react';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   createUser,
   createUserSchema,
   passwordRules,
-  getUnlinkedEmployees,
+  searchUnlinkedEmployees,
 } from '@/app/lib/api/account-creation';
-import { listActiveCompanies, listRoles } from '@/app/lib/api/settings';
+import {
+  listSelectableCompanies,
+  useSelectedCompanyId,
+} from '@/app/lib/api/company-selection';
+import { listRoles } from '@/app/lib/api/settings';
 import { USERS_NOTICE_KEY } from '@/app/ui/settings/user-list';
+import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
+import QueryError from '@/app/ui/query-error';
+import { mayAssignRole } from '@/app/ui/settings/grant-ceiling';
 import {
   FormError,
   SecondaryButton,
@@ -46,12 +53,15 @@ export default function CreateUserForm() {
   // Empty means "send an invite" — the two modes differ by whether this is filled
   // in, not by a separate control (backend FR-015).
   const [password, setPassword] = useState('');
-  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeeOption, setEmployeeOption] = useState<SearchableOption | null>(
+    null,
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
+  // `['roles']`, the key the Users and Roles screens read (036 C18), so a role added there is here.
   const { data: allRoles = [] } = useQuery({
-    queryKey: ['settings', 'roles'],
+    queryKey: ['roles'],
     queryFn: listRoles,
   });
   // Only roles the creator may give (2026-10-16 access-control audit, C2): the API refuses a role
@@ -61,17 +71,21 @@ export default function CreateUserForm() {
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
-  const roles = allRoles.filter((role) =>
-    role.permissions.every(
-      (permission) =>
-        permission === 'MY_WORKSPACE' ||
-        (me?.permissions ?? []).includes(permission),
-    ),
-  );
+  // The same ceiling the Users screen applies, levels included (036 C10).
+  const roles = allRoles.filter((role) => mayAssignRole(me, role));
+  // The companies the caller may work in — exactly their own for a company administrator — rather
+  // than the Companies settings list, which needs COMPANY_SETTINGS an account administrator may
+  // not hold (036 C18).
   const { data: companies = [] } = useQuery({
-    queryKey: ['settings', 'companies', 'active'],
-    queryFn: listActiveCompanies,
+    queryKey: ['companies', 'selectable'],
+    queryFn: listSelectableCompanies,
   });
+  // 036 C18: a company administrator can only create accounts in their own company — the API
+  // scopes them there — so the field is fixed rather than offering every company and failing.
+  // A group administrator gets the selected company preselected and may change it.
+  const isGroupAdmin = me?.permissions.includes(CROSS_COMPANY_ACCESS) ?? false;
+  const selectedCompanyId = useSelectedCompanyId();
+  const lockedCompany = !isGroupAdmin && companies.length === 1 ? companies[0] : null;
 
   // The default role is preselected (029 FR-001) — derived rather than written into state once
   // the roles load, so the choice is still the admin's the moment they touch the field.
@@ -89,21 +103,34 @@ export default function CreateUserForm() {
   // to pick from and a typed name is the only option. Deriving also means switching
   // the role away restores whatever was chosen before, instead of having silently
   // destroyed it.
-  const effectiveCompanyId = roleIsCrossCompany ? '' : companyId;
+  const effectiveCompanyId = roleIsCrossCompany
+    ? ''
+    : lockedCompany?.id || companyId || selectedCompanyId || '';
   const effectiveNameSource: NameSource = roleIsCrossCompany
     ? 'displayName'
     : nameSource;
   const effectiveEmployeeId = roleIsCrossCompany ? '' : employeeId;
 
-  const { data: employees = [], isFetching: loadingEmployees } = useQuery({
-    queryKey: [
-      'account-creation',
-      'unlinked-employees',
-      effectiveCompanyId,
-      employeeSearch,
-    ],
-    queryFn: () => getUnlinkedEmployees(effectiveCompanyId, employeeSearch),
-    // Only meaningful once a company narrows the list.
+  /**
+   * The employees without an account yet (036 C17, C18): searched on the server by name or code,
+   * a page at a time, through `AsyncSelect`. The plain select listed codes only, searched on every
+   * keystroke, and — when the request failed — said "Every employee already has an account."
+   * Now a failure shows as a failure, with Retry, inside the picker.
+   */
+  const searchEmployees = (term: string, page: number) =>
+    searchUnlinkedEmployees(effectiveCompanyId, term, page).then((r) => ({
+      items: r.items.map((e) => ({
+        id: e.id,
+        label: e.name || e.employeeCode,
+        note: e.name ? e.employeeCode : undefined,
+      })),
+      total: r.total,
+    }));
+  // Whether anyone is left to invite at all, for the "everyone has an account" note — asked once
+  // per company, and only believed when it actually answered.
+  const anyUnlinked = useQuery({
+    queryKey: ['account-creation', 'unlinked-employees', effectiveCompanyId, 'any'],
+    queryFn: () => searchUnlinkedEmployees(effectiveCompanyId, '', 1),
     enabled: effectiveNameSource === 'employee' && Boolean(effectiveCompanyId),
   });
 
@@ -138,22 +165,10 @@ export default function CreateUserForm() {
       // already-pending each need a different next step, so they are shown as
       // written rather than flattened into one message.
       setFormError(
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : 'Could not create the account. Please try again.',
+        errorMessage(error, 'Could not create the account. Please try again.'),
       );
     },
   });
-
-  const employeeOptions = useMemo(
-    () =>
-      employees.map((e) => (
-        <option key={e.id} value={e.id}>
-          {e.employeeCode}
-        </option>
-      )),
-    [employees],
-  );
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -223,7 +238,16 @@ export default function CreateUserForm() {
       {/* Hidden rather than disabled for a cross-company role: the field has no
           meaningful value in that case, and showing a greyed-out control invites
           the question of what it would do. */}
-      {!roleIsCrossCompany && (
+      {!roleIsCrossCompany && lockedCompany && (
+        <TextField
+          id="companyId"
+          label="Company"
+          value={lockedCompany.name}
+          readOnly
+          hint="Accounts you create belong to your company."
+        />
+      )}
+      {!roleIsCrossCompany && !lockedCompany && (
         <SelectField
           id="companyId"
           label="Company"
@@ -234,6 +258,7 @@ export default function CreateUserForm() {
             // The picker lists employees of one company, so a previous pick is
             // meaningless once the company changes.
             setEmployeeId('');
+            setEmployeeOption(null);
           }}
         >
           <option value="">Select a company…</option>
@@ -273,40 +298,55 @@ export default function CreateUserForm() {
         )}
 
         {effectiveNameSource === 'employee' ? (
-          <>
-            <TextField
-              id="employeeSearch"
-              label="Search employees"
-              value={employeeSearch}
-              disabled={!effectiveCompanyId}
-              hint={
-                effectiveCompanyId
-                  ? 'Only employees without an account are listed.'
-                  : 'Choose a company first.'
-              }
-              onChange={(e) => setEmployeeSearch(e.target.value)}
-            />
-            <SelectField
-              id="employeeId"
-              label="Employee"
-              value={effectiveEmployeeId}
-              error={fieldErrors.displayName}
-              disabled={!effectiveCompanyId}
-              onChange={(e) => setEmployeeId(e.target.value)}
+          <div>
+            <label
+              htmlFor="employeeId"
+              className="mb-1 block text-sm font-medium text-gray-700"
             >
-              <option value="">
-                {loadingEmployees ? 'Loading…' : 'Select an employee…'}
-              </option>
-              {employeeOptions}
-            </SelectField>
-            {effectiveCompanyId &&
-              !loadingEmployees &&
-              employees.length === 0 && (
-                <p className="text-sm text-gray-500">
-                  Every employee in this company already has an account.
-                </p>
-              )}
-          </>
+              Employee
+            </label>
+            <AsyncSelect
+              id="employeeId"
+              value={effectiveEmployeeId}
+              selectedOption={employeeOption}
+              onChange={(id, option) => {
+                setEmployeeId(id);
+                setEmployeeOption(option);
+              }}
+              search={searchEmployees}
+              cacheKey={['account-creation', 'unlinked-employees', effectiveCompanyId]}
+              placeholder={
+                effectiveCompanyId ? 'Search by name or code' : 'Choose a company first'
+              }
+              disabled={!effectiveCompanyId}
+              invalid={Boolean(fieldErrors.displayName)}
+              aria-describedby="employeeId-hint"
+            />
+            <p id="employeeId-hint" className="mt-1 text-xs text-gray-500">
+              {effectiveCompanyId
+                ? 'Only current employees without an account are listed.'
+                : 'Choose a company first.'}
+            </p>
+            {fieldErrors.displayName && (
+              <p className="mt-1 text-xs text-red-600" role="alert">
+                {fieldErrors.displayName}
+              </p>
+            )}
+            {anyUnlinked.isError && (
+              <QueryError
+                compact
+                className="mt-2"
+                error={anyUnlinked.error}
+                onRetry={anyUnlinked.refetch}
+                fallback="The employees could not be loaded."
+              />
+            )}
+            {anyUnlinked.data?.total === 0 && (
+              <p className="mt-2 text-sm text-gray-500">
+                Every current employee in this company already has an account.
+              </p>
+            )}
+          </div>
         ) : (
           <TextField
             id="displayName"
@@ -330,7 +370,7 @@ export default function CreateUserForm() {
           autoComplete="new-password"
           value={password}
           error={fieldErrors.password}
-          hint="Leave blank to email an invite and let them choose their own. Fill it in to create the account immediately — no email is sent, you pass the password on yourself, and they must change it when they first sign in."
+          hint="Leave blank to email an invite and let them choose their own. Fill it in to create the account immediately — an email tells them where to sign in and their username, but never the password: you pass that on yourself, and they must change it when they first sign in."
           onChange={(e) => setPassword(e.target.value)}
         />
         {password.length > 0 && (
@@ -353,14 +393,8 @@ export default function CreateUserForm() {
       <FormError message={formError} />
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending
-            ? password
-              ? 'Creating account…'
-              : 'Sending invite…'
-            : password
-              ? 'Create account'
-              : 'Send invite'}
+        <Button type="submit" loading={mutation.isPending}>
+          {password ? 'Create account' : 'Send invite'}
         </Button>
         <SecondaryButton
           type="button"

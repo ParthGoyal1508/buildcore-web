@@ -10,6 +10,7 @@ import {
   purgeRuntimeCaches,
 } from '@/app/lib/session';
 import { MESSAGES, formatLockoutMessage } from '@/app/lib/constants';
+import { clearLocalUserData } from '@/app/lib/local-data';
 
 const loginResponseSchema = z.object({
   accessToken: z.string(),
@@ -85,6 +86,8 @@ export async function logout(): Promise<void> {
     // Awaited here, unlike on an expired session: this is a sign-out the user asked for, and
     // the page it lands on must not be served anything of theirs (029).
     await purgeRuntimeCaches();
+    // Bill drafts, the legacy punch queue and remembered choices go with the person (036 A26).
+    await clearLocalUserData();
   }
 }
 

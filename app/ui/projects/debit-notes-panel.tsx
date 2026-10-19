@@ -13,10 +13,13 @@ import {
   type RaiseDebitNoteInput,
 } from '@/app/lib/api/bill-packages';
 import { downloadDebitNote } from '@/app/lib/api/billing';
+import { money as roundMoney, productRounded } from '@/app/lib/bill-totals';
 import { saveBlob } from '@/app/lib/download-file';
-import { dateLabel } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { dateLabel, rupees, todayIso } from '@/app/lib/format';
+import { Button, TextButton } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
 import { describe } from '@/app/ui/projects/bill-lifecycle';
+import { useProjectLock } from '@/app/ui/projects/project-lock-context';
 import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
@@ -39,11 +42,8 @@ type Viewer = (file: {
 const fileStem = (note: DebitNote) =>
   `Debit Note ${(note.noteNumber ?? 'draft').replace(/\//g, '-')}`;
 
-const rupees = (value: string) =>
-  Number(value).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+/** The API sends Decimals as strings. The shared `rupees` puts the ₹ on (036 A20). */
+const amount = (value: string) => rupees(Number(value));
 
 /**
  * The debit notes on a subcontractor's bill (2026-10-15), in the client's DV-04 format.
@@ -77,6 +77,10 @@ export default function DebitNotesPanel({
   onError: (message: string) => void;
 }) {
   const [raising, setRaising] = useState(false);
+  /** The note being recovered, for its button's spinner (036 Wave 3). */
+  const [recovering, setRecovering] = useState<string | null>(null);
+  // Raising a note is a write on the project, refused with a 423 while it is locked (036 Wave 3).
+  const { isLocked } = useProjectLock();
 
   const download = (note: DebitNote, format: 'pdf' | 'docx' | 'xlsx') =>
     downloadDebitNote(note.id, format, `${fileStem(note)}.${format}`)
@@ -90,7 +94,7 @@ export default function DebitNotesPanel({
         {/* Raising changes no bill — only recovering does — so it is offered on any bill not yet
             issued. Not on an issued one: its notes are the notes as at issue, and a note raised
             now would vanish from it. */}
-        {!register.asAtIssue && workOrderId && (
+        {!register.asAtIssue && workOrderId && !isLocked && (
           <Button onClick={() => setRaising(true)}>Raise a debit note</Button>
         )}
       </div>
@@ -107,8 +111,8 @@ export default function DebitNotesPanel({
             note here to deduct it on this bill.
           </>
         )}{' '}
-        Recovered on this bill: ₹{rupees(register.recoveredOnThisPackage)} of ₹
-        {rupees(register.total)}.
+        Recovered on this bill: {amount(register.recoveredOnThisPackage)} of{' '}
+        {amount(register.total)}.
       </p>
 
       {register.notes.length === 0 ? (
@@ -141,7 +145,7 @@ export default function DebitNotesPanel({
                     {note.lines.map((line) => line.description).join(', ')}
                   </td>
                   <td className={clsx(DENSE_TD, 'text-right')}>
-                    ₹{rupees(note.netAmount)}
+                    {amount(note.netAmount)}
                   </td>
                   <td className={clsx(DENSE_TD, 'text-xs text-gray-500')}>
                     {note.recoveredOn
@@ -193,7 +197,19 @@ export default function DebitNotesPanel({
                           application by name, so its refusal is shown rather than guessed at. */}
                       {editable && !note.recoveredOnPackageId && (
                         <Button
-                          onClick={() => {
+                          loading={recovering === note.id}
+                          disabled={recovering !== null}
+                          onClick={async () => {
+                            // 036 Wave 3 (2026-10-18): asked first — a note is recovered on
+                            // exactly one bill, so a stray click here spends it on this one.
+                            const ok = await confirmDialog({
+                              title: `Recover ${note.noteNumber ?? 'this note'} on this bill?`,
+                              message: `${amount(note.netAmount)} comes off this bill's payable. A note is recovered on one bill only, so it cannot then be recovered on another.`,
+                              confirmLabel: 'Recover here',
+                              tone: 'default',
+                            });
+                            if (!ok) return;
+                            setRecovering(note.id);
                             applyDebitNote(note.id, packageId)
                               .then(() => {
                                 onNotice(
@@ -201,7 +217,8 @@ export default function DebitNotesPanel({
                                 );
                                 onChanged();
                               })
-                              .catch((err: unknown) => onError(describe(err)));
+                              .catch((err: unknown) => onError(describe(err)))
+                              .finally(() => setRecovering(null));
                           }}
                         >
                           Recover here
@@ -252,7 +269,7 @@ const blankLine = (key: number): LineDraft => ({
   rate: '',
 });
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIso();
 
 /**
  * The form behind "Raise a debit note" — the fields of the client's format that are not already on
@@ -291,12 +308,19 @@ function RaiseDebitNote({
     setLines((all) =>
       all.map((line) => (line.key === key ? { ...line, ...patch } : line)),
     );
+  /**
+   * The preview's figures on `bill-totals.ts`'s decimal arithmetic (036 Wave 3, 2026-10-18): the
+   * float `Math.round(q × r × 100) / 100` priced 10.05 × 0.5 at 5.02 where the server says 5.03.
+   * Still a preview — the server computes what the note prints.
+   */
   const amountOf = (line: LineDraft) =>
     line.quantity && line.rate
-      ? Math.round(Number(line.quantity) * Number(line.rate) * 100) / 100
+      ? productRounded(2, Number(line.quantity), Number(line.rate))
       : null;
-  const workDone = lines.reduce((sum, line) => sum + (amountOf(line) ?? 0), 0);
-  const tax = Math.round(workDone * Number(gstPercent || 0)) / 100;
+  const workDone = roundMoney(
+    lines.reduce((sum, line) => sum + (amountOf(line) ?? 0), 0),
+  );
+  const tax = productRounded(2, workDone, Number(gstPercent || 0), 0.01);
 
   /** What both Preview and Raise send — one shape, so the preview is the note that would be raised. */
   const input = (): RaiseDebitNoteInput => ({
@@ -356,7 +380,8 @@ function RaiseDebitNote({
           <Button
             type="submit"
             form="debit-note-form"
-            disabled={!ready || saving}
+            disabled={!ready}
+            loading={saving}
           >
             {saving ? 'Saving…' : 'Raise'}
           </Button>
@@ -468,9 +493,8 @@ function RaiseDebitNote({
                   <TextField
                     id={`dn-qty-${line.key}`}
                     label="Qty"
-                    type="number"
-                    min={0}
-                    step="any"
+                    inputMode="decimal"
+                    autoComplete="off"
                     required
                     value={line.quantity}
                     onChange={(event) =>
@@ -482,9 +506,8 @@ function RaiseDebitNote({
                   <TextField
                     id={`dn-rate-${line.key}`}
                     label="Rate (₹)"
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    inputMode="decimal"
+                    autoComplete="off"
                     required
                     value={line.rate}
                     onChange={(event) =>
@@ -494,50 +517,45 @@ function RaiseDebitNote({
                 </div>
                 <div className="flex items-end justify-between gap-2 sm:col-span-4">
                   <p className="pb-2 text-sm text-gray-700">
-                    {amountOf(line) === null
-                      ? '—'
-                      : `₹${amountOf(line)!.toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                        })}`}
+                    {amountOf(line) === null ? '—' : rupees(amountOf(line))}
                   </p>
                   {lines.length > 1 && (
-                    <button
-                      type="button"
+                    <TextButton
+                      tone="danger"
+                      className="mb-1"
                       onClick={() =>
                         setLines((all) =>
                           all.filter((other) => other.key !== line.key),
                         )
                       }
-                      className="mb-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-red-700 hover:bg-red-50"
                     >
                       <TrashIcon className="h-4 w-4" aria-hidden="true" />
                       Remove
-                    </button>
+                    </TextButton>
                   )}
                 </div>
               </div>
             ))}
           </div>
-          <button
-            type="button"
+          <TextButton
+            className="mt-2"
             onClick={() =>
               setLines((all) => [
                 ...all,
                 blankLine(Math.max(...all.map((line) => line.key)) + 1),
               ])
             }
-            className="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
           >
             <PlusIcon className="h-4 w-4" aria-hidden="true" />
             Add an item
-          </button>
+          </TextButton>
         </div>
 
         <dl className="grid gap-1 rounded-md bg-gray-50 px-3 py-2 text-sm sm:grid-cols-3">
           <div>
             <dt className="text-xs text-gray-500">Work done amount</dt>
             <dd className="font-medium text-gray-900">
-              ₹{workDone.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {rupees(workDone)}
             </dd>
           </div>
           <div>
@@ -545,13 +563,13 @@ function RaiseDebitNote({
               {taxBasis === 'intra_state' ? 'CGST + SGST' : 'IGST'}
             </dt>
             <dd className="font-medium text-gray-900">
-              ₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {rupees(tax)}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500">Net amount (approx.)</dt>
             <dd className="font-medium text-gray-900">
-              ₹{Math.round(workDone + tax).toLocaleString('en-IN')}
+              {rupees(roundMoney(workDone + tax))}
             </dd>
           </div>
         </dl>

@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   downloadLogbookSheet,
   getLogbookSheet,
@@ -14,9 +14,13 @@ import {
 } from '@/app/lib/api/plant';
 import { saveBlob } from '@/app/lib/download-file';
 import { MESSAGES } from '@/app/lib/constants';
+import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import { Button } from '@/app/ui/button';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import QueryError from '@/app/ui/query-error';
 import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
-import { LoadingText } from '@/app/ui/spinner';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 
 const MONTHS = [
   'Jan',
@@ -130,12 +134,34 @@ const INPUT =
 export default function LogbookSheet({
   equipmentId,
   month,
+  onUnsavedChange,
 }: {
   equipmentId: string;
   month: string;
+  /** How many typed days are unsaved — the page asks before switching machine or month (036 K7). */
+  onUnsavedChange?: (count: number) => void;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const dirtyCount = Object.values(drafts).filter(isDirty).length;
+
+  // 036 K7: typed days are protected from a company switch, a closed tab and a reload, as well as
+  // from the page's own machine and month pickers.
+  useUnsavedChanges('Logbook sheet', dirtyCount > 0);
+  useEffect(() => {
+    onUnsavedChange?.(dirtyCount);
+  }, [dirtyCount, onUnsavedChange]);
+  useEffect(() => {
+    if (dirtyCount === 0) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Older browsers show the prompt only when a value is set.
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirtyCount]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<'pdf' | 'xlsx' | null>(null);
@@ -154,29 +180,28 @@ export default function LogbookSheet({
       // The entries list, the fuel list and the machine's reading all moved.
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
       setDrafts({});
-      setNotice(`Saved ${rows.length} ${rows.length === 1 ? 'day' : 'days'}.`);
+      const saved = `Saved ${rows.length} ${rows.length === 1 ? 'day' : 'days'}.`;
+      setNotice(saved);
+      toast.success(saved);
     },
-    onError: (err) =>
-      setError(
-        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
-      ),
+    // Typed days stay on the sheet; only the message changes.
+    onError: (err) => setError(errorMessage(err, MESSAGES.plantSaveFailed)),
   });
 
   if (sheet.isPending) {
     return (
-      <p className="text-sm text-gray-500" role="status">
-        <LoadingText />
-      </p>
+      <ListSkeleton
+        headers={['Date', 'Diesel', 'Starting', 'Closing', 'Total']}
+        rows={8}
+      />
     );
   }
   if (sheet.isError) {
     return (
-      <FormError
-        message={
-          sheet.error instanceof ApiError
-            ? sheet.error.message
-            : MESSAGES.plantLoadFailed
-        }
+      <QueryError
+        error={sheet.error}
+        fallback={MESSAGES.plantLoadFailed}
+        onRetry={sheet.refetch}
       />
     );
   }
@@ -201,7 +226,6 @@ export default function LogbookSheet({
   const totalAmount = sum(rows.map((row) => row.amount));
   const totalLitres = sum(rows.map((row) => row.litres));
   const totalRun = sum(rows.map((row) => row.total));
-  const dirtyCount = Object.values(drafts).filter(isDirty).length;
   // The server's own figure until something is typed, so the screen and the download agree.
   const average =
     dirtyCount === 0
@@ -212,7 +236,7 @@ export default function LogbookSheet({
           : totalLitres / totalRun
         : null;
 
-  function submit() {
+  async function submit() {
     setError(null);
     setNotice(null);
     const payload: LogbookSheetRowInput[] = [];
@@ -232,6 +256,32 @@ export default function LogbookSheet({
         }
         item.openingReading = row.opening;
         item.closingReading = row.closing;
+        // 036 K4: a starting reading that does not follow the closing before it needs a reason,
+        // which the API refuses the whole sheet without.
+        if (
+          row.defaultOpening !== null &&
+          Math.round(row.opening * 1000) !==
+            Math.round(row.defaultOpening * 1000)
+        ) {
+          const reason = await promptDialog({
+            title: `Reading gap on ${sheetDate(row.day.date)}`,
+            message: `The starting reading ${reading(
+              row.opening,
+            )} does not follow the closing reading before it (${reading(
+              row.defaultOpening,
+            )}). Say why — meter replaced, moved on a trailer — or cancel and correct it.`,
+            label: 'Reason',
+            confirmLabel: 'Use this reason',
+            multiline: true,
+          });
+          if (!reason?.trim()) {
+            setError(
+              `${sheetDate(row.day.date)}: correct the starting reading or give a reason for the gap.`,
+            );
+            return;
+          }
+          item.readingGapReason = reason.trim().slice(0, 500);
+        }
       }
       if (!row.dieselLocked) {
         const amount = num(draft.dieselAmount);
@@ -268,9 +318,7 @@ export default function LogbookSheet({
       );
       saveBlob(blob, filename);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : 'Could not download the sheet.',
-      );
+      toast.error(errorMessage(err, 'Could not download the sheet.'));
     } finally {
       setDownloading(null);
     }
@@ -299,16 +347,18 @@ export default function LogbookSheet({
           <SecondaryButton
             type="button"
             disabled={downloading !== null}
+            loading={downloading === 'pdf'}
             onClick={() => void download('pdf')}
           >
-            {downloading === 'pdf' ? 'PDF…' : 'PDF'}
+            PDF
           </SecondaryButton>
           <SecondaryButton
             type="button"
             disabled={downloading !== null}
+            loading={downloading === 'xlsx'}
             onClick={() => void download('xlsx')}
           >
-            {downloading === 'xlsx' ? 'Excel…' : 'Excel'}
+            Excel
           </SecondaryButton>
         </div>
       </div>
@@ -396,15 +446,27 @@ export default function LogbookSheet({
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
         <p className="text-xs text-gray-500 sm:mr-auto">
-          Days already read are locked; correct them from the daily entries. A
-          day&apos;s starting reading follows the closing before it.
+          Days already read are locked; correct them with “Correct readings” on
+          the daily entries. A day&apos;s starting reading follows the closing
+          before it.
         </p>
         {dirtyCount > 0 && (
           <SecondaryButton
             type="button"
-            onClick={() => {
-              setDrafts({});
-              setError(null);
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Discard the typed days?',
+                  message: `${dirtyCount} unsaved ${
+                    dirtyCount === 1 ? 'day' : 'days'
+                  } will be cleared.`,
+                  confirmLabel: 'Discard',
+                  tone: 'danger',
+                })
+              ) {
+                setDrafts({});
+                setError(null);
+              }
             }}
           >
             Discard
@@ -412,14 +474,13 @@ export default function LogbookSheet({
         )}
         <Button
           type="button"
-          onClick={submit}
-          disabled={save.isPending || dirtyCount === 0}
+          onClick={() => void submit()}
+          loading={save.isPending}
+          disabled={dirtyCount === 0}
         >
-          {save.isPending
-            ? 'Saving…'
-            : dirtyCount > 0
-              ? `Save ${dirtyCount} ${dirtyCount === 1 ? 'day' : 'days'}`
-              : 'Save'}
+          {dirtyCount > 0
+            ? `Save ${dirtyCount} ${dirtyCount === 1 ? 'day' : 'days'}`
+            : 'Save'}
         </Button>
       </div>
     </section>

@@ -1,7 +1,11 @@
 'use client';
 
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
+
+import { useLayer, useScrollLock } from '@/app/lib/layers';
+import { confirmDialog } from '@/app/ui/dialogs';
+import { IconButton } from '@/app/ui/button';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -13,6 +17,15 @@ const FOCUSABLE =
  * on close; Escape closes. Built on native `<button>`/`<label>` elements throughout
  * rather than div-with-handler, so the whole thing is keyboard-operable and
  * screen-reader-navigable by default (spec FR-024, research.md §8).
+ *
+ * 036 A8–A10:
+ * - Escape goes through the layer stack (`app/lib/layers.ts`), so a confirmation, picker or calendar
+ *   open inside this modal is closed first, and the modal only when it is the top layer.
+ * - `isDirty` asks "Discard changes?" before Escape, the X or a backdrop click throws typing away;
+ *   `pending` ignores all three while a save is on the wire — closing then left the request running
+ *   with nothing on screen to say whether it landed.
+ * - The title id comes from `useId()` (two stacked modals used to share one), the page behind stops
+ *   scrolling, and the height is in `dvh` so the footer is not hidden under the iOS toolbar.
  */
 export default function Modal({
   title,
@@ -20,15 +33,46 @@ export default function Modal({
   children,
   footer,
   wide = false,
+  isDirty = false,
+  pending = false,
+  closeOnBackdrop = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
   wide?: boolean;
+  /** Asks before closing by Escape, the X or the backdrop. Pass react-hook-form's `isDirty`. */
+  isDirty?: boolean;
+  /** While true, Escape, the X and the backdrop do nothing. Pass the mutation's `isPending`. */
+  pending?: boolean;
+  /** A click on the dimmed page closes (through the same dirty check). Off by default. */
+  closeOnBackdrop?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+  const asking = useRef(false);
+
+  const requestClose = useCallback(async () => {
+    if (pending || asking.current) return;
+    if (isDirty) {
+      asking.current = true;
+      const discard = await confirmDialog({
+        title: 'Discard changes?',
+        message: 'What you have entered in this form will be lost.',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+        tone: 'danger',
+      });
+      asking.current = false;
+      if (!discard) return;
+    }
+    onClose();
+  }, [isDirty, onClose, pending]);
+
+  const isTop = useLayer(() => void requestClose());
+  useScrollLock();
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement | null;
@@ -42,12 +86,9 @@ export default function Modal({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (event.key !== 'Tab') return;
+      // Escape is the layer stack's (above). Tab is trapped only while this is the top layer: a
+      // confirmation open above it keeps its own trap.
+      if (event.key !== 'Tab' || !isTop()) return;
 
       const focusable = Array.from(
         dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [],
@@ -68,34 +109,41 @@ export default function Modal({
 
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [onClose]);
+  }, [isTop]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onMouseDown={(event) => {
+        if (closeOnBackdrop && event.target === event.currentTarget) {
+          void requestClose();
+        }
+      }}
+    >
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="settings-modal-title"
-        className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-lg bg-white shadow-xl sm:rounded-lg ${
+        aria-labelledby={titleId}
+        aria-busy={pending || undefined}
+        className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-lg bg-white shadow-xl sm:rounded-lg ${
           wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'
         }`}
       >
         <div className="flex items-center justify-between border-b px-5 py-4">
-          <h2 id="settings-modal-title" className="text-lg font-medium">
+          <h2 id={titleId} className="text-lg font-medium">
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
+          <IconButton
+            label="Close"
+            onClick={() => void requestClose()}
+            disabled={pending}
             // 44×44px below `sm` (016 FR-021). `p-1` around a 20px icon is a 28px target: reachable
             // with a mouse, missed with a thumb — and the close control being the one somebody stabs
             // at repeatedly makes it the worst one to leave small.
-            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 sm:min-h-0 sm:min-w-0 sm:p-1"
           >
             <XMarkIcon className="w-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && (

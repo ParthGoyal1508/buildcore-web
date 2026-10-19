@@ -10,7 +10,7 @@ import {
   getVendorCategories,
 } from '@/app/lib/api/partners';
 import { MESSAGES } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import VendorCategoryModal from '@/app/ui/partners/vendor-category-modal';
 import PageHeader from '@/app/ui/page-header';
@@ -58,7 +58,7 @@ export default function VendorCategoriesPage() {
       key: 'description',
       header: 'Description',
       render: (row) =>
-        row.description ?? <span className="text-gray-400">—</span>,
+        row.description ?? <span className="text-gray-500">—</span>,
     },
     {
       key: 'vendorCount',
@@ -108,19 +108,15 @@ export default function VendorCategoriesPage() {
         emptyMessage="No vendor categories yet."
         actions={(row) => (
           <>
-            <button
-              type="button"
-              className="text-sm font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            <TextButton
               onClick={() => {
                 setEditing(row);
                 setModalOpen(true);
-              }}
-            >
+              }}>
               Edit
-            </button>
-            <button
-              type="button"
-              className="text-sm font-medium text-red-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400 disabled:no-underline"
+            </TextButton>
+            <TextButton
+              tone="danger"
               disabled={remove.isPending}
               onClick={async () => {
                 if (
@@ -136,7 +132,7 @@ export default function VendorCategoriesPage() {
               }}
             >
               Delete
-            </button>
+            </TextButton>
           </>
         )}
       />

@@ -6,9 +6,10 @@ import {
   type Interview,
   getCandidateTimeline,
   getInterviews,
+  interviewerName,
 } from '@/app/lib/api/recruitment';
 import { recruitmentLabel } from '@/app/lib/constants';
-import { useEmployees } from '@/app/ui/recruitment/use-employees';
+import { dateTimeLabel } from '@/app/lib/format';
 
 /**
  * How a candidate got where they are (2026-10-14) — every stage change and every interview round,
@@ -27,7 +28,6 @@ export default function CandidateTimeline({ candidateId }: { candidateId: string
     queryKey: ['interviews', 'candidate', candidateId],
     queryFn: () => getInterviews({ candidateId }),
   });
-  const { nameOf } = useEmployees();
 
   if (timeline.isPending || interviews.isPending) {
     return <p className="text-sm text-gray-500">Loading the timeline…</p>;
@@ -109,7 +109,7 @@ export default function CandidateTimeline({ candidateId }: { candidateId: string
             </>
           )}
           {event.kind === 'interview' && (
-            <InterviewEvent interview={event.interview} nameOf={nameOf} />
+            <InterviewEvent interview={event.interview} />
           )}
         </li>
       ))}
@@ -117,13 +117,10 @@ export default function CandidateTimeline({ candidateId }: { candidateId: string
   );
 }
 
-function InterviewEvent({
-  interview,
-  nameOf,
-}: {
-  interview: Interview;
-  nameOf: (id: string) => string;
-}) {
+function InterviewEvent({ interview }: { interview: Interview }) {
+  // Names from the interview itself (036 H4): the active-employee lookup this used printed a raw id
+  // for anyone past its first page and for everyone who had since left.
+  const nameOf = (id: string) => interviewerName(interview, id);
   const given = new Set(interview.feedback.map((f) => f.interviewerEmployeeId));
   const awaiting = interview.interviewerEmployeeIds.filter((id) => !given.has(id));
   const state =
@@ -194,7 +191,7 @@ function dotColour(event: {
 }): string {
   if (event.kind === 'interview') {
     const i = event.interview as Interview;
-    if (i.status === 'completed') return 'bg-blue-600';
+    if (i.status === 'completed') return 'bg-brand-600';
     return i.overdue ? 'bg-amber-500' : 'bg-gray-300';
   }
   if (event.kind === 'stage') {
@@ -205,11 +202,5 @@ function dotColour(event: {
 }
 
 function when(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return dateTimeLabel(iso);
 }

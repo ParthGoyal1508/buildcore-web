@@ -14,7 +14,7 @@ import {
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { LABOUR_GENDER_LABELS } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { rupees, todayIso } from '@/app/lib/format';
 import AccessDenied from '@/app/ui/access-denied';
 import { Button } from '@/app/ui/button';
 import { promptDialog } from '@/app/ui/dialogs';
@@ -35,12 +35,6 @@ interface SiteRow {
   male: SiteWageRate | undefined;
   female: SiteWageRate | undefined;
 }
-
-const todayIso = () => {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 
 /**
  * The HR office's daily rates (031): one male and one female rate per site, from a date. A new
@@ -94,7 +88,7 @@ export default function SiteRatesPage() {
     r ? (
       <>
         {rupees(r.dailyRate)}
-        <span className="ml-1 text-xs text-gray-400">from {r.effectiveFrom}</span>
+        <span className="ml-1 text-xs text-gray-500">from {r.effectiveFrom}</span>
       </>
     ) : (
       <span className="text-amber-700">Not set</span>
@@ -271,9 +265,14 @@ function SetRatesForm({
     <Modal
       title={`Rates — ${row.site.name}`}
       onClose={onClose}
+      isDirty={!nothingChanged}
+      pending={save.isPending}
+      // O15 (036): buttons passed straight to the footer, so a phone stacks them full width.
       footer={
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <>
+          <SecondaryButton onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
@@ -283,13 +282,13 @@ function SetRatesForm({
               !effectiveFrom ||
               nothingChanged ||
               !!invalid(male) ||
-              !!invalid(female) ||
-              save.isPending
+              !!invalid(female)
             }
+            loading={save.isPending}
           >
-            {save.isPending ? 'Saving…' : 'Save'}
+            Save
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-3">

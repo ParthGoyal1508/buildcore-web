@@ -8,10 +8,14 @@ import {
   createBOQItem,
   getBOQ,
   type BoqGroup,
+  boqKeys,
 } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
 import {
   FormError,
   SecondaryButton,
@@ -36,7 +40,7 @@ export default function BoqEntry({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState<'section' | 'line' | null>(null);
 
   const { data: groups } = useQuery({
-    queryKey: ['projects', projectId, 'boq'],
+    queryKey: boqKeys.project(projectId),
     queryFn: () => getBOQ(projectId),
   });
 
@@ -72,7 +76,7 @@ export default function BoqEntry({ projectId }: { projectId: string }) {
 function useInvalidateBoq(projectId: string) {
   const queryClient = useQueryClient();
   return () => {
-    void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq'] });
+    void queryClient.invalidateQueries({ queryKey: boqKeys.project(projectId) });
     // The alerts read the same lines through a different endpoint, so they go stale together.
     void queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'boq-alerts'] });
   };
@@ -91,7 +95,8 @@ function SectionModal({ projectId, onClose }: { projectId: string; onClose: () =
       invalidate();
       onClose();
     },
-    onError: (err: Error) => setError(err.message),
+    // A 423 reads as the lock, not as the server's bare refusal (036 Wave 3, 2026-10-17).
+    onError: (err: Error) => setError(projectErrorMessage(err)),
   });
 
   return (
@@ -105,7 +110,7 @@ function SectionModal({ projectId, onClose }: { projectId: string; onClose: () =
           </SecondaryButton>
           <Button
             type="button"
-            disabled={save.isPending}
+            loading={save.isPending}
             onClick={() => {
               if (!boqNo.trim() || !name.trim()) {
                 setError(BOQ_COPY.sectionName);
@@ -185,7 +190,8 @@ function LineModal({
       invalidate();
       onClose();
     },
-    onError: (err: Error) => setError(err.message),
+    // A 423 reads as the lock, not as the server's bare refusal (036 Wave 3, 2026-10-17).
+    onError: (err: Error) => setError(projectErrorMessage(err)),
   });
 
   return (
@@ -199,7 +205,7 @@ function LineModal({
           </SecondaryButton>
           <Button
             type="button"
-            disabled={save.isPending}
+            loading={save.isPending}
             onClick={() => {
               if (!groupId || !boqNo.trim() || !taskName.trim() || !unit.trim() || !scopeQty.trim()) {
                 setError(BOQ_COPY.taskName);

@@ -14,6 +14,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useLayer } from '@/app/lib/layers';
+import { Button, DangerButton, SecondaryButton } from '@/app/ui/button';
+
 /**
  * The app's own confirm and prompt (2026-10-15), in place of `window.confirm` and `window.prompt`.
  *
@@ -162,6 +165,10 @@ function Dialog({ request }: { request: Request }) {
     (restoreFocus.current as HTMLElement | null)?.focus?.();
   };
 
+  // A layer of its own (036 A8), so Escape here never reaches a modal underneath — whether or not
+  // focus is inside this dialog when it is pressed.
+  useLayer(() => close(false));
+
   useEffect(() => {
     restoreFocus.current = document.activeElement;
     (fieldRef.current ?? confirmRef.current)?.focus();
@@ -209,6 +216,10 @@ function Dialog({ request }: { request: Request }) {
         : 'Please confirm');
   const field =
     'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30';
+
+  const confirmLabel =
+    options.confirmLabel ??
+    (prompt ? 'Continue' : tone === 'danger' ? 'Yes, continue' : 'OK');
 
   return (
     <div
@@ -291,32 +302,34 @@ function Dialog({ request }: { request: Request }) {
           </div>
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 sm:flex-row sm:justify-end sm:px-6">
-          <button
+          <SecondaryButton
             type="button"
             onClick={() => close(false)}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             {options.cancelLabel ?? 'Cancel'}
-          </button>
-          <button
-            ref={confirmRef}
-            type="button"
-            disabled={blocked}
-            onClick={() => close(true)}
-            className={clsx(
-              'h-10 rounded-lg px-4 text-sm font-medium text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-              tone === 'danger'
-                ? 'bg-red-600 hover:bg-red-500 focus-visible:outline-red-500'
-                : 'bg-brand-600 hover:bg-brand-500 focus-visible:outline-accent-500',
-            )}
-          >
-            {options.confirmLabel ??
-              (prompt
-                ? 'Continue'
-                : tone === 'danger'
-                  ? 'Yes, continue'
-                  : 'OK')}
-          </button>
+          </SecondaryButton>
+          {/* The danger confirm is the primary's shape in red; both are `DangerButton`/`Button`
+              rather than hand-built since 036 A21. `intent="read"`: a dialog is only ever opened
+              by an action that was already gated. */}
+          {tone === 'danger' ? (
+            <DangerButton
+              ref={confirmRef}
+              disabled={blocked}
+              onClick={() => close(true)}
+            >
+              {confirmLabel}
+            </DangerButton>
+          ) : (
+            <Button
+              ref={confirmRef}
+              type="button"
+              intent="read"
+              disabled={blocked}
+              onClick={() => close(true)}
+            >
+              {confirmLabel}
+            </Button>
+          )}
         </div>
       </div>
     </div>

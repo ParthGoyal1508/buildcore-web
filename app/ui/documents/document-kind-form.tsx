@@ -46,7 +46,12 @@ export function DocumentKindForm({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    await onCreate({ name, hasExpiry, needsNumber });
+    try {
+      await onCreate({ name, hasExpiry, needsNumber });
+    } catch {
+      // The caller reports the failure; what was typed stays for the retry (036 J4).
+      return;
+    }
     setName('');
     setHasExpiry(false);
     setNeedsNumber(false);
@@ -79,7 +84,11 @@ export function DocumentKindForm({
           onChange={(event) => setNeedsNumber(event.target.checked)}
         />
         <div>
-          <Button type="submit" disabled={busy || name.trim().length < 2}>
+          <Button
+            type="submit"
+            loading={busy}
+            disabled={name.trim().length < 2}
+          >
             {DOCUMENT_COPY.addKindSubmit}
           </Button>
         </div>

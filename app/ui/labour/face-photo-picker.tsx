@@ -9,6 +9,7 @@ import {
 } from '@/app/lib/constants';
 import CameraCapture from '@/app/ui/my/camera-capture';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
+import { IconButton } from '@/app/ui/button';
 
 /**
  * Takes the 3–5 face photos a labour is registered with (031): a camera, thumbnails that can be
@@ -58,14 +59,15 @@ export default function FacePhotoPicker({
                 alt={`Face photo ${i + 1}`}
                 className="aspect-square w-full rounded-md object-cover"
               />
-              <button
-                type="button"
+              <IconButton
+                size="xs"
+                tone="overlay"
+                label={`Remove photo ${i + 1}`}
+                className="absolute -right-1 -top-1"
                 onClick={() => onChange(photos.filter((_, j) => j !== i))}
-                className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white"
-                aria-label={`Remove photo ${i + 1}`}
               >
                 <XMarkIcon className="w-4" aria-hidden="true" />
-              </button>
+              </IconButton>
             </li>
           ))}
         </ul>

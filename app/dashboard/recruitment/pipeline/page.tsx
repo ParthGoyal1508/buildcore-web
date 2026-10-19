@@ -1,10 +1,14 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Suspense, useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   createCandidate,
   getCandidate,
@@ -23,10 +27,21 @@ import {
 import {
   CANDIDATE_LETTER_KIND_KEYS,
   CANDIDATE_SOURCES,
+  CANDIDATE_STAGES,
   PIPELINE_COLUMNS,
   recruitmentLabel,
 } from '@/app/lib/constants';
-import { Button } from '@/app/ui/button';
+import {
+  urlEnum,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
+import { Button, TextButton } from '@/app/ui/button';
+import { promptDialog } from '@/app/ui/dialogs';
+import Pager from '@/app/ui/inventory/pager';
+import QueryError from '@/app/ui/query-error';
+import { useToast } from '@/app/ui/toast';
 import CandidateTimeline from '@/app/ui/recruitment/candidate-timeline';
 import JoinModal from '@/app/ui/recruitment/join-modal';
 import { offerLetterSubmit } from '@/app/ui/recruitment/offer-letter-submit';
@@ -37,6 +52,8 @@ import {
   SecondaryButton,
   SelectField,
   TextField,
+  inlineSelectClass,
+  fieldClass,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
@@ -90,18 +107,39 @@ export default function PipelinePage() {
   );
 }
 
+/**
+ * One page of the pipeline (036 H1). The screen read the first 200 candidates and showed them as
+ * if they were all of them: the 201st did not exist, and there was no search to find them by. Now
+ * the server pages and searches by name, and the page, stage and search live in the URL.
+ */
+const PAGE_SIZE = 50;
+const STAGE_FILTERS = ['', ...CANDIDATE_STAGES] as const;
+
 function PipelineInner() {
   const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
-  const stageParam = searchParams.get('stage') ?? '';
+  const toast = useToast();
+  const [filters, setFilters, query] = useUrlState(
+    {
+      q: urlString(),
+      stage: urlEnum(STAGE_FILTERS, ''),
+      page: urlNumber(1),
+    },
+    { debounce: ['q'], resetPage: 'page' },
+  );
   const [view, setView] = useState<'table' | 'board'>('table');
   const [showForm, setShowForm] = useState(false);
   const [drawer, setDrawer] = useState<Candidate | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const candidates = useQuery({
-    queryKey: ['candidates', stageParam],
-    queryFn: () => getCandidates({ stage: stageParam || undefined }),
+    queryKey: ['candidates', 'pipeline', query.stage, query.q.trim(), query.page],
+    queryFn: () =>
+      getCandidates({
+        stage: query.stage || undefined,
+        search: query.q.trim() || undefined,
+        page: query.page,
+        pageSize: PAGE_SIZE,
+      }),
+    placeholderData: keepPreviousData,
   });
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['candidates'] });
@@ -109,19 +147,20 @@ function PipelineInner() {
   const move = useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: string }) =>
       transitionStage(id, stage),
-    onSuccess: invalidate,
+    onSuccess: (_, { stage }) => {
+      toast.success(`Moved to ${recruitmentLabel(stage)}`);
+      return invalidate();
+    },
     onError: (e) =>
-      setError(
-        e instanceof ApiError ? e.message : 'Could not move the candidate.',
-      ),
+      toast.error(errorMessage(e, 'Could not move the candidate.')),
   });
 
   const items = candidates.data?.items ?? [];
 
-  // The same list the Interviews screen reads, shared through its cache key; only fetched while
-  // somebody on the page is in Interviewing, the one stage whose next step depends on it.
+  // Only fetched while somebody on the page is in Interviewing, the one stage whose next step
+  // depends on it. Its own key: the Interviews screen now reads one page at a time (036 H4).
   const interviews = useQuery({
-    queryKey: ['interviews'],
+    queryKey: ['interviews', 'pipeline'],
     queryFn: () => getInterviews(),
     enabled: items.some((c) => c.stage === 'interviewing'),
   });
@@ -183,13 +222,17 @@ function PipelineInner() {
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-gray-200 p-0.5">
             <button
-              className={`rounded-md px-3 py-1 text-sm ${view === 'table' ? 'bg-gray-100 font-medium' : ''}`}
+              type="button"
+              aria-pressed={view === 'table'}
+              className={`rounded-md px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${view === 'table' ? 'bg-gray-100 font-medium' : ''}`}
               onClick={() => setView('table')}
             >
               Table
             </button>
             <button
-              className={`rounded-md px-3 py-1 text-sm ${view === 'board' ? 'bg-gray-100 font-medium' : ''}`}
+              type="button"
+              aria-pressed={view === 'board'}
+              className={`rounded-md px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${view === 'board' ? 'bg-gray-100 font-medium' : ''}`}
               onClick={() => setView('board')}
             >
               Board
@@ -199,7 +242,50 @@ function PipelineInner() {
         </div>
       </div>
 
-      <FormError message={error} />
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="min-w-[14rem] flex-1 sm:max-w-sm">
+          <label
+            htmlFor="pl-search"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Search
+          </label>
+          <input
+            id="pl-search"
+            type="search"
+            placeholder="Candidate name"
+            autoComplete="off"
+            value={filters.q}
+            onChange={(e) => setFilters({ q: e.target.value })}
+            className={fieldClass}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="pl-stage"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Stage
+          </label>
+          <select
+            id="pl-stage"
+            value={filters.stage}
+            onChange={(e) =>
+              setFilters({
+                stage: e.target.value as (typeof STAGE_FILTERS)[number],
+              })
+            }
+            className={inlineSelectClass}
+          >
+            <option value="">All stages</option>
+            {CANDIDATE_STAGES.map((stage) => (
+              <option key={stage} value={stage}>
+                {recruitmentLabel(stage)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {view === 'table' ? (
         <ResponsiveList
@@ -207,8 +293,15 @@ function PipelineInner() {
           rows={items}
           rowKey={(c) => c.id}
           isLoading={candidates.isPending}
-          error={candidates.isError ? 'Could not load candidates.' : null}
-          emptyMessage="No candidates match this filter."
+          error={candidates.isError ? candidates.error : null}
+          onRetry={candidates.refetch}
+          serverPaged
+          isRefreshing={candidates.isPlaceholderData}
+          emptyMessage={
+            query.q.trim() || query.stage
+              ? 'No candidates match this search or filter.'
+              : 'No candidates yet.'
+          }
           actions={(c) => (
             <span className="flex gap-2">
               {NEXT_STAGE[c.stage] && (
@@ -217,6 +310,9 @@ function PipelineInner() {
                     move.mutate({ id: c.id, stage: NEXT_STAGE[c.stage]! })
                   }
                   disabled={!!blockedReason(c) || move.isPending}
+                  loading={
+                    move.isPending && move.variables?.id === c.id
+                  }
                   title={blockedReason(c) ?? undefined}
                   aria-label={
                     blockedReason(c)
@@ -233,8 +329,20 @@ function PipelineInner() {
             </span>
           )}
         />
+      ) : candidates.isPending ? (
+        <p className="text-sm text-gray-500">
+          <LoadingText />
+        </p>
+      ) : candidates.isError ? (
+        <QueryError
+          error={candidates.error}
+          onRetry={candidates.refetch}
+          fallback="Could not load candidates."
+        />
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        <div
+          className={`flex gap-3 overflow-x-auto pb-2 ${candidates.isPlaceholderData ? 'opacity-60' : ''}`}
+        >
           {PIPELINE_COLUMNS.map((stage) => {
             const columnItems = items.filter((c) => c.stage === stage);
             return (
@@ -258,15 +366,15 @@ function PipelineInner() {
                         {recruitmentLabel(c.source)}
                       </p>
                       <div className="mt-2 flex items-center justify-between">
-                        <button
-                          className="text-xs text-blue-600"
+                        <TextButton
+                          size="xs"
                           onClick={() => setDrawer(c)}
                         >
                           Open
-                        </button>
+                        </TextButton>
                         {NEXT_STAGE[c.stage] && (
-                          <button
-                            className="text-xs text-blue-600 disabled:cursor-not-allowed disabled:text-gray-400"
+                          <TextButton
+                            size="xs"
                             onClick={() =>
                               move.mutate({
                                 id: c.id,
@@ -277,7 +385,7 @@ function PipelineInner() {
                             title={blockedReason(c) ?? undefined}
                           >
                             {forwardLabel(c)}
-                          </button>
+                          </TextButton>
                         )}
                       </div>
                       {blockedReason(c) && (
@@ -291,6 +399,18 @@ function PipelineInner() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {candidates.data && (
+        <div className="mt-4">
+          <Pager
+            total={candidates.data.total}
+            page={query.page}
+            pageSize={PAGE_SIZE}
+            onPageChange={(page) => setFilters({ page })}
+            noun="candidate"
+          />
         </div>
       )}
 
@@ -342,6 +462,7 @@ function CandidateForm({
     address: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const mutation = useMutation({
@@ -359,20 +480,23 @@ function CandidateForm({
         fatherName: form.fatherName.trim() || undefined,
         address: form.address.trim() || undefined,
       }),
-    onSuccess: onSaved,
-    onError: (e) =>
-      setError(
-        e instanceof ApiError ? e.message : 'Could not add the candidate.',
-      ),
+    onSuccess: () => {
+      toast.success('Candidate added');
+      onSaved();
+    },
+    onError: (e) => setError(errorMessage(e, 'Could not add the candidate.')),
   });
 
   const valid = form.requisitionId && form.fullName && form.phone && form.email;
+  const dirty = Boolean(form.fullName || form.phone || form.email);
 
   return (
     <Modal
       title="New Candidate"
       onClose={onClose}
       wide
+      isDirty={dirty}
+      pending={mutation.isPending}
       footer={
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
@@ -382,6 +506,7 @@ function CandidateForm({
               mutation.mutate();
             }}
             disabled={!valid}
+            loading={mutation.isPending}
           >
             Save
           </Button>
@@ -528,31 +653,65 @@ function CandidateDrawer({
   });
   const draftOffer = offers.data?.find((o) => o.status === 'draft') ?? null;
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const reveal = useMutation({
     mutationFn: () => getCandidate(candidate.id),
     onSuccess: (d) => setRevealed(d),
     onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not reveal details.'),
+      setError(errorMessage(e, 'Could not reveal details.')),
   });
+  // 036 H2: Reject and No-show both end the application, and both went on one tap with a reason
+  // the screen made up ("Rejected", "No show") — which is what the candidate's history then said
+  // for ever. Each now asks for the real reason first, and while either is on the wire both buttons
+  // (and the drawer's close) wait, so a second tap cannot send a second request.
   const reject = useMutation({
-    mutationFn: () => rejectCandidate(candidate.id, 'Rejected'),
+    mutationFn: (reason: string) => rejectCandidate(candidate.id, reason),
     onSuccess: () => {
+      toast.success(`${candidate.fullName} rejected`);
       onChanged();
       onClose();
     },
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not reject.'),
+    onError: (e) => setError(errorMessage(e, 'Could not reject.')),
   });
   const noShow = useMutation({
-    mutationFn: () => markNoShow(candidate.id, 'No show'),
+    mutationFn: (reason: string) => markNoShow(candidate.id, reason),
     onSuccess: () => {
+      toast.success(`${candidate.fullName} marked as a no-show`);
       onChanged();
       onClose();
     },
-    onError: (e) =>
-      setError(e instanceof ApiError ? e.message : 'Could not mark no-show.'),
+    onError: (e) => setError(errorMessage(e, 'Could not mark no-show.')),
   });
+  const ending = reject.isPending || noShow.isPending;
+  const askReject = async () => {
+    const reason = await promptDialog({
+      title: 'Reject candidate',
+      message: `Reject ${candidate.fullName}? This ends their application.`,
+      label: 'Reason',
+      required: true,
+      multiline: true,
+      confirmLabel: 'Reject',
+      tone: 'danger',
+    });
+    if (reason === null) return;
+    setError(null);
+    reject.mutate(reason.trim());
+  };
+  const askNoShow = async () => {
+    const reason = await promptDialog({
+      title: 'Mark no-show',
+      message: `Mark ${candidate.fullName} as a no-show? Their accepted offer will not proceed to joining.`,
+      label: 'Reason',
+      required: true,
+      multiline: true,
+      confirmLabel: 'Mark no-show',
+      tone: 'danger',
+    });
+    if (reason === null) return;
+    setError(null);
+    noShow.mutate(reason.trim());
+  };
 
   if (showOffer)
     return (
@@ -596,7 +755,12 @@ function CandidateDrawer({
     );
 
   return (
-    <Modal title={candidate.fullName} onClose={onClose} wide>
+    <Modal
+      title={candidate.fullName}
+      onClose={onClose}
+      wide
+      pending={ending}
+    >
       <div className="space-y-3 text-sm">
         <FormError message={error} />
         <p>
@@ -658,10 +822,14 @@ function CandidateDrawer({
           )}
           {candidate.stage === 'offer_accepted' && (
             <>
-              <Button onClick={() => setShowJoin(true)}>
+              <Button onClick={() => setShowJoin(true)} disabled={ending}>
                 Complete Joining
               </Button>
-              <SecondaryButton onClick={() => noShow.mutate()}>
+              <SecondaryButton
+                onClick={askNoShow}
+                loading={noShow.isPending}
+                disabled={ending}
+              >
                 Mark No-show
               </SecondaryButton>
             </>
@@ -686,7 +854,11 @@ function CandidateDrawer({
             </div>
           )}
           {candidate.stage !== 'joined' && candidate.stage !== 'rejected' && (
-            <SecondaryButton onClick={() => reject.mutate()}>
+            <SecondaryButton
+              onClick={askReject}
+              loading={reject.isPending}
+              disabled={ending}
+            >
               Reject
             </SecondaryButton>
           )}

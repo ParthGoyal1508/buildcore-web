@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
+import Link from 'next/link';
 import * as React from 'react';
 import { useState } from 'react';
 
@@ -16,7 +17,8 @@ import {
   setClaim,
 } from '@/app/lib/api/bill-packages';
 import { getRaBill } from '@/app/lib/api/billing';
-import { projectsLabel } from '@/app/lib/constants';
+import { ApiError } from '@/app/lib/api/client';
+import { ROUTES, projectsLabel } from '@/app/lib/constants';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { dateLabel } from '@/app/lib/format';
 import BillAdjustments from '@/app/ui/projects/bill-adjustments';
@@ -24,8 +26,12 @@ import BillDeductionLines from '@/app/ui/projects/bill-deduction-lines';
 import DebitNotesPanel from '@/app/ui/projects/debit-notes-panel';
 import BillLifecycle, { describe } from '@/app/ui/projects/bill-lifecycle';
 import RaBillSettlement from '@/app/ui/projects/ra-bill-settlement';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import MeasurementSheet from '@/app/ui/projects/measurement-sheet';
+import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
 import {
   AddNonBoqItem,
   NonBoqItemEditor,
@@ -77,29 +83,48 @@ export default function BillPackageDetail({
   /** Opens the unmeasured lines back up on an issued bill — see `acted` below. */
   const [showEveryLine, setShowEveryLine] = useState(false);
 
-  const { data: pkg, isLoading } = useQuery({
+  /**
+   * 036 I15 (2026-10-18): every read here has an error state. The package read used to be
+   * `isLoading || !pkg` → "Loading the bill…", which on a 404, a 403 or a dropped connection is
+   * still `!pkg` — so a bill that does not exist, or one this user may not open, read as loading for
+   * ever. The abstract, the register and the RA bill rendered nothing at all on failure, which on a
+   * bill is worse than an error: a missing abstract reads as a bill with no figures.
+   */
+  const pkgQuery = useQuery({
     queryKey: ['billPackage', packageId],
     queryFn: () => getBillPackage(packageId),
+    // A missing or forbidden bill will not appear on a retry; the default three retries only
+    // delay the message by several seconds.
+    retry: (count, err) =>
+      !(err instanceof ApiError && (err.status === 404 || err.status === 403)) &&
+      count < 2,
   });
-  const { data: abstract } = useQuery({
+  const pkg = pkgQuery.data;
+  const abstractQuery = useQuery({
     queryKey: ['billAbstract', packageId],
     queryFn: () => getAbstract(packageId),
   });
-  const { data: register } = useQuery({
+  const abstract = abstractQuery.data;
+  const registerQuery = useQuery({
     queryKey: ['billRegister', packageId],
     queryFn: () => getDebitRegister(packageId),
   });
+  const register = registerQuery.data;
+  /** Writes hidden on a locked project (036 Wave 3): every bill-package write answers 423 there. */
+  const { isLocked, projectId: shellProjectId } = useProjectLock();
+  const toast = useToast();
 
   // A certified subcontractor bill is paid here, and each payment produces its payment advice.
   const certifiedRaBillId =
     pkg?.direction === 'to_subcontractor' && pkg.status === 'certified'
       ? (pkg.raBillId ?? null)
       : null;
-  const { data: raBill } = useQuery({
+  const raBillQuery = useQuery({
     queryKey: ['raBill', certifiedRaBillId],
     queryFn: () => getRaBill(certifiedRaBillId as string),
     enabled: certifiedRaBillId !== null,
   });
+  const raBill = raBillQuery.data;
 
   const refresh = () => {
     for (const key of ['billPackage', 'billAbstract', 'billRegister']) {
@@ -108,15 +133,61 @@ export default function BillPackageDetail({
     void queryClient.invalidateQueries({ queryKey: ['raBill'] });
   };
 
-  if (isLoading || !pkg) {
+  if (pkgQuery.isError && !pkg) {
+    const status =
+      pkgQuery.error instanceof ApiError ? pkgQuery.error.status : null;
+    // 036 I15: a bill that is not there is said once, with the way back — not offered a Retry
+    // that cannot succeed. 403 reads the same way on purpose: the API answers a bill of another
+    // company as not found, and naming which would say the bill exists.
+    if (status === 404 || status === 403) {
+      return (
+        <div className="flex flex-col items-start gap-3 rounded-md border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-900">
+            This bill could not be found
+          </h2>
+          <p className="text-sm text-gray-600">
+            It may have been abandoned and removed, the link may be wrong, or it
+            may belong to a project you cannot open.
+          </p>
+          {shellProjectId && (
+            <Link
+              href={ROUTES.projectsBillPackages(shellProjectId)}
+              className="text-sm font-medium text-brand-700 underline"
+            >
+              Back to the bills on this project
+            </Link>
+          )}
+        </div>
+      );
+    }
     return (
-      <p className="p-4 text-sm text-gray-500" role="status">
-        Loading the bill…
-      </p>
+      <QueryError
+        error={pkgQuery.error}
+        fallback="The bill could not be loaded."
+        onRetry={pkgQuery.refetch}
+      />
     );
   }
 
-  const editable = isEditable(pkg.status);
+  if (!pkg) {
+    return (
+      <div role="status" aria-label="Loading the bill…" className="flex flex-col gap-6">
+        <div className="h-6 w-48 animate-pulse rounded bg-gray-200" aria-hidden="true" />
+        <ListSkeleton
+          headers={['BOQ', 'Description', 'Unit', 'Proposed', 'Claimed', 'Rate', 'Amount']}
+          rows={6}
+        />
+      </div>
+    );
+  }
+
+  /**
+   * What may be written on this screen. A locked project keeps the bill readable and takes every
+   * edit control away (036 Wave 3, 2026-10-18) — the server refuses each with a 423 anyway, and a
+   * grid of inputs that all fail on save is a worse way to learn the project is locked than a
+   * sentence saying so.
+   */
+  const editable = isEditable(pkg.status) && !isLocked;
   // Null and "0.000" are different facts on a claim — a line with no measurement source against a
   // line measured as nothing — but neither is a quantity to bill, so both count as nothing here.
   const nothingProposed =
@@ -155,7 +226,10 @@ export default function BillPackageDetail({
    * would remove the only way to bill it. The collapse is for a document that has been sent, where
    * the rows are a record rather than a form.
    */
-  const claims = editable || showEveryLine ? pkg.claims : acted;
+  // By the bill's status, not `editable`: a locked project's draft is still a draft, whose every
+  // schedule line is part of what it is, read-only or not.
+  const draftLike = isEditable(pkg.status);
+  const claims = draftLike || showEveryLine ? pkg.claims : acted;
   const hiddenClaims = pkg.claims.length - claims.length;
 
   return (
@@ -212,7 +286,14 @@ export default function BillPackageDetail({
           {error}
         </p>
       )}
-      {!editable && pkg.status !== 'abandoned' && (
+      {isLocked && isEditable(pkg.status) && (
+        <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+          This project is locked, so this draft cannot be changed — its lines,
+          figures and debit notes are shown read-only. Unlock the project to
+          edit it; this is not a permission problem.
+        </p>
+      )}
+      {!isEditable(pkg.status) && pkg.status !== 'abandoned' && (
         <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
           {pkg.status === 'pending_approval' || pkg.status === 'approved'
             ? 'This bill is with its approver, so its lines are locked — an approval is of the figures the approver saw. Withdraw it to draft to change anything.'
@@ -232,7 +313,7 @@ export default function BillPackageDetail({
           at what rate; approved daily work decides how much — and that fact is nowhere on this
           screen unless it is said. */}
       {nothingProposed && (
-        <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+        <p className="rounded-md bg-brand-50 p-3 text-sm text-brand-900">
           Every line proposes 0.000, because no approved daily work falls in{' '}
           {dateLabel(pkg.periodFrom)} – {dateLabel(pkg.periodTo)}. Quantities
           come from approved daily reports, not from the award — the award sets
@@ -271,24 +352,24 @@ export default function BillPackageDetail({
               other schedule line
               {hiddenClaims === 1 ? ' carries' : 's carry'} no quantity.
             </p>
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="underline"
               onClick={() => setShowEveryLine(true)}
-              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               Show every schedule line
-            </button>
+            </TextButton>
           </div>
         )}
-        {showEveryLine && !editable && (
+        {showEveryLine && !draftLike && (
           <div className="mb-2">
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="underline"
               onClick={() => setShowEveryLine(false)}
-              className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               Show only what was claimed
-            </button>
+            </TextButton>
           </div>
         )}
         {/* Lines exist and none carries a quantity — a different fact from a bill with no lines,
@@ -300,13 +381,13 @@ export default function BillPackageDetail({
               considered and nothing was claimed.
             </p>
             {hiddenClaims > 0 && (
-              <button
-                type="button"
+              <TextButton
+                size="xs"
+                className="underline"
                 onClick={() => setShowEveryLine(true)}
-                className="text-xs font-medium text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               >
                 Show every schedule line
-              </button>
+              </TextButton>
             )}
           </div>
         ) : (
@@ -365,9 +446,13 @@ export default function BillPackageDetail({
                           ...(reason ? { reason } : {}),
                         });
                         setError(null);
+                        toast.success(`${claim.boqNo} saved.`);
                         refresh();
                       } catch (err) {
+                        // The row keeps what was typed (it owns that state), so the person can
+                        // correct the reason or the figure and save again.
                         setError(describe(err));
+                        throw err;
                       }
                     }}
                   />
@@ -429,9 +514,40 @@ export default function BillPackageDetail({
       )}
 
       {/* ── The abstract ──────────────────────────────────────────────── */}
+      {/* 036 I15: loading and failure each say so. Nothing rendered here read as a bill with no
+          figures — and Recoveries and deductions above it, which needs the abstract, vanished
+          with it. */}
+      {!abstract && abstractQuery.isLoading && (
+        <div role="status" aria-label="Loading the abstract…">
+          <ListSkeleton
+            headers={['Particulars', 'Upto date', 'Upto previous', 'This month']}
+            rows={5}
+          />
+        </div>
+      )}
+      {!abstract && abstractQuery.isError && (
+        <QueryError
+          compact
+          error={abstractQuery.error}
+          fallback="The abstract could not be loaded."
+          onRetry={abstractQuery.refetch}
+        />
+      )}
       {abstract && (
         <section>
           <h3 className="mb-1 font-medium text-gray-900">Abstract</h3>
+          {/* 036 I16 (2026-10-18): the parties' GSTINs disagree with the tax this bill charges.
+              Advisory — the project's setting still decides — and shown here as well as in the
+              Issue confirmation, because the person reading the abstract is the one who can go
+              and change the setting before anybody presses Issue. */}
+          {abstract.taxBasisWarning && (
+            <p
+              className="mb-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+              role="note"
+            >
+              {abstract.taxBasisWarning}
+            </p>
+          )}
           <p className="mb-2 text-xs text-gray-500">
             Tax basis: <strong>{projectsLabel(abstract.taxBasis)}</strong> (
             {projectsLabel(abstract.taxBasisSource)}) — shown because a tax
@@ -553,6 +669,14 @@ export default function BillPackageDetail({
       )}
 
       {/* ── Payments and payment advice (a certified subcontractor bill) ─── */}
+      {certifiedRaBillId !== null && !raBill && raBillQuery.isError && (
+        <QueryError
+          compact
+          error={raBillQuery.error}
+          fallback="The payments on this bill could not be loaded."
+          onRetry={raBillQuery.refetch}
+        />
+      )}
       {raBill && (
         <section>
           <h3 className="mb-1 font-medium text-gray-900">
@@ -567,6 +691,17 @@ export default function BillPackageDetail({
       )}
 
       {/* ── Debit notes — subcontractor bills only (2026-10-15) ────────── */}
+      {/* 036 I15: only a subcontractor bill has a register, so a failure is shown there alone. */}
+      {!register &&
+        registerQuery.isError &&
+        pkg.direction === 'to_subcontractor' && (
+          <QueryError
+            compact
+            error={registerQuery.error}
+            fallback="The debit notes on this bill could not be loaded."
+            onRetry={registerQuery.refetch}
+          />
+        )}
       {register?.applicable && (
         <DebitNotesPanel
           register={register}
@@ -630,14 +765,11 @@ function ClaimRow({
         <td className={clsx(DENSE_TD, 'whitespace-nowrap')}>
           {/* 025 FR-028. Until now this existed only inside the downloaded workbook, so answering
             "where did this figure come from?" meant producing a document. */}
-          <button
-            type="button"
+          <TextButton
             onClick={onToggleSheet}
-            className="font-medium text-blue-700 hover:underline"
-            aria-expanded={sheetOpen}
-          >
+            aria-expanded={sheetOpen}>
             {claim.boqNo}
-          </button>
+          </TextButton>
         </td>
         <td className={clsx(DENSE_TD, 'max-w-md')}>
           <span className="line-clamp-2">{claim.description}</span>
@@ -647,13 +779,13 @@ function ClaimRow({
             </span>
           )}
           {canEditItem && !editingItem && (
-            <button
-              type="button"
+            <TextButton
+              size="xs"
+              className="ml-2 underline"
               onClick={() => setEditingItem(true)}
-              className="ml-2 text-xs font-medium text-blue-700 underline"
             >
               Edit item
-            </button>
+            </TextButton>
           )}
           {claim.overClaimed && (
             <span className="ml-1 rounded bg-amber-200 px-1 text-xs font-medium text-amber-900">
@@ -706,14 +838,20 @@ function ClaimRow({
               )}
               {changed && (
                 <Button
-                  disabled={saving || (needsReason && reason.trim() === '')}
+                  loading={saving}
+                  disabled={needsReason && reason.trim() === ''}
                   onClick={async () => {
                     setSaving(true);
-                    await onSave(
-                      claimed,
-                      needsReason ? reason.trim() : undefined,
-                    );
-                    setSaving(false);
+                    try {
+                      await onSave(
+                        claimed,
+                        needsReason ? reason.trim() : undefined,
+                      );
+                    } catch {
+                      // Reported by the parent; what was typed stays in this row to correct.
+                    } finally {
+                      setSaving(false);
+                    }
                   }}
                 >
                   {saving ? 'Saving…' : 'Save'}

@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   generatePaymentSheet,
+  getLabourDayRules,
   getMyLabourSites,
   getPaymentSheets,
   type PaymentSheet,
@@ -15,7 +16,7 @@ import {
 } from '@/app/lib/api/labour';
 import { getProjects } from '@/app/lib/api/projects';
 import { labourLabel, ROUTES } from '@/app/lib/constants';
-import { rupees } from '@/app/lib/format';
+import { dateLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -62,7 +63,7 @@ export default function PaymentSheetsPage() {
     {
       key: 'period',
       header: 'Dates',
-      render: (s) => `${s.periodFrom} → ${s.periodTo}`,
+      render: (s) => `${dateLabel(s.periodFrom)} → ${dateLabel(s.periodTo)}`,
     },
     { key: 'net', header: 'Net payable', render: (s) => rupees(s.netTotal) },
     {
@@ -89,7 +90,8 @@ export default function PaymentSheetsPage() {
         rows={sheets.data ?? []}
         rowKey={(s) => s.id}
         isLoading={sheets.isPending}
-        error={sheets.isError ? 'Could not load payment sheets.' : null}
+        error={sheets.error}
+        onRetry={sheets.refetch}
         emptyMessage="No payment sheets yet."
         actions={(s) => (
           <Link href={ROUTES.labourPaymentSheet(s.id)}>
@@ -113,13 +115,21 @@ export default function PaymentSheetsPage() {
   );
 }
 
-/** The first and last day of the current month, as the default range. */
-function thisMonth(): { from: string; to: string } {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const ym = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-  return { from: `${ym}-01`, to: `${ym}-${pad(last)}` };
+/**
+ * The day before today in India time, as `YYYY-MM-DD` — the latest a sheet may end (036 O3: a sheet
+ * covering today would miss the punches still to come, and the server now refuses it with
+ * `LABOUR_SHEET_PERIOD_NOT_ENDED`).
+ */
+function yesterdayIso(): string {
+  const d = new Date(`${todayIso()}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Yesterday's month so far, as the default range: the 1st to yesterday. */
+function defaultRange(): { from: string; to: string } {
+  const to = yesterdayIso();
+  return { from: `${to.slice(0, 7)}-01`, to };
 }
 
 function GenerateSheetForm({
@@ -132,9 +142,16 @@ function GenerateSheetForm({
   onSaved: (sheet: PaymentSheet) => void;
 }) {
   const [siteId, setSiteId] = useState(sites.length === 1 ? sites[0].id : '');
-  const [periodFrom, setPeriodFrom] = useState(() => thisMonth().from);
-  const [periodTo, setPeriodTo] = useState(() => thisMonth().to);
+  const [periodFrom, setPeriodFrom] = useState(() => defaultRange().from);
+  const [periodTo, setPeriodTo] = useState(() => defaultRange().to);
   const [error, setError] = useState<string | null>(null);
+  const latestEnd = yesterdayIso();
+
+  // 036 O10: the help text reads the company's own thresholds (034), not a fixed sentence.
+  const rules = useQuery({
+    queryKey: ['labour', 'day-rules'],
+    queryFn: () => getLabourDayRules(),
+  });
 
   const mutation = useMutation({
     mutationFn: () => generatePaymentSheet({ siteId, periodFrom, periodTo }),
@@ -142,44 +159,45 @@ function GenerateSheetForm({
     // The 409s name exactly what is missing ("No female daily rate is set for …"), which is
     // the instruction HR needs, so the server's sentence is shown here.
     onError: (e) =>
-      setError(
-        e instanceof ApiError
-          ? e.message
-          : 'Could not generate the payment sheet.',
-      ),
+      setError(errorMessage(e, 'Could not generate the payment sheet.')),
   });
 
   const rangeError =
     periodFrom && periodTo && periodTo < periodFrom
       ? 'The "to" date must be on or after the "from" date.'
+      : periodTo > latestEnd
+      ? `A sheet must end by yesterday (${dateLabel(latestEnd)}) — today's punches are not in yet.`
       : undefined;
 
   return (
     <Modal
       title="Generate Payment Sheet"
       onClose={onClose}
+      pending={mutation.isPending}
       footer={
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <>
+          <SecondaryButton onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </SecondaryButton>
           <Button
             onClick={() => {
               setError(null);
               mutation.mutate();
             }}
-            disabled={
-              !siteId || !periodFrom || !periodTo || !!rangeError || mutation.isPending
-            }
+            disabled={!siteId || !periodFrom || !periodTo || !!rangeError}
+            loading={mutation.isPending}
           >
             {mutation.isPending ? 'Generating…' : 'Generate'}
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-3">
         <FormError message={error} />
         <SelectField
           id="gen-site"
-          label="Site"
+          label="Site *"
+          required
           value={siteId}
           onChange={(e) => setSiteId(e.target.value)}
         >
@@ -193,24 +211,59 @@ function GenerateSheetForm({
         <div className="grid grid-cols-2 gap-3">
           <TextField
             id="gen-from"
-            label="From"
+            label="From *"
             type="date"
+            required
+            max={periodTo || latestEnd}
             value={periodFrom}
             onChange={(e) => setPeriodFrom(e.target.value)}
           />
           <TextField
             id="gen-to"
-            label="To"
+            label="To *"
             type="date"
+            required
+            max={latestEnd}
             value={periodTo}
             onChange={(e) => setPeriodTo(e.target.value)}
             error={rangeError}
           />
         </div>
-        <p className="text-xs text-gray-500">
-          Punched in and out counts as a full day, punched in only as a half day.
-        </p>
+        <DayRulesHelp rules={rules.data} />
       </div>
     </Modal>
+  );
+}
+
+/**
+ * How the sheet counts a day (036 O10). Rewritten from the hours-based day rules of 034: the old
+ * sentence ("punched in only is a half day") described the rule 034 replaced, and was wrong for
+ * every company since. The figures are the company's own when they have loaded.
+ */
+function DayRulesHelp({
+  rules,
+}: {
+  rules?: { fullDayHours: number; halfDayHours: number; standardHours: number };
+}) {
+  const full = rules ? `${rules.fullDayHours} hours` : 'the full-day hours';
+  const half = rules ? `${rules.halfDayHours} hours` : 'the half-day hours';
+  return (
+    <ul className="list-disc space-y-1 pl-4 text-xs text-gray-500">
+      <li>
+        Each day is counted from the hours between punch in and punch out: {full} or
+        more is a full day, {half} or more a half day, and less is not paid.
+      </li>
+      {rules && rules.standardHours > 0 && (
+        <li>Hours beyond {rules.standardHours} in a day are paid as overtime.</li>
+      )}
+      <li>
+        A day with a missing punch must be corrected under Muster attendance first, and
+        the sheet must end by yesterday.
+      </li>
+      <li>
+        Anything short-paid on an earlier sheet is added as a &ldquo;Balance carried
+        forward&rdquo; line.
+      </li>
+    </ul>
   );
 }

@@ -1,23 +1,40 @@
 'use client';
 
+import { DocumentIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   createReimbursementClaim,
+  getMyReimbursementReceipt,
   getReimbursementCategories,
   updateReimbursementClaim,
   type ClaimInput,
   type ReimbursementClaim,
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
+import { openStoredFile } from '@/app/lib/download-file';
+import { MAX_UPLOAD_BYTES } from '@/app/lib/files';
 import { Button } from '@/app/ui/button';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
+import QueryError from '@/app/ui/query-error';
 import {
   FormError,
+  RowAction,
   SecondaryButton,
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
+import { rupees, todayIso } from '@/app/lib/format';
+
+/**
+ * What the API stores as a receipt (036 G5): a photo it can normalise, or a PDF. Narrower than the
+ * kit's `ACCEPT_IMAGES_AND_PDF` on purpose — HEIC is not decoded by most browsers, so it would go up
+ * uncompressed and be refused with a 415. iOS hands the picker a JPEG when HEIC is not listed.
+ */
+const RECEIPT_ACCEPT =
+  'image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf';
 
 /** Matches the backend's DECIMAL(12,2): more precision would be silently rounded. */
 const AMOUNT_STEP = '0.01';
@@ -38,19 +55,24 @@ function receiptIsRequired(
 }
 
 /**
- * Reads a chosen file as base64 for the claim payload.
- *
- * The receipt travels inside the create/edit request rather than through a
- * separate upload, so an abandoned claim leaves no orphaned blob behind — the same
- * shape enrolment uses for its photos.
+ * Opens a claim's receipt — a photo or a PDF, in a new tab — from the employee's own endpoint
+ * (036 G5). `viewing` is the claim id in flight, for the button's spinner. Shared by the claim list
+ * and the edit form.
  */
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.readAsDataURL(file);
-  });
+export function useViewReceipt() {
+  const toast = useToast();
+  const [viewing, setViewing] = useState<string | null>(null);
+  async function viewReceipt(id: string) {
+    setViewing(id);
+    try {
+      openStoredFile(await getMyReimbursementReceipt(id), 'receipt');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not open the receipt. Please try again.'));
+    } finally {
+      setViewing(null);
+    }
+  }
+  return { viewReceipt, viewing };
 }
 
 /**
@@ -79,11 +101,21 @@ export default function ReimbursementForm({
         }
       : EMPTY,
   );
-  const [receipt, setReceipt] = useState<string | null>(null);
-  const [receiptName, setReceiptName] = useState<string | null>(null);
+  const toast = useToast();
+  // 036 G5: through the kit `FileUpload` — a photo is shrunk before it goes up over a site
+  // connection, the type and the 10 MB limit are checked before reading, and a PDF is accepted.
+  const [receipt, setReceipt] = useState<PreparedFile | null>(null);
+  // Edit only: the employee chose to take the receipt on file off the claim.
+  const [removeExisting, setRemoveExisting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { viewReceipt, viewing } = useViewReceipt();
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+    refetch: refetchCategories,
+  } = useQuery({
     queryKey: ['my', 'reimbursement-categories'],
     queryFn: getReimbursementCategories,
   });
@@ -96,7 +128,8 @@ export default function ReimbursementForm({
 
   // The employee already has a receipt on file when editing a draft that carried
   // one, so the requirement is satisfied without re-attaching it.
-  const hasReceipt = receipt !== null || Boolean(editing?.receiptRef);
+  const existingReceipt = Boolean(editing?.receiptRef) && !removeExisting;
+  const hasReceipt = receipt !== null || existingReceipt;
   const needsReceipt = receiptIsRequired(
     category?.receiptRequiredAbove,
     amount,
@@ -110,19 +143,26 @@ export default function ReimbursementForm({
         amount,
         expenseDate: form.expenseDate,
         description: form.description.trim(),
-        ...(receipt ? { receipt } : {}),
+        // 036 G5: only ever the uploaded file. `receiptRef` is sent solely as `null`, to take the
+        // receipt on file off; the server no longer accepts a client string as a receipt.
+        ...(receipt
+          ? { receipt: receipt.base64 }
+          : editing && removeExisting
+            ? { receiptRef: null }
+            : {}),
         status,
       };
       return editing
         ? updateReimbursementClaim(editing.id, input)
         : createReimbursementClaim(input);
     },
-    onSuccess: () => {
+    onSuccess: (_claim, status) => {
       queryClient.invalidateQueries({ queryKey: ['my', 'reimbursements'] });
+      toast.success(status === 'draft' ? 'Draft saved' : 'Claim submitted');
       onDone();
     },
-    onError: (err: unknown) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed),
+    // The form keeps everything typed and the file picked, so a retry is one tap.
+    onError: (err: unknown) => setError(errorMessage(err, MESSAGES.saveFailed)),
   });
 
   const complete =
@@ -135,21 +175,6 @@ export default function ReimbursementForm({
   // it was never fileable is the worse of the two ways to enforce it.
   const canSubmit = complete && !receiptMissing && !submit.isPending;
 
-  async function onFileChange(file: File | undefined) {
-    if (!file) {
-      setReceipt(null);
-      setReceiptName(null);
-      return;
-    }
-    try {
-      setReceipt(await readAsBase64(file));
-      setReceiptName(file.name);
-      setError(null);
-    } catch {
-      setError('Could not read that file. Try a different photo.');
-    }
-  }
-
   return (
     <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
       <h2 className="text-lg font-medium text-gray-900">
@@ -158,9 +183,19 @@ export default function ReimbursementForm({
 
       <FormError message={error} />
 
+      {categoriesError && (
+        <QueryError
+          compact
+          error={categoriesError}
+          fallback="Could not load the claim categories."
+          onRetry={refetchCategories}
+        />
+      )}
+
       <SelectField
         id="claim-category"
         label="Category"
+        required
         value={form.categoryId}
         onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
       >
@@ -171,7 +206,7 @@ export default function ReimbursementForm({
           <option key={c.id} value={c.id}>
             {c.name}
             {c.receiptRequiredAbove !== null &&
-              ` — receipt needed above ${c.receiptRequiredAbove}`}
+              ` — receipt needed above ${rupees(c.receiptRequiredAbove)}`}
           </option>
         ))}
       </SelectField>
@@ -185,7 +220,8 @@ export default function ReimbursementForm({
 
       <TextField
         id="claim-amount"
-        label="Amount"
+        label="Amount (₹)"
+        required
         type="number"
         min="0"
         step={AMOUNT_STEP}
@@ -197,9 +233,11 @@ export default function ReimbursementForm({
       <TextField
         id="claim-date"
         label="Expense date"
+        required
         type="date"
-        // A claim cannot be for money not yet spent.
-        max={new Date().toISOString().slice(0, 10)}
+        // A claim cannot be for money not yet spent. Today in India (036 G5): the UTC date this
+        // once used refused today's expense until 05:30 IST.
+        max={todayIso()}
         value={form.expenseDate}
         onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
       />
@@ -207,44 +245,69 @@ export default function ReimbursementForm({
       <TextField
         id="claim-description"
         label="Description"
+        required
         maxLength={500}
         value={form.description}
         placeholder="e.g. Taxi from site office to the depot"
         onChange={(e) => setForm({ ...form, description: e.target.value })}
       />
 
-      <div>
-        <label
-          htmlFor="claim-receipt"
-          className="mb-1 block text-sm font-medium text-gray-700"
-        >
-          Receipt{needsReceipt ? '' : ' (optional)'}
-        </label>
-        <input
+      <div className="space-y-2">
+        <FileUpload
           id="claim-receipt"
-          type="file"
-          accept="image/*"
-          // `capture` is a hint, not a lock: on a phone it opens the camera
-          // straight away, and on a desktop browser it is ignored and the normal
-          // file picker appears.
-          capture="environment"
-          onChange={(e) => onFileChange(e.target.files?.[0])}
-          className="block w-full text-sm text-gray-700"
+          label={`Receipt${needsReceipt ? '' : ' (optional)'}`}
+          accept={RECEIPT_ACCEPT}
+          maxBytes={MAX_UPLOAD_BYTES}
+          compress
+          hint="A photo (JPEG, PNG, WebP) or a PDF, up to 10 MB."
+          onSelect={setReceipt}
+          disabled={submit.isPending}
         />
-        {receiptName && (
-          <p className="mt-1 text-xs text-gray-500">Attached: {receiptName}</p>
-        )}
-        {!receiptName && editing?.receiptRef && (
-          <p className="mt-1 text-xs text-gray-500">
-            A receipt is already attached. Choosing a file replaces it.
-          </p>
+        {/* The receipt already on the draft: openable, removable, and replaced by a new pick. */}
+        {editing?.receiptRef && !receipt && (
+          <div className="flex max-w-md flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 text-sm">
+            <DocumentIcon
+              aria-hidden="true"
+              className="h-6 w-6 shrink-0 text-gray-400"
+            />
+            <span className="min-w-0 flex-1 text-gray-700">
+              {removeExisting
+                ? 'The receipt on file will be removed when you save.'
+                : 'A receipt is on file. Choosing a file replaces it.'}
+            </span>
+            {removeExisting ? (
+              <RowAction
+                type="button"
+                intent="read"
+                onClick={() => setRemoveExisting(false)}
+              >
+                Keep it
+              </RowAction>
+            ) : (
+              <>
+                <RowAction
+                  type="button"
+                  intent="read"
+                  loading={viewing === editing.id}
+                  onClick={() => void viewReceipt(editing.id)}
+                >
+                  View receipt
+                </RowAction>
+                <RowAction
+                  type="button"
+                  className="text-red-600"
+                  onClick={() => setRemoveExisting(true)}
+                >
+                  Remove
+                </RowAction>
+              </>
+            )}
+          </div>
         )}
         {receiptMissing && category && (
-          <p className="mt-1 text-xs text-amber-700" role="alert">
-            {MESSAGES.claimReceiptRequired(
-              category.name,
-              category.receiptRequiredAbove as number,
-            )}
+          <p className="text-xs text-amber-700" role="alert">
+            {/* With ₹ (036 G5); `MESSAGES.claimReceiptRequired` prints the bare number. */}
+            {`${category.name} claims above ${rupees(category.receiptRequiredAbove)} need a receipt attached.`}
           </p>
         )}
       </div>
@@ -254,6 +317,7 @@ export default function ReimbursementForm({
           type="button"
           onClick={() => submit.mutate('submitted')}
           disabled={!canSubmit}
+          loading={submit.isPending && submit.variables === 'submitted'}
         >
           {submit.isPending ? 'Saving…' : 'Submit claim'}
         </Button>
@@ -264,6 +328,7 @@ export default function ReimbursementForm({
           type="button"
           onClick={() => submit.mutate('draft')}
           disabled={!complete || submit.isPending}
+          loading={submit.isPending && submit.variables === 'draft'}
         >
           Save as draft
         </SecondaryButton>

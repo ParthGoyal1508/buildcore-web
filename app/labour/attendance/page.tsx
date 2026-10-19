@@ -37,6 +37,9 @@ import CameraCapture from '@/app/ui/my/camera-capture';
 import PageHeader from '@/app/ui/page-header';
 import { FormError, SelectField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import { clockTime } from '@/app/lib/format';
+import { SecondaryButton } from '@/app/ui/button';
+import StatusBadge from '@/app/ui/status-badge';
 
 /** The last site picked on this phone, so a supervisor with several opens where they left off. */
 const SITE_STORAGE_KEY = 'buildcore.labour.attendanceSite';
@@ -80,11 +83,7 @@ function subscribeOnline(onChange: () => void) {
   };
 }
 
-const timeOf = (iso: string) =>
-  new Date(iso).toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+const timeOf = (iso: string) => clockTime(iso);
 
 /** "9.5 h, full day (+1.5 h overtime)" — what the hours between the punches made of the day. */
 function dayText(day: { status: string; hours: number | null; overtimeHours: number }) {
@@ -115,6 +114,10 @@ function punchErrorMessage(error: unknown): string {
  * attendance nobody could check until later — and a refusal discovered hours after the labour has
  * gone home cannot be retaken.
  */
+/** 036 O5: a night shift still open from yesterday counts as "in", not as still to punch in. */
+const isIn = (i: LabourDayRow) =>
+  (!!i.punchInAt && !i.punchOutAt) || (!i.punchInAt && !!i.openShiftFrom);
+
 export default function LabourAttendancePage() {
   const queryClient = useQueryClient();
   // Null until the supervisor picks one; until then the remembered site, or the only one.
@@ -161,8 +164,8 @@ export default function LabourAttendancePage() {
   const counts = useMemo(() => {
     const items = today.data?.items ?? [];
     return {
-      todo: items.filter((i) => !i.punchInAt).length,
-      in: items.filter((i) => i.punchInAt && !i.punchOutAt).length,
+      todo: items.filter((i) => !i.punchInAt && !i.openShiftFrom).length,
+      in: items.filter(isIn).length,
       done: items.filter((i) => i.punchOutAt).length,
       all: items.length,
     };
@@ -171,8 +174,8 @@ export default function LabourAttendancePage() {
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return (today.data?.items ?? []).filter((i) => {
-      if (filter === 'todo' && i.punchInAt) return false;
-      if (filter === 'in' && (!i.punchInAt || i.punchOutAt)) return false;
+      if (filter === 'todo' && (i.punchInAt || i.openShiftFrom)) return false;
+      if (filter === 'in' && !isIn(i)) return false;
       if (filter === 'done' && !i.punchOutAt) return false;
       if (!needle) return true;
       return [i.fullName, i.labourCode, i.fatherName ?? '']
@@ -216,18 +219,17 @@ export default function LabourAttendancePage() {
         actions={
           siteId ? (
             <div className="flex flex-wrap gap-2">
-              <button
+              <SecondaryButton
                 type="button"
                 disabled={!online}
                 onClick={() => {
                   setNotice(null);
                   setGroupPhoto(true);
                 }}
-                className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50 sm:h-10"
               >
                 <CameraIcon className="w-5" aria-hidden="true" />
                 Group photo
-              </button>
+              </SecondaryButton>
               <Link
                 href={`${ROUTES.labourRegister}?siteId=${encodeURIComponent(siteId)}`}
                 className="flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:border-brand-300 hover:bg-brand-50 sm:h-10"
@@ -318,7 +320,7 @@ export default function LabourAttendancePage() {
               placeholder="Search name, code or father's name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="block min-h-11 w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="block min-h-11 w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm placeholder:text-gray-400 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
             />
           </div>
 
@@ -335,9 +337,9 @@ export default function LabourAttendancePage() {
                 aria-selected={filter === f.id}
                 onClick={() => setFilter(f.id)}
                 className={clsx(
-                  'flex h-9 flex-none items-center gap-1 rounded-full border px-3 text-sm font-medium',
+                  'flex h-9 flex-none items-center gap-1 rounded-full border px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
                   filter === f.id
-                    ? 'border-blue-600 bg-blue-600 text-white'
+                    ? 'border-brand-600 bg-brand-600 text-white'
                     : 'border-gray-300 bg-white text-gray-700',
                 )}
               >
@@ -442,7 +444,13 @@ function LabourRow({
   disabled: boolean;
   onPunch: (type: 'in' | 'out') => void;
 }) {
-  const next: 'in' | 'out' | null = !worker.punchInAt
+  // 036 O5: an in-punch from yesterday still open (within 16 hours) is a night shift — the next
+  // punch closes it, so Punch out is offered before a new Punch in. The server attaches the
+  // out-punch to that open shift.
+  const nightShift = !worker.punchInAt && !!worker.openShiftFrom;
+  const next: 'in' | 'out' | null = nightShift
+    ? 'out'
+    : !worker.punchInAt
     ? 'in'
     : !worker.punchOutAt
     ? 'out'
@@ -457,6 +465,11 @@ function LabourRow({
           {worker.labourCode}
           {worker.fatherName ? ` · S/o, D/o ${worker.fatherName}` : ''}
         </p>
+        {nightShift && worker.openShiftFrom && (
+          <p className="mt-0.5 text-xs text-gray-600">
+            Night shift · in {timeOf(worker.openShiftFrom)} yesterday
+          </p>
+        )}
         {(worker.punchInAt || worker.punchOutAt) && (
           <p className="mt-0.5 text-xs text-gray-600">
             {worker.punchInAt && `In ${timeOf(worker.punchInAt)}`}
@@ -465,18 +478,16 @@ function LabourRow({
         )}
       </div>
       {!worker.faceEnrolled ? (
-        <span className="flex-none rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-          No face photos
-        </span>
+        <StatusBadge tone="warning" label={'No face photos'} className="flex-none" />
       ) : next ? (
         <button
           type="button"
           disabled={disabled}
           onClick={() => onPunch(next)}
           className={clsx(
-            'flex h-11 flex-none items-center rounded-lg px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50',
+            'flex h-11 flex-none items-center rounded-lg px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
             next === 'in'
-              ? 'bg-blue-600 hover:bg-blue-500'
+              ? 'bg-brand-600 hover:bg-brand-500'
               : 'bg-gray-800 hover:bg-gray-700',
           )}
           aria-label={`Punch ${next} ${worker.fullName}`}
@@ -677,7 +688,7 @@ function GroupPhotoDialog({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="e.g. Morning gang at block C"
-          className="mb-3 block min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="mb-3 block min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
         {save.isPending ? (
           <div className="flex flex-col items-center gap-3 py-10" role="status">

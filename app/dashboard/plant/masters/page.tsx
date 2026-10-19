@@ -30,6 +30,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { dateLabel } from '@/app/lib/format';
 
 type Tab = 'categories' | 'doc-types' | 'rates';
 
@@ -187,7 +188,7 @@ export default function MastersPage() {
         row.effectiveTo === null ? (
           <span className="font-medium text-green-800">Current</span>
         ) : (
-          row.effectiveTo.slice(0, 10)
+          dateLabel(row.effectiveTo)
         ),
     },
   ];
@@ -213,8 +214,8 @@ export default function MastersPage() {
                 onClick={() => setTab(value)}
                 className={
                   tab === value
-                    ? '-mb-px block whitespace-nowrap border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500'
-                    : '-mb-px block whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500'
+                    ? '-mb-px block whitespace-nowrap border-b-2 border-brand-600 px-3 py-2 text-sm font-medium text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
+                    : '-mb-px block whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
                 }
               >
                 {label}

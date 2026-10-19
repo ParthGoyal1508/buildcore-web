@@ -8,6 +8,7 @@ import type { ApprovalState } from '@/app/lib/api/approvals';
 import { MESSAGES } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import { LoadingText } from '@/app/ui/spinner';
+import { TextButton } from '@/app/ui/button';
 
 /**
  * The full ordered decision history for one record (spec FR-009).
@@ -55,15 +56,14 @@ export default function DecisionHistory({
 
   return (
     <div className="text-xs">
-      <button
-        type="button"
+      <TextButton
+        className="underline decoration-dotted"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="rounded text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
       >
         {open ? 'Hide history' : 'Show full history'}
         {state.returnCount > 0 ? ` (returned ${state.returnCount}×)` : ''}
-      </button>
+      </TextButton>
 
       {open && (
         <div className="mt-2">

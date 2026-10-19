@@ -1,22 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-
 import { uploadCountersigned } from '@/app/lib/api/letters';
-import { Button } from '@/app/ui/button';
-import { FormError } from '@/app/ui/settings/form-fields';
-
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('The file could not be read.'));
-    reader.onload = () => {
-      const result = String(reader.result ?? '');
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.readAsDataURL(file);
-  });
-}
+import FileUpload from '@/app/ui/file-upload';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * The executed copy that comes back signed by the other party (017 FR-012, backend FR-017).
@@ -25,6 +11,11 @@ function readAsBase64(file: File): Promise<string> {
  * it" are different claims about the world, and a screen that overwrote the first with
  * the second would lose the ability to show what was actually sent — which is the half
  * that matters when the two disagree.
+ *
+ * 036 J4 (2026-10-17): the shared picker, uploading as soon as a file is chosen. The bare
+ * `<input type="file">` this replaced took any file of any size, said nothing while it sent a
+ * scan, and could not be given the same file again after a failure. A photographed signature
+ * page is shrunk before it goes; the server's refusal, if any, is shown under the control.
  */
 export function CountersignUpload({
   letterId,
@@ -33,45 +24,20 @@ export function CountersignUpload({
   letterId: string;
   onUploaded?: () => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async () => {
-    if (!file) return;
-    setError(null);
-    setBusy(true);
-    try {
-      await uploadCountersigned(letterId, {
-        data: await readAsBase64(file),
-        contentType: file.type || 'application/pdf',
-      });
-      setFile(null);
-      onUploaded?.();
-    } catch (err) {
-      const code = (err as { code?: string } | null)?.code;
-      setError(
-        code && err instanceof Error
-          ? err.message
-          : 'The executed copy could not be attached.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const toast = useToast();
   return (
-    <div className="flex flex-col gap-2">
-      <input
-        type="file"
-        aria-label="Executed copy"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="block w-full text-sm text-gray-700"
-      />
-      <FormError message={error} />
-      <Button type="button" disabled={!file || busy} onClick={() => void submit()}>
-        {busy ? 'Attaching…' : 'Attach executed copy'}
-      </Button>
-    </div>
+    <FileUpload
+      label="Executed copy"
+      onUpload={(file) =>
+        uploadCountersigned(letterId, {
+          data: file.base64,
+          contentType: file.mimeType,
+        })
+      }
+      onUploaded={() => {
+        toast.success('The executed copy has been attached.');
+        onUploaded?.();
+      }}
+    />
   );
 }

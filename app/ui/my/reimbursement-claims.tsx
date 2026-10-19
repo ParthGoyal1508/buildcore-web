@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import clsx from 'clsx';
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   deleteReimbursementClaim,
   getReimbursementCategories,
@@ -15,10 +15,14 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
-import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
-import ReimbursementForm from '@/app/ui/my/reimbursement-form';
+import ReimbursementForm, {
+  useViewReceipt,
+} from '@/app/ui/my/reimbursement-form';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
+import { dateLabel, rupees } from '@/app/lib/format';
 
 /** Distinct per status (US8 AC4). Rejected is the one in red: it is the only
  * outcome that costs the employee money they have already spent. */
@@ -27,7 +31,7 @@ const STATUS_CLASS: Record<ReimbursementClaim['status'], string> = {
   submitted: 'bg-amber-100 text-amber-800',
   approved: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
-  paid: 'bg-blue-100 text-blue-800',
+  paid: 'bg-brand-100 text-brand-800',
   withdrawn: 'bg-gray-100 text-gray-600',
 };
 
@@ -45,27 +49,16 @@ const PAYMENT_LABEL: Record<'payroll' | 'direct', string> = {
   direct: 'paid directly',
 };
 
-const money = (value: number) =>
-  value.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const shortDate = (value: string) =>
-  new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+const shortDate = (value: string) => dateLabel(value.slice(0, 10));
 
 export default function ReimbursementClaims() {
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const { viewReceipt, viewing } = useViewReceipt();
   const [isFiling, setIsFiling] = useState(false);
   const [editing, setEditing] = useState<ReimbursementClaim | null>(null);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['my', 'reimbursements'],
     queryFn: getReimbursementClaims,
   });
@@ -79,21 +72,22 @@ export default function ReimbursementClaims() {
   const categoryName = (id: string) =>
     categories?.find((c) => c.id === id)?.name ?? '—';
 
-  const afterChange = () => {
+  // 036 G5: toasts in place of a banner above the list, which stayed after the next success.
+  const afterChange = (message: string) => () => {
     queryClient.invalidateQueries({ queryKey: ['my', 'reimbursements'] });
-    setError(null);
+    toast.success(message);
   };
   const onError = (err: unknown) =>
-    setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed);
+    toast.error(errorMessage(err, MESSAGES.saveFailed));
 
   const withdraw = useMutation({
     mutationFn: withdrawReimbursementClaim,
-    onSuccess: afterChange,
+    onSuccess: afterChange('Claim withdrawn'),
     onError,
   });
   const remove = useMutation({
     mutationFn: deleteReimbursementClaim,
-    onSuccess: afterChange,
+    onSuccess: afterChange('Draft deleted'),
     onError,
   });
   // A status-only edit: the backend re-checks the receipt threshold against the
@@ -102,7 +96,7 @@ export default function ReimbursementClaims() {
   const submit = useMutation({
     mutationFn: (id: string) =>
       updateReimbursementClaim(id, { status: 'submitted' }),
-    onSuccess: afterChange,
+    onSuccess: afterChange('Claim submitted'),
     onError,
   });
 
@@ -124,7 +118,7 @@ export default function ReimbursementClaims() {
       header: 'Amount',
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">
-          ₹{money(row.amount)}
+          {rupees(row.amount)}
         </span>
       ),
     },
@@ -164,8 +158,17 @@ export default function ReimbursementClaims() {
               {PAYMENT_LABEL[row.paymentMode]}
             </p>
           )}
+          {/* 036 G5: openable — the employee could see a receipt was attached but not which. */}
           {row.receiptRef && (
-            <p className="mt-1 text-xs text-gray-500">Receipt attached</p>
+            <RowAction
+              type="button"
+              intent="read"
+              className="mt-1"
+              loading={viewing === row.id}
+              onClick={() => void viewReceipt(row.id)}
+            >
+              View receipt
+            </RowAction>
           )}
         </div>
       ),
@@ -190,14 +193,15 @@ export default function ReimbursementClaims() {
         New claim
       </Button>
 
-      <FormError message={error} />
 
       <ResponsiveList
         columns={columns}
         rows={data ?? []}
         rowKey={(row) => row.id}
         isLoading={isLoading}
-        error={isError ? MESSAGES.loadFailed : null}
+        error={error}
+        onRetry={refetch}
+        skeletonRows={3}
         emptyMessage="You have not filed any reimbursement claims yet."
         actions={(row) => {
           // A draft is still the employee's to change or discard; a submitted
@@ -214,8 +218,9 @@ export default function ReimbursementClaims() {
                     Withdraw while the claim is still pending review. */}
                 <RowAction
                   type="button"
-                  className="text-blue-600"
+                  className="text-brand-600"
                   disabled={submit.isPending}
+                  loading={submit.isPending && submit.variables === row.id}
                   onClick={() => submit.mutate(row.id)}
                 >
                   Submit
@@ -224,6 +229,7 @@ export default function ReimbursementClaims() {
                   type="button"
                   className="text-red-600"
                   disabled={remove.isPending}
+                  loading={remove.isPending && remove.variables === row.id}
                   onClick={async () => {
                     if (
                       await confirmDialog({
@@ -248,6 +254,7 @@ export default function ReimbursementClaims() {
                 type="button"
                 className="text-red-600"
                 disabled={withdraw.isPending}
+                loading={withdraw.isPending && withdraw.variables === row.id}
                 onClick={async () => {
                   if (
                     await confirmDialog({

@@ -1,13 +1,21 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { Suspense, useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   deletePurchase,
+  downloadInventoryExport,
   downloadStoreDocument,
   getPurchaseBill,
+  getPurchasePhoto,
   getPurchases,
   type Purchase,
 } from '@/app/lib/api/inventory';
@@ -16,10 +24,29 @@ import {
   PURCHASE_BILL_STATUSES,
   inventoryLabel,
 } from '@/app/lib/constants';
-import { formatRupees } from '@/app/lib/utils';
+import { saveBlob } from '@/app/lib/download-file';
+import { dateLabel, quantity, rupees, todayIso } from '@/app/lib/format';
+import {
+  urlEnum,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
+import AsyncSelect from '@/app/ui/async-select';
+import { Button, TextButton } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import {
+  dateRangeError,
+  searchSites,
+  searchVendors,
+  useSiteOption,
+  useVendorOption,
+} from '@/app/ui/inventory/inventory-search';
+import Pager from '@/app/ui/inventory/pager';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
 import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
-import { useSites, useVendors } from '@/app/ui/inventory/use-inventory-refs';
+import PageHeader from '@/app/ui/page-header';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import {
   FormError,
   RowAction,
@@ -27,65 +54,89 @@ import {
   SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
-import PageHeader from '@/app/ui/page-header';
-import { useFileViewer } from '@/app/ui/pdf-viewer';
-import { confirmDialog } from '@/app/ui/dialogs';
+import { useToast } from '@/app/ui/toast';
 
-export default function PurchasesPage() {
+/**
+ * Purchases (009), on the 036 kit (M5, M11, M12, M9):
+ * - filters in the URL, so Back and a shared link keep them; store and vendor searched on the
+ *   server rather than picked from the first 200;
+ * - dates as DD-MM-YYYY, quantities grouped, totals of the whole filter (not the page) and an Excel
+ *   download of it;
+ * - the PO line a delivery was received against, the delivery photo beside the bill;
+ * - a delete refused because the stock has moved on says how much is left (422), per row.
+ */
+function PurchasesList() {
   const queryClient = useQueryClient();
-  const sites = useSites();
-  const vendors = useVendors();
+  const toast = useToast();
+  const companyId = useSelectedCompanyId();
 
-  const [siteId, setSiteId] = useState('');
-  const [vendorId, setVendorId] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [page, setPage] = useState(1);
+  const [filters, setFilters, query] = useUrlState(
+    {
+      siteId: urlString(),
+      vendorId: urlString(),
+      paymentStatus: urlEnum(['', ...PURCHASE_BILL_STATUSES] as const, ''),
+      from: urlString(),
+      to: urlString(),
+      page: urlNumber(1),
+    },
+    { resetPage: 'page' },
+  );
+  const siteOption = useSiteOption(filters.siteId);
+  const vendorOption = useVendorOption(filters.vendorId);
+  const rangeError = dateRangeError(filters.from, filters.to);
+
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openingBill, setOpeningBill] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   // The vendor's bill reads in the page's own viewer when it is a PDF or a photo (2026-10-14).
   const { show, viewer } = useFileViewer();
 
-  const filters = {
-    page,
-    ...(siteId ? { siteId } : {}),
-    ...(vendorId ? { vendorId } : {}),
-    ...(paymentStatus ? { paymentStatus } : {}),
-    ...(dateFrom ? { dateFrom } : {}),
-    ...(dateTo ? { dateTo } : {}),
+  const params = {
+    page: query.page,
+    siteId: query.siteId || undefined,
+    vendorId: query.vendorId || undefined,
+    paymentStatus: query.paymentStatus || undefined,
+    dateFrom: query.from || undefined,
+    dateTo: query.to || undefined,
   };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['inventory', 'purchases', filters],
-    queryFn: () => getPurchases(filters),
+  const list = useQuery({
+    queryKey: ['inventory', 'purchases', companyId, params],
+    queryFn: () => getPurchases(params),
+    placeholderData: keepPreviousData,
+    // A reversed range matches nothing; it is said beside the filter instead of asked.
+    enabled: !rangeError,
   });
+  const data = list.data;
 
   /**
-   * Opens a stored bill in the page's viewer (2026-10-14) — before, a new tab, which most browsers
-   * block when it is opened after the fetch. Fetched rather than linked: the endpoint needs the
-   * bearer token, which lives in memory and never appears in a URL, so a plain `<a href>` would 401.
-   * A bill that is neither a PDF nor an image is saved instead.
+   * Opens a stored bill or delivery photo in the page's viewer. Fetched rather than linked: the
+   * endpoint needs the bearer token, which lives in memory and never appears in a URL.
    */
-  async function openBill(id: string) {
-    setOpeningBill(id);
-    setError(null);
+  async function openFile(row: Purchase, which: 'bill' | 'photo') {
+    setOpening(`${which}:${row.id}`);
     try {
-      show(
-        { blob: await getPurchaseBill(id) },
-        `purchase-bill-${id}`,
-        'Vendor bill',
-      );
+      if (which === 'bill') {
+        show(
+          { blob: await getPurchaseBill(row.id) },
+          `purchase-bill-${row.grnNumber ?? row.id}`,
+          'Vendor bill',
+        );
+      } else {
+        show(
+          await getPurchasePhoto(row.id),
+          `delivery-photo-${row.grnNumber ?? row.id}`,
+          'Delivery photo',
+        );
+      }
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : 'Could not open this bill.',
-      );
+      toast.error(errorMessage(err, 'Could not open this file.'));
     } finally {
-      setOpeningBill(null);
+      setOpening(null);
     }
   }
 
@@ -93,18 +144,52 @@ export default function PurchasesPage() {
     mutationFn: (id: string) => deletePurchase(id),
     onSuccess: () => {
       setError(null);
+      toast.success('Purchase deleted and its stock reversed');
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
     },
     onError: (err) =>
       setError(
         err instanceof ApiError && err.status === 409
           ? MESSAGES.purchaseHasAllocations
-          : 'Could not delete this purchase.',
+          : // 422 (036 M1): the material has been issued or transferred; the server says how much
+            // is still in the store.
+            errorMessage(err, 'Could not delete this purchase.'),
       ),
   });
 
+  async function exportXlsx() {
+    setExporting(true);
+    try {
+      saveBlob(
+        await downloadInventoryExport('purchases', {
+          ...params,
+          page: undefined,
+        }),
+        `purchases-${todayIso()}.xlsx`,
+      );
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not download the purchases.'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const fileLink = (row: Purchase, which: 'bill' | 'photo') => (
+    <TextButton
+      className="underline"
+      onClick={() => void openFile(row, which)}
+      disabled={opening === `${which}:${row.id}`}
+    >
+      {opening === `${which}:${row.id}`
+        ? 'Opening…'
+        : which === 'bill'
+          ? 'Bill'
+          : 'Photo'}
+    </TextButton>
+  );
+
   const columns: Column<Purchase>[] = [
-    { key: 'date', header: 'Date', render: (row) => row.date.slice(0, 10) },
+    { key: 'date', header: 'Date', render: (row) => dateLabel(row.date) },
     { key: 'site', header: 'Store', render: (row) => row.siteName },
     {
       key: 'item',
@@ -112,17 +197,24 @@ export default function PurchasesPage() {
       render: (row) => `${row.itemName} (${row.unit})`,
     },
     { key: 'vendor', header: 'Vendor', render: (row) => row.vendorName },
-    { key: 'quantity', header: 'Qty', render: (row) => row.quantity },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      className: 'text-right',
+      render: (row) => quantity(row.quantity),
+    },
     {
       key: 'rate',
       header: 'Rate',
       hideOnCard: true,
-      render: (row) => formatRupees(row.rate),
+      className: 'text-right',
+      render: (row) => rupees(row.rate),
     },
     {
       key: 'amount',
       header: 'Amount',
-      render: (row) => formatRupees(row.amount),
+      className: 'text-right',
+      render: (row) => rupees(row.amount),
     },
     {
       key: 'grn',
@@ -131,19 +223,24 @@ export default function PurchasesPage() {
       render: (row) => row.grnNumber ?? '—',
     },
     {
-      key: 'bill',
-      header: 'Bill',
+      key: 'po',
+      header: 'PO',
       hideOnCard: true,
       render: (row) =>
-        row.hasBillFile ? (
-          <button
-            type="button"
-            onClick={() => void openBill(row.id)}
-            disabled={openingBill === row.id}
-            className="text-blue-700 underline hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400"
-          >
-            {openingBill === row.id ? 'Opening…' : 'View'}
-          </button>
+        row.purchaseOrderRef
+          ? `${row.purchaseOrderRef} · line ${row.purchaseOrderLineNo}`
+          : '—',
+    },
+    {
+      key: 'files',
+      header: 'Files',
+      hideOnCard: true,
+      render: (row) =>
+        row.hasBillFile || row.hasPhoto ? (
+          <span className="flex gap-3">
+            {row.hasBillFile && fileLink(row, 'bill')}
+            {row.hasPhoto && fileLink(row, 'photo')}
+          </span>
         ) : (
           '—'
         ),
@@ -160,64 +257,75 @@ export default function PurchasesPage() {
     },
   ];
 
+  const totals = data?.totals;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Purchases" />
-        <SecondaryButton type="button" onClick={() => setShowModal(true)}>
-          New purchase
-        </SecondaryButton>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryButton
+            type="button"
+            onClick={() => void exportXlsx()}
+            disabled={exporting || Boolean(rangeError)}
+          >
+            {exporting ? 'Preparing…' : 'Export to Excel'}
+          </SecondaryButton>
+          <Button type="button" onClick={() => setShowModal(true)}>
+            New purchase
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <SelectField
-          id="purchases-site"
-          label="Store"
-          value={siteId}
-          onChange={(event) => {
-            setSiteId(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
-        >
-          <option value="">All stores</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label
+            htmlFor="purchases-site"
+            className="font-medium text-gray-700"
+          >
+            Store
+          </label>
+          <AsyncSelect
+            id="purchases-site"
+            value={filters.siteId}
+            onChange={(id) => setFilters({ siteId: id })}
+            search={searchSites}
+            cacheKey={['inventory', 'sites', 'search', companyId]}
+            selectedOption={siteOption}
+            emptyLabel="All stores"
+            placeholder="All stores"
+          />
+        </div>
 
-        <SelectField
-          id="purchases-vendor"
-          label="Vendor"
-          value={vendorId}
-          onChange={(event) => {
-            setVendorId(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
-        >
-          <option value="">All vendors</option>
-          {(vendors.data ?? []).map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1 text-sm">
+          <label
+            htmlFor="purchases-vendor"
+            className="font-medium text-gray-700"
+          >
+            Vendor
+          </label>
+          <AsyncSelect
+            id="purchases-vendor"
+            value={filters.vendorId}
+            onChange={(id) => setFilters({ vendorId: id })}
+            search={searchVendors}
+            cacheKey={['inventory', 'vendors', 'search', companyId]}
+            selectedOption={vendorOption}
+            emptyLabel="All vendors"
+            placeholder="All vendors"
+          />
+        </div>
 
         <SelectField
           id="purchases-status"
           label="Payment"
-          value={paymentStatus}
-          onChange={(event) => {
-            setPaymentStatus(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
+          value={filters.paymentStatus}
+          onChange={(event) =>
+            setFilters({
+              paymentStatus: event.target
+                .value as (typeof filters)['paymentStatus'],
+            })
+          }
         >
           <option value="">Any status</option>
           {PURCHASE_BILL_STATUSES.map((status) => (
@@ -231,37 +339,43 @@ export default function PurchasesPage() {
           id="purchases-from"
           label="From"
           type="date"
-          value={dateFrom}
-          onChange={(event) => {
-            setDateFrom(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
+          value={filters.from}
+          max={filters.to || undefined}
+          onChange={(event) => setFilters({ from: event.target.value })}
         />
         <TextField
           id="purchases-to"
           label="To"
           type="date"
-          value={dateTo}
-          onChange={(event) => {
-            setDateTo(event.target.value);
-            // Back to the first page: narrowing the list while on page
-            // three would show an empty screen for a filter that matches.
-            setPage(1);
-          }}
+          value={filters.to}
+          min={filters.from || undefined}
+          onChange={(event) => setFilters({ to: event.target.value })}
+          error={rangeError}
         />
       </div>
 
       <FormError message={error} />
       {viewer}
 
+      {totals && (data?.total ?? 0) > 0 && (
+        <p className="text-sm text-gray-700">
+          {data?.total} purchase{data?.total === 1 ? '' : 's'} ·{' '}
+          <span className="font-medium">{rupees(totals.amount)}</span> billed ·{' '}
+          {rupees(totals.paidAmount)} paid ·{' '}
+          {rupees(totals.amount - totals.paidAmount)} outstanding
+          {totals.quantity !== null && <> · {quantity(totals.quantity)} received</>}
+        </p>
+      )}
+
       <ResponsiveList
         columns={columns}
         rows={data?.purchases ?? []}
         rowKey={(row) => row.id}
-        isLoading={isPending}
-        error={isError ? MESSAGES.inventoryLoadFailed : undefined}
+        isLoading={list.isPending && !rangeError}
+        isRefreshing={list.isFetching && !list.isPending}
+        error={list.error}
+        onRetry={() => void list.refetch()}
+        serverPaged
         emptyMessage={MESSAGES.purchasesEmpty}
         actions={(row) => (
           <div className="flex flex-wrap gap-2">
@@ -285,6 +399,7 @@ export default function PurchasesPage() {
                   remove.mutate(row.id);
                 }
               }}
+              loading={remove.isPending && remove.variables === row.id}
               disabled={remove.isPending}
             >
               Delete
@@ -297,11 +412,27 @@ export default function PurchasesPage() {
         total={data?.total ?? 0}
         page={data?.page ?? 1}
         pageSize={data?.pageSize ?? 25}
-        onPageChange={setPage}
+        onPageChange={(page) => setFilters({ page })}
         noun="purchase"
       />
 
       {showModal && <PurchaseModal onClose={() => setShowModal(false)} />}
     </div>
+  );
+}
+
+export default function PurchasesPage() {
+  // `useUrlState` reads `useSearchParams`, which needs a Suspense boundary.
+  return (
+    <Suspense
+      fallback={
+        <ListSkeleton
+          headers={['Date', 'Store', 'Item', 'Vendor', 'Qty', 'Amount']}
+          rows={8}
+        />
+      }
+    >
+      <PurchasesList />
+    </Suspense>
   );
 }

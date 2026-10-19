@@ -119,7 +119,7 @@ function BillLineRowImpl({
       <td className="px-2 py-1.5 align-top text-sm text-gray-900">
         {taskName}
         {isVariation && (
-          <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-800">
+          <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-800">
             {variationRef ? `Variation ${variationRef}` : 'Variation'}
           </span>
         )}
@@ -191,12 +191,15 @@ function BillLineRowImpl({
         {readOnly ? (
           <span className="text-sm tabular-nums text-gray-900">{quantity}</span>
         ) : (
+          // 036 Wave 3 (2026-10-18): text with a decimal keypad, as `ra-bill-sheet.tsx` (036 I14) —
+          // the box shows exactly what was typed, and the pattern flags a fourth decimal the API's
+          // 3dp quantity column would round away.
           <input
             ref={inputRef}
-            type="number"
+            type="text"
             inputMode="decimal"
-            step="0.001"
-            min="0"
+            pattern="\d*(\.\d{0,3})?"
+            autoComplete="off"
             value={raw}
             disabled={unpriced}
             aria-label={`${BILLING_COPY.columns.quantity} — ${boqNo}`}

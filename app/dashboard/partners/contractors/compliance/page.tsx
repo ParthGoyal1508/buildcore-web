@@ -1,52 +1,89 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Suspense, useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
 import {
   MonthlyCompliance,
   getCompliance,
+  getContractors,
   verifyCompliance,
 } from '@/app/lib/api/partners';
-import { MESSAGES } from '@/app/lib/constants';
+import {
+  MESSAGES,
+  MONTHLY_COMPLIANCE_STATUSES,
+  partnersLabel,
+} from '@/app/lib/constants';
 import { dateLabel, money, periodLabel } from '@/app/lib/format';
+import { urlEnum, urlString, useUrlState } from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import ComplianceModal from '@/app/ui/partners/compliance-modal';
+import { Field, SelectInput, TextInput } from '@/app/ui/partners/form-controls';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
-import { LoadingText } from '@/app/ui/spinner';
+import { RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import { useToast } from '@/app/ui/toast';
+
+const HEADERS = ['Contractor', 'Month', 'PF challan', 'ESIC challan', 'Status'];
 
 function CompliancePageBody() {
-  const searchParams = useSearchParams();
-  const contractorId = searchParams.get('contractorId') ?? undefined;
-  const month = searchParams.get('month') ?? undefined;
+  // On-page filters, in the URL (036 N6, 2026-10-17). The contractor and month arrived only
+  // as URL parameters — from a RAG cell or a contractor's page — with no control showing them
+  // and no way to clear them short of editing the address. The parameter names are kept so
+  // those links still land here filtered.
+  const [filters, setFilters, query] = useUrlState({
+    contractorId: urlString(),
+    month: urlString(),
+    status: urlEnum(['', ...MONTHLY_COMPLIANCE_STATUSES] as const, ''),
+  });
+  const contractorId = query.contractorId || undefined;
+  const month = /^\d{4}-\d{2}$/.test(query.month) ? query.month : undefined;
+  const filtered = Boolean(contractorId || month || query.status);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
 
-  const filters = { contractorProfileId: contractorId, month };
+  const params = {
+    contractorProfileId: contractorId,
+    month,
+    status: query.status || undefined,
+  };
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: ['partners', 'compliance', filters],
-    queryFn: () => getCompliance(filters),
+  const { data, isPending, error, refetch, isPlaceholderData, isFetching } =
+    useQuery({
+      queryKey: ['partners', 'compliance', params],
+      queryFn: () => getCompliance(params),
+      placeholderData: keepPreviousData,
+    });
+
+  // The same cache entry the filing modal reads.
+  const { data: contractors } = useQuery({
+    queryKey: ['partners', 'contractors', ''],
+    queryFn: () => getContractors(),
   });
+  const contractorName = contractors?.find((c) => c.id === contractorId)?.vendorName;
 
   const verify = useMutation({
     mutationFn: (id: string) => verifyCompliance(id),
     onSuccess: () => {
-      setError(null);
+      toast.success('Filing verified.');
       queryClient.invalidateQueries({ queryKey: ['partners', 'compliance'] });
+      queryClient.invalidateQueries({ queryKey: ['partners', 'rag'] });
       // The contractor's own status is recomputed server-side by the same
       // transaction, so its badge elsewhere is stale until this is invalidated.
       queryClient.invalidateQueries({ queryKey: ['partners', 'contractors'] });
       queryClient.invalidateQueries({ queryKey: ['partners', 'contractor'] });
     },
-    onError: (err: unknown) =>
-      setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed),
+    onError: (err: unknown) => toast.error(errorMessage(err, MESSAGES.saveFailed)),
   });
 
   const columns: Column<MonthlyCompliance>[] = [
@@ -73,7 +110,7 @@ function CompliancePageBody() {
             </p>
           </div>
         ) : (
-          <span className="text-gray-400">Not filed</span>
+          <span className="text-gray-500">Not filed</span>
         ),
     },
     {
@@ -88,7 +125,7 @@ function CompliancePageBody() {
             </p>
           </div>
         ) : (
-          <span className="text-gray-400">Not filed</span>
+          <span className="text-gray-500">Not filed</span>
         ),
     },
     {
@@ -119,34 +156,89 @@ function CompliancePageBody() {
             description={
               <>
                 PF and ESIC filings per contractor per month.
-                {contractorId && ' Filtered to one contractor.'}
               </>
             }
           />
         </div>
-        <Button onClick={() => setModalOpen(true)}>Record filing</Button>
+        <Button onClick={() => setModalOpen(true)}>
+          {month ? `Record filing for ${periodLabel(month)}` : 'Record filing'}
+        </Button>
       </div>
 
-      {error && (
-        <p
-          role="alert"
-          className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
-        >
-          {error}
-        </p>
-      )}
+      <div className="mb-4 grid items-end gap-3 sm:grid-cols-4">
+        <Field id="compliance-filter-contractor" label="Contractor">
+          <SelectInput
+            id="compliance-filter-contractor"
+            value={filters.contractorId}
+            onChange={(event) => setFilters({ contractorId: event.target.value })}
+          >
+            <option value="">All contractors</option>
+            {/* A contractor in the URL that the list does not hold (deactivated vendor) still
+                shows as selected rather than silently reading "All". */}
+            {contractorId && contractors && !contractorName && (
+              <option value={contractorId}>Selected contractor</option>
+            )}
+            {(contractors ?? []).map((contractor) => (
+              <option key={contractor.id} value={contractor.id}>
+                {contractor.vendorName} ({contractor.vendorCode})
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field id="compliance-filter-month" label="Month">
+          <TextInput
+            id="compliance-filter-month"
+            type="month"
+            value={filters.month}
+            onChange={(event) => setFilters({ month: event.target.value })}
+          />
+        </Field>
+        <Field id="compliance-filter-status" label="Status">
+          <SelectInput
+            id="compliance-filter-status"
+            value={filters.status}
+            onChange={(event) =>
+              setFilters({ status: event.target.value as typeof filters.status })
+            }
+          >
+            <option value="">All statuses</option>
+            {MONTHLY_COMPLIANCE_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {partnersLabel(value)}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <div>
+          {filtered && (
+            <SecondaryButton
+              type="button"
+              onClick={() => setFilters({ contractorId: '', month: '', status: '' })}
+            >
+              Clear filters
+            </SecondaryButton>
+          )}
+        </div>
+      </div>
 
       <DataTable
         columns={columns}
         rows={data ?? []}
         rowKey={(row) => row.id}
         isLoading={isPending}
-        error={isError ? MESSAGES.loadFailed : null}
-        emptyMessage="No filings recorded for this selection."
+        error={error}
+        onRetry={() => refetch()}
+        isRefreshing={isPlaceholderData && isFetching}
+        emptyMessage={
+          filtered
+            ? `No filings recorded${contractorName ? ` for ${contractorName}` : ''}${month ? ` in ${periodLabel(month)}` : ''}${query.status ? ` with status ${partnersLabel(query.status).toLowerCase()}` : ''}.`
+            : 'No filings recorded yet.'
+        }
         actions={(row) =>
           row.status === 'submitted' ? (
-            <button
+            <RowAction
               type="button"
+              loading={verify.isPending && verify.variables === row.id}
               disabled={verify.isPending}
               onClick={async () => {
                 if (
@@ -161,14 +253,13 @@ function CompliancePageBody() {
                   verify.mutate(row.id);
                 }
               }}
-              className="text-sm font-medium text-blue-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:text-gray-400"
             >
               Verify
-            </button>
+            </RowAction>
           ) : (
             // Nothing to offer: a partial filing is not verifiable and a verified one
             // is final. An always-visible disabled button would only invite clicks.
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-500">
               {row.status === 'verified' ? 'Final' : 'Needs both challans'}
             </span>
           )
@@ -178,6 +269,7 @@ function CompliancePageBody() {
       {modalOpen && (
         <ComplianceModal
           contractorId={contractorId}
+          month={month}
           onClose={() => setModalOpen(false)}
         />
       )}
@@ -188,13 +280,7 @@ function CompliancePageBody() {
 export default function CompliancePage() {
   // `useSearchParams` needs a Suspense boundary in the App Router.
   return (
-    <Suspense
-      fallback={
-        <p className="p-4 text-sm text-gray-500">
-          <LoadingText />
-        </p>
-      }
-    >
+    <Suspense fallback={<ListSkeleton headers={HEADERS} />}>
       <CompliancePageBody />
     </Suspense>
   );

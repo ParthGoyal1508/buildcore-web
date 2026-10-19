@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReportType } from '@/app/lib/api/dashboard';
+import StatusBadge from '@/app/ui/status-badge';
 
 /**
  * The report-type picker (spec FR-012). Available types are selectable; unavailable
@@ -26,17 +27,15 @@ export default function ReportTypeList({
               onClick={() => type.isAvailable && onSelect(type)}
               disabled={!type.isAvailable}
               aria-pressed={selected}
-              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
                 selected
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-brand-500 bg-brand-50'
                   : 'border-gray-200 bg-white hover:bg-gray-50'
               } ${type.isAvailable ? '' : 'cursor-not-allowed opacity-70'}`}
             >
               <span className="font-medium text-gray-900">{type.name}</span>
               {!type.isAvailable && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                  Coming soon
-                </span>
+                <StatusBadge tone="neutral" label={'Coming soon'} />
               )}
             </button>
           </li>

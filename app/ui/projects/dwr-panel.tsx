@@ -1,15 +1,23 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import {
+  DWR_PAGE_SIZE,
+  DWR_STATUSES,
+  type DwrStatus,
   type DwrSummary,
   approveDwr,
   deleteDwr,
-  listDwrs,
+  listDwrPage,
   returnDwr,
   reverseDwr,
   submitDwr,
@@ -17,15 +25,32 @@ import {
 import { getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
-import StatusBadge from '@/app/ui/status-badge';
 import {
-  SortHeader,
-  TABLE,
-  useSortedRows,
-  type SortableColumn,
-} from '@/app/ui/table';
+  urlEnum,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
+import { Button, TextButton } from '@/app/ui/button';
+import Pager from '@/app/ui/inventory/pager';
+import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
+import StatusBadge from '@/app/ui/status-badge';
+import { TABLE } from '@/app/ui/table';
+import { useToast } from '@/app/ui/toast';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
+import { boqKeys } from '@/app/lib/api/projects';
+
+const STATUS_FILTERS = ['all', ...DWR_STATUSES] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+const STATUS_LABELS: Record<StatusFilter, string> = {
+  all: 'All states',
+  draft: 'Draft',
+  submitted: 'Submitted',
+  returned: 'Returned',
+  approved: 'Approved',
+};
 
 /**
  * Every daily work report on a project, and what can be done to each (024 Story 1, Story 2).
@@ -43,8 +68,21 @@ import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
  */
 export default function DwrPanel({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
+  const { isLocked } = useProjectLock();
   const [error, setError] = useState<string | null>(null);
+
+  // 036 I6: the filters and the page live in the URL, so Back from a report returns to the same
+  // page of the same filter, and a filtered list can be sent as a link.
+  const [filters, setFilters, query] = useUrlState(
+    {
+      status: urlEnum(STATUS_FILTERS, 'all'),
+      from: urlString(),
+      to: urlString(),
+      page: urlNumber(1),
+    },
+    { resetPage: 'page' },
+  );
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -62,29 +100,33 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     user?.permissions.includes('CROSS_COMPANY_ACCESS'),
   );
 
-  const {
-    data: reports,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ['dwrs', projectId],
-    queryFn: () => listDwrs(projectId),
+  // 036 I6: one page at a time, with the total. Unpaged, the API's default of 25 applied and every
+  // older report silently did not exist here. Under `['dwrs', projectId, …]`, so the existing
+  // invalidations of `['dwrs', projectId]` still refresh every page and filter.
+  const list = useQuery({
+    queryKey: ['dwrs', projectId, query],
+    queryFn: () =>
+      listDwrPage({
+        projectId,
+        status: query.status === 'all' ? undefined : (query.status as DwrStatus),
+        from: query.from || undefined,
+        to: query.to || undefined,
+        page: query.page,
+        pageSize: DWR_PAGE_SIZE,
+      }),
+    placeholderData: keepPreviousData,
   });
-
-  // Unsorted until the reader clicks a header, so the first paint is the server's own order:
-  // `workDate desc`, with the report number breaking ties. The shared sort is stable, so two
-  // reports on one day keep that tiebreak when the list is sorted by date (2026-10-15).
-  const {
-    sorted: rows,
-    sort,
-    toggle,
-  } = useSortedRows(reports ?? [], DWR_COLUMNS);
+  // The server's order — work date newest first, report number breaking ties. No column sorting:
+  // sorting one page of many would present a page's order as the list's (036 I6).
+  const rows = list.data?.items ?? [];
+  const filtered =
+    query.status !== 'all' || query.from !== '' || query.to !== '';
 
   /** Resolves once the list has been re-read, so a notice can wait for the row it describes. */
   const refresh = () => {
     // Approval moved BOQ executed quantities, so anything reading them is now stale. Named
     // individually rather than clearing everything: a blanket reset re-fetches the whole project.
-    void queryClient.invalidateQueries({ queryKey: ['boq', projectId] });
+    void queryClient.invalidateQueries({ queryKey: boqKeys.project(projectId) });
     void queryClient.invalidateQueries({
       queryKey: ['billPackages', projectId],
     });
@@ -111,7 +153,7 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
     onSuccess: async (_result, job) => {
       await refresh();
       setError(null);
-      setNotice(
+      toast.success(
         job.kind === 'approve'
           ? 'Approved. The executed quantity on each BOQ line has moved.'
           : job.kind === 'delete'
@@ -124,25 +166,9 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
       );
     },
     onError: (err: unknown) => {
-      setNotice(null);
       setError(describe(err));
     },
   });
-
-  if (isLoading) {
-    return (
-      <p className="p-4 text-sm text-gray-500" role="status">
-        Loading daily work reports…
-      </p>
-    );
-  }
-  if (isError) {
-    return (
-      <p className="p-4 text-sm text-red-700" role="alert">
-        Could not load the daily work reports.
-      </p>
-    );
-  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -157,19 +183,62 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
             somebody else approves it.
           </p>
         </div>
-        <Link href={ROUTES.projectsDwrNew(projectId)}>
-          <Button>Record a day</Button>
-        </Link>
+        {/* Hidden on a locked project, as the BOQ entry is: a greyed button invites a click and
+            then a 423. The layout's banner says the project is locked. */}
+        {!isLocked && (
+          <Link href={ROUTES.projectsDwrNew(projectId)}>
+            <Button>Record a day</Button>
+          </Link>
+        )}
       </header>
 
-      {notice && (
-        <p
-          className="rounded-md bg-green-50 p-3 text-sm text-green-800"
-          role="status"
-        >
-          {notice}
-        </p>
-      )}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-sm text-gray-700">
+          State
+          <select
+            value={filters.status}
+            onChange={(e) =>
+              setFilters({ status: e.target.value as StatusFilter })
+            }
+            className="h-10 rounded-md border border-gray-300 px-2 text-sm"
+          >
+            {STATUS_FILTERS.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-gray-700">
+          Work date from
+          <input
+            type="date"
+            value={filters.from}
+            max={filters.to || undefined}
+            onChange={(e) => setFilters({ from: e.target.value })}
+            className="h-10 rounded-md border border-gray-300 px-2 text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-gray-700">
+          to
+          <input
+            type="date"
+            value={filters.to}
+            min={filters.from || undefined}
+            onChange={(e) => setFilters({ to: e.target.value })}
+            className="h-10 rounded-md border border-gray-300 px-2 text-sm"
+          />
+        </label>
+        {filtered && (
+          <TextButton
+            className="h-10 px-3"
+            onClick={() => setFilters({ status: 'all', from: '', to: '' })}
+          >
+            Clear filters
+          </TextButton>
+        )}
+      </div>
+
       {error && (
         <p
           className="rounded-md bg-red-50 p-3 text-sm text-red-800"
@@ -179,80 +248,106 @@ export default function DwrPanel({ projectId }: { projectId: string }) {
         </p>
       )}
 
-      {rows.length === 0 ? (
+      {list.isLoading ? (
+        <ListSkeleton
+          headers={DWR_COLUMNS.map((column) => column.label)}
+          actions={!isLocked}
+        />
+      ) : list.isError ? (
+        <QueryError
+          error={list.error}
+          onRetry={list.refetch}
+          fallback="The daily work reports could not be loaded."
+        />
+      ) : rows.length === 0 ? (
         <p className="rounded-md border border-dashed border-gray-300 p-6 text-sm text-gray-600">
-          No day has been recorded on this project yet. Until one is, every BOQ
-          line reads nought per cent complete and a bill composed from it would
-          claim nothing.
+          {filtered
+            ? 'No report matches these filters.'
+            : 'No day has been recorded on this project yet. Until one is, every BOQ line reads nought per cent complete and a bill composed from it would claim nothing.'}
         </p>
       ) : (
-        <div className={TABLE.wrap}>
-          <table className={TABLE.table}>
-            <thead className={TABLE.thead}>
-              <tr>
-                {DWR_COLUMNS.map((column) => (
-                  <SortHeader
-                    key={column.key}
-                    label={column.label}
-                    columnKey={column.key}
-                    sort={sort}
-                    onSort={toggle}
-                    numeric={column.numeric}
+        <>
+          <div
+            className={clsx(
+              TABLE.wrap,
+              list.isPlaceholderData && 'opacity-60 transition-opacity',
+            )}
+            aria-busy={list.isFetching || undefined}
+          >
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
+                <tr>
+                  {DWR_COLUMNS.map((column) => (
+                    <th
+                      key={column.key}
+                      scope="col"
+                      className={clsx(TABLE.th, column.numeric && 'text-right')}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                  {!isLocked && (
+                    <th className={clsx(TABLE.th, 'text-right')}>Actions</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((report) => (
+                  <ReportRow
+                    key={report.id}
+                    projectId={projectId}
+                    report={report}
+                    currentUserId={user?.id}
+                    busy={act.isPending}
+                    pendingKind={
+                      act.isPending && act.variables?.dwrId === report.id
+                        ? act.variables.kind
+                        : null
+                    }
+                    readOnly={isLocked}
+                    mayApproveOwn={mayApproveOwn}
+                    onAct={(kind, reason) =>
+                      act.mutate({ kind, dwrId: report.id, reason })
+                    }
                   />
                 ))}
-                <th className={clsx(TABLE.th, 'text-right')}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((report) => (
-                <ReportRow
-                  key={report.id}
-                  projectId={projectId}
-                  report={report}
-                  currentUserId={user?.id}
-                  busy={act.isPending}
-                  mayApproveOwn={mayApproveOwn}
-                  onAct={(kind, reason) =>
-                    act.mutate({ kind, dwrId: report.id, reason })
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+          {list.data && (
+            <Pager
+              total={list.data.total}
+              page={list.data.page}
+              pageSize={list.data.pageSize}
+              onPageChange={(page) => setFilters({ page })}
+              noun="report"
+            />
+          )}
+        </>
       )}
     </section>
   );
 }
 
-// The sortable columns (2026-10-15). `dprNumber` sorts with numeric collation, so DPR-10000
-// lands after DPR-9999 rather than between 0001 and 0002.
-const DWR_COLUMNS: (SortableColumn<DwrSummary> & {
-  label: string;
-  numeric?: boolean;
-})[] = [
-  { key: 'dprNumber', label: 'Report', render: (r) => r.dprNumber },
-  { key: 'workDate', label: 'Work date', render: (r) => r.workDate },
-  { key: 'status', label: 'State', render: (r) => r.status },
-  {
-    key: 'lineCount',
-    label: 'Lines',
-    numeric: true,
-    render: (r) => r.lineCount,
-  },
-  {
-    key: 'onSite',
-    label: 'On site',
-    render: (r) => r.workerCount,
-    sortValue: (r) => r.workerCount ?? 0,
-  },
+// The columns. Sortable until 036 I6; the list is now one page of many, and sorting a page would
+// present one page's order as the whole list's, so the server's order (newest day first) stands.
+const DWR_COLUMNS: { key: string; label: string; numeric?: boolean }[] = [
+  { key: 'dprNumber', label: 'Report' },
+  { key: 'workDate', label: 'Work date' },
+  { key: 'status', label: 'State' },
+  { key: 'lineCount', label: 'Lines', numeric: true },
+  { key: 'onSite', label: 'On site' },
 ];
+
+type DwrAction = 'submit' | 'approve' | 'return' | 'reverse' | 'delete';
 
 function ReportRow({
   projectId,
   report,
   currentUserId,
   busy,
+  pendingKind,
+  readOnly,
   mayApproveOwn,
   onAct,
 }: {
@@ -261,10 +356,11 @@ function ReportRow({
   report: DwrSummary;
   currentUserId: string | undefined;
   busy: boolean;
-  onAct: (
-    kind: 'submit' | 'approve' | 'return' | 'reverse' | 'delete',
-    reason?: string,
-  ) => void;
+  /** Which of this row's actions is in flight, for its button's spinner. */
+  pendingKind: DwrAction | null;
+  /** A locked project: the row is a link and its facts, with no actions (036 Wave 3). */
+  readOnly: boolean;
+  onAct: (kind: DwrAction, reason?: string) => void;
 }) {
   const reversed = Boolean(report.reversedAt);
 
@@ -286,7 +382,7 @@ function ReportRow({
       <td className={clsx(TABLE.td, 'align-top')}>
         <Link
           href={ROUTES.projectsDwrReport(projectId, report.id)}
-          className="font-medium text-blue-700 hover:underline"
+          className="font-medium text-brand-700 hover:underline"
         >
           {report.dprNumber}
         </Link>
@@ -320,17 +416,23 @@ function ReportRow({
       >
         {report.workerCount ?? 0} people · {report.machineryCount ?? 0} machines
       </td>
+      {!readOnly && (
       <td className={clsx(TABLE.td, 'align-top')}>
         <div className="flex flex-wrap justify-end gap-2">
           {report.status === 'draft' || report.status === 'returned' ? (
             <>
-              <Button disabled={busy} onClick={() => onAct('submit')}>
+              <Button
+                disabled={busy}
+                loading={pendingKind === 'submit'}
+                onClick={() => onAct('submit')}
+              >
                 Submit
               </Button>
               {/* 025 FR-026. A draft entered against the wrong project or the wrong day had no way
                   out: the endpoint has existed since 022 and nothing called it. */}
               <Button
                 disabled={busy}
+                loading={pendingKind === 'delete'}
                 intent="write"
                 onClick={async () => {
                   if (
@@ -355,6 +457,7 @@ function ReportRow({
             <>
               <Button
                 disabled={busy || blockedAsAuthor}
+                loading={pendingKind === 'approve'}
                 title={
                   blockedAsAuthor
                     ? 'You submitted this report, so somebody else has to approve it.'
@@ -368,6 +471,7 @@ function ReportRow({
               </Button>
               <Button
                 disabled={busy}
+                loading={pendingKind === 'return'}
                 intent="write"
                 onClick={async () => {
                   const reason = await promptDialog({
@@ -389,6 +493,7 @@ function ReportRow({
           {report.status === 'approved' && !reversed && (
             <Button
               disabled={busy}
+              loading={pendingKind === 'reverse'}
               onClick={async () => {
                 const reason = await promptDialog({
                   title: 'Reverse this approval?',
@@ -414,6 +519,7 @@ function ReportRow({
           </p>
         )}
       </td>
+      )}
     </tr>
   );
 }

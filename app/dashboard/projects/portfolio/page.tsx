@@ -2,27 +2,32 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-
-import { ApiError } from '@/app/lib/api/client';
-import { INCLUDE_DOCUMENT_READINESS } from '@/app/lib/api/project-documents';
-import { deleteProject, getClients, getProjects } from '@/app/lib/api/projects';
 import {
-  MESSAGES,
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+
+import { INCLUDE_DOCUMENT_READINESS } from '@/app/lib/api/project-documents';
+import { deleteProject, getClient, getProjects } from '@/app/lib/api/projects';
+import {
   PROJECT_MOVED_PARAM,
   PROJECT_SHELL_COPY,
   PROJECT_STATUSES,
   ROUTES,
   projectsLabel,
 } from '@/app/lib/constants';
+import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
+import AsyncSelect from '@/app/ui/async-select';
+import Pager from '@/app/ui/inventory/pager';
+import { searchClients } from '@/app/ui/projects/pickers';
+import { projectErrorMessage } from '@/app/ui/projects/project-lock-context';
 import ProjectListTable from '@/app/ui/projects/project-list-table';
-import {
-  RowAction,
-  SelectField,
-  TextField,
-} from '@/app/ui/settings/form-fields';
+import { SelectField, TextField } from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
+import { useToast } from '@/app/ui/toast';
+import { TextButton } from '@/app/ui/button';
 
 /** The project portfolio (spec US3). */
 export default function PortfolioPage() {
@@ -33,51 +38,61 @@ export default function PortfolioPage() {
   const movedCompany =
     useSearchParams().get(PROJECT_MOVED_PARAM) !== null;
 
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [page, setPage] = useState(1);
-  const [rowError, setRowError] = useState<string | null>(null);
-
+  // 036 I23: search, filters and page in the URL (Back from a project returns to the same page of
+  // the same filter), the search debounced, the previous page kept on screen while the next loads.
+  const [filters, setFilters, query] = useUrlState(
+    {
+      q: urlString(),
+      status: urlString(),
+      client: urlString(),
+      page: urlNumber(1),
+    },
+    { debounce: ['q'], resetPage: 'page' },
+  );
+  const toast = useToast();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['projects', 'portfolio', { search, status, clientId, page }],
+  const portfolio = useQuery({
+    queryKey: ['projects', 'portfolio', query],
     // `include=documentReadiness` attaches each project's paperwork state to its row
     // (017 FR-008), in ONE request for the whole page. Asking per row is the N+1 the
     // backend's batch form exists to prevent — quickstart Pass 7 counts the requests.
     queryFn: () =>
       getProjects({
-        search,
-        status,
-        clientId,
-        page,
+        search: query.q || undefined,
+        status: query.status || undefined,
+        clientId: query.client || undefined,
+        page: query.page,
         include: INCLUDE_DOCUMENT_READINESS,
       }),
+    placeholderData: keepPreviousData,
   });
+  const data = portfolio.data;
 
-  const { data: clients } = useQuery({
-    queryKey: ['projects', 'clients', { pageSize: 200 }],
-    queryFn: () => getClients({ pageSize: 200 }),
+  // The filter's chosen client, by id, so a filtered link opened cold still names it. Its own key:
+  // the filter searches *all* clients, the project form *active* ones (036 I21).
+  const filterClient = useQuery({
+    queryKey: ['projects', 'clients', 'one', query.client],
+    queryFn: () => getClient(query.client),
+    enabled: Boolean(query.client),
   });
 
   const removal = useMutation({
     mutationFn: (id: string) => deleteProject(id),
     onSuccess: () => {
-      setRowError(null);
+      toast.success('Project deleted.');
       queryClient.invalidateQueries({ queryKey: ['projects', 'portfolio'] });
       // The client list carries a projectCount that has just changed.
       queryClient.invalidateQueries({ queryKey: ['projects', 'clients'] });
     },
+    // The server's own sentence for a 409 (it names what is in the way) and the lock sentence
+    // for a 423, as a toast rather than a banner that outlives the row it was about.
     onError: (error: unknown) =>
-      setRowError(
-        error instanceof ApiError && (error.status === 409 || error.status === 423)
-          ? error.message
-          : MESSAGES.saveFailed,
-      ),
+      toast.error(projectErrorMessage(error, 'The project could not be deleted.')),
   });
 
-  const pageCount = data ? Math.ceil(data.total / data.pageSize) : 0;
+  const filtered =
+    filters.q !== '' || filters.status !== '' || filters.client !== '';
 
   return (
     <main>
@@ -85,7 +100,7 @@ export default function PortfolioPage() {
         <PageHeader title="Portfolio" />
         <Link
           href={ROUTES.projectsNewProject}
-          className="flex h-10 items-center rounded-lg bg-blue-500 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           Add project
         </Link>
@@ -94,7 +109,7 @@ export default function PortfolioPage() {
       {movedCompany && (
         <p
           role="status"
-          className="mb-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900"
+          className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900"
         >
           {PROJECT_SHELL_COPY.otherCompanyExplanation}
         </p>
@@ -105,20 +120,14 @@ export default function PortfolioPage() {
           id="project-search"
           label="Search"
           placeholder="Project name or code"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          value={filters.q}
+          onChange={(e) => setFilters({ q: e.target.value })}
         />
         <SelectField
           id="project-status-filter"
           label="Status"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
+          value={filters.status}
+          onChange={(e) => setFilters({ status: e.target.value })}
         >
           <option value="">All statuses</option>
           {PROJECT_STATUSES.map((value) => (
@@ -127,54 +136,60 @@ export default function PortfolioPage() {
             </option>
           ))}
         </SelectField>
-        <SelectField
-          id="project-client-filter"
-          label="Client"
-          value={clientId}
-          onChange={(e) => {
-            setClientId(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All clients</option>
-          {clients?.items.map((client) => (
-            <option key={client.id} value={client.id}>
-              {client.name}
-            </option>
-          ))}
-        </SelectField>
+        <div>
+          <label
+            htmlFor="project-client-filter"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Client
+          </label>
+          {/* 036 I22: searched on the server, not the first 200 clients. */}
+          <AsyncSelect
+            id="project-client-filter"
+            value={filters.client}
+            onChange={(id) => setFilters({ client: id })}
+            search={searchClients()}
+            cacheKey={['projects', 'clients', 'picker', 'all']}
+            emptyLabel="All clients"
+            selectedOption={
+              filterClient.data && filterClient.data.id === filters.client
+                ? { id: filterClient.data.id, label: filterClient.data.name }
+                : null
+            }
+            placeholder="All clients"
+          />
+        </div>
       </div>
 
-      {rowError && (
-        <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {rowError}
-        </p>
+      {filtered && (
+        <div className="mb-3">
+          <TextButton
+            onClick={() => setFilters({ q: '', status: '', client: '' })}>
+            Clear filters
+          </TextButton>
+        </div>
       )}
 
       <ProjectListTable
         rows={data?.items ?? []}
-        isLoading={isLoading}
-        isError={isError}
-        isDeleting={removal.isPending}
+        isLoading={portfolio.isLoading}
+        error={portfolio.isError ? portfolio.error : null}
+        onRetry={portfolio.refetch}
+        filtered={filtered}
+        isRefreshing={portfolio.isPlaceholderData}
+        deletingId={removal.isPending ? removal.variables : null}
         onDelete={(id) => removal.mutate(id)}
       />
 
-      {pageCount > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-          <span>
-            Page {data?.page} of {pageCount}
-          </span>
-          <div className="flex gap-2">
-            <RowAction disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </RowAction>
-            <RowAction
-              disabled={page >= pageCount}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </RowAction>
-          </div>
+      {data && (
+        <div className="mt-4">
+          <Pager
+            total={data.total}
+            page={data.page}
+            pageSize={data.pageSize}
+            onPageChange={(page) => setFilters({ page })}
+            noun="project"
+          />
         </div>
       )}
     </main>

@@ -213,8 +213,8 @@ export default function MyRequests() {
               {row.detail && (
                 <p className="text-xs text-gray-500">{row.detail}</p>
               )}
-              <p className="mt-0.5 text-xs text-gray-400">
-                Raised {dateLabel(row.raisedAt.slice(0, 10))}
+              <p className="mt-0.5 text-xs text-gray-500">
+                Raised {dateLabel(row.raisedAt)}
               </p>
             </div>
             <div className="text-right">

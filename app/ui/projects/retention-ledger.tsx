@@ -6,7 +6,14 @@ import { useState } from 'react';
 import { getRetention, releaseRetention } from '@/app/lib/api/billing';
 import { dateLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
+import {
+  projectErrorMessage,
+  useProjectLock,
+} from '@/app/ui/projects/project-lock-context';
+import QueryError from '@/app/ui/query-error';
 import { FieldLabelSpacer } from '@/app/ui/settings/form-fields';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * What a work order still holds back, and recording money going back (025 FR-032).
@@ -40,8 +47,10 @@ export default function RetentionLedger({
   const [releasedOn, setReleasedOn] = useState(todayIso());
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const { isLocked } = useProjectLock();
+  const toast = useToast();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error: loadError, refetch } = useQuery({
     queryKey: ['retention', workOrderId],
     queryFn: () => getRetention(workOrderId),
   });
@@ -55,6 +64,7 @@ export default function RetentionLedger({
       }),
     onSuccess: () => {
       setError(null);
+      toast.success('The release was recorded.');
       setAmount('');
       setReason('');
       void queryClient.invalidateQueries({
@@ -62,12 +72,37 @@ export default function RetentionLedger({
       });
     },
     // The server refuses more than the outstanding balance, and a release with nothing said about
-    // it, each by its own code. Its sentence is the useful one.
-    onError: (err: Error) => setError(err.message),
+    // it, each by its own code. Its sentence is the useful one. A 423 gets the lock sentence.
+    onError: (err: Error) => setError(projectErrorMessage(err)),
   });
 
+  // 036 I17 (2026-10-17): `isLoading || !data` held "Reading the retention…" for ever when the read
+  // failed. A placeholder while it loads, the failure with a retry when it does not.
+  if (isError) {
+    return (
+      <QueryError
+        compact
+        error={loadError}
+        fallback="The retention could not be loaded."
+        onRetry={refetch}
+      />
+    );
+  }
   if (isLoading || !data) {
-    return <p className="text-sm text-gray-500">Reading the retention…</p>;
+    return (
+      <div
+        role="status"
+        aria-label="Reading the retention…"
+        className="grid animate-pulse grid-cols-3 gap-3 rounded-md border border-gray-200 p-4"
+      >
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="space-y-2">
+            <div className="h-3 w-16 rounded bg-gray-200" />
+            <div className="h-4 w-24 rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -108,10 +143,22 @@ export default function RetentionLedger({
 
       {/* `items-start`, not `items-end`: the date field carries a hint, and bottom-aligning the
           row pushed its input up while dropping every neighbouring label below it. */}
+      {/* Absent on a locked project (036 Wave 3): the release is a write the server refuses 423. */}
+      {!isLocked && (
       <form
         className="flex flex-wrap items-start gap-3"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
+          // Append-only — there is no edit or reversal — so it is confirmed first (036 Wave 3).
+          if (
+            !(await confirmDialog({
+              title: 'Record this release?',
+              message: `${rupees(Number(amount))} released on ${dateLabel(releasedOn)}. A release cannot be edited or removed afterwards.`,
+              confirmLabel: 'Record',
+            }))
+          ) {
+            return;
+          }
           release.mutate();
         }}
       >
@@ -150,11 +197,12 @@ export default function RetentionLedger({
         </label>
         <div>
           <FieldLabelSpacer />
-          <Button type="submit" disabled={release.isPending}>
+          <Button type="submit" loading={release.isPending}>
             {release.isPending ? 'Recording…' : 'Record the release'}
           </Button>
         </div>
       </form>
+      )}
 
       {error && (
         <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">

@@ -1,8 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 
+import { errorMessage } from '@/app/lib/api/client';
 import {
   downloadLetter,
   getLetters,
@@ -17,10 +17,11 @@ import {
 import { dateLabel } from '@/app/lib/format';
 import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
-import { FormError, RowAction } from '@/app/ui/settings/form-fields';
+import { RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useToast } from '@/app/ui/toast';
 
 /**
  * Recruitment's one document: the offer letter to a candidate (2026-10-15). Everything from the
@@ -42,7 +43,7 @@ const HR_KIND_KEYS: readonly string[] = [...CANDIDATE_LETTER_KIND_KEYS];
  * the pipeline, which is what moves the offer and the candidate on.
  */
 export default function LettersPage() {
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   // An offer letter read in the page, without saving it (2026-10-14).
   const { view, viewer } = useFileViewer();
 
@@ -53,11 +54,10 @@ export default function LettersPage() {
   });
 
   const download = async (letter: IssuedLetter) => {
-    setError(null);
     try {
       saveBlob(await downloadLetter(letter.id), letterFileName(letter));
-    } catch {
-      setError(GENERATE_LETTER_COPY.downloadFailed);
+    } catch (err) {
+      toast.error(errorMessage(err, GENERATE_LETTER_COPY.downloadFailed));
     }
   };
 
@@ -100,7 +100,6 @@ export default function LettersPage() {
         />
       </div>
 
-      <FormError message={error} />
       {viewer}
 
       <ResponsiveList
@@ -108,7 +107,9 @@ export default function LettersPage() {
         rows={letters.data ?? []}
         rowKey={(l) => l.id}
         isLoading={letters.isPending}
-        error={letters.isError ? 'Could not load letters.' : null}
+        // 036 J1 (2026-10-17): the server's own reason, and a Retry.
+        error={letters.error}
+        onRetry={letters.refetch}
         emptyMessage="No offer letter has been issued yet."
         actions={(l) =>
           l.status === 'composed' ? null : (

@@ -1,16 +1,21 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { ApiError } from '@/app/lib/api/client';
+import { useState } from 'react';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   applyLeave,
   getLeaveBalance,
+  getLeaveDayCount,
   LEAVE_TYPES,
   type LeaveType,
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
+import { dateLabel } from '@/app/lib/format';
+import { useDebounced } from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
+import QueryError from '@/app/ui/query-error';
+import { useToast } from '@/app/ui/toast';
 import {
   FormError,
   SelectField,
@@ -19,31 +24,18 @@ import {
 import { financialYearOf, LEAVE_TYPE_LABEL } from '@/app/ui/my/leave-balance';
 
 const HTTP_LOCKED = 423;
-const MS_PER_DAY = 86_400_000;
+/** How long the dates must sit still before the server is asked to count them. */
+const DAY_COUNT_DEBOUNCE_MS = 350;
 
-/**
- * An approximate chargeable-day count for the range (spec FR-011).
- *
- * Weekends are excluded; the employee's site holidays are not, because no endpoint
- * exposes a site's holiday calendar to this app — the backend reads it internally
- * when it computes the authoritative count. The preview is therefore an upper
- * bound, and is labelled as approximate rather than presented as final: showing a
- * confident number that the server then contradicts is worse than admitting the
- * estimate.
- */
-export function approximateDayCount(fromDate: string, toDate: string): number {
-  if (!fromDate || !toDate) return 0;
-  const start = Date.parse(`${fromDate}T00:00:00Z`);
-  const end = Date.parse(`${toDate}T00:00:00Z`);
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
-
-  let count = 0;
-  for (let t = start; t <= end; t += MS_PER_DAY) {
-    const day = new Date(t).getUTCDay();
-    if (day !== 0 && day !== 6) count += 1;
-  }
-  return count;
-}
+const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
 const EMPTY = {
   leaveType: 'earned' as LeaveType,
@@ -54,6 +46,7 @@ const EMPTY = {
 
 export default function ApplyLeaveForm() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,10 +59,29 @@ export default function ApplyLeaveForm() {
     queryFn: () => getLeaveBalance(financialYear),
   });
 
-  const dayCount = useMemo(
-    () => approximateDayCount(form.fromDate, form.toDate),
-    [form.fromDate, form.toDate],
-  );
+  // 036 G3: the count comes from the server, which knows the employee's site weekly off and
+  // holidays. The local Saturday/Sunday skip this replaces was wrong on a six-day site week (it
+  // dropped a working Saturday) and blind to holidays, so the number shown and the number the
+  // application was then charged disagreed. Debounced so typing a date does not fire a request per
+  // keystroke; compared against the live dates so a stale answer never gates the submit button.
+  const range =
+    form.fromDate && form.toDate && form.toDate >= form.fromDate
+      ? `${form.fromDate}|${form.toDate}`
+      : null;
+  const settledRange = useDebounced(range, DAY_COUNT_DEBOUNCE_MS);
+  const [fromDate, toDate] = (settledRange ?? '|').split('|');
+  const dayCountQuery = useQuery({
+    queryKey: ['my', 'leave-day-count', fromDate, toDate],
+    queryFn: () => getLeaveDayCount(fromDate, toDate),
+    enabled: settledRange !== null && settledRange === range,
+    // A 400 (range over a year) will be refused the same way again.
+    retry: false,
+  });
+  const preview =
+    range !== null && settledRange === range ? dayCountQuery.data : undefined;
+  const counting =
+    range !== null && (settledRange !== range || dayCountQuery.isFetching);
+  const dayCount = preview?.days ?? 0;
 
   const available =
     balances?.find((b) => b.leaveType === form.leaveType)?.balance ?? 0;
@@ -85,13 +97,15 @@ export default function ApplyLeaveForm() {
       queryClient.invalidateQueries({ queryKey: ['my', 'leave-balance'] });
       setForm(EMPTY);
       setError(null);
+      toast.success('Leave application submitted');
     },
+    // The form keeps what was typed on a failure, so a corrected retry is one tap.
     onError: (err: unknown) => {
       if (err instanceof ApiError && err.status === HTTP_LOCKED) {
         setError(MESSAGES.payrollLocked);
         return;
       }
-      setError(err instanceof ApiError ? err.message : MESSAGES.saveFailed);
+      setError(errorMessage(err, MESSAGES.saveFailed));
     },
   });
 
@@ -99,6 +113,8 @@ export default function ApplyLeaveForm() {
     form.fromDate !== '' &&
     form.toDate !== '' &&
     form.reason.trim() !== '' &&
+    preview !== undefined &&
+    !counting &&
     dayCount > 0 &&
     !isOverBalance &&
     !submit.isPending;
@@ -138,6 +154,7 @@ export default function ApplyLeaveForm() {
             id="from-date"
             label="From"
             type="date"
+            required
             value={form.fromDate}
             onChange={(event) =>
               setForm({ ...form, fromDate: event.target.value })
@@ -147,6 +164,7 @@ export default function ApplyLeaveForm() {
             id="to-date"
             label="To"
             type="date"
+            required
             min={form.fromDate || undefined}
             value={form.toDate}
             onChange={(event) =>
@@ -155,15 +173,51 @@ export default function ApplyLeaveForm() {
           />
         </div>
 
-        {dayCount > 0 && (
-          <div className="rounded-md bg-gray-50 px-3 py-2">
-            <p className="text-sm text-gray-700">
-              About <strong>{dayCount}</strong> day{dayCount === 1 ? '' : 's'}
-              {form.leaveType !== 'lwp' && ` · ${available} available`}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-500">
-              {MESSAGES.leaveDayCountApprox}
-            </p>
+        {range !== null && (
+          <div className="rounded-md bg-gray-50 px-3 py-2" aria-live="polite">
+            {counting && !preview ? (
+              <p className="text-sm text-gray-500" role="status">
+                Counting working days…
+              </p>
+            ) : dayCountQuery.isError && !counting ? (
+              <QueryError
+                compact
+                error={dayCountQuery.error}
+                fallback="Could not count the working days in this range."
+                onRetry={dayCountQuery.refetch}
+              />
+            ) : preview ? (
+              <>
+                <p className="text-sm text-gray-700">
+                  <strong>{preview.days}</strong> working day
+                  {preview.days === 1 ? '' : 's'}
+                  {form.leaveType !== 'lwp' && ` · ${available} available`}
+                </p>
+                {preview.excluded.length > 0 && (
+                  <>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Not counted:
+                    </p>
+                    <ul className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                      {preview.excluded.map((day) => (
+                        <li key={day.date}>
+                          {dateLabel(day.date)} —{' '}
+                          {day.reason === 'holiday'
+                            ? 'holiday'
+                            : `weekly off (${WEEKDAY_NAMES[preview.weeklyOffDay] ?? 'site'})`}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {preview.days === 0 && (
+                  <p className="mt-1 text-xs text-amber-700" role="alert">
+                    Every day in this range is a weekly off or a holiday, so
+                    there is nothing to apply for.
+                  </p>
+                )}
+              </>
+            ) : null}
           </div>
         )}
 
@@ -178,11 +232,12 @@ export default function ApplyLeaveForm() {
           id="leave-reason"
           label="Reason"
           value={form.reason}
+          required
           onChange={(event) => setForm({ ...form, reason: event.target.value })}
           placeholder="e.g. Family function"
         />
 
-        <Button type="submit" disabled={!canSubmit}>
+        <Button type="submit" disabled={!canSubmit} loading={submit.isPending}>
           {submit.isPending ? 'Submitting…' : 'Apply'}
         </Button>
       </form>

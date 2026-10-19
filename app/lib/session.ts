@@ -2,9 +2,15 @@ import {
   apiFetch,
   apiFetchBlob,
   apiFetchFile,
+  apiFetchWithMeta,
   ApiError,
+  type ApiInit,
   type StoredFile,
+  type WithMeta,
 } from './api/client';
+import { expectedCompanyHeaders } from './company-tab';
+import { clearLocalUserData } from './local-data';
+import { returnPathQuery } from './return-path';
 import { SESSION_COOKIE_MISSING, SESSION_EXPIRED, SESSION_REVOKED } from './session-codes';
 import { ROUTES } from './constants';
 
@@ -131,8 +137,19 @@ export function consumeJustLoggedIn(): boolean {
  * failure, clears the session and sends the user back to /login (spec edge
  * cases: expired access token mid-session, revoked/expired refresh token).
  */
-export async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function authFetch<T>(path: string, init?: ApiInit): Promise<T> {
   return withAuth(path, init, apiFetch<T>);
+}
+
+/**
+ * `authFetch`, also handing back the response headers — for a paged list whose total rides in
+ * `X-Total-Count` while its body stays a plain array. Same refresh-and-retry path.
+ */
+export async function authFetchWithMeta<T>(
+  path: string,
+  init?: ApiInit,
+): Promise<WithMeta<T>> {
+  return withAuth(path, init, apiFetchWithMeta<T>);
 }
 
 /**
@@ -143,7 +160,7 @@ export async function authFetch<T>(path: string, init?: RequestInit): Promise<T>
  */
 export async function authFetchBlob(
   path: string,
-  init?: RequestInit,
+  init?: ApiInit,
 ): Promise<Blob> {
   return withAuth(path, init, apiFetchBlob);
 }
@@ -156,7 +173,7 @@ export async function authFetchBlob(
  */
 export async function authFetchFile(
   path: string,
-  init?: RequestInit,
+  init?: ApiInit,
 ): Promise<StoredFile> {
   return withAuth(path, init, apiFetchFile);
 }
@@ -185,9 +202,14 @@ function refreshOnce(): Promise<string> {
     })();
     // Cleared however it settles: a failed renewal must not pin a rejected promise
     // that every later request would then inherit forever.
-    refreshInFlight.finally(() => {
-      refreshInFlight = null;
-    });
+    // The `.catch` is for this derived chain only — callers still receive the rejection through
+    // `refreshInFlight` itself. Without it, `.finally` produced a second promise that rejected with
+    // nothing attached, and every failed renewal logged "Uncaught (in promise)" (036 A25).
+    refreshInFlight
+      .catch(() => undefined)
+      .finally(() => {
+        refreshInFlight = null;
+      });
   }
   return refreshInFlight;
 }
@@ -215,16 +237,19 @@ let sessionEnded = false;
 
 async function withAuth<T>(
   path: string,
-  init: RequestInit | undefined,
-  run: (path: string, init?: RequestInit) => Promise<T>,
+  init: ApiInit | undefined,
+  run: (path: string, init?: ApiInit) => Promise<T>,
 ): Promise<T> {
   if (sessionEnded) {
     throw new ApiError('Your session has ended.', 401, SESSION_EXPIRED);
   }
-  const withAuthHeader = (token: string | null): RequestInit => ({
+  const withAuthHeader = (token: string | null): ApiInit => ({
     ...init,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // The company this tab believes it is in, so the server can refuse a save from a tab that
+      // another tab has since switched (036 B17). Absent until the company list has loaded.
+      ...expectedCompanyHeaders(),
       ...init?.headers,
     },
   });
@@ -266,6 +291,8 @@ async function withAuth<T>(
       clearSessionHint();
       abandonRefresh();
       void purgeRuntimeCaches();
+      // Drafts and queued work belong to the person whose session this was (036 A26).
+      void clearLocalUserData({ keepOwnedDrafts: true });
       if (typeof window !== 'undefined') {
         // Deliberately a full document navigation, not router.push(): the session
         // has just been invalidated, and a client-side transition would keep the
@@ -300,8 +327,10 @@ async function withAuth<T>(
         // keeps the next one from doing it again, since the reason is already on screen.
         if (window.location.pathname !== ROUTES.login && !sessionEnded) {
           sessionEnded = true;
+          // `next=` brings them back to this page after signing in (036 A24).
+          const next = returnPathQuery();
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-          window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}`;
+          window.location.href = `/login?${SESSION_ENDED_REASON_KEY}=${reason}${next ? `&${next}` : ''}`;
         }
       }
       throw refreshErr;

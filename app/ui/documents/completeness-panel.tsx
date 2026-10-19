@@ -6,6 +6,7 @@ import type {
 } from '@/app/lib/api/company-documents';
 import { DOCUMENT_COPY } from '@/app/lib/constants';
 import { RestrictedBadge } from '@/app/ui/documents/restricted-badge';
+import { dateLabel } from '@/app/lib/format';
 
 interface CompletenessPanelProps {
   present: CompanyDocument[];
@@ -18,7 +19,7 @@ interface CompletenessPanelProps {
 }
 
 const dateText = (value: Date | null) =>
-  value ? value.toISOString().slice(0, 10) : '—';
+  dateLabel(value);
 
 /**
  * What is on file and what is not (017 FR-003).

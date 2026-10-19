@@ -5,8 +5,10 @@ import clsx from 'clsx';
 import { useState } from 'react';
 
 import { getMyHolidays } from '@/app/lib/api/my-workspace';
-import { todayIso } from '@/app/lib/format';
+import { todayIso, datePart } from '@/app/lib/format';
 import { LoadingText } from '@/app/ui/spinner';
+import { IconButton } from '@/app/ui/button';
+import StatusBadge from '@/app/ui/status-badge';
 
 const TYPE_LABELS: Record<string, string> = {
   national: 'National',
@@ -20,7 +22,10 @@ const TYPE_LABELS: Record<string, string> = {
  * date, with the next one marked and past ones dimmed; a year switcher for planning ahead.
  */
 export default function HolidayList() {
-  const [year, setYear] = useState(() => new Date().getFullYear());
+  // This year and next only (2026-10-18): past years are history nobody plans by, and a company
+  // rarely declares beyond next year. The business timezone's year, not the browser's.
+  const thisYear = Number(todayIso().slice(0, 4));
+  const [year, setYear] = useState(thisYear);
   const { data, isPending, isError } = useQuery({
     queryKey: ['my', 'holidays', year],
     queryFn: () => getMyHolidays(year),
@@ -31,25 +36,25 @@ export default function HolidayList() {
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-label="Previous year"
-          onClick={() => setYear((y) => y - 1)}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        <IconButton
+          label="Previous year"
+          className="border border-gray-200 bg-white"
+          disabled={year <= thisYear}
+          onClick={() => setYear((y) => Math.max(thisYear, y - 1))}
         >
           ‹
-        </button>
+        </IconButton>
         <span className="min-w-16 text-center text-sm font-medium text-gray-900">
           {year}
         </span>
-        <button
-          type="button"
-          aria-label="Next year"
-          onClick={() => setYear((y) => y + 1)}
-          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        <IconButton
+          label="Next year"
+          className="border border-gray-200 bg-white"
+          disabled={year >= thisYear + 1}
+          onClick={() => setYear((y) => Math.min(thisYear + 1, y + 1))}
         >
           ›
-        </button>
+        </IconButton>
       </div>
 
       {isPending ? (
@@ -77,13 +82,13 @@ export default function HolidayList() {
                 key={holiday.id}
                 className={clsx(
                   'flex items-center gap-4 px-4 py-3',
-                  past && 'text-gray-400',
+                  past && 'text-gray-500',
                   holiday.id === nextId && 'bg-green-50',
                 )}
               >
                 <div className="w-14 shrink-0 text-center">
                   <div className="text-xs uppercase tracking-wide">
-                    {date.toLocaleDateString('en-IN', { month: 'short' })}
+                    {datePart(holiday.date, 'monthShort')}
                   </div>
                   <div className="text-xl font-semibold leading-tight">
                     {date.getDate()}
@@ -99,15 +104,13 @@ export default function HolidayList() {
                     {holiday.name}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {date.toLocaleDateString('en-IN', { weekday: 'long' })} ·{' '}
+                    {datePart(holiday.date, 'weekday')} ·{' '}
                     {TYPE_LABELS[holiday.type] ?? holiday.type}
                     {!holiday.appliesToAllSites && ' · Your site'}
                   </div>
                 </div>
                 {holiday.id === nextId && (
-                  <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                    Next
-                  </span>
+                  <StatusBadge tone="success" label={'Next'} className="shrink-0" />
                 )}
               </li>
             );

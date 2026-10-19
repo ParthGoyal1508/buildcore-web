@@ -195,10 +195,28 @@ export const roleSchema = z.object({
   /** Where holders land after signing in — a module key (029 FR-020). Null: their first module. */
   homeModule: z.string().nullable().default(null),
   assignedUserCount: z.number(),
+  /** Active accounts holding the role in the caller's company (036 C11). Optional: a server
+   * predating it still parses, and the screens then say nothing rather than "0 holders". */
+  activeHolderCount: z.number().optional(),
+  /**
+   * The company a custom role belongs to; null for a system role every company shares (036 C10).
+   * Defaulted so a server predating the field still parses — every role was global then.
+   */
+  companyId: z.string().nullable().default(null),
+  /** That company's name, on the list only. */
+  companyName: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type Role = z.infer<typeof roleSchema>;
+
+/** Whether an account of `companyId` may hold the role: a global one, or its own company's. */
+export function roleFitsCompany(
+  role: Pick<Role, 'companyId'>,
+  companyId: string | null | undefined,
+): boolean {
+  return role.companyId === null || role.companyId === (companyId ?? null);
+}
 
 export async function listRoles(): Promise<Role[]> {
   return z.array(roleSchema).parse(await authFetch('/settings/roles'));
@@ -255,8 +273,8 @@ export async function deleteRole(
 
 /**
  * `roles` is an array, not a single `role`: an account can hold several roles at
- * once and its effective permissions are their union. The Users form still edits a
- * single role, which replaces the whole set — that is what the API's `roleId` means.
+ * once and its effective permissions are their union. Since 036 C1 the Users form edits the
+ * whole set (`roleIds`); it used to edit `roles[0]` alone, and saving removed the others.
  */
 export const userSummarySchema = z.object({
   id: z.string(),
@@ -276,9 +294,43 @@ export async function listUsers(): Promise<UserSummary[]> {
   return z.array(userSummarySchema).parse(await authFetch('/settings/users'));
 }
 
+export interface UserListParams {
+  q?: string;
+  status?: UserSummary['status'] | '';
+  roleId?: string;
+  companyId?: string;
+  /** `key:asc` / `key:desc` — name, email, status, lastLoginAt, createdAt. */
+  sort?: string;
+  page: number;
+  pageSize: number;
+}
+
+const userPageSchema = z.object({
+  items: z.array(userSummarySchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type UserPage = z.infer<typeof userPageSchema>;
+
+/** One page of accounts, searched and filtered on the server (036 C5). */
+export async function listUsersPage(params: UserListParams): Promise<UserPage> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  return userPageSchema.parse(
+    await authFetch(`/settings/users?${query.toString()}`),
+  );
+}
+
 export async function updateUser(
   id: string,
-  input: { roleId?: string; status?: 'active' | 'deactivated' },
+  input: {
+    /** The account's whole role set after the save — at least one (036 C1, C2). */
+    roleIds?: string[];
+    status?: 'active' | 'deactivated';
+  },
 ): Promise<UserSummary> {
   return userSummarySchema.parse(
     await authFetch(`/settings/users/${id}`, {

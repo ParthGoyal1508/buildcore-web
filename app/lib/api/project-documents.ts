@@ -132,6 +132,49 @@ export async function getProjectDocuments(
   return z.array(projectDocumentSchema).parse(raw);
 }
 
+/** One page of a project's documents (036 I26 paging on the API). */
+export interface ProjectDocumentPage {
+  items: ProjectDocument[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * A page of the same list, with the total (036 Wave 3). Unpaged, the API caps the list at 500; the
+ * panel asks for the largest page and says when there are more than it shows.
+ */
+export async function getProjectDocumentPage(
+  projectId: string,
+  page = 1,
+  pageSize = 200,
+): Promise<ProjectDocumentPage> {
+  const raw = await authFetch<unknown>(
+    `/projects/${encodeURIComponent(projectId)}/documents?page=${page}&pageSize=${pageSize}`,
+  );
+  return z
+    .object({
+      items: z.array(projectDocumentSchema),
+      total: z.number(),
+      page: z.number(),
+      pageSize: z.number(),
+    })
+    .parse(raw);
+}
+
+/**
+ * Removes a document filed by mistake (036 I25). Audited; refused on a locked project (423).
+ */
+export async function removeProjectDocument(
+  projectId: string,
+  documentId: string,
+): Promise<void> {
+  await authFetch<unknown>(
+    `/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(documentId)}`,
+    { method: 'DELETE' },
+  );
+}
+
 /** The bytes, as a blob the caller turns into a download. */
 export async function downloadProjectDocument(
   projectId: string,
@@ -171,6 +214,8 @@ export async function uploadProjectDocument(
     documentNumber?: string;
     /** Required by the server when the kind lapses (`hasExpiry`). */
     expiresAt?: string;
+    /** 036 I25: a document on this project this one replaces; removed once this is filed. */
+    supersedesDocumentId?: string;
   },
   companyId?: string,
 ): Promise<ProjectDocument> {
@@ -283,17 +328,5 @@ export async function stageProjectDocument(
   return { stagedDocumentId };
 }
 
-/** Reads a File as base64 without the data-URL prefix the API does not want. */
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      const comma = result.indexOf(',');
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = () =>
-      reject(new Error('The file could not be read.'));
-    reader.readAsDataURL(file);
-  });
-}
+// One copy, in `app/lib/files.ts` (036 A27); re-exported so existing imports keep working.
+export { fileToBase64 } from '@/app/lib/files';

@@ -14,7 +14,7 @@ import {
   type AdminClaim,
   type LeaveApplication,
 } from '@/app/lib/api/hr-payroll';
-import { getCurrentUser } from '@/app/lib/api/users';
+import { getCurrentUser, hasWrite } from '@/app/lib/api/users';
 import { dateLabel, money } from '@/app/lib/format';
 import { promptDialog } from '@/app/ui/dialogs';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
@@ -40,17 +40,24 @@ const LEAVE_LABELS: Record<string, string> = {
  *
  * Each list shows only to someone who may decide it: leave to `ATTENDANCE`, claims to
  * `EMPLOYEES` — the permissions their screens and the server's own guards ask for.
+ *
+ * 036 (stream 3b): deciding a claim now needs `PAYROLL` write on the API, while reading the queue
+ * still needs `EMPLOYEES` or `PAYROLL`. So the claims list shows to either, and Approve / Reject
+ * only to a `PAYROLL` writer — an `EMPLOYEES`-only holder would otherwise be offered buttons that
+ * answer 403.
  */
 export default function HrRequests() {
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
   const permissions = user.data?.permissions ?? [];
   const mayLeave = permissions.includes('ATTENDANCE');
-  const mayClaims = permissions.includes('EMPLOYEES');
+  const mayClaims =
+    permissions.includes('EMPLOYEES') || permissions.includes('PAYROLL');
+  const mayDecideClaims = hasWrite(user.data, 'PAYROLL');
   if (!mayLeave && !mayClaims) return null;
   return (
     <div className="space-y-6">
       {mayLeave && <LeaveRequests />}
-      {mayClaims && <ClaimRequests />}
+      {mayClaims && <ClaimRequests mayDecide={mayDecideClaims} />}
     </div>
   );
 }
@@ -126,7 +133,7 @@ function LeaveRequests() {
         </h2>
         <Link
           href="/dashboard/hr/leave"
-          className="text-sm text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           Open leave
         </Link>
@@ -187,7 +194,7 @@ function LeaveRequests() {
   );
 }
 
-function ClaimRequests() {
+function ClaimRequests({ mayDecide }: { mayDecide: boolean }) {
   const queryClient = useQueryClient();
   const employees = useEmployeeNames();
   const [error, setError] = useState<string | null>(null);
@@ -251,7 +258,7 @@ function ClaimRequests() {
         </h2>
         <Link
           href="/dashboard/hr/reimbursements"
-          className="text-sm text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          className="text-sm text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
         >
           Open reimbursements
         </Link>
@@ -271,7 +278,7 @@ function ClaimRequests() {
           rows={data}
           rowKey={(row) => row.id}
           emptyMessage="No reimbursement claims are waiting."
-          actions={(row) => (
+          actions={!mayDecide ? undefined : (row) => (
             <>
               <RowAction
                 disabled={decide.isPending}

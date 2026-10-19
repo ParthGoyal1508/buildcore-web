@@ -215,7 +215,7 @@ export default function MyResignation() {
               maxLength={2000}
               value={detail}
               onChange={(event) => setDetail(event.target.value)}
-              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
             />
           </div>
           <Button type="submit" disabled={submit.isPending || !detail.trim()}>

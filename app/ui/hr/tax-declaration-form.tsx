@@ -5,13 +5,13 @@ import { useState } from 'react';
 
 import {
   getTaxDeclaration,
-  listEmployees,
   saveTaxDeclaration,
   verifyDeclarationLine,
 } from '@/app/lib/api/hr-payroll';
 import { TDS_SECTIONS, TDS_SECTION_CEILINGS } from '@/app/lib/constants';
 import { financialYearOf, rupees } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { Button, SecondaryButton } from '@/app/ui/button';
+import EmployeePicker from '@/app/ui/hr/employee-picker';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import {
   FormError,
@@ -45,10 +45,6 @@ export default function TaxDeclarationForm() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const { data: employees } = useQuery({
-    queryKey: ['hr', 'employees', { pageSize: 100 }],
-    queryFn: () => listEmployees({ pageSize: 100 }),
-  });
 
   const { data: declaration, isLoading } = useQuery({
     queryKey: ['hr', 'taxDeclaration', employeeId, financialYear],
@@ -164,7 +160,7 @@ export default function TaxDeclarationForm() {
                 ),
               )
             }
-            className="w-32 rounded-md border border-gray-200 px-2 py-1 text-right text-sm tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="w-32 rounded-md border border-gray-200 px-2 py-1 text-right text-sm tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           />
         );
       },
@@ -207,7 +203,7 @@ export default function TaxDeclarationForm() {
                 ),
               )
             }
-            className="w-44 rounded-md border border-gray-200 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="w-44 rounded-md border border-gray-200 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           />
         );
       },
@@ -222,20 +218,14 @@ export default function TaxDeclarationForm() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <SelectField
+        <EmployeePicker
           id="declaration-employee"
           label="Employee"
           value={employeeId}
-          onChange={(event) => setEmployeeId(event.target.value)}
-        >
-          <option value="">Select an employee</option>
-          {employees?.items.map((employee) => (
-            <option key={employee.id} value={employee.id}>
-              {employee.employeeCode} ·{' '}
-              {[employee.firstName, employee.lastName].filter(Boolean).join(' ')}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(id) => setEmployeeId(id)}
+          allowLeavers
+          required
+        />
         <TextField
           id="declaration-fy"
           label="Financial year"
@@ -310,7 +300,7 @@ export default function TaxDeclarationForm() {
           />
 
           <div className="flex flex-wrap justify-between gap-2">
-            <button
+            <SecondaryButton
               type="button"
               onClick={() =>
                 setLines((current) => [
@@ -318,10 +308,9 @@ export default function TaxDeclarationForm() {
                   { sectionCode: '', declaredAmount: '', proofRef: '' },
                 ])
               }
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               Add a line
-            </button>
+            </SecondaryButton>
             <Button
               type="button"
               onClick={() => save.mutate()}

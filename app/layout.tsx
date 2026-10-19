@@ -1,11 +1,13 @@
 import '@/app/ui/global.css';
 import { inter } from '@/app/ui/fonts';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Providers from '@/app/providers';
 import InstallPrompt from '@/app/install-prompt';
 import { DialogHost } from '@/app/ui/dialogs';
 import NativePickers from '@/app/ui/native-pickers';
 import RowLinks from '@/app/ui/row-links';
+import { ToastHost } from '@/app/ui/toast';
+import CompanyChangedBanner from '@/app/ui/company-changed-banner';
 import TopLoader from '@/app/ui/top-loader';
 
 export const metadata: Metadata = {
@@ -42,6 +44,15 @@ export const metadata: Metadata = {
       type: 'image/png',
     },
   ],
+};
+
+/**
+ * Theme colour for the installed app's title bar and the browser chrome.
+ *
+ * In `viewport`, not `metadata`: Next has ignored `themeColor` and `colorScheme` inside `metadata`
+ * since 14, so the `<meta name="theme-color">` tag was never output (036 A30).
+ */
+export const viewport: Viewport = {
   themeColor: '#002d4e',
   colorScheme: 'light',
 };
@@ -67,6 +78,8 @@ export default function RootLayout({
           <InstallPrompt />
           <NativePickers />
           <DialogHost />
+          <ToastHost />
+          <CompanyChangedBanner />
           <RowLinks />
           <TopLoader />
         </Providers>

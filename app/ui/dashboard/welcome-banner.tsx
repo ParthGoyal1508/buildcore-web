@@ -32,7 +32,7 @@ export default function WelcomeBanner() {
   if (!name) return null;
 
   return (
-    <p className="mb-4 rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800">
+    <p className="mb-4 rounded-md bg-brand-50 px-4 py-3 text-sm text-brand-800">
       {MESSAGES.welcomeBack(name)}
     </p>
   );

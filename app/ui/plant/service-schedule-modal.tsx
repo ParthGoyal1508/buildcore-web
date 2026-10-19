@@ -1,12 +1,14 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
   createServiceSchedule,
+  getEquipmentDetail,
   updateServiceSchedule,
+  type Equipment,
   type ServiceSchedule,
 } from '@/app/lib/api/plant';
 import { MESSAGES, formatReading } from '@/app/lib/constants';
@@ -15,10 +17,9 @@ import Modal from '@/app/ui/settings/modal';
 import {
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import { usePlantEquipment } from './use-plant-refs';
+import { EquipmentPicker, equipmentOption } from './pickers';
 
 /**
  * Add or edit a service schedule.
@@ -39,10 +40,16 @@ export default function ServiceScheduleModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const equipment = usePlantEquipment();
   const isEdit = schedule !== undefined;
 
+  const [machine, setMachine] = useState<Equipment | null>(null);
   const [equipmentId, setEquipmentId] = useState(schedule?.equipmentId ?? '');
+  // An edit names its machine from the record; a new schedule from the picker's row.
+  const existing = useQuery({
+    queryKey: ['plant', 'equipment', schedule?.equipmentId ?? ''],
+    queryFn: () => getEquipmentDetail(schedule!.equipmentId),
+    enabled: isEdit,
+  });
   const [serviceType, setServiceType] = useState(schedule?.serviceType ?? '');
   const [interval, setInterval] = useState(
     String(schedule?.intervalHours ?? schedule?.intervalKm ?? ''),
@@ -52,8 +59,7 @@ export default function ServiceScheduleModal({
   );
   const [error, setError] = useState<string | null>(null);
 
-  const machine = equipment.data?.find((row) => row.id === equipmentId);
-  const meterType = machine?.meterType ?? 'hours';
+  const meterType = (machine ?? existing.data)?.meterType ?? 'hours';
   const nextDue =
     interval !== '' && lastDoneReading !== ''
       ? Number(lastDoneReading) + Number(interval)
@@ -107,26 +113,23 @@ export default function ServiceScheduleModal({
       >
         <FormError message={error} />
 
-        <SelectField
+        <EquipmentPicker
           id="schedule-equipment"
           label="Machine"
           required
           disabled={isEdit}
           value={equipmentId}
-          onChange={(event) => setEquipmentId(event.target.value)}
+          selectedOption={existing.data ? equipmentOption(existing.data) : null}
+          onChange={(id, row) => {
+            setEquipmentId(id);
+            setMachine(row);
+          }}
           hint={
             isEdit
               ? 'A schedule belongs to the machine it was created for.'
               : undefined
           }
-        >
-          <option value="">Select a machine</option>
-          {(equipment.data ?? []).map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.code} · {row.name}
-            </option>
-          ))}
-        </SelectField>
+        />
 
         <TextField
           id="schedule-type"

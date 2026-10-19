@@ -17,6 +17,7 @@ import { getProjects } from '@/app/lib/api/projects';
 import { MESSAGES, ROUTES } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
 import { formatRupees } from '@/app/lib/utils';
+import { dateLabel } from '@/app/lib/format';
 import PageHeader from '@/app/ui/page-header';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import CategoryOptions from '@/app/ui/plant/category-options';
@@ -30,6 +31,9 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
+import Pager from '@/app/ui/inventory/pager';
+import QueryError from '@/app/ui/query-error';
+import { ListSkeleton } from '@/app/ui/skeletons';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 
@@ -42,6 +46,9 @@ const money = (v: number | null) => (v === null ? '—' : formatRupees(v));
  * sales made or lost money against book value. Reversed disposals are not counted — the machine is
  * back in service.
  */
+/** Rows per screen page (036 K18). */
+const DISPOSAL_PAGE = 25;
+
 export default function DisposalsPage() {
   const [type, setType] = useState<'' | 'scrapped' | 'sold'>('');
   const [from, setFrom] = useState('');
@@ -62,6 +69,14 @@ export default function DisposalsPage() {
     ...(search.trim() ? { search: search.trim() } : {}),
   };
   const filtered = Object.keys(filters).length > 0;
+  // Back to the first page whenever the filters change (React's "adjust state while rendering").
+  const filterKey = JSON.stringify(filters);
+  const [listPage, setListPage] = useState(1);
+  const [pagedFor, setPagedFor] = useState(filterKey);
+  if (pagedFor !== filterKey) {
+    setPagedFor(filterKey);
+    setListPage(1);
+  }
 
   const categories = usePlantCategories();
   const projects = useQuery({
@@ -87,7 +102,7 @@ export default function DisposalsPage() {
       render: (r) => (
         <Link
           href={ROUTES.plantEquipmentDetail(r.equipmentId)}
-          className="font-mono text-blue-700 hover:underline"
+          className="font-mono text-brand-700 hover:underline"
         >
           {r.equipmentCode}
         </Link>
@@ -101,7 +116,7 @@ export default function DisposalsPage() {
       render: (r) => [r.make, r.model].filter(Boolean).join(' / ') || '—',
       hideOnCard: true,
     },
-    { key: 'purchaseDate', header: 'Purchase date', render: (r) => r.purchaseDate ?? '—', hideOnCard: true },
+    { key: 'purchaseDate', header: 'Purchase date', render: (r) => dateLabel(r.purchaseDate), hideOnCard: true },
     {
       key: 'purchaseCost',
       header: 'Purchase cost',
@@ -116,7 +131,7 @@ export default function DisposalsPage() {
         <StatusBadge status={r.type} label={r.type === 'sold' ? 'Sold' : 'Scrapped'} />
       ),
     },
-    { key: 'date', header: 'Date', render: (r) => r.disposalDate },
+    { key: 'date', header: 'Date', render: (r) => dateLabel(r.disposalDate) },
     {
       key: 'value',
       header: 'Value realised',
@@ -182,8 +197,17 @@ export default function DisposalsPage() {
       </div>
       <FormError message={error} />
 
-      {data.isPending ? null : data.isError ? (
-        <FormError message={MESSAGES.plantLoadFailed} />
+      {data.isPending ? (
+        <ListSkeleton
+          headers={['Machine ID', 'Name', 'Disposal', 'Date', 'Value realised']}
+          rows={6}
+        />
+      ) : data.isError ? (
+        <QueryError
+          error={data.error}
+          fallback={MESSAGES.plantLoadFailed}
+          onRetry={data.refetch}
+        />
       ) : nothingEver ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-12 text-center">
           <ArchiveBoxXMarkIcon className="w-10 text-gray-400" aria-hidden="true" />
@@ -266,7 +290,12 @@ export default function DisposalsPage() {
 
           <ResponsiveList
             columns={columns}
-            rows={data.data?.items ?? []}
+            // 036 K18: paged on the screen — the summary and chart above need every row, so the
+            // API returns them together; 25 at a time keeps a long history readable on a phone.
+            rows={(data.data?.items ?? []).slice(
+              (listPage - 1) * DISPOSAL_PAGE,
+              listPage * DISPOSAL_PAGE,
+            )}
             rowKey={(r) => r.id}
             isLoading={data.isPending}
             emptyMessage="No disposals match these filters."
@@ -275,6 +304,13 @@ export default function DisposalsPage() {
                 View
               </RowAction>
             )}
+          />
+          <Pager
+            total={data.data?.items.length ?? 0}
+            page={listPage}
+            pageSize={DISPOSAL_PAGE}
+            onPageChange={setListPage}
+            noun="disposal"
           />
         </>
       )}
@@ -344,7 +380,7 @@ function MonthChart({
                 <div className="bg-slate-500" style={{ height: `${(m.sold / max) * 100}%` }} />
                 <div className="rounded-t-sm bg-red-400" style={{ height: `${(m.scrapped / max) * 100}%` }} />
               </div>
-              <span className="text-[10px] text-gray-500">{label}</span>
+              <span className="text-xs text-gray-500">{label}</span>
             </div>
           );
         })}

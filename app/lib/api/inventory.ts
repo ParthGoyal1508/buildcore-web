@@ -145,6 +145,14 @@ export async function getItems(query: ItemQuery = {}): Promise<ItemPage> {
   return itemPageSchema.parse(raw);
 }
 
+/** One item, for a form opened on a known id (036 M5: the pickers no longer hold every item). */
+export async function getItem(id: string): Promise<Item> {
+  const raw = await authFetch<unknown>(
+    `/inventory/items/${encodeURIComponent(id)}`,
+  );
+  return itemSchema.parse(raw);
+}
+
 export interface ItemInput {
   name: string;
   categoryId: string;
@@ -204,6 +212,8 @@ export type StockRow = z.infer<typeof stockRowSchema>;
 
 export const stockPageSchema = z.object({
   rows: z.array(stockRowSchema),
+  /** The valuation of every row the filter matches, not just this page (036 M13). */
+  totals: z.object({ stockValue: decimal }).optional(),
   total: z.number(),
   page: z.number(),
   pageSize: z.number(),
@@ -222,6 +232,70 @@ export interface StockQuery {
 export async function getStock(query: StockQuery = {}): Promise<StockPage> {
   const raw = await authFetch<unknown>(`/inventory/stock${qs({ ...query })}`);
   return stockPageSchema.parse(raw);
+}
+
+/** One movement on an item's ledger at one store (036 M13). */
+export const stockLedgerLineSchema = z.object({
+  id: z.string(),
+  date: isoDate,
+  type: z.string(),
+  label: z.string(),
+  reference: z.string().nullable(),
+  counterparty: z.string().nullable(),
+  quantityIn: decimal,
+  quantityOut: decimal,
+  rate: nullableDecimal,
+  balance: decimal,
+});
+export type StockLedgerLine = z.infer<typeof stockLedgerLineSchema>;
+
+export const stockLedgerSchema = z.object({
+  itemId: z.string(),
+  itemName: z.string(),
+  itemCode: z.string(),
+  unit: z.string(),
+  siteId: z.string(),
+  siteName: z.string(),
+  dateFrom: z.string().nullable(),
+  dateTo: z.string().nullable(),
+  openingQuantity: decimal,
+  inQuantity: decimal,
+  outQuantity: decimal,
+  closingQuantity: decimal,
+  avgRate: decimal,
+  closingValue: decimal,
+  entries: z.array(stockLedgerLineSchema),
+});
+export type StockLedger = z.infer<typeof stockLedgerSchema>;
+
+/** One item at one store, movement by movement, over a date range (036 M13). */
+export async function getStockLedger(
+  itemId: string,
+  siteId: string,
+  range: { dateFrom?: string; dateTo?: string } = {},
+): Promise<StockLedger> {
+  const raw = await authFetch<unknown>(
+    `/inventory/stock/${encodeURIComponent(itemId)}/${encodeURIComponent(siteId)}/ledger${qs(range)}`,
+  );
+  return stockLedgerSchema.parse(raw);
+}
+
+/**
+ * The inventory registers as Excel (036 M12, M13) — the list's own filters, every page. Returned
+ * as a blob for `saveBlob`: the endpoint is behind the bearer token.
+ */
+export type InventoryExport =
+  | 'purchases'
+  | 'payments'
+  | 'issues'
+  | 'stock'
+  | 'stock-ledger';
+
+export async function downloadInventoryExport(
+  register: InventoryExport,
+  query: Record<string, string | number | boolean | undefined | null> = {},
+): Promise<Blob> {
+  return authFetchBlob(`/inventory/exports/${register}.xlsx${qs(query)}`);
 }
 
 export const stockHintSchema = z.object({
@@ -266,12 +340,26 @@ export const purchaseSchema = z.object({
   paymentStatus: z.enum(PURCHASE_BILL_STATUSES).nullable(),
   paidAmount: decimal,
   indentLineId: z.string().nullable(),
+  // 036 M9: the PO line received against; 036 M11: whether a delivery photo is stored. Optional so
+  // an API not yet redeployed still parses.
+  purchaseOrderLineId: z.string().nullable().optional(),
+  purchaseOrderRef: z.string().nullable().optional(),
+  purchaseOrderLineNo: z.number().nullable().optional(),
+  hasPhoto: z.boolean().optional(),
   remarks: z.string().nullable(),
 });
 export type Purchase = z.infer<typeof purchaseSchema>;
 
 export const purchasePageSchema = z.object({
   purchases: z.array(purchaseSchema),
+  /** Every page of the filter (036 M12); `quantity` only when one item is filtered. */
+  totals: z
+    .object({
+      amount: decimal,
+      paidAmount: decimal,
+      quantity: nullableDecimal,
+    })
+    .optional(),
   total: z.number(),
   page: z.number(),
   pageSize: z.number(),
@@ -309,7 +397,11 @@ export interface PurchaseInput {
    * rather than as multipart, matching 007's contractor documents. */
   billFile?: string;
   billContentType?: string;
+  /** The delivery photographed at the gate, base64 (028 FR-017; viewable since 036 M11). */
+  photoFile?: string;
   indentLineId?: string;
+  /** The PO line this delivery is received against (036 M9). */
+  purchaseOrderLineId?: string;
   remarks?: string;
   /** What the gate counted, for the GRN (2026-10-15). Left out entirely when nothing was entered. */
   grn?: GrnDetails;
@@ -357,6 +449,136 @@ export async function getPurchaseBill(id: string): Promise<Blob> {
   return authFetchBlob(`/inventory/purchases/${id}/bill`);
 }
 
+/** The delivery photograph (036 M11), served as the image it is. */
+export async function getPurchasePhoto(id: string): Promise<StoredFile> {
+  return authFetchFile(`/inventory/purchases/${encodeURIComponent(id)}/photo`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchase orders, structured (036 M9)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PO_STATUSES = ['not_received', 'partly_received', 'received'] as const;
+export const PO_STATUS_LABELS: Record<(typeof PO_STATUSES)[number], string> = {
+  not_received: 'Not received',
+  partly_received: 'Partly received',
+  received: 'Received',
+};
+
+export const purchaseOrderSummarySchema = z.object({
+  id: z.string(),
+  letterId: z.string(),
+  referenceNo: z.string().nullable(),
+  version: z.number(),
+  vendorId: z.string().nullable(),
+  vendorName: z.string().nullable(),
+  issuedAt: z.string(),
+  gstPercent: decimal,
+  lineCount: z.number(),
+  orderedValue: decimal,
+  orderedTotal: decimal,
+  receivedValue: decimal,
+  billedAmount: decimal,
+  paidAmount: decimal,
+  status: z.enum(PO_STATUSES),
+});
+export type PurchaseOrderSummary = z.infer<typeof purchaseOrderSummarySchema>;
+
+const purchaseOrderDeliverySchema = z.object({
+  purchaseId: z.string(),
+  grnNumber: z.string().nullable(),
+  date: isoDate,
+  siteId: z.string(),
+  siteName: z.string(),
+  quantity: decimal,
+  rate: decimal,
+  amount: decimal,
+  billedAmount: decimal,
+  paidAmount: decimal,
+  paymentStatus: z.string().nullable(),
+  payments: z.array(
+    z.object({
+      paymentId: z.string(),
+      date: isoDate,
+      paymentMode: z.string(),
+      referenceNumber: z.string(),
+      allocatedAmount: decimal,
+    }),
+  ),
+});
+
+export const purchaseOrderDetailSchema = purchaseOrderSummarySchema.extend({
+  lines: z.array(
+    z.object({
+      id: z.string(),
+      lineNo: z.number(),
+      itemId: z.string().nullable(),
+      description: z.string(),
+      unit: z.string(),
+      quantity: decimal,
+      rate: decimal,
+      amount: decimal,
+      gstPercent: decimal,
+      receivedQuantity: decimal,
+      remainingQuantity: decimal,
+      billedAmount: decimal,
+      paidAmount: decimal,
+      deliveries: z.array(purchaseOrderDeliverySchema),
+    }),
+  ),
+});
+export type PurchaseOrderDetail = z.infer<typeof purchaseOrderDetailSchema>;
+
+export const openPurchaseOrderLineSchema = z.object({
+  id: z.string(),
+  purchaseOrderId: z.string(),
+  letterId: z.string(),
+  referenceNo: z.string().nullable(),
+  lineNo: z.number(),
+  itemId: z.string(),
+  description: z.string(),
+  unit: z.string(),
+  quantity: decimal,
+  rate: decimal,
+  receivedQuantity: decimal,
+  remainingQuantity: decimal,
+});
+export type OpenPurchaseOrderLine = z.infer<typeof openPurchaseOrderLineSchema>;
+
+/** Issued POs with ordered / received / billed / paid. */
+export async function getPurchaseOrders(
+  query: { vendorId?: string } = {},
+): Promise<PurchaseOrderSummary[]> {
+  const raw = await authFetch<unknown>(
+    `/inventory/purchase-orders${qs(query)}`,
+  );
+  return z
+    .object({ purchaseOrders: z.array(purchaseOrderSummarySchema) })
+    .parse(raw).purchaseOrders;
+}
+
+/** One PO traced, by its letter id: lines → GRNs → bills → payments. */
+export async function getPurchaseOrder(
+  letterId: string,
+): Promise<PurchaseOrderDetail> {
+  const raw = await authFetch<unknown>(
+    `/inventory/purchase-orders/${encodeURIComponent(letterId)}`,
+  );
+  return purchaseOrderDetailSchema.parse(raw);
+}
+
+/** The PO lines a delivery can still be received against, for the purchase form. */
+export async function getOpenPurchaseOrderLines(query: {
+  vendorId?: string;
+  itemId?: string;
+}): Promise<OpenPurchaseOrderLine[]> {
+  const raw = await authFetch<unknown>(
+    `/inventory/purchase-orders/open-lines${qs(query)}`,
+  );
+  return z.object({ lines: z.array(openPurchaseOrderLineSchema) }).parse(raw)
+    .lines;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues
 // ─────────────────────────────────────────────────────────────────────────────
@@ -393,6 +615,8 @@ export type Issue = z.infer<typeof issueSchema>;
 
 export const issuePageSchema = z.object({
   issues: z.array(issueSchema),
+  /** Every page of the filter (036 M12); the quantity only when one item is filtered. */
+  totals: z.object({ quantity: nullableDecimal }).optional(),
   total: z.number(),
   page: z.number(),
   pageSize: z.number(),
@@ -402,6 +626,10 @@ export type IssuePage = z.infer<typeof issuePageSchema>;
 export interface IssueQuery {
   siteId?: string;
   itemId?: string;
+  /** 036 M12. */
+  projectId?: string;
+  vendorId?: string;
+  slipNo?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -442,9 +670,12 @@ export async function createIssue(input: IssueInput): Promise<Issue> {
 }
 
 export interface IssueReturnInput {
-  /** The total returned against the issue so far, not this return alone — the register prints
-   * one "Received Qty" per issue, and a total cannot be double-counted by a retried request. */
-  returnedQuantity: number;
+  /**
+   * The quantity coming back now (036 M4). It was the cumulative total returned so far, which
+   * nobody filling the form read that way; the server now adds this to what came back before and
+   * refuses more than is still out ("at most N more").
+   */
+  returnedNow: number;
   returnedOn: string;
   receivedBy: string;
 }
@@ -498,6 +729,8 @@ export const transferSchema = z.object({
   expectedArrival: z.string().nullable().optional(),
   receivedQuantity: nullableDecimal.optional(),
   reason: z.string().nullable().optional(),
+  /** Why less arrived than was sent (036 M3); written off as a loss at the destination. */
+  shortageReason: z.string().nullable().optional(),
 });
 export type Transfer = z.infer<typeof transferSchema>;
 
@@ -561,14 +794,16 @@ export async function updateTransferStatus(
   /** Only with `received`: what actually arrived. The slip prints the difference from what was
    * sent, so a short delivery is on paper rather than in someone's memory. */
   receivedQuantity?: number,
+  /** Required by the server when `receivedQuantity` is below what was sent (036 M3). */
+  shortageReason?: string,
 ): Promise<{ id: string; status: string }> {
   const raw = await authFetch<unknown>(`/inventory/transfers/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(
-      receivedQuantity === undefined
-        ? { status }
-        : { status, receivedQuantity },
-    ),
+    body: JSON.stringify({
+      status,
+      ...(receivedQuantity === undefined ? {} : { receivedQuantity }),
+      ...(shortageReason ? { shortageReason } : {}),
+    }),
   });
   return z.object({ id: z.string(), status: z.string() }).parse(raw);
 }
@@ -608,6 +843,10 @@ export type Payment = z.infer<typeof paymentSchema>;
 
 export const paymentPageSchema = z.object({
   payments: z.array(paymentSchema),
+  /** Every page of the filter (036 M12). */
+  totals: z
+    .object({ amount: decimal, allocatedAmount: decimal })
+    .optional(),
   total: z.number(),
   page: z.number(),
   pageSize: z.number(),
@@ -676,15 +915,32 @@ export interface PaymentInput {
   amount: number;
   date: string;
   paymentMode: (typeof PAYMENT_MODES)[number];
-  referenceNumber: string;
+  /** Optional for cash (036 M10); required for UPI, bank transfer and cheque. */
+  referenceNumber?: string;
 }
 
-export async function createPayment(input: PaymentInput): Promise<Payment> {
+export const createdPaymentSchema = paymentSchema.extend({
+  /** True when the Idempotency-Key matched an earlier submission: nothing new was recorded. */
+  replayed: z.boolean().default(false),
+  /** Non-blocking notices — a reference already used on another payment, for one. */
+  warnings: z.array(z.string()).default([]),
+});
+export type CreatedPayment = z.infer<typeof createdPaymentSchema>;
+
+/**
+ * Records a payment (036 M10). `idempotencyKey` is one UUID per form submission: a double click or
+ * a retry after a dropped response replays the first payment instead of recording a second.
+ */
+export async function createPayment(
+  input: PaymentInput,
+  idempotencyKey: string,
+): Promise<CreatedPayment> {
   const raw = await authFetch<unknown>('/inventory/payments', {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input),
   });
-  return paymentSchema.parse(raw);
+  return createdPaymentSchema.parse(raw);
 }
 
 export async function deletePayment(id: string): Promise<void> {

@@ -108,7 +108,7 @@ export default function SlipDelivery({ runId }: { runId: string }) {
     summary.sent + summary.failed + summary.undeliverable === 0
   ) {
     return (
-      <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+      <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
         {SLIP_DELIVERY_COPY.turnedOff}
       </p>
     );
