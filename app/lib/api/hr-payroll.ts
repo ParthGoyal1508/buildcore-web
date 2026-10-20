@@ -244,6 +244,7 @@ export interface EmployeeFilters {
   search?: string;
   departmentId?: string;
   siteId?: string;
+  shiftId?: string;
   isActive?: boolean;
   page?: number;
   pageSize?: number;
@@ -277,6 +278,42 @@ export async function listEmployees(filters: EmployeeFilters = {}) {
     `/hr/employees${qs({ ...filters, pageSize })}`,
   );
   return paginated(employeeSchema).parse(data);
+}
+
+const shiftRosterSchema = z.array(
+  z.object({
+    id: z.string(),
+    employeeCode: z.string(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    departmentId: z.string().nullable(),
+    designationId: z.string().nullable(),
+    siteId: z.string(),
+    shiftId: z.string(),
+  }),
+);
+export type ShiftRosterRow = z.infer<typeof shiftRosterSchema>[number];
+
+/** Every active employee, unpaged and without PII — the bulk shift screen's list (036). */
+export async function getShiftRoster(): Promise<ShiftRosterRow[]> {
+  return shiftRosterSchema.parse(
+    await authFetch<unknown>('/hr/employees/shift-roster'),
+  );
+}
+
+/** Moves every listed employee onto one shift; all or nothing (036). */
+export async function bulkSetShift(input: {
+  shiftId: string;
+  employeeIds: string[];
+}): Promise<{ updated: number; shiftId: string }> {
+  return z
+    .object({ updated: z.number(), shiftId: z.string() })
+    .parse(
+      await authFetch<unknown>('/hr/employees/bulk-shift', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    );
 }
 
 export async function getEmployee(id: string) {

@@ -71,6 +71,7 @@ export const ROUTES = {
   hr: '/dashboard/hr',
   hrEmployees: '/dashboard/hr/employees',
   hrEmployee: (id: string) => `/dashboard/hr/employees/${id}`,
+  hrEmployeesBulkShift: '/dashboard/hr/employees/bulk-shift',
   hrAttendance: '/dashboard/hr/attendance',
   hrHolidays: '/dashboard/hr/attendance/holidays',
   hrAttendanceImport: '/dashboard/hr/attendance/import',
