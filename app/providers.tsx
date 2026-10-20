@@ -1,9 +1,13 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { isTransientError } from '@/app/lib/api/client';
+import { ApiError, CASH_HIDDEN, isTransientError } from '@/app/lib/api/client';
 
 /**
  * One `QueryClient` for the whole app (research.md §3).
@@ -14,7 +18,16 @@ import { isTransientError } from '@/app/lib/api/client';
  */
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => {
-    const client = new QueryClient({
+    const client: QueryClient = new QueryClient({
+        // 038: a write refused because the company hides cash means this tab's cash policy is
+        // stale (the setting changed elsewhere). Asking again takes Cash off the forms at once,
+        // rather than leaving it offered until the next navigation.
+        mutationCache: new MutationCache({
+          onError: (error) => {
+            if (error instanceof ApiError && error.code === CASH_HIDDEN)
+              void client.invalidateQueries({ queryKey: ['cash-policy'] });
+          },
+        }),
         defaultOptions: {
           queries: {
             // Settings data is admin-edited rarely and read often; a short stale

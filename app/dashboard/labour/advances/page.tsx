@@ -16,6 +16,7 @@ import {
   type Advance,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
+import { useCashPolicy } from '@/app/lib/cash-entry';
 import { labourLabel } from '@/app/lib/constants';
 import { rupees, todayIso } from '@/app/lib/format';
 import AsyncSelect from '@/app/ui/async-select';
@@ -43,9 +44,14 @@ export default function AdvancesPage() {
   const [actingId, setActingId] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  // 038: a labour advance is paid in cash at site, so while the company hides cash there are none
+  // to list and none may be raised. The tab leaves the Labour strip; a bookmark lands here on a
+  // plain empty list rather than a refusal.
+  const { hidden: cashHidden } = useCashPolicy();
   const advances = useQuery({
     queryKey: ['advances', companyId],
     queryFn: () => getAdvances({}),
+    enabled: !cashHidden,
   });
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   const invalidate = () =>
@@ -141,17 +147,19 @@ export default function AdvancesPage() {
           title="Advances"
           description="Advances against wages and their recovery through payment sheets."
         />
-        <Button onClick={() => setShowForm(true)}>New Advance</Button>
+        {!cashHidden && (
+          <Button onClick={() => setShowForm(true)}>New Advance</Button>
+        )}
       </div>
 
       <ResponsiveList
         columns={columns}
-        rows={advances.data ?? []}
+        rows={cashHidden ? [] : (advances.data ?? [])}
         rowKey={(a) => a.id}
-        isLoading={advances.isPending}
-        error={advances.error}
+        isLoading={!cashHidden && advances.isPending}
+        error={cashHidden ? null : advances.error}
         onRetry={advances.refetch}
-        emptyMessage="No advances yet."
+        emptyMessage={cashHidden ? 'No advances to show.' : 'No advances yet.'}
         actions={(a) => {
           // O12 maker-checker: the server refuses a requester approving their own advance
           // (`SELF_APPROVAL`), so the button is not offered to them.
@@ -186,7 +194,7 @@ export default function AdvancesPage() {
         }}
       />
 
-      {showForm && (
+      {showForm && !cashHidden && (
         <AdvanceForm
           onClose={() => setShowForm(false)}
           onSaved={() => {

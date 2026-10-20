@@ -47,11 +47,11 @@ import { clockTime } from '@/app/lib/format';
  *    change sends it, because the API refuses a change without it. When it lapses the API says so
  *    with a coded 403 and this falls back to the prompt.
  *
- * **A display control, and it says so.** Nothing is deleted or altered while it is on, and turning
- * it off restores every figure exactly.
- *
- * **Separate from `CASH_ENTRY`**, which decides who may *record* cash (FR-017a). Nothing here reads
- * or writes the other.
+ * **Hiding cash means cash does not exist** (038, 2026-10-20 — it was a display mask before). While
+ * it is on, cash payments, cash labour payments and advances, and cash sales leave every screen,
+ * report, total and export, and nobody — Super Admins included — can record cash until it is turned
+ * off. Nothing is deleted, and turning it off restores everything exactly. `CASH_ENTRY` still
+ * decides who may record cash while it is off.
  */
 export default function CashVisibility() {
   const queryClient = useQueryClient();
@@ -118,11 +118,12 @@ export default function CashVisibility() {
       queryClient.setQueryData(['cash-visibility'], next);
       toast.success(
         next.hideCashTransactions
-          ? `Cash amounts are now hidden for ${companyLabel}.`
-          : `Cash amounts are now shown for ${companyLabel}.`,
+          ? `Cash transactions are now hidden for ${companyLabel}.`
+          : `Cash transactions are now shown for ${companyLabel}.`,
       );
       // FR-015. Every open screen is holding figures the server shaped under the old setting, so
-      // the whole cache goes rather than a list of the modules that hold cash.
+      // the whole cache goes rather than a list of the modules that hold cash — the cash policy
+      // (`['cash-policy']`, which decides whether forms offer Cash) included.
       void queryClient.invalidateQueries();
     },
     onError: (err) => {
@@ -222,20 +223,21 @@ export default function CashVisibility() {
             Cash transaction visibility
           </h2>
           <p className="mt-1 text-sm text-gray-600">
-            Hides every cash amount across screens, reports and exports. A
-            display setting only — nothing is deleted or changed, and switching
-            it off restores every figure exactly as it was.
+            When on, cash payments, cash labour payments and advances, and cash
+            sales disappear from every screen, report, total and export, and
+            nobody — including Super Admins — can record cash until it is
+            turned off.
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            Who may <em>record</em> a payment in cash is a separate permission,
-            set per role.
+            Nothing is deleted. Turning it off brings every record and figure
+            back exactly as it was.
           </p>
         </div>
       </div>
       <div className="mt-4 flex flex-col gap-3">
         <FormError message={error} />
         <label className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800">
-          <span>Hide cash amounts for {companyLabel}</span>
+          <span>Hide cash transactions for {companyLabel}</span>
           {/* A real checkbox drawn as a switch: keyboard and screen-reader behaviour come from the
               input, the look from the sibling span. */}
           <span className="relative inline-flex shrink-0 items-center">
@@ -262,8 +264,8 @@ export default function CashVisibility() {
             {current.isPending
               ? '…'
               : hidden
-                ? 'cash amounts are hidden'
-                : 'cash amounts are shown'}
+                ? 'cash transactions are hidden'
+                : 'cash transactions are shown'}
           </span>
           . Confirmed until{' '}
           {clockTime(confirmation.expiresAt)}

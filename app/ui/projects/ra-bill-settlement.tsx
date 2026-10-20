@@ -10,6 +10,7 @@ import {
   removeBillPayment,
   downloadPaymentAdvice,
 } from '@/app/lib/api/billing';
+import { ApiError, CASH_HIDDEN, errorMessage } from '@/app/lib/api/client';
 import { saveBlob } from '@/app/lib/download-file';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
 import { SETTLEMENT_COPY } from '@/app/lib/constants';
@@ -18,7 +19,6 @@ import { useCanWrite } from '@/app/lib/write-access';
 import { Button } from '@/app/ui/button';
 import PaymentAdviceDialog from '@/app/ui/projects/payment-advice-dialog';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
-import HiddenAmount from '@/app/ui/hidden-amount';
 import { confirmDialog } from '@/app/ui/dialogs';
 import QueryError from '@/app/ui/query-error';
 import { useToast } from '@/app/ui/toast';
@@ -53,12 +53,11 @@ import { useToast } from '@/app/ui/toast';
  * that wastes somebody's typing. The sentence says what to do instead: money paid before
  * certification is an advance, recovered through the package's adjustments.
  *
- * ## A cash amount may be hidden, and that is not a bug
+ * ## A cash payment is absent, not masked (038)
  *
- * `instrument` joined the cash surface list with this feature, so a cash payment's amount arrives
- * as `null` with `amountHidden` beside it for a caller without Cash Entry. Rendered as a stated
- * absence through `HiddenAmount` — never as a blank and never as a zero, because a zero is a figure
- * nothing downstream can tell from a real one.
+ * While the company hides cash the API leaves cash payments out of this list and out of the
+ * outstanding figure altogether, and refuses to record one (`CASH_HIDDEN`). The amount stays
+ * nullable in the schema as a backstop for the old masking.
  */
 export default function RaBillSettlement({ bill }: { bill: RaBill }) {
   const queryClient = useQueryClient();
@@ -252,12 +251,9 @@ function Payments({
             >
               <span className="flex flex-wrap items-center gap-2">
                 <span className="tabular-nums">
-                  {/* A hidden cash amount is a stated absence, never a blank and never a zero. */}
-                  {payment.amountHidden ? (
-                    <HiddenAmount />
-                  ) : (
-                    rupees(payment.amount)
-                  )}
+                  {/* 038: a cash payment no longer arrives while the company hides cash, so there is
+                      no "Hidden" to show; a backstop null reads as no figure. */}
+                  {rupees(payment.amount)}
                 </span>
                 <span className="text-gray-600">
                   {dateLabel(payment.paidOn)} ·{' '}
@@ -350,6 +346,8 @@ function Payments({
 }
 
 function describe(err: unknown): string {
+  if (err instanceof ApiError && err.code === CASH_HIDDEN)
+    return errorMessage(err);
   const anyErr = err as {
     status?: number;
     message?: string;

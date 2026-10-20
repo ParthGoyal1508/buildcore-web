@@ -1,7 +1,40 @@
 import { z } from 'zod';
 
+import { authFetch } from '@/app/lib/session';
+
+/**
+ * Whether cash is hidden for the company the caller is working in (038 FR-004).
+ *
+ * Since 038, hiding cash means cash does not exist: the API stops returning cash rows and figures,
+ * and refuses every cash write with 403 `CASH_HIDDEN` — Super Admin included. This tells the forms
+ * whether "Cash" belongs on their payment-mode lists at all. Any signed-in user may ask; the server
+ * answers for the company the session is serving, so the call carries no company id.
+ */
+const cashPolicySchema = z.object({ hidden: z.boolean() });
+export type CashPolicy = z.infer<typeof cashPolicySchema>;
+
+/**
+ * The served company's cash policy, or "not hidden" when the API cannot say.
+ *
+ * A 404 means an API older than 038, which has no such endpoint and no such rule; any other
+ * failure falls back the same way. Offering Cash by mistake costs one refusal with a clear message
+ * (the server is the one that enforces this); taking every payment form's Cash away on a blip is
+ * the worse failure.
+ */
+export async function getCashPolicy(): Promise<CashPolicy> {
+  try {
+    return cashPolicySchema.parse(await authFetch<unknown>('/my/cash-policy'));
+  } catch {
+    return { hidden: false };
+  }
+}
+
 /**
  * Parsing a response whose cash amounts the server has hidden (019 FR-014, FR-015).
+ *
+ * **A backstop since 038.** With cash hidden the API now leaves cash rows out entirely rather than
+ * masking their amounts, so these should no longer see a `null`. They stay tolerant so that a row
+ * the masking interceptor still catches renders rather than throws.
  *
  * **This existed as a bug, not a gap.** When a company turns cash hiding on, the backend's
  * `CashVisibilityInterceptor` replaces a cash row's amount with `null` and adds

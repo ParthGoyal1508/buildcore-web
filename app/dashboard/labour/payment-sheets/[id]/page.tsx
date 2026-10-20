@@ -20,7 +20,6 @@ import {
   type PaymentSheetLine,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
-import HiddenAmount from '@/app/ui/hidden-amount';
 import { useCashRights } from '@/app/lib/cash-entry';
 import {
   CASH_DENOMINATIONS,
@@ -55,11 +54,11 @@ interface Breakup {
   residuals: { workerId: string; residual: number }[];
 }
 
-/** A line's deductions, or null when any of them is hidden from this reader. */
+/** A line's deductions, or null when any of them arrived masked. */
 function deductionTotal(l: PaymentSheetLine): number | null {
-  // A nulled deduction is a hidden one, not a zero: summing it as zero would understate the
-  // column by the value of every concealed deduction, which is the exact arithmetic the backend
-  // nulls rather than zeroes to prevent.
+  // A nulled deduction is a masked one, not a zero: summing it as zero would understate the
+  // column. Since 038 a cash line does not arrive at all while the company hides cash, so this is
+  // only the backstop for the old masking, and reads as no figure.
   if (l.deductions.some((d) => d.amount === null)) return null;
   return l.deductions.reduce((sum, d) => sum + (d.amount ?? 0), 0);
 }
@@ -130,7 +129,7 @@ const lineColumns: Column<PaymentSheetLine>[] = [
     sortValue: deductionTotal,
     render: (l) => {
       const total = deductionTotal(l);
-      return total === null ? <HiddenAmount /> : rupees(total);
+      return rupees(total);
     },
   },
   {
@@ -195,9 +194,9 @@ export default function PaymentSheetDetailPage() {
   });
 
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
-  // 019 FR-017a, FR-017d. Two separate rights, and neither is inferred from the company's
-  // hiding setting — see `app/lib/cash-entry.ts`.
-  const { mayEnterCash, maySeeCashBreakup } = useCashRights();
+  // 019 FR-017a, FR-017d. Two separate rights — and since 038 both are false while the company
+  // hides cash, when neither the breakup nor a cash disbursement exists — see `app/lib/cash-entry.ts`.
+  const { mayEnterCash, maySeeCashBreakup, cashHidden } = useCashRights();
   // 036 O9: the list shows status and totals too, so it is refreshed with the sheet — it used to
   // keep showing "Draft" after an approval until a reload.
   const invalidate = () =>
@@ -469,7 +468,7 @@ export default function PaymentSheetDetailPage() {
         </div>
       )}
 
-      {s.engagementType === 'direct' && breakup && !maySeeCashBreakup && (
+      {s.engagementType === 'direct' && breakup && !maySeeCashBreakup && !cashHidden && (
         // FR-014. The alternative is a sheet that simply ends after the table, which reads as a
         // screen that failed to finish loading. Naming the permission is what lets the reader
         // decide between reporting a bug and asking for access.
@@ -481,6 +480,7 @@ export default function PaymentSheetDetailPage() {
       {disbursing && (
         <DisburseModal
           mayEnterCash={mayEnterCash}
+          cashHidden={cashHidden}
           line={disbursing}
           onClose={() => setDisbursing(null)}
           onSaved={() => {
@@ -505,11 +505,13 @@ function Summary({ label, value }: { label: string; value: string }) {
 function DisburseModal({
   line,
   mayEnterCash,
+  cashHidden,
   onClose,
   onSaved,
 }: {
   line: PaymentSheetLine;
   mayEnterCash: boolean;
+  cashHidden: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -605,7 +607,7 @@ function DisburseModal({
           {mayEnterCash && <option value="cash">Cash</option>}
           <option value="bank">Bank</option>
         </SelectField>
-        {!mayEnterCash && (
+        {!mayEnterCash && !cashHidden && (
           <p className="text-xs text-gray-500">
             {MESSAGES.cashEntryUnavailable}
           </p>
