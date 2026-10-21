@@ -6,7 +6,6 @@ import { errorMessage } from '@/app/lib/api/client';
 import {
   cancelLeaveApplication,
   getLeaveApplications,
-  requestStage,
   type LeaveApplication,
 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
@@ -96,13 +95,8 @@ export default function LeaveApplications() {
           >
             {row.status}
           </span>
-          {/* Where a pending application is (2026-10-16): the reporting manager decides first. */}
           {row.status === 'pending' && (
-            <p className="mt-1 text-xs text-gray-500">
-              {requestStage(row) === 'manager'
-                ? 'With your reporting manager'
-                : 'With HR'}
-            </p>
+            <p className="mt-1 text-xs text-gray-500">Awaiting approval</p>
           )}
           {row.managerRemarks && row.managerRemarks !== row.adminRemarks && (
             <p className="mt-1 text-xs text-gray-500">

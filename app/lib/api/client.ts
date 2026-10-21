@@ -97,11 +97,18 @@ export function isTransientError(error: unknown): boolean {
   );
 }
 
+/** A cash write refused because the company hides cash — for every caller, Super Admin too (038). */
+export const CASH_HIDDEN = 'CASH_HIDDEN';
+const CASH_HIDDEN_MESSAGE = 'Cash transactions are turned off for this company.';
+
 /** The text to show for any thrown value, never `[object Object]` or a stack-trace fragment. */
 export function errorMessage(
   error: unknown,
   fallback = 'Something went wrong. Please try again.',
 ): string {
+  // One sentence for the refusal wherever a write meets it, whatever the endpoint words it as.
+  if (error instanceof ApiError && error.code === CASH_HIDDEN)
+    return CASH_HIDDEN_MESSAGE;
   if (error instanceof ApiError && error.message) return error.message;
   return fallback;
 }

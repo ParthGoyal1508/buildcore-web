@@ -147,6 +147,10 @@ export function noteServedCompany(
 ) {
   const header = res.headers.get(SERVED_COMPANY_HEADER);
   if (header === null || sentWith === undefined || switching) return;
+  // A cacheable response (company logos and equipment photos are cached for a year) may be the
+  // browser's stored copy, replaying the header from whenever it was first fetched. It says
+  // nothing about the selection now — reading it as one raised the banner on every reload.
+  if (/max-age=[1-9]/.test(res.headers.get('Cache-Control') ?? '')) return;
   if (sentWith !== belief) return;
   const id = header === '' || header === 'none' ? null : header;
   if (id !== sentWith.id) flag(id);

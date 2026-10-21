@@ -1,14 +1,20 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
+import { ApiError } from '@/app/lib/api/client';
 import {
   getEquipmentDetail,
   getMaintenanceJobs,
   type MaintenanceJob,
 } from '@/app/lib/api/plant';
+import {
+  JOB_CARD_FLOW_LABELS,
+  JOB_CARD_FLOW_STATUSES,
+  submitJobCard,
+} from '@/app/lib/api/plant-hire';
 import {
   MAINTENANCE_STATUSES,
   MAINTENANCE_TYPES,
@@ -18,6 +24,14 @@ import {
 import { formatRupees } from '@/app/lib/utils';
 import Pager from '@/app/ui/inventory/pager';
 import { EquipmentPicker, equipmentOption } from '@/app/ui/plant/pickers';
+import { confirmDialog } from '@/app/ui/dialogs';
+import {
+  FinalBillModal,
+  JobCardHistoryModal,
+  JobCardPaymentModal,
+  JobCardStatusBadge,
+  useMayPayJobCards,
+} from '@/app/ui/plant/job-card-flow';
 import JobCardModal from '@/app/ui/plant/job-card-modal';
 import JobPartsPanel from '@/app/ui/plant/job-parts-panel';
 import { CloseJobModal, OpenJobModal } from '@/app/ui/plant/maintenance-modal';
@@ -33,6 +47,14 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
+import { useToast } from '@/app/ui/toast';
+
+/** A job card workflow dialog opened from a row (039). */
+type FlowDialog = {
+  kind: 'history' | 'bill' | 'payment';
+  jobId: string;
+  jobCardNo: string | null | undefined;
+};
 
 export default function MaintenancePage() {
   // 036 K15: the filter is a server-searched picker; the chosen machine is named from its record.
@@ -52,12 +74,47 @@ export default function MaintenancePage() {
   });
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
+  const [jobCardStatus, setJobCardStatus] = useState('');
   const [page, setPage] = useState(1);
   const [showOpen, setShowOpen] = useState(false);
   const [closing, setClosing] = useState<MaintenanceJob | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // `jobId: null` is a new card; a string is that job's card.
-  const [jobCard, setJobCard] = useState<{ jobId: string | null } | null>(null);
+  // `jobId: null` is a new card; a string is that job's card. A Head Office reviewer arrives from
+  // the Approvals queue with `?jobCard=<jobId>` (039) and lands on the card itself.
+  const [jobCard, setJobCard] = useState<{ jobId: string | null } | null>(() => {
+    const linked = searchParams.get('jobCard');
+    return linked ? { jobId: linked } : null;
+  });
+  const [flow, setFlow] = useState<FlowDialog | null>(null);
+  const mayPay = useMayPayJobCards();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const submit = useMutation({
+    mutationFn: (row: MaintenanceJob) => submitJobCard(row.id),
+    onSuccess: (_, row) => {
+      void queryClient.invalidateQueries({ queryKey: ['plant'] });
+      toast.success(
+        row.jobCardStatus === 'returned'
+          ? 'Resubmitted to Head Office.'
+          : 'Sent to Head Office for approval.',
+      );
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed),
+  });
+
+  async function confirmSubmit(row: MaintenanceJob) {
+    const again = row.jobCardStatus === 'returned';
+    const ok = await confirmDialog({
+      title: again ? 'Resubmit job card' : 'Submit job card',
+      message: again
+        ? `Send ${row.jobCardNo ?? 'this job card'} back to Head Office with your corrections?`
+        : `Send ${row.jobCardNo ?? 'this job card'} to Head Office for approval? It cannot be changed while they review it.`,
+      confirmLabel: again ? 'Resubmit' : 'Submit',
+    });
+    if (ok) submit.mutate(row);
+  }
 
   const companyId = usePlantCompanyId();
 
@@ -67,6 +124,7 @@ export default function MaintenancePage() {
     ...(equipmentId ? { equipmentId } : {}),
     ...(status ? { status } : {}),
     ...(type ? { type } : {}),
+    ...(jobCardStatus ? { jobCardStatus } : {}),
   };
 
   const { data, isPending, isError } = useQuery({
@@ -92,6 +150,11 @@ export default function MaintenancePage() {
           {row.jobCardNo ?? '—'}
         </span>
       ),
+    },
+    {
+      key: 'cardStatus',
+      header: 'Card status',
+      render: (row) => <JobCardStatusBadge status={row.jobCardStatus} />,
     },
     { key: 'type', header: 'Type', render: (row) => plantLabel(row.type) },
     {
@@ -157,7 +220,7 @@ export default function MaintenancePage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <EquipmentPicker
           id="maintenance-filter-equipment"
           label="Machine"
@@ -205,6 +268,22 @@ export default function MaintenancePage() {
             </option>
           ))}
         </SelectField>
+        <SelectField
+          id="maintenance-filter-card-status"
+          label="Job card"
+          value={jobCardStatus}
+          onChange={(event) => {
+            setJobCardStatus(event.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">Any card status</option>
+          {JOB_CARD_FLOW_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {JOB_CARD_FLOW_LABELS[value]}
+            </option>
+          ))}
+        </SelectField>
       </div>
 
       <ResponsiveList
@@ -233,6 +312,50 @@ export default function MaintenancePage() {
             >
               Job card
             </RowAction>
+            {(row.jobCardStatus === 'draft' || row.jobCardStatus === 'returned') && (
+              <RowAction
+                icon={null}
+                loading={submit.isPending && submit.variables?.id === row.id}
+                onClick={() => void confirmSubmit(row)}
+              >
+                {row.jobCardStatus === 'returned' ? 'Resubmit' : 'Submit'}
+              </RowAction>
+            )}
+            {row.jobCardStatus === 'approved' && (
+              <RowAction
+                icon={null}
+                onClick={() =>
+                  setFlow({ kind: 'bill', jobId: row.id, jobCardNo: row.jobCardNo })
+                }
+              >
+                Upload final bill
+              </RowAction>
+            )}
+            {(row.jobCardStatus === 'bill_uploaded' || row.jobCardStatus === 'paid') && (
+              // A read for anyone who can see the job; the form inside is MAINTENANCE_PAY's.
+              <RowAction
+                intent="read"
+                icon={null}
+                onClick={() =>
+                  setFlow({ kind: 'payment', jobId: row.id, jobCardNo: row.jobCardNo })
+                }
+              >
+                {row.jobCardStatus === 'bill_uploaded' && mayPay
+                  ? 'Record payment'
+                  : 'Payments'}
+              </RowAction>
+            )}
+            {row.jobCardStatus && (
+              <RowAction
+                intent="read"
+                icon={null}
+                onClick={() =>
+                  setFlow({ kind: 'history', jobId: row.id, jobCardNo: row.jobCardNo })
+                }
+              >
+                History
+              </RowAction>
+            )}
             {row.status === 'open' && (
               <RowAction onClick={() => setClosing(row)}>Close</RowAction>
             )}
@@ -279,6 +402,27 @@ export default function MaintenancePage() {
       )}
       {closing && (
         <CloseJobModal job={closing} onClose={() => setClosing(null)} />
+      )}
+      {flow?.kind === 'history' && (
+        <JobCardHistoryModal
+          jobId={flow.jobId}
+          jobCardNo={flow.jobCardNo}
+          onClose={() => setFlow(null)}
+        />
+      )}
+      {flow?.kind === 'bill' && (
+        <FinalBillModal
+          jobId={flow.jobId}
+          jobCardNo={flow.jobCardNo}
+          onClose={() => setFlow(null)}
+        />
+      )}
+      {flow?.kind === 'payment' && (
+        <JobCardPaymentModal
+          jobId={flow.jobId}
+          jobCardNo={flow.jobCardNo}
+          onClose={() => setFlow(null)}
+        />
       )}
     </div>
   );

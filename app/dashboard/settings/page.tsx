@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getCurrentUser } from '@/app/lib/api/users';
+import InstallAppCard from '@/app/ui/install-app-card';
 import PageHeader from '@/app/ui/page-header';
 import { visibleSettingsSections } from '@/app/ui/settings/sections';
 import TileGrid from '@/app/ui/tile-grid';
@@ -37,6 +38,8 @@ export default function SettingsPage() {
           icon: section.icon,
         }))}
       />
+      {/* 036: for everyone, whatever their role — installing the app needs no permission. */}
+      <InstallAppCard />
     </main>
   );
 }

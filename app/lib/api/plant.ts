@@ -1020,6 +1020,11 @@ export const maintenanceJobSchema = z.object({
   linkedServiceScheduleId: z.string().nullable(),
   /** The job card's number once a card is saved (2026-10-15). */
   jobCardNo: z.string().nullable().optional(),
+  /** Where the job card stands in its approval-and-payment workflow (039); null without a card. */
+  jobCardStatus: z
+    .enum(['draft', 'pending_approval', 'returned', 'approved', 'bill_uploaded', 'paid'])
+    .nullable()
+    .optional(),
   status: z.enum(MAINTENANCE_STATUSES),
 });
 export type MaintenanceJob = z.infer<typeof maintenanceJobSchema>;
@@ -1031,6 +1036,8 @@ export interface MaintenanceQuery extends PageQuery {
   equipmentId?: string;
   status?: string;
   type?: string;
+  /** The job card's workflow status (039). */
+  jobCardStatus?: string;
 }
 
 export async function getMaintenanceJobs(

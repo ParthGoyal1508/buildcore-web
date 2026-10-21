@@ -756,6 +756,18 @@ export async function approveAdvance(id: string): Promise<Advance> {
   return advanceSchema.parse(data);
 }
 
+/** A decision on the advance's approval chain (2026-10-20); it is never disbursed. */
+export async function rejectAdvance(
+  id: string,
+  reason: string,
+): Promise<Advance> {
+  const data = await authFetch<unknown>(`/labour/advances/${id}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
+  });
+  return advanceSchema.parse(data);
+}
+
 export async function disburseAdvance(id: string): Promise<Advance> {
   const data = await authFetch<unknown>(`/labour/advances/${id}/disburse`, {
     method: 'PATCH',

@@ -88,6 +88,9 @@ const STATUS_TONES: Record<string, StatusTone> = {
   pending_verification: 'neutral',
   verified: 'info',
   partially_paid: 'warning',
+  // Job card (039): the workshop's final bill is in and Head Office owes the payment — blue, like
+  // a verified bill, until `paid` turns it green.
+  bill_uploaded: 'info',
 
   // Indent status (009 FR-025). `draft` and `submitted` are neutral — nobody has
   // decided yet. `rejected` and `cancelled` are grey rather than red: neither is a

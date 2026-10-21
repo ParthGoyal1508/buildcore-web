@@ -71,6 +71,7 @@ export const ROUTES = {
   hr: '/dashboard/hr',
   hrEmployees: '/dashboard/hr/employees',
   hrEmployee: (id: string) => `/dashboard/hr/employees/${id}`,
+  hrEmployeesBulkShift: '/dashboard/hr/employees/bulk-shift',
   hrAttendance: '/dashboard/hr/attendance',
   hrHolidays: '/dashboard/hr/attendance/holidays',
   hrAttendanceImport: '/dashboard/hr/attendance/import',
@@ -129,6 +130,8 @@ export const ROUTES = {
   projectsSites: '/dashboard/projects/sites',
   /** 037: tenders with their EMD and PBG bank guarantees, and the tender page with documents. */
   projectsBankGuarantees: '/dashboard/projects/bank-guarantees',
+  /** 039: the DWR picker — the way in for a holder of `DWR` without the portfolio. */
+  projectsDwrIndex: '/dashboard/projects/dwr',
   projectsBankGuarantee: (id: string) => `/dashboard/projects/bank-guarantees/${id}`,
   /** One site: its geofence, its address and the project it belongs to. */
   projectsSite: (id: string) => `/dashboard/projects/sites/${id}`,
@@ -2165,12 +2168,18 @@ export const PERMISSIONS = [
   'PROJECT_LOCK',
   /** 037: the Bank Guarantees register under Projects, and its 30-day expiry alerts. */
   'BANK_GUARANTEES',
+  /**
+   * 039: Head Office paying a job card's final bill (Plant → Maintenance). Super Admin and HO User
+   * hold it; site roles keep MAINTENANCE to raise and correct cards.
+   */
+  'MAINTENANCE_PAY',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
 const PERMISSION_LABELS: Record<string, string> = {
   HR_LETTERS: 'HR Letters',
+  MAINTENANCE_PAY: 'Maintenance Payments',
 };
 
 /** Human-readable label for a permission value, for checkbox lists and summaries. */
@@ -2386,6 +2395,9 @@ export const PROJECTS_PERMISSIONS = {
   // 037. Its own permission: who keeps the BG register (and gets its expiry alerts) is not
   // everyone who can open projects.
   'bank-guarantees': 'BANK_GUARANTEES',
+  // 039. The DWR picker: a project to report on, for whoever records daily work — the DWR Entry
+  // role holds `DWR` and nothing of the portfolio.
+  dwr: 'DWR',
 } as const;
 
 export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;
@@ -2505,8 +2517,9 @@ export const NAV_MODULES = [
     href: ROUTES.projects,
     guardPrefix: ROUTES.projects,
     guardsSubtree: true,
-    // Any-of: someone who keeps only the BG register (037) still reaches Projects for it.
-    permissions: ['PROJECTS', 'BANK_GUARANTEES'],
+    // Any-of: someone who keeps only the BG register (037) still reaches Projects for it, and
+    // someone who only records daily work (039, the DWR Entry role) reaches it for that.
+    permissions: ['PROJECTS', 'BANK_GUARANTEES', 'DWR'],
   },
   {
     id: 'plant',
@@ -2728,13 +2741,16 @@ export const LEAVE_APPLICATION_STATUSES = [
 ] as const;
 export const HOLIDAY_TYPES = ['national', 'regional', 'company'] as const;
 export const PAYROLL_RUN_STATUSES = ['draft', 'processed', 'paid'] as const;
-export const LOAN_STATUSES = ['pending', 'active', 'closed'] as const;
+// `rejected` (2026-10-20): refused on its approval chain.
+export const LOAN_STATUSES = ['pending', 'active', 'closed', 'rejected'] as const;
 export const LOAN_SCHEDULE_STATUSES = ['upcoming', 'paid', 'overdue'] as const;
 export const SALARY_ADVANCE_STATUSES = [
   'pending',
   'approved',
   'disbursed',
   'closed',
+  // Refused on its approval chain (2026-10-20).
+  'rejected',
 ] as const;
 export const EXIT_REASONS = [
   'resignation',
@@ -3247,6 +3263,8 @@ export const ADVANCE_STATUSES = [
   'approved',
   'disbursed',
   'closed',
+  // Refused on its approval chain (2026-10-20).
+  'rejected',
 ] as const;
 
 export const LABOUR_PAYMENT_MODES = ['cash', 'bank'] as const;
@@ -3794,6 +3812,8 @@ export const APPROVAL_INERT_MESSAGES = {
       levelLabel ?? 'this level'
     } for your company. Someone with settings access must map it under ` +
     `Settings → Approvals before this can move.`,
+  // 2026-10-20: the applicant, the maker, or the employee it pays.
+  own_item: () => 'Your own request — another approver decides it',
 } as const;
 
 /**
@@ -4139,6 +4159,18 @@ export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
   // An initialism the fallback would print as "Ra bill" (2026-10-15).
   ra_bill: 'RA bill',
   dwr: 'Daily work report',
+  // On the spine since 2026-10-20 — each used to have its own single approve step.
+  leave_application: 'Leave application',
+  reimbursement_claim: 'Reimbursement claim',
+  employee_loan: 'Employee loan',
+  salary_advance: 'Salary advance',
+  labour_advance: 'Labour advance',
+  // On the spine before then but never labelled, so they printed as raw keys.
+  operator_fuel_recovery: 'Operator fuel recovery',
+  exit_clearance_waiver: 'Exit clearance waiver',
+  client_bill: 'Client bill',
+  work_order_award: 'Work order award',
+  purchase_rate_change: 'Purchase rate change',
 };
 
 /**
@@ -4716,6 +4748,8 @@ export const PROJECT_SHELL_COPY = {
   loading: 'Loading this project…',
   loadFailed: 'This project could not be loaded.',
   breadcrumb: 'Portfolio',
+  /** 039: the DWR-only shell's trail leads back to the DWR picker, not to the portfolio. */
+  dwrBreadcrumb: 'Daily Work Reports',
   tabsLabel: 'Project sections',
 
   overviewHeading: 'Overview',

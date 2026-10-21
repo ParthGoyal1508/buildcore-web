@@ -7,6 +7,7 @@ import { ApiError, errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   approveAdvance,
+  rejectAdvance,
   createAdvance,
   disburseAdvance,
   getAdvances,
@@ -16,11 +17,12 @@ import {
   type Advance,
 } from '@/app/lib/api/labour';
 import { getCurrentUser } from '@/app/lib/api/users';
+import { useCashPolicy } from '@/app/lib/cash-entry';
 import { labourLabel } from '@/app/lib/constants';
 import { rupees, todayIso } from '@/app/lib/format';
 import AsyncSelect from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
-import { confirmDialog } from '@/app/ui/dialogs';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 import {
   RowAction,
   SecondaryButton,
@@ -43,20 +45,46 @@ export default function AdvancesPage() {
   const [actingId, setActingId] = useState<string | null>(null);
 
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  // 038: a labour advance is paid in cash at site, so while the company hides cash there are none
+  // to list and none may be raised. The tab leaves the Labour strip; a bookmark lands here on a
+  // plain empty list rather than a refusal.
+  const { hidden: cashHidden } = useCashPolicy();
   const advances = useQuery({
     queryKey: ['advances', companyId],
     queryFn: () => getAdvances({}),
+    enabled: !cashHidden,
   });
   const canApprove = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['advances'] });
 
   const act = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'disburse' }) =>
-      action === 'approve' ? approveAdvance(id) : disburseAdvance(id),
+    mutationFn: ({
+      id,
+      action,
+      reason,
+    }: {
+      id: string;
+      action: 'approve' | 'reject' | 'disburse';
+      reason?: string;
+    }) =>
+      action === 'approve'
+        ? approveAdvance(id)
+        : action === 'reject'
+          ? rejectAdvance(id, reason ?? '')
+          : disburseAdvance(id),
     onMutate: ({ id }) => setActingId(id),
-    onSuccess: (_, { action }) => {
-      toast.success(action === 'approve' ? 'Advance approved.' : 'Advance disbursed.');
+    onSuccess: (advance, { action }) => {
+      toast.success(
+        action === 'disburse'
+          ? 'Advance disbursed.'
+          : action === 'reject'
+            ? 'Advance rejected.'
+            : // The approval chain may have further levels (2026-10-20).
+              advance.status === 'approved'
+              ? 'Advance approved.'
+              : 'Approval recorded; the advance moves to the next approver.',
+      );
       return invalidate();
     },
     onError: (e) =>
@@ -76,6 +104,18 @@ export default function AdvancesPage() {
       confirmLabel: 'Approve',
     });
     if (ok) act.mutate({ id: a.id, action: 'approve' });
+  };
+  const askReject = async (a: Advance) => {
+    const reason = await promptDialog({
+      title: 'Reject this advance?',
+      message: `${rupees(a.amount)} to ${who(a)}. It will not be paid or recovered. Why?`,
+      label: 'Reason',
+      required: true,
+      multiline: true,
+      confirmLabel: 'Reject',
+      tone: 'danger',
+    });
+    if (reason?.trim()) act.mutate({ id: a.id, action: 'reject', reason: reason.trim() });
   };
   const askDisburse = async (a: Advance) => {
     const ok = await confirmDialog({
@@ -141,17 +181,19 @@ export default function AdvancesPage() {
           title="Advances"
           description="Advances against wages and their recovery through payment sheets."
         />
-        <Button onClick={() => setShowForm(true)}>New Advance</Button>
+        {!cashHidden && (
+          <Button onClick={() => setShowForm(true)}>New Advance</Button>
+        )}
       </div>
 
       <ResponsiveList
         columns={columns}
-        rows={advances.data ?? []}
+        rows={cashHidden ? [] : (advances.data ?? [])}
         rowKey={(a) => a.id}
-        isLoading={advances.isPending}
-        error={advances.error}
+        isLoading={!cashHidden && advances.isPending}
+        error={cashHidden ? null : advances.error}
         onRetry={advances.refetch}
-        emptyMessage="No advances yet."
+        emptyMessage={cashHidden ? 'No advances to show.' : 'No advances yet.'}
         actions={(a) => {
           // O12 maker-checker: the server refuses a requester approving their own advance
           // (`SELF_APPROVAL`), so the button is not offered to them.
@@ -165,6 +207,14 @@ export default function AdvancesPage() {
                   disabled={actingId === a.id}
                 >
                   Approve
+                </RowAction>
+              )}
+              {a.status === 'pending' && canApprove && !own && (
+                <RowAction
+                  onClick={() => void askReject(a)}
+                  disabled={actingId === a.id}
+                >
+                  Reject
                 </RowAction>
               )}
               {a.status === 'pending' && canApprove && own && (
@@ -186,7 +236,7 @@ export default function AdvancesPage() {
         }}
       />
 
-      {showForm && (
+      {showForm && !cashHidden && (
         <AdvanceForm
           onClose={() => setShowForm(false)}
           onSaved={() => {

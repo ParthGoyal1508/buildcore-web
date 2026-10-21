@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getCashPolicy } from './api/cash-hiding';
+import { useSelectedCompanyId } from './api/company-selection';
 import { getCurrentUser, hasWrite, type CurrentUser } from './api/users';
 
 /**
@@ -12,11 +14,12 @@ import { getCurrentUser, hasWrite, type CurrentUser } from './api/users';
  * `write` is the right to record a cash payment, `read` is the right to see a breakup. A cashier
  * holds both; a supervisor checking a payout sheet against the notes needs only the second.
  *
- * **Separate from the company's hiding setting, deliberately** (FR-017b, task T068). Those are two
- * controls answering different questions — one company-wide and about display, one per-caller and
- * about capability — and a screen that read one to decide the other would reintroduce the
- * company-wide entry block the design rejected. Nothing here reads `hideCashTransactions`, and
- * nothing that imports this should.
+ * **The company's hiding setting overrides both, since 038.** 019 kept the two apart (FR-017b): the
+ * setting only masked figures and the permission alone decided who could record cash. The client
+ * rejected that split on 2026-10-20 — when a company hides cash, no cash shows and *nobody*, Super
+ * Admin included, may record it until the setting is turned off. So `useCashRights` answers false
+ * to both questions while cash is hidden, and says so (`cashHidden`) so a screen can drop its cash
+ * controls without explaining a missing permission the user may well hold.
  *
  * The server refuses either way. This only decides what is *shown*, and of the two possible
  * mistakes, hiding a control somebody holds is the recoverable one — which is why `hasWrite` fails
@@ -43,23 +46,49 @@ export function maySeeCashBreakup(user: CurrentUser | undefined): boolean {
   return user.grants.some((grant) => grant.permission === CASH_ENTRY);
 }
 
+/** The query key of the served company's cash policy; invalidate `['cash-policy']` for every company. */
+export const cashPolicyKey = (companyId: string | null) =>
+  ['cash-policy', companyId] as const;
+
 /**
- * The signed-in user's cash rights.
+ * Whether cash is hidden for the company being worked in (038 FR-004).
  *
- * Shares the `['currentUser']` query key every screen already uses, so this adds no request —
- * TanStack Query serves it from the same cache entry.
+ * Keyed by the selected company, so switching company asks again rather than serving the other
+ * company's answer. Saving the setting (`app/ui/settings/cash-visibility.tsx`) invalidates the whole
+ * cache, this included, and a write refused with `CASH_HIDDEN` invalidates it too (`providers.tsx`),
+ * so a stale "shown" corrects itself on the first refusal. Until the answer arrives — and whenever
+ * the API cannot give one — cash counts as shown; the server enforces the rule either way.
+ */
+export function useCashPolicy(): { hidden: boolean; isPending: boolean } {
+  const companyId = useSelectedCompanyId();
+  const policy = useQuery({
+    queryKey: cashPolicyKey(companyId),
+    queryFn: getCashPolicy,
+  });
+  return { hidden: policy.data?.hidden ?? false, isPending: policy.isPending };
+}
+
+/**
+ * The signed-in user's cash rights, with the company's hiding setting applied.
+ *
+ * Shares the `['currentUser']` query key every screen already uses, so the permission half adds no
+ * request — TanStack Query serves it from the same cache entry.
  */
 export function useCashRights(): {
   mayEnterCash: boolean;
   maySeeCashBreakup: boolean;
+  /** Cash is hidden for this company: show no cash control and no "your role lacks Cash Entry". */
+  cashHidden: boolean;
   isPending: boolean;
 } {
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const policy = useCashPolicy();
   return {
-    mayEnterCash: mayEnterCash(user.data),
-    maySeeCashBreakup: maySeeCashBreakup(user.data),
+    mayEnterCash: !policy.hidden && mayEnterCash(user.data),
+    maySeeCashBreakup: !policy.hidden && maySeeCashBreakup(user.data),
+    cashHidden: policy.hidden,
     // Exposed so a screen can avoid flashing "you cannot do this" at somebody who can, during the
     // moment before the answer arrives.
-    isPending: user.isPending,
+    isPending: user.isPending || policy.isPending,
   };
 }

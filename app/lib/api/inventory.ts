@@ -187,6 +187,137 @@ export async function deleteItem(id: string): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Composite items (039) — a mix issued as its sub-items in fixed proportions
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const compositeComponentSchema = z.object({
+  itemId: z.string(),
+  itemName: z.string(),
+  itemCode: z.string(),
+  /** The sub-item's own unit — the unit `qtyPerUnit` is in. */
+  itemUnit: z.string(),
+  qtyPerUnit: decimal,
+  position: z.number(),
+});
+export type CompositeComponent = z.infer<typeof compositeComponentSchema>;
+
+export const compositeItemSchema = z.object({
+  id: z.string(),
+  companyId: z.string(),
+  name: z.string(),
+  unit: z.string(),
+  description: z.string().nullable(),
+  active: z.boolean(),
+  components: z.array(compositeComponentSchema),
+});
+export type CompositeItem = z.infer<typeof compositeItemSchema>;
+
+export const compositeItemPageSchema = z.object({
+  compositeItems: z.array(compositeItemSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type CompositeItemPage = z.infer<typeof compositeItemPageSchema>;
+
+export interface CompositeItemQuery {
+  search?: string;
+  active?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+/** The master list (Settings permission). */
+export async function getCompositeItems(
+  query: CompositeItemQuery = {},
+): Promise<CompositeItemPage> {
+  const raw = await authFetch<unknown>(
+    `/inventory/composite-items${qs({ ...query })}`,
+  );
+  return compositeItemPageSchema.parse(raw);
+}
+
+export interface CompositeItemInput {
+  name: string;
+  unit: (typeof ITEM_UNITS)[number];
+  description?: string;
+  components: { itemId: string; qtyPerUnit: number }[];
+  active?: boolean;
+}
+
+export async function createCompositeItem(
+  input: CompositeItemInput,
+): Promise<CompositeItem> {
+  const raw = await authFetch<unknown>('/inventory/composite-items', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return compositeItemSchema.parse(raw);
+}
+
+export async function updateCompositeItem(
+  id: string,
+  input: Partial<CompositeItemInput>,
+): Promise<CompositeItem> {
+  const raw = await authFetch<unknown>(`/inventory/composite-items/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  return compositeItemSchema.parse(raw);
+}
+
+/** 409 once the composite has been issued — deactivate it instead. */
+export async function deleteCompositeItem(id: string): Promise<void> {
+  await authFetch<void>(`/inventory/composite-items/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Active composites for the issue form's picker — readable with Inventory permission alone. */
+export async function getCompositeChoices(
+  search?: string,
+): Promise<CompositeItem[]> {
+  const raw = await authFetch<unknown>(
+    `/inventory/issues/composites${qs({ search })}`,
+  );
+  return z.array(compositeItemSchema).parse(raw);
+}
+
+export const compositePreviewSchema = z.object({
+  compositeItemId: z.string(),
+  compositeItemName: z.string(),
+  unit: z.string(),
+  quantity: decimal,
+  lines: z.array(
+    z.object({
+      itemId: z.string(),
+      itemName: z.string(),
+      itemCode: z.string(),
+      unit: z.string(),
+      qtyPerUnit: decimal,
+      /** quantity × qty per unit, rounded half-up to 3 decimals — what the issue will deduct. */
+      required: decimal,
+      available: decimal,
+      short: decimal,
+    }),
+  ),
+  blocked: z.boolean(),
+});
+export type CompositePreview = z.infer<typeof compositePreviewSchema>;
+
+/** Each sub-item's need against the store's stock now. Advisory; the issue re-checks under lock. */
+export async function getCompositePreview(query: {
+  compositeItemId: string;
+  siteId: string;
+  quantity: number;
+}): Promise<CompositePreview> {
+  const raw = await authFetch<unknown>(
+    `/inventory/issues/composite-preview${qs({ ...query })}`,
+  );
+  return compositePreviewSchema.parse(raw);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Stock
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -225,6 +356,8 @@ export interface StockQuery {
   categoryId?: string;
   search?: string;
   belowReorderLevel?: boolean;
+  /** Only item-stores with stock on hand (039) — the issue form's item picker. */
+  inStockOnly?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -610,8 +743,26 @@ export const issueSchema = z.object({
   returnedQuantity: nullableDecimal.optional(),
   returnedOn: z.string().nullable().optional(),
   receivedBy: z.string().nullable().optional(),
+  // 039: set on each sub-item row of a composite issue; the rows of one issue share the group.
+  compositeItemId: z.string().nullable().optional(),
+  compositeItemName: z.string().nullable().optional(),
+  compositeQuantity: nullableDecimal.optional(),
+  compositeUnit: z.string().nullable().optional(),
+  issueGroupId: z.string().nullable().optional(),
 });
 export type Issue = z.infer<typeof issueSchema>;
+
+/** A composite issue as created (039): one slip, a row per sub-item. */
+export const compositeIssueSchema = z.object({
+  issueGroupId: z.string(),
+  slipNo: z.string().nullable(),
+  compositeItemId: z.string(),
+  compositeItemName: z.string(),
+  compositeQuantity: decimal,
+  compositeUnit: z.string(),
+  issues: z.array(issueSchema),
+});
+export type CompositeIssue = z.infer<typeof compositeIssueSchema>;
 
 export const issuePageSchema = z.object({
   issues: z.array(issueSchema),
@@ -624,6 +775,8 @@ export const issuePageSchema = z.object({
 export type IssuePage = z.infer<typeof issuePageSchema>;
 
 export interface IssueQuery {
+  /** 039: every sub-item row of one composite issue. */
+  issueGroupId?: string;
   siteId?: string;
   itemId?: string;
   /** 036 M12. */
@@ -643,7 +796,10 @@ export async function getIssues(query: IssueQuery = {}): Promise<IssuePage> {
 
 export interface IssueInput {
   siteId: string;
-  itemId: string;
+  /** The item issued — or, instead, `compositeItemId` (039). */
+  itemId?: string;
+  /** A composite: `quantity` is in its unit and every sub-item is issued in proportion. */
+  compositeItemId?: string;
   date: string;
   quantity: number;
   /** Optional when `vendorId` is set: the vendor's name is recorded instead. */
@@ -661,12 +817,20 @@ export interface IssueInput {
   equipmentNo?: string;
 }
 
-export async function createIssue(input: IssueInput): Promise<Issue> {
+/**
+ * A plain issue comes back as the one row; a composite one (039) as its group. A composite
+ * shortfall is a 422 whose body carries `shortfalls` — one entry per short sub-item.
+ */
+export async function createIssue(
+  input: IssueInput,
+): Promise<Issue | CompositeIssue> {
   const raw = await authFetch<unknown>('/inventory/issues', {
     method: 'POST',
     body: JSON.stringify(input),
   });
-  return issueSchema.parse(raw);
+  return input.compositeItemId
+    ? compositeIssueSchema.parse(raw)
+    : issueSchema.parse(raw);
 }
 
 export interface IssueReturnInput {

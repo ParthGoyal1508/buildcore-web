@@ -244,6 +244,7 @@ export interface EmployeeFilters {
   search?: string;
   departmentId?: string;
   siteId?: string;
+  shiftId?: string;
   isActive?: boolean;
   page?: number;
   pageSize?: number;
@@ -277,6 +278,42 @@ export async function listEmployees(filters: EmployeeFilters = {}) {
     `/hr/employees${qs({ ...filters, pageSize })}`,
   );
   return paginated(employeeSchema).parse(data);
+}
+
+const shiftRosterSchema = z.array(
+  z.object({
+    id: z.string(),
+    employeeCode: z.string(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    departmentId: z.string().nullable(),
+    designationId: z.string().nullable(),
+    siteId: z.string(),
+    shiftId: z.string(),
+  }),
+);
+export type ShiftRosterRow = z.infer<typeof shiftRosterSchema>[number];
+
+/** Every active employee, unpaged and without PII — the bulk shift screen's list (036). */
+export async function getShiftRoster(): Promise<ShiftRosterRow[]> {
+  return shiftRosterSchema.parse(
+    await authFetch<unknown>('/hr/employees/shift-roster'),
+  );
+}
+
+/** Moves every listed employee onto one shift; all or nothing (036). */
+export async function bulkSetShift(input: {
+  shiftId: string;
+  employeeIds: string[];
+}): Promise<{ updated: number; shiftId: string }> {
+  return z
+    .object({ updated: z.number(), shiftId: z.string() })
+    .parse(
+      await authFetch<unknown>('/hr/employees/bulk-shift', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    );
 }
 
 export async function getEmployee(id: string) {
@@ -1007,9 +1044,30 @@ export const payrollRunSchema = z.object({
   isFnf: z.boolean().optional(),
   generatedAt: nullableIsoDate.optional(),
   generatedByUserId: z.string().nullable().optional(),
+  /**
+   * 039: where the run stands with the Director — null when it was never sent. Defaulted so a
+   * response from before the API added it still parses.
+   */
+  approval: approvalStateSchemaForModules.nullable().optional().default(null),
 });
 
 export type PayrollRun = z.infer<typeof payrollRunSchema>;
+
+/**
+ * Whether HR may correct this run's lines (039): a regular draft that is not with the Director and
+ * not approved by them — never sent, or returned (or rejected, or voided by an attendance change).
+ * The server enforces the same rule; this only decides whether the controls are offered.
+ */
+export function isRunEditable(run: PayrollRun): boolean {
+  if (run.status !== 'draft' || run.isFnf) return false;
+  const state = run.approval?.state;
+  return state !== 'pending' && state !== 'approved';
+}
+
+/** The Director has approved the run, so it may be processed and its bank sheet produced (039). */
+export function isRunApproved(run: PayrollRun): boolean {
+  return run.approval?.state === 'approved';
+}
 
 export const payrollLineItemSchema = z.object({
   id: z.string().optional(),
@@ -1047,9 +1105,84 @@ export const payrollLineItemSchema = z.object({
   employerEsic: decimal,
   gratuity: decimal,
   bonus: decimal,
+  /** 039: the columns corrected by hand, for highlighting. Defaulted for an older API. */
+  editedFields: z.array(z.string()).optional().default([]),
 });
 
 export type PayrollLineItem = z.infer<typeof payrollLineItemSchema>;
+
+/**
+ * The line columns HR may correct by hand (039) — the API's allow-list, in the order the table shows
+ * them. Loan EMI, advance and fuel recoveries are settled at processing at exactly their planned
+ * amounts, and employer contributions feed the challans, so neither is offered.
+ */
+export const EDITABLE_LINE_FIELDS = [
+  { field: 'basic', label: 'Basic' },
+  { field: 'hra', label: 'HRA' },
+  { field: 'conveyanceAllowance', label: 'Conveyance' },
+  { field: 'siteAllowance', label: 'Site allowance' },
+  { field: 'specialAllowance', label: 'Special allowance' },
+  { field: 'otWages', label: 'OT wages' },
+  { field: 'employeePf', label: 'PF (employee)' },
+  { field: 'employeeEsic', label: 'ESIC (employee)' },
+  { field: 'professionalTax', label: 'Professional tax' },
+  { field: 'tds', label: 'TDS' },
+] as const;
+
+export type EditableLineField = (typeof EDITABLE_LINE_FIELDS)[number]['field'];
+
+/** A column's label for the change history. */
+export function lineFieldLabel(field: string): string {
+  return EDITABLE_LINE_FIELDS.find((f) => f.field === field)?.label ?? field;
+}
+
+/**
+ * Corrects one generated line (039). Only changed figures need sending; the justification is
+ * mandatory and kept against each figure. Net pay is recomputed by the server.
+ */
+export async function editPayrollLine(
+  runId: string,
+  lineId: string,
+  changes: Partial<Record<EditableLineField, number>>,
+  justification: string,
+) {
+  return payrollLineItemSchema.parse(
+    await authFetch<unknown>(`/hr/payroll/runs/${runId}/lines/${lineId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ changes, justification }),
+    }),
+  );
+}
+
+const lineEditSchema = z.object({
+  id: z.string(),
+  lineItemId: z.string(),
+  employeeId: z.string(),
+  employeeCode: z.string().nullable(),
+  employeeName: z.string().nullable(),
+  field: z.string(),
+  oldValue: decimal,
+  newValue: decimal,
+  justification: z.string(),
+  editedByUserId: z.string(),
+  editedByName: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type PayrollLineEdit = z.infer<typeof lineEditSchema>;
+
+/** The hand corrections on a run, newest first — for one line when `lineItemId` is given (039). */
+export async function getPayrollLineEdits(runId: string, lineItemId?: string) {
+  const query = lineItemId ? `?lineItemId=${encodeURIComponent(lineItemId)}` : '';
+  return z
+    .array(lineEditSchema)
+    .parse(await authFetch<unknown>(`/hr/payroll/runs/${runId}/edits${query}`));
+}
+
+/** Regenerating a draft with hand corrections asks first (039, 409 `PAYROLL_RUN_HAS_EDITS`). */
+export function isRunHasEditsError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'PAYROLL_RUN_HAS_EDITS';
+}
 
 /**
  * An employee the run could not compute correctly — no PAN, no tax slabs (036 F7). Saved on the run
@@ -1064,6 +1197,8 @@ const runExceptionSchema = z.object({
 export type PayrollRunException = z.infer<typeof runExceptionSchema>;
 
 const payrollRunDetailSchema = payrollRunSchema.extend({
+  /** 039: the company has a payroll chain, so the run must be approved before it is processed. */
+  approvalRequired: z.boolean().optional().default(true),
   lineItems: z.array(payrollLineItemSchema).optional(),
   exceptions: z.array(runExceptionSchema).nullable().optional(),
 });
@@ -1090,7 +1225,7 @@ export async function getPayrollRun(id: string) {
  * `runId`, the line count and the exceptions — which is what this parses (it used to parse the
  * answer as a whole run and fail on the missing `id`).
  */
-export async function generatePayrollRun(period: string) {
+export async function generatePayrollRun(period: string, discardEdits = false) {
   return z
     .object({
       runId: z.string(),
@@ -1102,7 +1237,7 @@ export async function generatePayrollRun(period: string) {
     .parse(
       await authFetch<unknown>('/hr/payroll/runs', {
         method: 'POST',
-        body: JSON.stringify({ period }),
+        body: JSON.stringify(discardEdits ? { period, discardEdits } : { period }),
       }),
     );
 }
@@ -1144,8 +1279,8 @@ export async function setPayrollRunStatus(
 }
 
 /**
- * Puts a processed run into its approval chain (2026-10-17) — for a run processed before
- * processing did that itself, whose bank sheet is otherwise held for good.
+ * Sends the run to the Director for approval (039) — HR's step after reviewing and correcting the
+ * draft, and again after a return. Also sends an older processed run that never entered a chain.
  */
 export async function submitPayrollRunForApproval(id: string) {
   return z
@@ -1381,6 +1516,14 @@ export async function approveLoan(id: string) {
   return authFetch<unknown>(`/hr/loans/${id}/approve`, { method: 'PATCH' });
 }
 
+/** A decision on the loan's approval chain (2026-10-20); it is never activated. */
+export async function rejectLoan(id: string, reason: string) {
+  return authFetch<unknown>(`/hr/loans/${id}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function closeLoan(id: string, reason: string) {
   return authFetch<unknown>(`/hr/loans/${id}/close`, {
     method: 'PATCH',
@@ -1446,6 +1589,14 @@ export async function createSalaryAdvance(input: SalaryAdvanceInput) {
 export async function approveSalaryAdvance(id: string) {
   return authFetch<unknown>(`/hr/salary-advances/${id}/approve`, {
     method: 'PATCH',
+  });
+}
+
+/** A decision on the advance's approval chain (2026-10-20); it is never paid. */
+export async function rejectSalaryAdvance(id: string, reason: string) {
+  return authFetch<unknown>(`/hr/salary-advances/${id}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
   });
 }
 

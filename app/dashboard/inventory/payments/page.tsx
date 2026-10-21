@@ -9,9 +9,9 @@ import {
 import { Suspense, useState } from 'react';
 
 import { amountOrHidden } from '@/app/lib/api/cash-hiding';
-import HiddenAmount from '@/app/ui/hidden-amount';
 import { errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
+import { useCashPolicy } from '@/app/lib/cash-entry';
 import {
   deletePayment,
   downloadInventoryExport,
@@ -80,6 +80,14 @@ function PaymentsList() {
     },
     { resetPage: 'page' },
   );
+  // 038: while the company hides cash, "Cash" is not a mode to filter by — and a bookmarked
+  // `?paymentMode=cash` reads as any mode rather than a select showing a value it does not offer.
+  const { hidden: cashHidden } = useCashPolicy();
+  const modeOptions = cashHidden
+    ? PAYMENT_MODES.filter((mode) => mode !== 'cash')
+    : PAYMENT_MODES;
+  const paymentMode =
+    cashHidden && query.paymentMode === 'cash' ? '' : query.paymentMode;
   const vendorOption = useVendorOption(filters.vendorId);
   const rangeError = dateRangeError(filters.from, filters.to);
   const [showModal, setShowModal] = useState(false);
@@ -89,7 +97,7 @@ function PaymentsList() {
   const params = {
     page: query.page,
     vendorId: query.vendorId || undefined,
-    paymentMode: query.paymentMode || undefined,
+    paymentMode: paymentMode || undefined,
     dateFrom: query.from || undefined,
     dateTo: query.to || undefined,
     missingProof:
@@ -138,15 +146,9 @@ function PaymentsList() {
     {
       key: 'amount',
       header: 'Amount',
-      // "Hidden", not an em dash: an em dash is what this table shows for a figure that was
-      // never recorded, and a reader cannot be left unable to tell the two apart. The component
-      // rather than the string, so the cell carries the explanation on hover.
-      render: (row) =>
-        row.amount === null && row.amountHidden ? (
-          <HiddenAmount />
-        ) : (
-          amountOrHidden(row.amount, row.amountHidden, rupees)
-        ),
+      // 038: a cash payment no longer arrives while the company hides cash, so the cell has no
+      // "Hidden" of its own to show; the masking-tolerant formatter stays as the backstop.
+      render: (row) => amountOrHidden(row.amount, row.amountHidden, rupees),
     },
     {
       key: 'mode',
@@ -224,7 +226,7 @@ function PaymentsList() {
         <SelectField
           id="payments-mode"
           label="Mode"
-          value={filters.paymentMode}
+          value={cashHidden && filters.paymentMode === 'cash' ? '' : filters.paymentMode}
           onChange={(event) =>
             setFilters({
               paymentMode: event.target.value as (typeof filters)['paymentMode'],
@@ -232,7 +234,7 @@ function PaymentsList() {
           }
         >
           <option value="">Any mode</option>
-          {PAYMENT_MODES.map((mode) => (
+          {modeOptions.map((mode) => (
             <option key={mode} value={mode}>
               {inventoryLabel(mode)}
             </option>

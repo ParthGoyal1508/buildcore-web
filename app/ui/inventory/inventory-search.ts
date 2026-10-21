@@ -131,13 +131,26 @@ export function searchProjects(
  * What a store holds — for issuing or transferring out of it. The option's `note` is the quantity in
  * stock, so the person picks with the figure in front of them; `rows` hands back the stock rows for
  * the form's own hint.
+ *
+ * `inStockOnly` (039) leaves out items the store has run out of — the issue form's picker, where
+ * an item at zero is a choice that can only end in a refusal. The server filters, so pages stay
+ * full.
  */
-export function searchStoreStock(siteId: string) {
+export function searchStoreStock(
+  siteId: string,
+  options: { inStockOnly?: boolean } = {},
+) {
   return (
     term: string,
     page: number,
   ): Promise<AsyncSearchPage & { rows: StockRow[] }> =>
-    getStock({ siteId, search: term || undefined, page, pageSize: PAGE }).then(
+    getStock({
+      siteId,
+      search: term || undefined,
+      ...(options.inStockOnly ? { inStockOnly: true } : {}),
+      page,
+      pageSize: PAGE,
+    }).then(
       (r) => ({
         rows: r.rows,
         items: r.rows.map((row) => ({

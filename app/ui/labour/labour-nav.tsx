@@ -12,6 +12,7 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 
+import { useCashPolicy } from '@/app/lib/cash-entry';
 import { ROUTES } from '@/app/lib/constants';
 import SectionTabs from '@/app/ui/section-tabs';
 
@@ -25,7 +26,8 @@ import SectionTabs from '@/app/ui/section-tabs';
  * `/dashboard`: face punch in/out is a field surface on the supervisor's phone (031). The old
  * project × skill Wage Rates and the Gangs tabs left the strip with the muster wizard they served
  * (pay comes from site rates and nobody is marked by gang now); their pages stay reachable for
- * history.
+ * history. Advances leave the strip while the company hides cash (038): they are paid in cash at
+ * site, so there are none to show.
  */
 export default function LabourNav({
   canSeeReports,
@@ -38,6 +40,7 @@ export default function LabourNav({
   className?: string;
   stripHidden?: boolean;
 }) {
+  const { hidden: cashHidden } = useCashPolicy();
   const tabs = [
     {
       name: 'Attendance',
@@ -67,7 +70,9 @@ export default function LabourNav({
       href: ROUTES.labourMusters,
       icon: ClipboardDocumentCheckIcon,
     },
-    { name: 'Advances', href: ROUTES.labourAdvances, icon: CreditCardIcon },
+    ...(cashHidden
+      ? []
+      : [{ name: 'Advances', href: ROUTES.labourAdvances, icon: CreditCardIcon }]),
     ...(canSeeReports
       ? [
           {

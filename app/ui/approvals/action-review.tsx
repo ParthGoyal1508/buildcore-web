@@ -293,7 +293,9 @@ export default function ActionReview({
             // be refused (FR-004).
             disabled={inFlight || !ready}
             onClick={() => void submit(pending, reason.trim())}
-            className="border-gray-300 bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-400"
+            // `!`: RowAction's own `bg-white text-gray-700` come later in the stylesheet, and without
+            // it this button rendered white on white — "Confirm return" looked like an empty box.
+            className="!border-gray-900 !bg-gray-900 !text-white hover:!bg-gray-800 disabled:!bg-gray-400"
           >
             {inFlight ? 'Recording…' : `Confirm ${config?.label.toLowerCase()}`}
           </RowAction>

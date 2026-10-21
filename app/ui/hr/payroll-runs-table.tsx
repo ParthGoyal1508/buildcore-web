@@ -8,9 +8,11 @@ import { errorMessage } from '@/app/lib/api/client';
 
 import {
   generatePayrollRun,
+  isRunHasEditsError,
   listPayrollRuns,
   type PayrollRun,
 } from '@/app/lib/api/hr-payroll';
+import RunApprovalBadge from '@/app/ui/hr/run-approval-badge';
 import { HR_MESSAGES, ROUTES } from '@/app/lib/constants';
 import { currentPeriod, dateTimeLabel, periodLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
@@ -40,7 +42,7 @@ export default function PayrollRunsTable() {
   const { data } = runs;
 
   const generate = useMutation({
-    mutationFn: () => generatePayrollRun(period),
+    mutationFn: (discardEdits: boolean) => generatePayrollRun(period, discardEdits),
     onSuccess: (result) => {
       setError(null);
       const flagged = result.exceptions?.length ?? 0;
@@ -52,8 +54,20 @@ export default function PayrollRunsTable() {
       queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRuns'] });
       queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRun', result.runId] });
     },
-    onError: (err: Error) =>
-      setError(errorMessage(err, 'Could not generate the run.')),
+    onError: async (err: Error) => {
+      // 039: the draft has hand corrections, each justified. Regenerating discards them, so ask.
+      if (isRunHasEditsError(err)) {
+        const discard = await confirmDialog({
+          title: 'Discard the corrections?',
+          message: `${errorMessage(err)} Their change history goes with them.`,
+          confirmLabel: 'Discard and regenerate',
+          tone: 'danger',
+        });
+        if (discard) generate.mutate(true);
+        return;
+      }
+      setError(errorMessage(err, 'Could not generate the run.'));
+    },
   });
 
   const submit = async () => {
@@ -71,7 +85,7 @@ export default function PayrollRunsTable() {
       });
       if (!ok) return;
     }
-    generate.mutate();
+    generate.mutate(false);
   };
 
   const columns: Column<PayrollRun>[] = [
@@ -97,6 +111,12 @@ export default function PayrollRunsTable() {
       key: 'status',
       header: 'Status',
       render: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: 'approval',
+      header: 'Director approval',
+      render: (row) => <RunApprovalBadge run={row} />,
+      sortValue: (row) => row.approval?.state ?? '',
     },
     {
       key: 'generated',
@@ -127,7 +147,8 @@ export default function PayrollRunsTable() {
           Generate run
         </Button>
         <p className="w-full text-xs text-gray-600">
-          A generated run starts as a draft. Regenerating a draft replaces its figures; nothing is
+          A generated run starts as a draft. Review and correct it, send it to the Director, and
+          process it once approved. Regenerating a draft replaces its figures; nothing is
           recovered, settled or paid until the run is processed.
         </p>
       </form>

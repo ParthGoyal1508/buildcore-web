@@ -21,6 +21,7 @@ import { saveBlob } from '@/app/lib/download-file';
 import {
   dateLabel,
   quantity as formatQuantity,
+  quantity3,
   todayIso,
 } from '@/app/lib/format';
 import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
@@ -57,6 +58,13 @@ import { useToast } from '@/app/ui/toast';
  *   which adding quantities up means anything.
  * - Excel export of the filtered register, every page.
  */
+/** "DLC Concrete for plant foundation · 10 CUM" — the mix a sub-item row was issued as (039). */
+function compositeLabel(row: Issue): string {
+  return `${row.compositeItemName ?? 'a composite item'} · ${quantity3(
+    row.compositeQuantity ?? null,
+  )} ${row.compositeUnit ?? ''}`.trim();
+}
+
 function IssuesPageBody() {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -106,9 +114,17 @@ function IssuesPageBody() {
   const totalQuantity = list.data?.totals?.quantity ?? null;
 
   const remove = async (row: Issue) => {
+    // 039: a sub-item row of a composite issue takes the whole issue with it — every sub-item on
+    // the slip goes back to the store — so the dialog says so before, not after.
     const ok = await confirmDialog({
-      title: 'Delete this issue?',
-      message: MESSAGES.confirmDeleteIssue,
+      title: row.issueGroupId
+        ? 'Delete this composite issue?'
+        : 'Delete this issue?',
+      message: row.issueGroupId
+        ? `This deletes the whole issue of ${compositeLabel(row)}${
+            row.slipNo ? ` on slip ${row.slipNo}` : ''
+          }: every sub-item on it goes back to the store, not only ${row.itemName}.`
+        : MESSAGES.confirmDeleteIssue,
       confirmLabel: 'Delete',
       tone: 'danger',
     });
@@ -177,14 +193,29 @@ function IssuesPageBody() {
     {
       key: 'item',
       header: 'Item',
-      render: (row) => `${row.itemName} (${row.unit})`,
+      // 039: a composite issue's rows each name the mix they went out as, "DLC Concrete · 10 CUM".
+      render: (row) =>
+        row.compositeItemId ? (
+          <span>
+            {`${row.itemName} (${row.unit})`}
+            <span className="block text-xs text-gray-500">
+              Part of {compositeLabel(row)}
+            </span>
+          </span>
+        ) : (
+          `${row.itemName} (${row.unit})`
+        ),
     },
     {
       key: 'quantity',
       header: 'Qty',
       className: 'text-right tabular-nums',
       sortValue: (row) => row.quantity,
-      render: (row) => formatQuantity(row.quantity),
+      // A composite's sub-quantities are kept to three decimals (0.827 MT per CUM).
+      render: (row) =>
+        row.compositeItemId
+          ? quantity3(row.quantity)
+          : formatQuantity(row.quantity),
     },
     {
       key: 'issuedTo',

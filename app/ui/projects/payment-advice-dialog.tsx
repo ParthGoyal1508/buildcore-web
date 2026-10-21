@@ -14,6 +14,8 @@ import {
   recordBillPayment,
   setPayeeBank,
 } from '@/app/lib/api/billing';
+import { ApiError, CASH_HIDDEN, errorMessage } from '@/app/lib/api/client';
+import { useCashPolicy } from '@/app/lib/cash-entry';
 import { saveBlob } from '@/app/lib/download-file';
 import { Button, TextButton } from '@/app/ui/button';
 import {
@@ -75,6 +77,11 @@ export default function PaymentAdviceDialog({
   const [error, setError] = useState<string | null>(null);
 
   const missingBank = (payee.data?.missing.length ?? 0) > 0;
+  // 038: while the company hides cash, Cash is not a mode at all.
+  const { hidden: cashHidden } = useCashPolicy();
+  const modes = cashHidden
+    ? PAYMENT_MODES.filter((option) => option !== 'Cash')
+    : PAYMENT_MODES;
 
   const submit = async () => {
     setBusy(true);
@@ -184,7 +191,7 @@ export default function PaymentAdviceDialog({
               value={mode}
               onChange={(e) => setMode(e.target.value as PaymentMode)}
             >
-              {PAYMENT_MODES.map((option) => (
+              {modes.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -380,6 +387,8 @@ function PayeePanel({
 }
 
 function describe(err: unknown): string {
+  if (err instanceof ApiError && err.code === CASH_HIDDEN)
+    return errorMessage(err);
   const anyErr = err as {
     message?: string;
     details?: { message?: string | string[] };

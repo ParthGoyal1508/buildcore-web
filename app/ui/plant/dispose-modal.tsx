@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { errorMessage } from '@/app/lib/api/client';
+import { useCashPolicy } from '@/app/lib/cash-entry';
 import {
   disposeEquipment,
   getDisposalPreview,
@@ -75,6 +76,11 @@ export default function DisposeModal({
   });
 
   const isSale = type === 'sold';
+  // 038: a sale received in cash is a cash record; while the company hides cash it is not offered.
+  const { hidden: cashHidden } = useCashPolicy();
+  const paymentModes = cashHidden
+    ? DISPOSAL_PAYMENT_MODES.filter((m) => m !== 'cash')
+    : DISPOSAL_PAYMENT_MODES;
   const autoBook = preview.data?.bookValue ?? null;
   const bookValue = autoBook ?? amountOf(manualBook) ?? null;
   const saleAmount = amountOf(amount);
@@ -146,7 +152,7 @@ export default function DisposeModal({
     },
     onError: (e) => {
       setStep('form');
-      setError(e instanceof ApiError ? e.message : 'Could not save the disposal.');
+      setError(errorMessage(e, 'Could not save the disposal.'));
     },
   });
 
@@ -344,7 +350,7 @@ export default function DisposeModal({
                 onChange={(e) => setPaymentMode(e.target.value)}
               >
                 <option value="">Choose…</option>
-                {DISPOSAL_PAYMENT_MODES.map((m) => (
+                {paymentModes.map((m) => (
                   <option key={m} value={m}>
                     {DISPOSAL_PAYMENT_MODE_LABELS[m]}
                   </option>

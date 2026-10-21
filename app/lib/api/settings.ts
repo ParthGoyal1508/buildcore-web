@@ -539,12 +539,12 @@ export async function deleteShift(id: string): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Whether cash amounts are hidden for this company.
+ * Whether cash transactions are hidden for this company.
  *
- * A **display** control, which is the whole of its design: nothing is deleted or altered while it
- * is on, and turning it off restores every figure exactly. The API nulls a cash amount and sets
- * `amountHidden` beside it rather than zeroing it — see `app/lib/api/cash-hiding.ts` for why that
- * distinction has to survive all the way to the screen.
+ * Since 038 hiding means cash does not exist: while it is on the API leaves every cash record out
+ * of every read and total, and refuses every cash write (`CASH_HIDDEN`) for everyone. Nothing is
+ * deleted, and turning it off restores everything exactly. Forms learn it from `/my/cash-policy`
+ * (`useCashPolicy`), which any signed-in user may read; this endpoint stays the Super Admin's.
  */
 export const cashVisibilitySchema = z.object({
   hideCashTransactions: z.boolean(),

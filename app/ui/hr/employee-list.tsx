@@ -201,7 +201,7 @@ export default function EmployeeList() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-[min(100%,40rem)] flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <TextField
             id="employee-search"
             label="Search"
@@ -263,6 +263,11 @@ export default function EmployeeList() {
           <SecondaryButton type="button" onClick={() => setBulkOpen(true)}>
             {LOCATION_ASSIGNMENT.bulkHeading}
           </SecondaryButton>
+          {/* 036: a screen of its own, unlike the location dialog beside it — a Day/Night
+              rotation moves whole crews across every page of this list, not the 25 on screen. */}
+          <Link href={ROUTES.hrEmployeesBulkShift}>
+            <SecondaryButton type="button">Change Shifts</SecondaryButton>
+          </Link>
           <Link href={`${ROUTES.hrEmployees}/new`}>
             <Button type="button">
               <PlusIcon className="mr-2 w-4" aria-hidden="true" />

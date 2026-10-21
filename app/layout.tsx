@@ -1,47 +1,48 @@
-import '@/app/ui/global.css';
-import { inter } from '@/app/ui/fonts';
-import type { Metadata, Viewport } from 'next';
-import Providers from '@/app/providers';
-import InstallPrompt from '@/app/install-prompt';
-import { DialogHost } from '@/app/ui/dialogs';
-import NativePickers from '@/app/ui/native-pickers';
-import RowLinks from '@/app/ui/row-links';
-import { ToastHost } from '@/app/ui/toast';
-import CompanyChangedBanner from '@/app/ui/company-changed-banner';
-import TopLoader from '@/app/ui/top-loader';
+import "@/app/ui/global.css";
+import { inter } from "@/app/ui/fonts";
+import type { Metadata, Viewport } from "next";
+import Providers from "@/app/providers";
+import InstallPrompt from "@/app/install-prompt";
+import { DialogHost } from "@/app/ui/dialogs";
+import NativePickers from "@/app/ui/native-pickers";
+import RowLinks from "@/app/ui/row-links";
+import { ToastHost } from "@/app/ui/toast";
+import CompanyChangedBanner from "@/app/ui/company-changed-banner";
+import SessionTabSync from "@/app/ui/session-tab-sync";
+import TopLoader from "@/app/ui/top-loader";
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | BuildCore',
-    default: 'BuildCore',
+    template: "%s | BuildCore",
+    default: "BuildCore",
   },
   description:
-    'BuildCore ERP — construction workforce, assets, and project management.',
-  manifest: '/manifest.webmanifest',
-  applicationName: 'BuildCore',
+    "BuildCore ERP — construction workforce, assets, and project management.",
+  manifest: "/manifest.webmanifest",
+  applicationName: "BuildCore",
   appleWebApp: {
     capable: true,
-    title: 'BuildCore',
-    statusBarStyle: 'default',
+    title: "BuildCore",
+    statusBarStyle: "default",
   },
   icons: [
     {
-      rel: 'icon',
-      url: '/icons/icon-192.png',
-      sizes: '192x192',
-      type: 'image/png',
+      rel: "icon",
+      url: "/icons/icon-192.png",
+      sizes: "192x192",
+      type: "image/png",
     },
     {
-      rel: 'icon',
-      url: '/icons/icon-512.png',
-      sizes: '512x512',
-      type: 'image/png',
+      rel: "icon",
+      url: "/icons/icon-512.png",
+      sizes: "512x512",
+      type: "image/png",
     },
     {
-      rel: 'apple-touch-icon',
-      url: '/icons/icon-192.png',
-      sizes: '192x192',
-      type: 'image/png',
+      rel: "apple-touch-icon",
+      url: "/icons/icon-192.png",
+      sizes: "192x192",
+      type: "image/png",
     },
   ],
 };
@@ -53,8 +54,8 @@ export const metadata: Metadata = {
  * since 14, so the `<meta name="theme-color">` tag was never output (036 A30).
  */
 export const viewport: Viewport = {
-  themeColor: '#002d4e',
-  colorScheme: 'light',
+  themeColor: "#002d4e",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -80,6 +81,7 @@ export default function RootLayout({
           <DialogHost />
           <ToastHost />
           <CompanyChangedBanner />
+          <SessionTabSync />
           <RowLinks />
           <TopLoader />
         </Providers>

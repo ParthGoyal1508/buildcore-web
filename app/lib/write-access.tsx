@@ -126,7 +126,23 @@ const ALL_SCOPES: readonly WriteScope[] = [...SECTION_SCOPES, ...MODULE_SCOPES];
  * module, so not this mechanism's business" and keeps controls visible; `[]` would mean "claimed
  * and writable by nobody", which no scope produces.
  */
+/**
+ * A project's daily work reports, `portfolio/:id/dwr` and beneath (039).
+ *
+ * The prefix scopes above cannot express it — the project id sits between `portfolio` and `dwr` —
+ * so the whole subtree resolved to `portfolio`'s `PROJECTS`. The server writes DWRs on `DWR`, so a
+ * DWR Entry user (who holds no `PROJECTS`) and a Site Incharge (who reads `PROJECTS` and writes
+ * `DWR`) both saw the report form with no Save button and no way to add a line.
+ */
+const DWR_SCREEN = /^\/dashboard\/projects\/portfolio\/[^/]+\/dwr(\/|$)/;
+
+/** Whether `pathname` is one of a project's DWR screens — read by the projects layout too. */
+export function isDwrScreenPath(pathname: string): boolean {
+  return DWR_SCREEN.test(pathname);
+}
+
 export function writePermissionsFor(pathname: string): readonly string[] | null {
+  if (DWR_SCREEN.test(pathname)) return [PROJECTS_PERMISSIONS.dwr];
   let best: WriteScope | null = null;
   for (const scope of ALL_SCOPES) {
     const matches =

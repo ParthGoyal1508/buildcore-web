@@ -55,7 +55,8 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
   const companyId = useSelectedCompanyId();
   // 019 FR-017a. Hidden, not disabled: a disabled option invites a support call, and the
   // client's intent is that the machinery of cash is not visible at all to an office viewer.
-  const { mayEnterCash } = useCashRights();
+  // 038: false for everyone while the company hides cash.
+  const { mayEnterCash, cashHidden } = useCashRights();
   const offeredModes = mayEnterCash
     ? PAYMENT_MODES
     : PAYMENT_MODES.filter((mode) => mode !== 'cash');
@@ -209,7 +210,9 @@ export default function PaymentModal({ onClose }: { onClose: () => void }) {
           ))}
         </SelectField>
 
-        {!mayEnterCash && (
+        {!mayEnterCash && !cashHidden && (
+          // 038: not while the company hides cash — then cash does not exist, and there is nothing
+          // to explain.
           // FR-014: a screen that loses a control must say so. Without this the mode list is
           // simply one item shorter and the viewer has no way to tell a missing permission from
           // a missing feature.
