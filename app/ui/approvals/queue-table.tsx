@@ -20,6 +20,8 @@ import {
 } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import ActionReview from '@/app/ui/approvals/action-review';
+import ApprovalFiles from '@/app/ui/approvals/approval-files';
+import { useFileViewer } from '@/app/ui/pdf-viewer';
 import ResponsiveList, {
   type Column,
 } from '@/app/ui/settings/responsive-list';
@@ -59,6 +61,7 @@ import { RowAction } from '@/app/ui/settings/form-fields';
  */
 export default function ApprovalQueue() {
   const queryClient = useQueryClient();
+  const { view, viewer } = useFileViewer();
   /**
    * 036 D3: an infinite query. "Load more" used to put every cursor walked so far into the query
    * key, so each press made a new key — the list blanked to its loading state and then re-fetched
@@ -128,6 +131,13 @@ export default function ApprovalQueue() {
           <div className="text-xs text-gray-500">
             {approvalActionTypeLabel(row.actionType)}
           </div>
+          {/* What the approver is deciding on, opened in place (2026-10-20). */}
+          <ApprovalFiles
+            entityType={row.entityType}
+            entityId={row.entityId}
+            subject={row.subject}
+            view={view}
+          />
         </div>
       ),
     },
@@ -216,6 +226,7 @@ export default function ApprovalQueue() {
 
   return (
     <div className="space-y-3">
+      {viewer}
       {groups.length === 0 ? (
         <ResponsiveList
           columns={columns}

@@ -2741,13 +2741,16 @@ export const LEAVE_APPLICATION_STATUSES = [
 ] as const;
 export const HOLIDAY_TYPES = ['national', 'regional', 'company'] as const;
 export const PAYROLL_RUN_STATUSES = ['draft', 'processed', 'paid'] as const;
-export const LOAN_STATUSES = ['pending', 'active', 'closed'] as const;
+// `rejected` (2026-10-20): refused on its approval chain.
+export const LOAN_STATUSES = ['pending', 'active', 'closed', 'rejected'] as const;
 export const LOAN_SCHEDULE_STATUSES = ['upcoming', 'paid', 'overdue'] as const;
 export const SALARY_ADVANCE_STATUSES = [
   'pending',
   'approved',
   'disbursed',
   'closed',
+  // Refused on its approval chain (2026-10-20).
+  'rejected',
 ] as const;
 export const EXIT_REASONS = [
   'resignation',
@@ -3260,6 +3263,8 @@ export const ADVANCE_STATUSES = [
   'approved',
   'disbursed',
   'closed',
+  // Refused on its approval chain (2026-10-20).
+  'rejected',
 ] as const;
 
 export const LABOUR_PAYMENT_MODES = ['cash', 'bank'] as const;
@@ -3807,6 +3812,8 @@ export const APPROVAL_INERT_MESSAGES = {
       levelLabel ?? 'this level'
     } for your company. Someone with settings access must map it under ` +
     `Settings → Approvals before this can move.`,
+  // 2026-10-20: the applicant, the maker, or the employee it pays.
+  own_item: () => 'Your own request — another approver decides it',
 } as const;
 
 /**
@@ -4152,6 +4159,18 @@ export const APPROVAL_ACTION_TYPE_LABELS: Record<string, string> = {
   // An initialism the fallback would print as "Ra bill" (2026-10-15).
   ra_bill: 'RA bill',
   dwr: 'Daily work report',
+  // On the spine since 2026-10-20 — each used to have its own single approve step.
+  leave_application: 'Leave application',
+  reimbursement_claim: 'Reimbursement claim',
+  employee_loan: 'Employee loan',
+  salary_advance: 'Salary advance',
+  labour_advance: 'Labour advance',
+  // On the spine before then but never labelled, so they printed as raw keys.
+  operator_fuel_recovery: 'Operator fuel recovery',
+  exit_clearance_waiver: 'Exit clearance waiver',
+  client_bill: 'Client bill',
+  work_order_award: 'Work order award',
+  purchase_rate_change: 'Purchase rate change',
 };
 
 /**

@@ -3,6 +3,7 @@
 import { PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import {
@@ -92,7 +93,12 @@ export default function EmployeeDetailTabs({
 }: {
   employeeId: string;
 }) {
-  const [tab, setTab] = useState<TabId>('overview');
+  // `?tab=leave` opens on that tab — the Approvals page links a leave application here so its
+  // approver lands on the balance (2026-10-20).
+  const requested = useSearchParams().get('tab');
+  const [tab, setTab] = useState<TabId>(
+    TABS.find((t) => t.id === requested)?.id ?? 'overview',
+  );
   const [transferring, setTransferring] = useState(false);
   const [offboarding, setOffboarding] = useState(false);
 

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { errorMessage } from '@/app/lib/api/client';
 import {
   approveLoan,
+  rejectLoan,
   closeLoan,
   createLoan,
   getLoan,
@@ -263,13 +264,30 @@ export default function LoansTable() {
 
   const approve = useMutation({
     mutationFn: approveLoan,
-    onSuccess: () => {
+    onSuccess: (result) => {
       setError(null);
-      toast.success('Loan approved; its repayment schedule is generated.');
+      // The loan's approval chain may have further levels (2026-10-20): active only once the last
+      // of them approves.
+      toast.success(
+        (result as { status?: string } | null)?.status === 'active'
+          ? 'Loan approved; its repayment schedule is generated.'
+          : 'Approval recorded; the loan moves to the next approver.',
+      );
       queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] });
     },
     // 403 SELF_APPROVAL arrives with the server's own sentence.
     onError: (err: Error) => setError(errorMessage(err, 'Could not approve the loan.')),
+  });
+
+  const reject = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      rejectLoan(id, reason),
+    onSuccess: () => {
+      setError(null);
+      toast.success('Loan rejected.');
+      queryClient.invalidateQueries({ queryKey: ['hr', 'loans'] });
+    },
+    onError: (err: Error) => setError(errorMessage(err, 'Could not reject the loan.')),
   });
 
   const close = useMutation({
@@ -381,6 +399,27 @@ export default function LoansTable() {
                 }}
               >
                 Approve
+              </RowAction>
+            )}
+            {row.status === 'pending' && !self.isSelf({ createdByUserId: row.createdByUserId, employeeCode: employees.code(row.employeeId) }) && (
+              <RowAction
+                type="button"
+                loading={reject.isPending && reject.variables?.id === row.id}
+                disabled={reject.isPending}
+                onClick={async () => {
+                  const reason = await promptDialog({
+                    title: 'Reject this loan?',
+                    message: 'It will not be activated or deducted. Why?',
+                    label: 'Reason',
+                    required: true,
+                    multiline: true,
+                    confirmLabel: 'Reject',
+                    tone: 'danger',
+                  });
+                  if (reason?.trim()) reject.mutate({ id: row.id, reason: reason.trim() });
+                }}
+              >
+                Reject
               </RowAction>
             )}
             {row.status === 'active' && (

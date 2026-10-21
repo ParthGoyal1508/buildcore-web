@@ -33,7 +33,7 @@ function Card({
 
 const EXPIRY_CLASS: Record<string, string> = {
   expired: 'text-red-700',
-  expiring: 'text-amber-800',
+  expiring_soon: 'text-amber-800',
 };
 
 /**
@@ -173,7 +173,8 @@ export default function MyProfile() {
                     <span
                       className={clsx(
                         'text-xs',
-                        EXPIRY_CLASS[doc.expiryState] ?? 'text-gray-500',
+                        (doc.expiryState && EXPIRY_CLASS[doc.expiryState]) ??
+                          'text-gray-500',
                       )}
                     >
                       {doc.expiresAt
