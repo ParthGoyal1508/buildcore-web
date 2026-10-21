@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getCurrentUser } from '@/app/lib/api/users';
+import { isDwrScreenPath } from '@/app/lib/write-access';
 import {
   PROJECTS_PERMISSIONS,
   ROUTES,
@@ -36,6 +37,20 @@ import { LoadingText } from '@/app/ui/spinner';
  * the sections still to come, which the backend gates on `DWR` and
  * `PROJECT_FINANCIALS` rather than `PROJECTS`.
  */
+/**
+ * A project's daily work reports — `portfolio/:id/dwr` and everything beneath it — for a holder of
+ * `DWR` (039).
+ *
+ * The section map is keyed on `portfolio`, which needs `PROJECTS`, so without this the DWR Entry
+ * role (`DWR` and nothing of the portfolio) was refused the only screens it exists for. Every other
+ * screen under a project still needs `PROJECTS`; the pages themselves check `DWR`.
+ */
+function isDwrScreen(pathname: string, permissions: readonly string[]): boolean {
+  return (
+    permissions.includes(PROJECTS_PERMISSIONS.dwr) && isDwrScreenPath(pathname)
+  );
+}
+
 export default function ProjectsLayout({
   children,
 }: {
@@ -68,7 +83,10 @@ export default function ProjectsLayout({
   // The Projects index lists only the sections the user can reach, so it needs no
   // permission of its own — same treatment the HR and Settings indexes get.
   if (section && section in PROJECTS_PERMISSIONS) {
-    if (!user.permissions.includes(PROJECTS_PERMISSIONS[section])) {
+    if (
+      !user.permissions.includes(PROJECTS_PERMISSIONS[section]) &&
+      !isDwrScreen(pathname, user.permissions)
+    ) {
       return <AccessDenied />;
     }
   }

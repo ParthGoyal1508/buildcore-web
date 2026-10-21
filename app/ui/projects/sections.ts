@@ -2,6 +2,7 @@ import {
   BanknotesIcon,
   BuildingOffice2Icon,
   ChartBarIcon,
+  ClipboardDocumentListIcon,
   MapPinIcon,
   RectangleStackIcon,
 } from '@heroicons/react/24/outline';
@@ -67,6 +68,15 @@ export const PROJECT_SECTIONS: {
     title: 'Bank Guarantees',
     description: 'EMD and performance guarantees per tender, with expiry alerts.',
     icon: BanknotesIcon,
+  },
+  {
+    // 039. Gated on `DWR`: the way in for someone who records daily work and may not open the
+    // portfolio.
+    key: 'dwr',
+    href: ROUTES.projectsDwrIndex,
+    title: 'Daily Work Reports',
+    description: 'Pick a project to record, submit or correct its daily work reports.',
+    icon: ClipboardDocumentListIcon,
   },
 ];
 

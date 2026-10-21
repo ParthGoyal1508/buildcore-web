@@ -130,6 +130,8 @@ export const ROUTES = {
   projectsSites: '/dashboard/projects/sites',
   /** 037: tenders with their EMD and PBG bank guarantees, and the tender page with documents. */
   projectsBankGuarantees: '/dashboard/projects/bank-guarantees',
+  /** 039: the DWR picker — the way in for a holder of `DWR` without the portfolio. */
+  projectsDwrIndex: '/dashboard/projects/dwr',
   projectsBankGuarantee: (id: string) => `/dashboard/projects/bank-guarantees/${id}`,
   /** One site: its geofence, its address and the project it belongs to. */
   projectsSite: (id: string) => `/dashboard/projects/sites/${id}`,
@@ -2166,12 +2168,18 @@ export const PERMISSIONS = [
   'PROJECT_LOCK',
   /** 037: the Bank Guarantees register under Projects, and its 30-day expiry alerts. */
   'BANK_GUARANTEES',
+  /**
+   * 039: Head Office paying a job card's final bill (Plant → Maintenance). Super Admin and HO User
+   * hold it; site roles keep MAINTENANCE to raise and correct cards.
+   */
+  'MAINTENANCE_PAY',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
 const PERMISSION_LABELS: Record<string, string> = {
   HR_LETTERS: 'HR Letters',
+  MAINTENANCE_PAY: 'Maintenance Payments',
 };
 
 /** Human-readable label for a permission value, for checkbox lists and summaries. */
@@ -2387,6 +2395,9 @@ export const PROJECTS_PERMISSIONS = {
   // 037. Its own permission: who keeps the BG register (and gets its expiry alerts) is not
   // everyone who can open projects.
   'bank-guarantees': 'BANK_GUARANTEES',
+  // 039. The DWR picker: a project to report on, for whoever records daily work — the DWR Entry
+  // role holds `DWR` and nothing of the portfolio.
+  dwr: 'DWR',
 } as const;
 
 export type ProjectsSection = keyof typeof PROJECTS_PERMISSIONS;
@@ -2506,8 +2517,9 @@ export const NAV_MODULES = [
     href: ROUTES.projects,
     guardPrefix: ROUTES.projects,
     guardsSubtree: true,
-    // Any-of: someone who keeps only the BG register (037) still reaches Projects for it.
-    permissions: ['PROJECTS', 'BANK_GUARANTEES'],
+    // Any-of: someone who keeps only the BG register (037) still reaches Projects for it, and
+    // someone who only records daily work (039, the DWR Entry role) reaches it for that.
+    permissions: ['PROJECTS', 'BANK_GUARANTEES', 'DWR'],
   },
   {
     id: 'plant',
@@ -4717,6 +4729,8 @@ export const PROJECT_SHELL_COPY = {
   loading: 'Loading this project…',
   loadFailed: 'This project could not be loaded.',
   breadcrumb: 'Portfolio',
+  /** 039: the DWR-only shell's trail leads back to the DWR picker, not to the portfolio. */
+  dwrBreadcrumb: 'Daily Work Reports',
   tabsLabel: 'Project sections',
 
   overviewHeading: 'Overview',

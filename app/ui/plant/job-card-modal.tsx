@@ -15,13 +15,16 @@ import {
   downloadJobCard,
   getJobCard,
   getJobCardPrefill,
+  isJobCardEditable,
   saveJobCard,
+  saveJobCardQuotation,
+  submitJobCard,
   type JobCard,
   type JobCardView,
 } from '@/app/lib/api/plant-hire';
 import { MESSAGES } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
-import { Button } from '@/app/ui/button';
+import { Button, TextButton } from '@/app/ui/button';
 import { LoadingText } from '@/app/ui/spinner';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -33,9 +36,18 @@ import {
   TextField,
   fieldClass,
 } from '@/app/ui/settings/form-fields';
+import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
+import { useToast } from '@/app/ui/toast';
 import DocumentDownloads from './document-downloads';
+import {
+  JobCardHistory,
+  JobCardStatusBadge,
+  finalBillLoader,
+  quotationLoader,
+  useOpenFile,
+} from './job-card-flow';
 import { EquipmentPicker } from './pickers';
-import { todayIso } from '@/app/lib/format';
+import { dateLabel, todayIso } from '@/app/lib/format';
 
 /** The card's single-value fields, held as strings while editing. */
 const TEXT_FIELDS = [
@@ -276,6 +288,17 @@ function JobCardForm({
   );
   const [prefilling, setPrefilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const openFile = useOpenFile(setError);
+
+  // 039: the card's workflow. Site changes it only while it is a draft or sent back for
+  // correction; after that it is Head Office's to decide and pay, and the form is read-only.
+  const workflow = view?.workflow ?? null;
+  const readOnly = !isJobCardEditable(workflow?.status);
+  const initialQuotation = str(workflow?.quotation.amount);
+  const [quotationAmount, setQuotationAmount] = useState(initialQuotation);
+  const [quotationFile, setQuotationFile] = useState<PreparedFile | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const bind = (key: TextKey) => ({
     value: values[key],
@@ -349,32 +372,59 @@ function JobCardForm({
     };
   }
 
+  /** Saves the card, then the quotation if it changed; `submit` then sends it to Head Office. */
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ submit }: { submit: boolean }) => {
       const body = toCard();
-      if (view?.jobId) {
-        await saveJobCard(view.jobId, body);
-        return view.jobId;
+      const amount = quotationAmount.trim();
+      if (quotationFile && !amount) {
+        throw new Error('Enter the quotation amount for the uploaded quotation.');
       }
-      const job = await createJobWithCard({
-        equipmentId,
-        type:
-          values.priority === 'Routine' || values.priority === ''
-            ? 'scheduled'
-            : 'breakdown',
-        description: values.complaint.trim(),
-        card: body,
-      });
-      return job.id;
+      if (submit && (!amount || !(quotationFile || workflow?.quotation.hasFile))) {
+        throw new Error(
+          'Upload the workshop quotation and enter its amount before submitting to Head Office.',
+        );
+      }
+      let jobId = view?.jobId ?? null;
+      if (jobId) {
+        await saveJobCard(jobId, body);
+      } else {
+        const job = await createJobWithCard({
+          equipmentId,
+          type:
+            values.priority === 'Routine' || values.priority === ''
+              ? 'scheduled'
+              : 'breakdown',
+          description: values.complaint.trim(),
+          card: body,
+        });
+        jobId = job.id;
+      }
+      if (amount && (quotationFile || amount !== initialQuotation)) {
+        await saveJobCardQuotation(jobId, {
+          amount: Number(amount),
+          file: quotationFile?.base64,
+          fileName: quotationFile?.fileName,
+        });
+      }
+      if (submit) await submitJobCard(jobId);
+      return { jobId, submit };
     },
-    onSuccess: (savedJobId) => {
+    onSuccess: ({ jobId: savedJobId, submit }) => {
       void queryClient.invalidateQueries({ queryKey: ['plant'] });
-      if (isNew) onCreated(savedJobId);
+      if (submit) {
+        toast.success(
+          workflow?.status === 'returned'
+            ? 'Resubmitted to Head Office.'
+            : 'Sent to Head Office for approval.',
+        );
+        onClose();
+      } else if (isNew) onCreated(savedJobId);
       else onClose();
     },
     onError: (err) =>
       setError(
-        err instanceof ApiError ? err.message : MESSAGES.plantSaveFailed,
+        err instanceof Error ? err.message : MESSAGES.plantSaveFailed,
       ),
   });
 
@@ -415,13 +465,33 @@ function JobCardForm({
           <SecondaryButton type="button" onClick={onClose}>
             {isNew ? 'Cancel' : 'Close'}
           </SecondaryButton>
-          <Button
-            type="submit"
-            form="job-card-form"
-            disabled={save.isPending || prefilling}
-          >
-            {save.isPending ? 'Saving…' : isNew ? 'Open job & save' : 'Save'}
-          </Button>
+          {!readOnly && (
+            <>
+              <Button
+                type="submit"
+                form="job-card-form"
+                disabled={save.isPending || prefilling}
+              >
+                {save.isPending ? 'Saving…' : isNew ? 'Open job & save' : 'Save'}
+              </Button>
+              <Button
+                type="button"
+                disabled={save.isPending || prefilling}
+                onClick={() => {
+                  setError(null);
+                  const form = document.getElementById(
+                    'job-card-form',
+                  ) as HTMLFormElement | null;
+                  if (form && !form.reportValidity()) return;
+                  save.mutate({ submit: true });
+                }}
+              >
+                {workflow?.status === 'returned'
+                  ? 'Save & resubmit'
+                  : 'Save & submit for approval'}
+              </Button>
+            </>
+          )}
         </>
       }
     >
@@ -431,15 +501,118 @@ function JobCardForm({
         onSubmit={(event) => {
           event.preventDefault();
           setError(null);
-          save.mutate();
+          save.mutate({ submit: false });
         }}
       >
         <FormError message={error} />
-        {!isNew && (
+        {workflow && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-gray-600">Status</span>
+            <JobCardStatusBadge status={workflow.status} />
+            <TextButton onClick={() => setShowHistory((v) => !v)}>
+              {showHistory ? 'Hide history' : 'History'}
+            </TextButton>
+          </div>
+        )}
+        {workflow?.returnRemarks &&
+          (workflow.status === 'returned' || workflow.status === 'draft') && (
+            <div
+              role="alert"
+              className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              <p className="font-medium">
+                {workflow.status === 'returned'
+                  ? 'Head Office sent this card back for correction'
+                  : 'Head Office rejected this card'}
+              </p>
+              <p className="mt-1 whitespace-pre-line">{workflow.returnRemarks}</p>
+            </div>
+          )}
+        {showHistory && view?.jobId && (
+          <section className="rounded-lg border border-gray-200 p-3 sm:p-4">
+            <JobCardHistory jobId={view.jobId} />
+          </section>
+        )}
+        {readOnly && workflow && (
+          <p className="text-xs text-gray-500">
+            {workflow.status === 'pending_approval'
+              ? 'With Head Office for approval — the card cannot be changed until they decide.'
+              : 'Approved by Head Office — the card can no longer be changed.'}
+          </p>
+        )}
+        {!isNew && !readOnly && (
           <p className="text-xs text-gray-500">
             Downloads print the card as last saved — save your changes first.
           </p>
         )}
+
+        <section className="rounded-lg border border-gray-200">
+          <h3 className="rounded-t-lg border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 sm:px-4">
+            Workshop quotation{' '}
+            <span className="font-normal text-gray-500">— required to submit</span>
+          </h3>
+          <div className="flex flex-col gap-4 p-3 sm:p-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                id="jc-quotation-amount"
+                label="Quotation amount (₹)"
+                type="number"
+                inputMode="decimal"
+                min="0.01"
+                step="0.01"
+                disabled={readOnly}
+                value={quotationAmount}
+                onChange={(event) => setQuotationAmount(event.target.value)}
+              />
+              {workflow?.quotation.hasFile && view?.jobId && (
+                <div className="flex items-end">
+                  <TextButton
+                    onClick={() =>
+                      void openFile(
+                        quotationLoader(view.jobId as string),
+                        workflow.quotation.fileName ?? 'quotation',
+                      )
+                    }
+                  >
+                    Open quotation{workflow.quotation.fileName ? ` (${workflow.quotation.fileName})` : ''}
+                  </TextButton>
+                </div>
+              )}
+            </div>
+            {!readOnly && (
+              <FileUpload
+                label={workflow?.quotation.hasFile ? 'Replace quotation' : 'Quotation file'}
+                hint="The workshop’s quotation — PDF or photo."
+                onSelect={setQuotationFile}
+              />
+            )}
+            {workflow?.finalBill && view?.jobId && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-3 text-sm text-gray-700">
+                <span className="font-medium text-gray-900">Final bill</span>
+                <span>
+                  {workflow.finalBill.billNumber} · {dateLabel(workflow.finalBill.billDate)} ·{' '}
+                  {workflow.finalBill.amount === null ? '—' : formatRupees(workflow.finalBill.amount)}
+                </span>
+                <span className="text-gray-500">
+                  Paid {formatRupees(workflow.paidTotal)}
+                  {workflow.balance !== null ? ` · balance ${formatRupees(workflow.balance)}` : ''}
+                </span>
+                <TextButton
+                  onClick={() =>
+                    void openFile(
+                      finalBillLoader(view.jobId as string),
+                      workflow.finalBill?.fileName ?? 'final-bill',
+                    )
+                  }
+                >
+                  Open bill
+                </TextButton>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <fieldset disabled={readOnly} className="contents">
 
         <Section n={1} title="Job Card & Equipment Details">
           <EquipmentPicker
@@ -931,7 +1104,9 @@ function JobCardForm({
             ))}
           </div>
         </Section>
+        </fieldset>
       </form>
     </Modal>
   );
 }
+

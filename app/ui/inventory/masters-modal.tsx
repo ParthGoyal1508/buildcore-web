@@ -37,11 +37,13 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
+import CompositeItemsTab from './composite-items-tab';
 
 const ITEM_PAGE_SIZE = 25;
 
 /**
- * The item and category masters, as a two-tab dialog opened from the Stock screen.
+ * The item, composite item (039) and category masters, as a tabbed dialog opened from the Stock
+ * screen.
  *
  * Not a route, deliberately. These are `settings`-schema company reference data
  * gated on `SETTINGS` rather than `INVENTORY` (009 research.md §1), so a storekeeper
@@ -53,7 +55,14 @@ const ITEM_PAGE_SIZE = 25;
  * edited, retired or deleted here at all. It is now searched on the server (debounced) and paged.
  * Categories come back whole from the API and are few, so their search filters in place.
  */
-type Tab = 'items' | 'categories';
+type Tab = 'items' | 'composites' | 'categories';
+
+const TAB_LABELS: Record<Tab, string> = {
+  items: 'Items',
+  // 039: mixes issued as their sub-items in fixed proportions.
+  composites: 'Composite items',
+  categories: 'Categories',
+};
 
 /** Turns an API failure into the message this module has agreed to show for it. */
 function messageFor(error: unknown, fallback: string): string {
@@ -504,7 +513,7 @@ export default function MastersModal({ onClose }: { onClose: () => void }) {
           role="tablist"
           aria-label="Master data"
         >
-          {(['items', 'categories'] as const).map((value) => (
+          {(['items', 'composites', 'categories'] as const).map((value) => (
             <button
               key={value}
               type="button"
@@ -517,12 +526,18 @@ export default function MastersModal({ onClose }: { onClose: () => void }) {
                   : 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
               }
             >
-              {value === 'items' ? 'Items' : 'Categories'}
+              {TAB_LABELS[value]}
             </button>
           ))}
         </div>
 
-        {tab === 'items' ? <ItemTab /> : <CategoryTab />}
+        {tab === 'items' ? (
+          <ItemTab />
+        ) : tab === 'composites' ? (
+          <CompositeItemsTab />
+        ) : (
+          <CategoryTab />
+        )}
       </div>
     </Modal>
   );

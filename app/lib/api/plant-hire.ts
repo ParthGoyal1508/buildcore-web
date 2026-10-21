@@ -5,6 +5,7 @@ import {
   maintenanceJobSchema,
   type MaintenanceJob,
 } from '@/app/lib/api/plant';
+import type { StoredFile } from '@/app/lib/api/client';
 import { authFetch, authFetchFile } from '@/app/lib/session';
 
 /**
@@ -440,6 +441,66 @@ export interface JobCard {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Job card workflow (039): quotation → Head Office approval → final bill → payment
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const JOB_CARD_FLOW_STATUSES = [
+  'draft',
+  'pending_approval',
+  'returned',
+  'approved',
+  'bill_uploaded',
+  'paid',
+] as const;
+export type JobCardFlowStatus = (typeof JOB_CARD_FLOW_STATUSES)[number];
+
+/** The client's words for each stage. `returned` is "Sent for Correction". */
+export const JOB_CARD_FLOW_LABELS: Record<JobCardFlowStatus, string> = {
+  draft: 'Draft',
+  pending_approval: 'Pending Approval',
+  returned: 'Sent for Correction',
+  approved: 'Approved',
+  bill_uploaded: 'Final Bill Uploaded',
+  paid: 'Paid',
+};
+
+/** Site may change the card only while it is a draft or sent back for correction. */
+export const isJobCardEditable = (status: JobCardFlowStatus | null | undefined) =>
+  !status || status === 'draft' || status === 'returned';
+
+export const JOB_CARD_PAYMENT_MODES = ['bank_transfer', 'cheque', 'upi', 'cash'] as const;
+export type JobCardPaymentMode = (typeof JOB_CARD_PAYMENT_MODES)[number];
+export const JOB_CARD_PAYMENT_MODE_LABELS: Record<JobCardPaymentMode, string> = {
+  bank_transfer: 'Bank transfer',
+  cheque: 'Cheque',
+  upi: 'UPI',
+  cash: 'Cash',
+};
+
+export const jobCardWorkflowSchema = z.object({
+  status: z.enum(JOB_CARD_FLOW_STATUSES),
+  returnRemarks: z.string().nullable(),
+  quotation: z.object({
+    amount: nullableDecimal,
+    fileName: z.string().nullable(),
+    hasFile: z.boolean(),
+  }),
+  finalBill: z
+    .object({
+      billNumber: z.string().nullable(),
+      billDate: z.string().nullable(),
+      amount: nullableDecimal,
+      fileName: z.string().nullable(),
+      uploadedAt: z.string().nullable(),
+      uploadedByName: z.string().nullable(),
+    })
+    .nullable(),
+  paidTotal: decimal,
+  balance: nullableDecimal,
+});
+export type JobCardWorkflow = z.infer<typeof jobCardWorkflowSchema>;
+
 export const jobCardViewSchema = z.object({
   jobId: z.string().nullable(),
   jobCardNo: z.string().nullable(),
@@ -457,6 +518,8 @@ export const jobCardViewSchema = z.object({
       amount: decimal,
     }),
   ),
+  /** Null on a card not yet saved. Optional so an older API's response still parses. */
+  workflow: jobCardWorkflowSchema.nullable().optional(),
 });
 export type JobCardView = z.infer<typeof jobCardViewSchema>;
 
@@ -511,5 +574,116 @@ export function downloadJobCard(
   return documentFile(
     `/plant/maintenance/${jobId}/job-card.${format}`,
     `Job Card ${jobCardNo ?? jobId}.${format}`,
+  );
+}
+
+/** Sets the quotation amount; `file` (base64) uploads or replaces the quotation itself. */
+export async function saveJobCardQuotation(
+  jobId: string,
+  input: { amount: number; file?: string; fileName?: string },
+): Promise<void> {
+  await authFetch<unknown>(`/plant/maintenance/${jobId}/job-card/quotation`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+/** Sends the card to Head Office, or resubmits it after correction. */
+export async function submitJobCard(jobId: string): Promise<void> {
+  await authFetch<unknown>(`/plant/maintenance/${jobId}/job-card/submit`, {
+    method: 'POST',
+  });
+}
+
+export async function uploadJobCardFinalBill(
+  jobId: string,
+  input: {
+    billNumber: string;
+    billDate: string;
+    amount: number;
+    file: string;
+    fileName?: string;
+  },
+): Promise<void> {
+  await authFetch<unknown>(`/plant/maintenance/${jobId}/job-card/final-bill`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export const jobCardPaymentSchema = z.object({
+  id: z.string(),
+  amount: decimal,
+  paidOn: z.string(),
+  mode: z.enum(JOB_CARD_PAYMENT_MODES),
+  referenceNumber: z.string().nullable(),
+  remarks: z.string().nullable(),
+  proofFileName: z.string().nullable(),
+  hasProof: z.boolean(),
+  recordedByName: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type JobCardPayment = z.infer<typeof jobCardPaymentSchema>;
+
+export const jobCardPaymentsSchema = z.object({
+  status: z.enum(JOB_CARD_FLOW_STATUSES).nullable(),
+  billAmount: nullableDecimal,
+  paidTotal: decimal,
+  balance: nullableDecimal,
+  payments: z.array(jobCardPaymentSchema),
+});
+export type JobCardPayments = z.infer<typeof jobCardPaymentsSchema>;
+
+export async function getJobCardPayments(jobId: string): Promise<JobCardPayments> {
+  const raw = await authFetch<unknown>(`/plant/maintenance/${jobId}/job-card/payments`);
+  return jobCardPaymentsSchema.parse(raw);
+}
+
+export async function recordJobCardPayment(
+  jobId: string,
+  input: {
+    amount: number;
+    paidOn: string;
+    mode: JobCardPaymentMode;
+    referenceNumber?: string;
+    remarks?: string;
+    proofFile?: string;
+    proofFileName?: string;
+  },
+): Promise<void> {
+  await authFetch<unknown>(`/plant/maintenance/${jobId}/job-card/payments`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export const jobCardEventSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  fromStatus: z.enum(JOB_CARD_FLOW_STATUSES).nullable(),
+  toStatus: z.enum(JOB_CARD_FLOW_STATUSES).nullable(),
+  remarks: z.string().nullable(),
+  detail: z.record(z.string(), z.unknown()).nullable(),
+  actorName: z.string().nullable(),
+  at: z.string(),
+});
+export type JobCardEvent = z.infer<typeof jobCardEventSchema>;
+
+export async function getJobCardHistory(jobId: string): Promise<JobCardEvent[]> {
+  const raw = await authFetch<unknown>(`/plant/maintenance/${jobId}/job-card/history`);
+  return z.array(jobCardEventSchema).parse(raw);
+}
+
+export function getJobCardQuotationFile(jobId: string): Promise<StoredFile> {
+  return authFetchFile(`/plant/maintenance/${jobId}/job-card/quotation/file`);
+}
+
+export function getJobCardFinalBillFile(jobId: string): Promise<StoredFile> {
+  return authFetchFile(`/plant/maintenance/${jobId}/job-card/final-bill/file`);
+}
+
+export function getJobCardPaymentProof(jobId: string, paymentId: string): Promise<StoredFile> {
+  return authFetchFile(
+    `/plant/maintenance/${jobId}/job-card/payments/${paymentId}/proof`,
   );
 }

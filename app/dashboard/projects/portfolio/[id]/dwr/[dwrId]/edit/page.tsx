@@ -7,7 +7,6 @@ import { getDwr } from '@/app/lib/api/dwr';
 import DwrForm from '@/app/ui/projects/dwr-form';
 import DwrReturnedNotice from '@/app/ui/projects/dwr-returned-notice';
 import SectionGuard from '@/app/ui/projects/section-guard';
-import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 
 /**
  * Correcting a draft (022 FR-018, 025 FR-026).
@@ -31,7 +30,9 @@ import { useProjectShell } from '@/app/ui/projects/project-shell-context';
  * "edit it as you would a draft" and this page answered that it could not be edited.
  */
 export default function EditDwrPage() {
-  const { project } = useProjectShell();
+  // The id from the route, not `useProjectShell()`: the DWR-only shell (039) has no project
+  // aggregate to provide, because a holder of `DWR` alone may not read it.
+  const projectId = useParams<{ id: string }>().id;
   const params = useParams<{ dwrId: string }>();
 
   const { data: report, isLoading } = useQuery({
@@ -67,7 +68,7 @@ export default function EditDwrPage() {
         {/* The complaint stays on screen while it is being answered. An author who has to
             navigate back to read what was wrong is an author correcting from memory. */}
         <DwrReturnedNotice report={report} />
-        <DwrForm projectId={project.id} report={report} />
+        <DwrForm projectId={projectId} report={report} />
       </div>
     </SectionGuard>
   );

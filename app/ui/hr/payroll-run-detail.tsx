@@ -12,30 +12,47 @@ import {
   getDeductionReport,
   getPayrollRun,
   getSalaryRegister,
+  isRunApproved,
+  isRunEditable,
   isStaleDraftError,
   saveBlob,
   setPayrollRunStatus,
+  submitPayrollRunForApproval,
   unsubmittedRunOf,
   type PayrollLineItem,
+  type PayrollRun,
 } from '@/app/lib/api/hr-payroll';
 import { HR_MESSAGES, ROUTES } from '@/app/lib/constants';
-import { money, periodLabel, rupees } from '@/app/lib/format';
-import { Button } from '@/app/ui/button';
+import { dateTimeLabel, money, periodLabel, rupees } from '@/app/lib/format';
+import DecisionHistory from '@/app/ui/approvals/decision-history';
+import { Button, RowAction } from '@/app/ui/button';
 import { downloadCsv } from '@/app/ui/hr/csv';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
-import { FormError, SecondaryButton } from '@/app/ui/settings/form-fields';
+import {
+  CheckboxField,
+  FormError,
+  SecondaryButton,
+} from '@/app/ui/settings/form-fields';
 import PageHeader from '@/app/ui/page-header';
 import QueryError from '@/app/ui/query-error';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import SlipDelivery from '@/app/ui/hr/slip-delivery';
 import SubmitRunApproval from '@/app/ui/hr/submit-run-approval';
+import {
+  EditLineModal,
+  LineHistoryModal,
+  RunEditsTable,
+} from '@/app/ui/hr/payroll-line-edits';
+import RunApprovalBadge from '@/app/ui/hr/run-approval-badge';
 import TransactionReconciliation from '@/app/ui/hr/transaction-reconciliation';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
 
 const TABS = [
   { id: 'lines', label: 'Line items' },
+  // 039: every hand correction in the run, for whoever checks it before it goes to the Director.
+  { id: 'changes', label: 'Changes' },
   { id: 'register', label: 'Salary register' },
   { id: 'deductions', label: 'Deduction report' },
   // 021 FR-006 to FR-011 (`bugs.md` item 8). Both tabs, and in this order: the slips go out after
@@ -78,20 +95,32 @@ interface MoneyColumn {
   key: string;
   header: string;
   value: (line: PayrollLineItem) => number;
+  /** The line column it shows, when HR may correct it by hand (039) — for the highlight. */
+  field?: string;
 }
 
 const MONEY_COLUMNS: MoneyColumn[] = [
-  { key: 'basic', header: 'Basic', value: (l) => l.basic },
-  { key: 'hra', header: 'HRA', value: (l) => l.hra },
-  { key: 'conv', header: 'Conveyance', value: (l) => l.conveyanceAllowance },
-  { key: 'site', header: 'Site allw.', value: (l) => l.siteAllowance },
-  { key: 'special', header: 'Special allw.', value: (l) => l.specialAllowance },
-  { key: 'ot', header: 'OT', value: (l) => l.otWages },
+  { key: 'basic', header: 'Basic', value: (l) => l.basic, field: 'basic' },
+  { key: 'hra', header: 'HRA', value: (l) => l.hra, field: 'hra' },
+  {
+    key: 'conv',
+    header: 'Conveyance',
+    value: (l) => l.conveyanceAllowance,
+    field: 'conveyanceAllowance',
+  },
+  { key: 'site', header: 'Site allw.', value: (l) => l.siteAllowance, field: 'siteAllowance' },
+  {
+    key: 'special',
+    header: 'Special allw.',
+    value: (l) => l.specialAllowance,
+    field: 'specialAllowance',
+  },
+  { key: 'ot', header: 'OT', value: (l) => l.otWages, field: 'otWages' },
   { key: 'gross', header: 'Gross', value: gross },
-  { key: 'pf', header: 'PF', value: (l) => l.employeePf },
-  { key: 'esic', header: 'ESIC', value: (l) => l.employeeEsic },
-  { key: 'pt', header: 'PT', value: (l) => l.professionalTax },
-  { key: 'tds', header: 'TDS', value: (l) => l.tds },
+  { key: 'pf', header: 'PF', value: (l) => l.employeePf, field: 'employeePf' },
+  { key: 'esic', header: 'ESIC', value: (l) => l.employeeEsic, field: 'employeeEsic' },
+  { key: 'pt', header: 'PT', value: (l) => l.professionalTax, field: 'professionalTax' },
+  { key: 'tds', header: 'TDS', value: (l) => l.tds, field: 'tds' },
   { key: 'emi', header: 'Loan EMI', value: (l) => l.loanEmiDeduction },
   { key: 'fuel', header: 'Fuel recovery', value: (l) => n(l.fuelRecoveryDeduction) },
   { key: 'advance', header: 'Advance', value: (l) => n(l.advanceRecovered) },
@@ -103,6 +132,76 @@ const MONEY_COLUMNS: MoneyColumn[] = [
 const nameOf = (line: PayrollLineItem) =>
   line.name ?? line.employeeCode ?? line.employeeId;
 
+/** A figure corrected by hand (039): highlighted, and said in words for a screen reader. */
+const EDITED_CELL = 'rounded bg-amber-100 px-1 font-semibold text-amber-900';
+const DERIVED_CELL = 'rounded bg-amber-50 px-1 text-amber-900';
+
+/**
+ * Where the run stands with the Director (039): the state, who it waits on, the Director's remarks
+ * on a return, and the full decision history.
+ */
+function RunApprovalPanel({ run }: { run: PayrollRun }) {
+  const approval = run.approval;
+  if (!approval) {
+    if (run.status !== 'draft' || run.isFnf) return null;
+    return (
+      <p className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
+        Not yet sent to the Director. Review the lines, correct anything wrong (each change needs a
+        justification), then send it for approval. It can be processed once the Director approves.
+      </p>
+    );
+  }
+  const decision = approval.latestDecision;
+  const sentBack =
+    (approval.state === 'returned' || approval.state === 'rejected') && decision;
+  return (
+    <section
+      aria-label="Director approval"
+      className="mb-4 rounded-md border border-gray-200 px-3 py-2 text-sm"
+    >
+      <p className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-gray-900">Director approval</span>
+        <RunApprovalBadge run={run} />
+        {approval.state === 'pending' && (
+          <span className="text-gray-600">
+            Waiting on {approval.levelLabel ?? 'the Director'}
+            {approval.awaitingUserName
+              ? ` (${approval.awaitingUserName})`
+              : approval.awaitingRoleName
+                ? ` (${approval.awaitingRoleName})`
+                : ''}
+            {' '}— corrections and processing wait for their decision.
+          </span>
+        )}
+        {approval.state === 'approved' && run.status === 'draft' && (
+          <span className="text-gray-600">Approved — process the run to freeze these figures.</span>
+        )}
+        {approval.state === 'abandoned' && (
+          <span className="text-gray-600">
+            The approval was voided (attendance changed or the run was regenerated). Check the
+            figures and send it again.
+          </span>
+        )}
+      </p>
+      {sentBack && (
+        <div role="alert" className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+          <p className="font-medium">
+            {approval.state === 'returned' ? 'Returned' : 'Rejected'} by {decision.actorName} ·{' '}
+            {dateTimeLabel(decision.decidedAt)}
+          </p>
+          {decision.reason && <p className="mt-0.5">“{decision.reason}”</p>}
+          {approval.state === 'returned' && (
+            <p className="mt-1 text-xs">Make the corrections asked for, then send it again.</p>
+          )}
+        </div>
+      )}
+      <div className="mt-2">
+        <DecisionHistory state={approval} entityType="payroll_run" entityId={run.id} />
+      </div>
+    </section>
+  );
+}
+
 export default function PayrollRunDetail({ runId }: { runId: string }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -112,6 +211,11 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   const [search, setSearch] = useState('');
   // A run never put into its approval chain: the bank sheet refusal offers to submit it.
   const [unsubmittedRun, setUnsubmittedRun] = useState<string | null>(null);
+  // 039: hand corrections — the line being corrected, the line whose history is open, and the
+  // "edited only" filter.
+  const [editing, setEditing] = useState<PayrollLineItem | null>(null);
+  const [historyOf, setHistoryOf] = useState<PayrollLineItem | null>(null);
+  const [editedOnly, setEditedOnly] = useState(false);
 
   const runQuery = useQuery({
     queryKey: ['hr', 'payrollRun', runId],
@@ -191,6 +295,20 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
     },
   });
 
+  const sendToDirector = useMutation({
+    mutationFn: () => submitPayrollRunForApproval(runId),
+    onSuccess: () => {
+      setError(null);
+      setUnsubmittedRun(null);
+      toast.success('Sent to the Director for approval.');
+      queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRun', runId] });
+      queryClient.invalidateQueries({ queryKey: ['hr', 'payrollRuns'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+    },
+    onError: (err: Error) =>
+      setError(errorMessage(err, 'Could not send the run to the Director.')),
+  });
+
   const discard = useMutation({
     mutationFn: () => discardPayrollRun(runId),
     onSuccess: () => {
@@ -207,13 +325,17 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   // 036 F9: find one person in a run of hundreds, by name or code.
   const visibleLines = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return lines;
-    return lines.filter((line) =>
+    const edited = editedOnly
+      ? lines.filter((line) => line.editedFields.length > 0)
+      : lines;
+    if (!term) return edited;
+    return edited.filter((line) =>
       [line.name, line.employeeCode]
         .filter(Boolean)
         .some((v) => v!.toLowerCase().includes(term)),
     );
-  }, [lines, search]);
+  }, [lines, search, editedOnly]);
+  const editedLineCount = lines.filter((line) => line.editedFields.length > 0).length;
 
   if (runQuery.isPending) {
     return (
@@ -241,12 +363,28 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   ) as Record<string, number>;
   const runNet = lines.reduce((sum, line) => sum + line.netPay, 0);
 
+  const editable = isRunEditable(run);
+  const approved = isRunApproved(run);
+  const approvalState = run.approval?.state ?? null;
+
   const lineColumns: Column<PayrollLineItem>[] = [
     {
       key: 'employee',
       header: 'Employee',
       sticky: true,
-      render: (line) => nameOf(line),
+      render: (line) =>
+        line.editedFields.length > 0 ? (
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
+              aria-hidden="true"
+            />
+            {nameOf(line)}
+            <span className="sr-only">(changed by hand)</span>
+          </span>
+        ) : (
+          nameOf(line)
+        ),
       sortValue: (line) => nameOf(line),
     },
     {
@@ -268,7 +406,24 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
         key: c.key,
         header: c.header,
         numeric: true,
-        render: (l) => money(c.value(l)),
+        render: (l) => {
+          const edited = c.field !== undefined && l.editedFields.includes(c.field);
+          // Gross, deductions and net move with a correction without being typed: tinted lighter.
+          const derived =
+            !edited &&
+            l.editedFields.length > 0 &&
+            ['gross', 'deductions', 'net'].includes(c.key);
+          if (!edited && !derived) return money(c.value(l));
+          return (
+            <span
+              className={edited ? EDITED_CELL : DERIVED_CELL}
+              title={edited ? 'Changed by hand' : 'Recalculated after a change'}
+            >
+              {money(c.value(l))}
+              {edited && <span className="sr-only"> (changed by hand)</span>}
+            </span>
+          );
+        },
         sortValue: (l) => c.value(l),
       }),
     ),
@@ -277,13 +432,23 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   const exportLines = () =>
     downloadCsv(
       `Payroll_${run.period}_line_items.csv`,
-      ['Code', 'Employee', 'Days paid', 'LOP', ...MONEY_COLUMNS.map((c) => c.header)],
+      [
+        'Code',
+        'Employee',
+        'Days paid',
+        'LOP',
+        ...MONEY_COLUMNS.map((c) => c.header),
+        'Changed by hand',
+      ],
       visibleLines.map((line) => [
         line.employeeCode ?? '',
         line.name ?? '',
         line.payableDays,
         line.lopDays,
         ...MONEY_COLUMNS.map((c) => c.value(line).toFixed(2)),
+        line.editedFields
+          .map((f) => MONEY_COLUMNS.find((c) => c.field === f)?.header ?? f)
+          .join('; '),
       ]),
     );
 
@@ -310,25 +475,60 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
         <div className="flex flex-wrap gap-2">
           {run.status === 'draft' && (
             <>
-              <Button
-                type="button"
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Process payroll run?',
-                      message: HR_MESSAGES.confirmProcessRun,
-                      confirmLabel: 'Process',
-                      tone: 'default',
-                    })
-                  ) {
-                    setStatus.mutate('processed');
-                  }
-                }}
-                loading={setStatus.isPending}
-                disabled={discard.isPending}
-              >
-                Process run
-              </Button>
+              {/* 039: HR sends the reviewed draft to the Director — again after a return. */}
+              {editable && (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Send to the Director?',
+                        message: `The ${periodLabel(run.period)} payroll goes to the Director for approval${
+                          editedLineCount > 0
+                            ? `, with ${editedLineCount} line${
+                                editedLineCount === 1 ? '' : 's'
+                              } changed by hand`
+                            : ''
+                        }. Lines cannot be changed while the Director has it.`,
+                        confirmLabel: 'Send',
+                        tone: 'default',
+                      })
+                    ) {
+                      sendToDirector.mutate();
+                    }
+                  }}
+                  loading={sendToDirector.isPending}
+                  disabled={discard.isPending || setStatus.isPending}
+                >
+                  {approvalState === 'returned' ? 'Send again' : 'Send to Director'}
+                </Button>
+              )}
+              {/* Processing freezes the approved figures, so it is offered once the Director has
+                  approved. An F&F run, and a run in a company with no payroll chain, keep the old
+                  path. */}
+              {(approved ||
+                run.isFnf ||
+                (approvalState === null && !run.approvalRequired)) && (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Process payroll run?',
+                        message: HR_MESSAGES.confirmProcessRun,
+                        confirmLabel: 'Process',
+                        tone: 'default',
+                      })
+                    ) {
+                      setStatus.mutate('processed');
+                    }
+                  }}
+                  loading={setStatus.isPending}
+                  disabled={discard.isPending || sendToDirector.isPending}
+                >
+                  Process run
+                </Button>
+              )}
               <SecondaryButton
                 type="button"
                 loading={discard.isPending}
@@ -372,7 +572,9 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
               Mark as paid
             </Button>
           )}
-          {processed && (
+          {/* 039: the bank sheet only once the Director has approved (and the run is processed);
+              the server refuses otherwise, and an F&F run keeps its own gate. */}
+          {processed && (approved || run.isFnf) && (
             <SecondaryButton
               type="button"
               onClick={() => exportSheet.mutate()}
@@ -383,6 +585,14 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
           )}
         </div>
       </div>
+      {processed && !approved && !run.isFnf && run.status !== 'paid' && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          <span>Bank sheet: waiting for Director approval.</span>
+          {approvalState === null && <SubmitRunApproval runId={runId} />}
+        </div>
+      )}
+
+      <RunApprovalPanel run={run} />
 
       <FormError message={error} />
       {unsubmittedRun && <SubmitRunApproval runId={unsubmittedRun} />}
@@ -429,6 +639,22 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
               className="block min-h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
             />
           </div>
+          {editedLineCount > 0 && (
+            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
+              <span className="flex items-center gap-1.5">
+                <span className={EDITED_CELL}>0.00</span> changed by hand
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className={DERIVED_CELL}>0.00</span> recalculated
+              </span>
+              <CheckboxField
+                id="run-edited-only"
+                label={`Changed lines only (${editedLineCount})`}
+                checked={editedOnly}
+                onChange={(event) => setEditedOnly(event.target.checked)}
+              />
+            </div>
+          )}
           <SecondaryButton
             type="button"
             onClick={exportLines}
@@ -443,10 +669,35 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
           rows={visibleLines}
           rowKey={(line) => line.id ?? line.employeeId}
           stickyHeader
+          actions={
+            editable || editedLineCount > 0
+              ? (line) => (
+                  <div className="flex gap-2">
+                    {editable && line.id && (
+                      <RowAction type="button" onClick={() => setEditing(line)}>
+                        Edit
+                      </RowAction>
+                    )}
+                    {line.editedFields.length > 0 && (
+                      <RowAction
+                        type="button"
+                        intent="read"
+                        icon={null}
+                        onClick={() => setHistoryOf(line)}
+                      >
+                        History
+                      </RowAction>
+                    )}
+                  </div>
+                )
+              : undefined
+          }
           emptyMessage={
             search.trim()
               ? 'No employee in this run matches that search.'
-              : 'This run has no line items.'
+              : editedOnly
+                ? 'No line in this run has been changed by hand.'
+                : 'This run has no line items.'
           }
           footer={
             <tr>
@@ -459,9 +710,14 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
                   {money(totals[c.key])}
                 </td>
               ))}
+              {(editable || editedLineCount > 0) && <td />}
             </tr>
           }
         />
+      </TabPanel>
+
+      <TabPanel id="changes" idPrefix="run" active={tab}>
+        <RunEditsTable runId={runId} />
       </TabPanel>
 
       <TabPanel id="delivery" idPrefix="run" active={tab}>
@@ -708,6 +964,12 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
           </>
         )}
       </TabPanel>
+      {editing && (
+        <EditLineModal runId={runId} line={editing} onClose={() => setEditing(null)} />
+      )}
+      {historyOf && (
+        <LineHistoryModal runId={runId} line={historyOf} onClose={() => setHistoryOf(null)} />
+      )}
     </main>
   );
 }

@@ -465,6 +465,31 @@ export async function listDwrPage(query: DwrListQuery): Promise<DwrPage> {
   return dwrListSchema.parse(raw);
 }
 
+/**
+ * A project a report can be recorded against, as the DWR picker lists it (039).
+ *
+ * Identity and lock state only, from `GET /projects/dwr/projects`, which `DWR` alone may read. The
+ * portfolio's own list needs `PROJECTS` and carries the contract value; the DWR Entry role holds
+ * neither, and this is all a picker needs.
+ */
+export const dwrProjectSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  location: z.string().nullable(),
+  status: z.string(),
+  isLocked: z.boolean(),
+});
+export type DwrProject = z.infer<typeof dwrProjectSchema>;
+
+export const dwrProjectsKey = ['dwr', 'projects'] as const;
+
+export async function listDwrProjects(): Promise<DwrProject[]> {
+  return z
+    .array(dwrProjectSchema)
+    .parse(await authFetch<unknown>('/projects/dwr/projects'));
+}
+
 export async function getDwr(dwrId: string): Promise<Dwr> {
   return dwrSchema.parse(await authFetch<unknown>(`/projects/dwr/${dwrId}`));
 }

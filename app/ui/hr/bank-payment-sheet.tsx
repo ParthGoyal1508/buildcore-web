@@ -106,7 +106,8 @@ export default function BankPaymentSheet() {
         Generate Bank Payment Sheet
       </h2>
       <p className="mb-3 text-xs text-gray-500">
-        Finalised payroll only, net pay above zero, in the bank&rsquo;s upload format.
+        Processed payroll the Director has approved only, net pay above zero, in the bank&rsquo;s
+        upload format. A month still waiting for the Director says so when checked.
       </p>
       <FormError message={error} />
       {unsubmittedRun && (

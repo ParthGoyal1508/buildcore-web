@@ -1,20 +1,37 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import clsx from 'clsx';
 import { useState } from 'react';
 
 import { ApiError, errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   createIssue,
+  getCompositeChoices,
+  getCompositePreview,
   getEquipmentChoices,
   getStockHint,
+  type CompositePreview,
   type IssueInput,
 } from '@/app/lib/api/inventory';
 import { getSite } from '@/app/lib/api/projects';
 import { MESSAGES } from '@/app/lib/constants';
-import { quantity as formatQuantity, todayIso } from '@/app/lib/format';
-import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
+import {
+  quantity as formatQuantity,
+  quantity3,
+  todayIso,
+} from '@/app/lib/format';
+import { useDebounced } from '@/app/lib/use-url-state';
+import AsyncSelect, {
+  type AsyncSearchPage,
+  type SearchableOption,
+} from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
 import {
   FormError,
@@ -31,6 +48,26 @@ import {
 } from './inventory-search';
 
 const today = () => todayIso();
+
+/** Active composites for the picker (039). The server returns the first 50 matches, unpaged. */
+function searchComposites(
+  term: string,
+  page: number,
+): Promise<AsyncSearchPage> {
+  if (page > 1) return Promise.resolve({ items: [], total: 0 });
+  return getCompositeChoices(term || undefined).then((rows) => ({
+    items: rows.map((row) => ({
+      id: row.id,
+      label: row.name,
+      // The recipe per unit, so the person sees what they are about to deduct.
+      sublabel: row.components
+        .map((c) => `${c.itemName} ${quantity3(c.qtyPerUnit)} ${c.itemUnit}`)
+        .join(' · '),
+      note: row.unit,
+    })),
+    total: rows.length,
+  }));
+}
 
 /**
  * Issue material from a store.
@@ -60,6 +97,14 @@ const today = () => todayIso();
  * page of 200 and the rest could not be chosen. The item picker searches what the store holds,
  * with the quantity in stock beside each name. Against an indent line the store and item are
  * fixed: the server refuses any other (036 M2).
+ *
+ * 039: the item picker offers only what the store has in stock — an item at zero is a choice that
+ * can only end in a refusal. And a *composite item* ("DLC Concrete for plant foundation", per CUM:
+ * cement, crusher dust, aggregates, fly ash) can be issued instead of a single item: the quantity
+ * is then in the composite's unit, and every sub-item is issued from the store in proportion,
+ * shown below with the store's stock against each and any shortfall flagged before submitting.
+ * The server checks all of them again under lock and refuses with every short line at once.
+ * Indent lines name a single item, so against one only an item can be issued.
  */
 export default function IssueModal({
   onClose,
@@ -97,7 +142,11 @@ export default function IssueModal({
       : null,
   );
   const siteId = site?.id ?? '';
-  const itemId = item?.id ?? '';
+  const [mode, setMode] = useState<'item' | 'composite'>('item');
+  const [composite, setComposite] = useState<SearchableOption | null>(null);
+  const isComposite = mode === 'composite';
+  const itemId = isComposite ? '' : (item?.id ?? '');
+  const compositeId = isComposite ? (composite?.id ?? '') : '';
   const [date, setDate] = useState(today());
   const [quantity, setQuantity] = useState('');
   const [issuedTo, setIssuedTo] = useState('');
@@ -138,8 +187,32 @@ export default function IssueModal({
   const storeProjectId = store.data?.projectId ?? '';
   const projectId = projectChoice ?? storeProjectId;
 
-  const available = hint.data?.inStock ?? null;
-  const unit = hint.data?.unit ?? '';
+  // What each sub-item of a composite needs from this store, against its stock now (039).
+  const previewQuantity = useDebounced(Number(quantity));
+  const preview = useQuery({
+    queryKey: [
+      'inventory',
+      'composite-preview',
+      compositeId,
+      siteId,
+      previewQuantity,
+    ],
+    queryFn: () =>
+      getCompositePreview({
+        compositeItemId: compositeId,
+        siteId,
+        quantity: previewQuantity,
+      }),
+    enabled: Boolean(compositeId && siteId && previewQuantity > 0),
+    placeholderData: keepPreviousData,
+  });
+  const previewFresh =
+    preview.data !== undefined &&
+    !preview.isPlaceholderData &&
+    previewQuantity === Number(quantity);
+
+  const available = isComposite ? null : (hint.data?.inStock ?? null);
+  const unit = isComposite ? (composite?.note ?? '') : (hint.data?.unit ?? '');
 
   const exceedsOutstanding =
     outstandingQuantity !== undefined &&
@@ -150,7 +223,7 @@ export default function IssueModal({
     mutationFn: () =>
       createIssue({
         siteId,
-        itemId,
+        ...(isComposite ? { compositeItemId: compositeId } : { itemId }),
         date,
         quantity: Number(quantity),
         ...(issuedTo.trim() ? { issuedTo: issuedTo.trim() } : {}),
@@ -163,15 +236,19 @@ export default function IssueModal({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success(
-        `${formatQuantity(Number(quantity))}${unit ? ` ${unit}` : ''} of ${item?.label ?? 'material'} issued`,
+        isComposite
+          ? `${quantity3(Number(quantity))} ${unit} of ${composite?.label ?? 'the composite'} issued`
+          : `${formatQuantity(Number(quantity))}${unit ? ` ${unit}` : ''} of ${item?.label ?? 'material'} issued`,
       );
       onClose();
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 422) {
         // Against the quantity field, where the user can act on it — not as a page
-        // banner that loses the connection to what was typed.
+        // banner that loses the connection to what was typed. A composite's refusal names every
+        // short sub-item; the table below is refreshed to show them.
         setQuantityError(err.message);
+        if (isComposite) void preview.refetch();
         return;
       }
       setError(errorMessage(err, 'Could not record this issue.'));
@@ -180,7 +257,9 @@ export default function IssueModal({
 
   const ready =
     siteId &&
-    itemId &&
+    (isComposite
+      ? compositeId && !(previewFresh && preview.data?.blocked)
+      : itemId) &&
     date &&
     Number(quantity) > 0 &&
     (issuedTo.trim() || vendorId) &&
@@ -190,7 +269,9 @@ export default function IssueModal({
     <Modal
       title="Issue material"
       onClose={onClose}
-      isDirty={Boolean(quantity || issuedTo || remarks || (!fixed && itemId))}
+      isDirty={Boolean(
+        quantity || issuedTo || remarks || (!fixed && (itemId || compositeId)),
+      )}
       pending={save.isPending}
       footer={
         <>
@@ -239,24 +320,85 @@ export default function IssueModal({
           />
         </div>
 
-        <div className="flex flex-col gap-1 text-sm">
-          <label htmlFor="issue-item" className="font-medium text-gray-700">
-            Item <span className="text-red-600">*</span>
-          </label>
-          <AsyncSelect
-            // Remounted per store so the results are the new store's stock.
-            key={siteId || 'none'}
-            id="issue-item"
-            value={itemId}
-            onChange={(_, option) => setItem(option)}
-            // Only what this store actually holds (009 research.md §7).
-            search={searchStoreStock(siteId)}
-            cacheKey={['inventory', 'stock', 'search', companyId, siteId]}
-            selectedOption={item}
-            disabled={!siteId || fixed}
-            placeholder={siteId ? 'Search this store’s stock' : 'Choose a store first'}
-          />
-        </div>
+        {!fixed && (
+          <div
+            role="radiogroup"
+            aria-label="What is being issued"
+            className="grid grid-cols-2 gap-2 sm:col-span-2"
+          >
+            {(['item', 'composite'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={mode === value}
+                onClick={() => {
+                  setMode(value);
+                  setQuantityError(null);
+                }}
+                className={clsx(
+                  'h-10 rounded-lg border text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500',
+                  mode === value
+                    ? 'border-brand-600 bg-brand-50 text-brand-800'
+                    : 'border-gray-300 bg-white text-gray-700',
+                )}
+              >
+                {value === 'item' ? 'Single item' : 'Composite item'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isComposite ? (
+          <div className="flex flex-col gap-1 text-sm">
+            <label
+              htmlFor="issue-composite"
+              className="font-medium text-gray-700"
+            >
+              Composite item <span className="text-red-600">*</span>
+            </label>
+            <AsyncSelect
+              id="issue-composite"
+              value={compositeId}
+              onChange={(_, option) => setComposite(option)}
+              search={searchComposites}
+              cacheKey={['inventory', 'composite-choices', companyId]}
+              selectedOption={composite}
+              disabled={!siteId}
+              placeholder={
+                siteId ? 'Search composite items' : 'Choose a store first'
+              }
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1 text-sm">
+            <label htmlFor="issue-item" className="font-medium text-gray-700">
+              Item <span className="text-red-600">*</span>
+            </label>
+            <AsyncSelect
+              // Remounted per store so the results are the new store's stock.
+              key={siteId || 'none'}
+              id="issue-item"
+              value={itemId}
+              onChange={(_, option) => setItem(option)}
+              // Only what this store has on hand (009 research.md §7; 039).
+              search={searchStoreStock(siteId, { inStockOnly: true })}
+              cacheKey={[
+                'inventory',
+                'stock',
+                'search',
+                'in-stock',
+                companyId,
+                siteId,
+              ]}
+              selectedOption={item}
+              disabled={!siteId || fixed}
+              placeholder={
+                siteId ? 'Search this store’s stock' : 'Choose a store first'
+              }
+            />
+          </div>
+        )}
 
         <TextField
           id="issue-date"
@@ -287,13 +429,27 @@ export default function IssueModal({
               : undefined)
           }
           hint={
-            available !== null
-              ? MESSAGES.stockHint(available, unit)
-              : itemId
-                ? 'Checking available stock…'
+            isComposite
+              ? compositeId
+                ? 'Each sub-item is issued in proportion — see below.'
                 : undefined
+              : available !== null
+                ? MESSAGES.stockHint(available, unit)
+                : itemId
+                  ? 'Checking available stock…'
+                  : undefined
           }
         />
+
+        {isComposite && compositeId && siteId && Number(quantity) > 0 && (
+          <div className="sm:col-span-2">
+            <CompositeLines
+              preview={preview.data}
+              loading={preview.isPending || !previewFresh}
+              error={preview.error}
+            />
+          </div>
+        )}
 
         <div className="flex flex-col gap-1 text-sm">
           <label htmlFor="issue-project" className="font-medium text-gray-700">
@@ -397,5 +553,107 @@ export default function IssueModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * The sub-items a composite issue will take (039): read-only, with the store's stock against each
+ * and the shortfall in red. Quantities to three decimals, the precision the issue deducts at.
+ */
+function CompositeLines({
+  preview,
+  loading,
+  error,
+}: {
+  preview: CompositePreview | undefined;
+  loading: boolean;
+  error: unknown;
+}) {
+  if (error) {
+    return (
+      <p className="text-sm text-red-700">
+        {errorMessage(error, 'Could not work out the sub-items.')}
+      </p>
+    );
+  }
+  if (!preview) {
+    return <p className="text-sm text-gray-500">Working out the sub-items…</p>;
+  }
+  const short = preview.lines.filter((line) => line.short > 0);
+  const tooSmall = preview.lines.filter((line) => line.required === 0);
+  return (
+    <div
+      className={clsx('flex flex-col gap-2', loading && 'opacity-60')}
+      aria-busy={loading}
+    >
+      <div className="overflow-x-auto rounded-md border border-gray-200">
+        <table className="min-w-full text-sm">
+          <caption className="sr-only">
+            Sub-items issued for {quantity3(preview.quantity)} {preview.unit}{' '}
+            of {preview.compositeItemName}
+          </caption>
+          <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-600">
+            <tr>
+              <th scope="col" className="px-3 py-2">
+                Sub-item
+              </th>
+              <th scope="col" className="px-3 py-2 text-right">
+                Per {preview.unit}
+              </th>
+              <th scope="col" className="px-3 py-2 text-right">
+                To issue
+              </th>
+              <th scope="col" className="px-3 py-2 text-right">
+                In store
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {preview.lines.map((line) => (
+              <tr
+                key={line.itemId}
+                className={line.short > 0 ? 'bg-red-50' : undefined}
+              >
+                <td className="px-3 py-2">
+                  {line.itemName}
+                  {line.short > 0 && (
+                    <span className="block text-xs text-red-700">
+                      Short by {quantity3(line.short)} {line.unit}
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {quantity3(line.qtyPerUnit)} {line.unit}
+                </td>
+                <td className="px-3 py-2 text-right font-medium tabular-nums">
+                  {quantity3(line.required)} {line.unit}
+                </td>
+                <td
+                  className={clsx(
+                    'px-3 py-2 text-right tabular-nums',
+                    line.short > 0 && 'text-red-700',
+                  )}
+                >
+                  {quantity3(line.available)} {line.unit}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {short.length > 0 && (
+        <p role="alert" className="text-sm text-red-700">
+          This store is short of{' '}
+          {short.map((line) => line.itemName).join(', ')}. Issue a smaller
+          quantity, or bring the material in first.
+        </p>
+      )}
+      {tooSmall.length > 0 && (
+        <p role="alert" className="text-sm text-red-700">
+          At this quantity {tooSmall.map((line) => line.itemName).join(', ')}{' '}
+          comes to less than 0.001. Issue a larger quantity.
+        </p>
+      )}
+    </div>
   );
 }

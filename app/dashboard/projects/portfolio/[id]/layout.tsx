@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
+import { dwrProjectsKey, listDwrProjects } from '@/app/lib/api/dwr';
 import { getProjectDetail } from '@/app/lib/api/projects';
 import { getCurrentUser } from '@/app/lib/api/users';
 import {
@@ -73,36 +74,56 @@ export default function ProjectShellLayout({
   const router = useRouter();
   const id = params.id;
 
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  // 039. A holder of `DWR` without `PROJECTS` (the DWR Entry role) reaches only this project's
+  // daily work reports, and `GET /projects/:id` — the project with its bill, revenue and document
+  // summaries — is not theirs to read. Their shell takes the project's name, code and lock state
+  // from the DWR picker's list instead, and the projects layout has already refused them every
+  // section but DWR.
+  const dwrOnly = !!user && !user.permissions.includes('PROJECTS');
+
   const {
     data: detail,
-    isLoading,
+    isLoading: detailLoading,
     isError,
     error,
   } = useQuery({
     queryKey: ['projects', 'portfolio', id],
     queryFn: () => getProjectDetail(id),
+    enabled: !!user && !dwrOnly,
     // A 404 here is the company switch, and retrying it three times only delays the redirect.
     retry: (failureCount, err) =>
       !(err instanceof ApiError && err.status === 404) && failureCount < 2,
   });
 
+  const dwrProjects = useQuery({
+    queryKey: dwrProjectsKey,
+    queryFn: listDwrProjects,
+    enabled: dwrOnly,
+  });
+  const dwrProject = dwrProjects.data?.find((row) => row.id === id);
+  const isLoading = userLoading || detailLoading || dwrProjects.isLoading;
+
   // FR-028. Narrowed to 404: a 500 or a dropped connection is a different problem with a different
-  // answer, and bouncing somebody to the portfolio for a server error hides the error.
-  const notInThisCompany = error instanceof ApiError && error.status === 404;
+  // answer, and bouncing somebody to the portfolio for a server error hides the error. For the
+  // DWR-only shell the same case is a project missing from this company's list.
+  const notInThisCompany =
+    (error instanceof ApiError && error.status === 404) ||
+    (dwrOnly && dwrProjects.isSuccess && !dwrProject);
 
   useEffect(() => {
     if (!notInThisCompany) return;
     // `replace`, not `push`: Back would otherwise return to the project that just 404ed, and the
     // reader would bounce between the two.
     router.replace(
-      `${ROUTES.projectsPortfolio}?${PROJECT_MOVED_PARAM}=1`,
+      dwrOnly
+        ? ROUTES.projectsDwrIndex
+        : `${ROUTES.projectsPortfolio}?${PROJECT_MOVED_PARAM}=1`,
     );
-  }, [notInThisCompany, router]);
-
-  const { data: user } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: getCurrentUser,
-  });
+  }, [notInThisCompany, dwrOnly, router]);
 
   if (isLoading) {
     return (
@@ -119,6 +140,32 @@ export default function ProjectShellLayout({
       <p className="p-4 text-sm text-gray-500" role="status">
         {PROJECT_SHELL_COPY.otherCompanyRedirect}
       </p>
+    );
+  }
+
+  if (dwrOnly) {
+    if (!dwrProject) {
+      return (
+        <main>
+          <Breadcrumbs
+            items={[{ label: PROJECT_SHELL_COPY.dwrBreadcrumb, href: ROUTES.projectsDwrIndex }]}
+          />
+          <p role="alert" className="text-sm text-red-600">
+            {PROJECT_SHELL_COPY.loadFailed}
+          </p>
+        </main>
+      );
+    }
+    return (
+      <ProjectLockProvider projectId={dwrProject.id} isLocked={dwrProject.isLocked}>
+        <main>
+          <Breadcrumbs
+            items={[{ label: PROJECT_SHELL_COPY.dwrBreadcrumb, href: ROUTES.projectsDwrIndex }]}
+          />
+          <ProjectHeading project={dwrProject} />
+          <div className="mt-6">{children}</div>
+        </main>
+      </ProjectLockProvider>
     );
   }
 
@@ -149,38 +196,7 @@ export default function ProjectShellLayout({
             items={[{ label: PROJECT_SHELL_COPY.breadcrumb, href: ROUTES.projectsPortfolio }]}
           />
 
-          <PageHeader
-            title={
-              <span className="flex flex-wrap items-center gap-2">
-                {project.name}
-                {project.isLocked && (
-                  <LockClosedIcon
-                    className="w-5 shrink-0 text-gray-500"
-                    // Announced, not decorative: the lock is the reason half the controls
-                    // under it refuse to save.
-                    aria-label="Locked"
-                    role="img"
-                  />
-                )}
-              </span>
-            }
-            description={
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs">{project.code}</span>
-                {project.location && <span>{project.location}</span>}
-                <StatusBadge status={project.status} />
-              </span>
-            }
-          />
-
-          {project.isLocked && (
-            <p
-              role="status"
-              className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
-            >
-              {PROJECT_SHELL_COPY.locked}
-            </p>
-          )}
+          <ProjectHeading project={project} />
 
           {tabs.length > 0 && (
             <SectionTabs
@@ -194,5 +210,58 @@ export default function ProjectShellLayout({
         </main>
       </ProjectLockProvider>
     </ProjectShellProvider>
+  );
+}
+
+/**
+ * The project's name, code, location, status and lock notice — shared by the full shell and the
+ * DWR-only one (039), which has the same five facts and nothing else.
+ */
+function ProjectHeading({
+  project,
+}: {
+  project: {
+    name: string;
+    code: string;
+    location: string | null;
+    status: string;
+    isLocked: boolean;
+  };
+}) {
+  return (
+    <>
+      <PageHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {project.name}
+            {project.isLocked && (
+              <LockClosedIcon
+                className="w-5 shrink-0 text-gray-500"
+                // Announced, not decorative: the lock is the reason half the controls
+                // under it refuse to save.
+                aria-label="Locked"
+                role="img"
+              />
+            )}
+          </span>
+        }
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs">{project.code}</span>
+            {project.location && <span>{project.location}</span>}
+            <StatusBadge status={project.status} />
+          </span>
+        }
+      />
+
+      {project.isLocked && (
+        <p
+          role="status"
+          className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          {PROJECT_SHELL_COPY.locked}
+        </p>
+      )}
+    </>
   );
 }
