@@ -1400,6 +1400,19 @@ export async function exportSalaryRegister(
   );
 }
 
+/**
+ * The month's Statutory Compliance Register (040): employee register, Form B wage register, Form C
+ * loans/recoveries and Form D attendance, in the client's workbook format. Processed or paid runs only.
+ */
+export async function exportStatutoryRegister(
+  runId: string,
+  filters: { projectId?: string; siteId?: string } = {},
+) {
+  return downloadFile(
+    `/hr/payroll/runs/${runId}/statutory-register/export${qs({ ...filters })}`,
+  );
+}
+
 export async function getDeductionReport(runId: string) {
   return deductionReportSchema.parse(
     await authFetch<unknown>(`/hr/payroll/runs/${runId}/deduction-report`),
