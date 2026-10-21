@@ -8,7 +8,6 @@ import {
   getLeaveApplications,
   getMyPunchExceptions,
   getReimbursementClaims,
-  requestStage,
 } from '@/app/lib/api/my-workspace';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { dateLabel, money } from '@/app/lib/format';
@@ -36,9 +35,6 @@ const TONE_CLASS: Record<Tone, string> = {
   refused: 'bg-red-100 text-red-800',
   closed: 'bg-gray-100 text-gray-700',
 };
-
-const stageLabel = (stage: 'manager' | 'hr') =>
-  stage === 'manager' ? 'With your reporting manager' : 'With HR';
 
 /**
  * Everything the employee has asked for, and where each stands (2026-10-16, My Workspace).
@@ -89,7 +85,7 @@ export default function MyRequests() {
       raisedAt: app.createdAt,
       status: app.status,
       where:
-        app.status === 'pending' ? stageLabel(requestStage(app)) : undefined,
+        app.status === 'pending' ? 'Awaiting approval' : undefined,
       tone:
         app.status === 'pending'
           ? 'waiting'
@@ -112,7 +108,7 @@ export default function MyRequests() {
       status: claim.status,
       where:
         claim.status === 'submitted'
-          ? stageLabel(requestStage(claim))
+          ? 'Awaiting approval'
           : claim.status === 'approved'
             ? 'Approved — awaiting payment'
             : undefined,

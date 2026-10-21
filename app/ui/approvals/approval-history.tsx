@@ -4,6 +4,7 @@ import {
   keepPreviousData,
   useMutation,
   useQuery,
+  useQueryClient,
 } from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ import { Suspense } from 'react';
 import {
   exportApprovalHistory,
   getApprovalHistoryList,
+  resubmitApproval,
   type ApprovalHistoryEntry,
   type ApprovalHistoryStatus,
   type ApprovalHistoryStep,
@@ -430,6 +432,39 @@ const STATE_BADGE: Record<ApprovalStateName, { label: string; cls: string }> =
     abandoned: { label: 'Withdrawn', cls: 'bg-gray-100 text-gray-700' },
   };
 
+/**
+ * Sends a returned item round its chain again — offered only to whoever raised it (2026-10-20).
+ *
+ * Leave, claims, loans and advances joined the chains with no screen of their own that could
+ * resubmit, so a returned one had no way back. This is that way, for every chain: the server
+ * still decides whether the caller may.
+ */
+function ResubmitButton({ item }: { item: ApprovalHistoryEntry }) {
+  const queryClient = useQueryClient();
+  const me = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const resubmit = useMutation({
+    mutationFn: () => resubmitApproval(item.entityType, item.entityId),
+    onSuccess: () => {
+      toast.success('Resubmitted for approval.');
+      void queryClient.invalidateQueries({ queryKey: ['approvalHistoryList'] });
+      void queryClient.invalidateQueries({ queryKey: ['approvalQueue'] });
+    },
+    onError: (err) =>
+      toast.error(errorMessage(err, 'Could not resubmit this item.')),
+  });
+  if (!me.data || me.data.id !== item.requestedById) return null;
+  return (
+    <SecondaryButton
+      type="button"
+      size="sm"
+      loading={resubmit.isPending}
+      onClick={() => resubmit.mutate()}
+    >
+      Resubmit
+    </SecondaryButton>
+  );
+}
+
 /** One item: what it is, who raised it, where it stands, and its chain. */
 function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
   const badge = STATE_BADGE[item.state];
@@ -483,9 +518,12 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
         </p>
       )}
       {item.state === 'returned' && (
-        <p className="mt-2 text-xs text-amber-900">
-          Waiting on {item.requestedByName} to correct and resubmit.
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-amber-900">
+            Waiting on {item.requestedByName} to correct and resubmit.
+          </p>
+          <ResubmitButton item={item} />
+        </div>
       )}
 
       <ol

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authFetch, authFetchBlob } from '@/app/lib/session';
+import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
 
 /**
  * Every `/approvals/*` call to `buildcore-api` (feature 016).
@@ -82,6 +82,8 @@ export const APPROVAL_INERT_REASONS = [
   'already_decided',
   'insufficient_authority',
   'slot_unmapped',
+  // 2026-10-20: the viewer raised, recorded, or is paid by this item.
+  'own_item',
 ] as const;
 export type ApprovalInertReason = (typeof APPROVAL_INERT_REASONS)[number];
 
@@ -679,5 +681,42 @@ export async function proposeDirectorFinalChange(
       method: 'PATCH',
       body: JSON.stringify({ changes }),
     }),
+  );
+}
+
+// ------------------------------------------------------------ Files (2026-10-20)
+
+const approvalFileSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+});
+export type ApprovalFile = z.infer<typeof approvalFileSchema>;
+
+/**
+ * The files an approver can open for one item: a DWR's attachments, a bill package's PDF, the letter
+ * under approval, a flagged punch's selfie. Empty for item types with none. Authorised by the
+ * approval itself on the server, so an approver without the module's permission still sees them.
+ */
+export async function listApprovalFiles(
+  entityType: string,
+  entityId: string,
+): Promise<ApprovalFile[]> {
+  return z
+    .array(approvalFileSchema)
+    .parse(
+      await authFetch<unknown>(
+        `/approvals/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/files`,
+      ),
+    );
+}
+
+export function getApprovalFile(
+  entityType: string,
+  entityId: string,
+  key: string,
+) {
+  return authFetchFile(
+    `/approvals/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/files/${encodeURIComponent(key)}`,
   );
 }

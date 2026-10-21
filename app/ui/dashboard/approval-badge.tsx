@@ -4,13 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
 import { getApprovalCount } from '@/app/lib/api/approvals';
-import {
-  listAdminClaims,
-  listLeaveApplications,
-} from '@/app/lib/api/hr-payroll';
-import { getCurrentUser } from '@/app/lib/api/users';
 import { APPROVAL_COUNT_POLL_MS, ROUTES } from '@/app/lib/constants';
-import { useTeamClaims, useTeamLeave } from '@/app/ui/approvals/team-requests';
 import SideNavItem from '@/app/ui/dashboard/sidenav-item';
 
 /**
@@ -76,7 +70,7 @@ export default function ApprovalBadge({
 }
 
 /**
- * Everything awaiting the caller's decision: spine items, leave and claims. Shared with the phone
+ * Everything awaiting the caller's decision. Shared with the phone
  * bar's Menu button (2026-10-15), which shows the same number — the queries are the badge's own, so
  * the two read one cache and cannot disagree.
  */
@@ -95,35 +89,6 @@ export function useApprovalTotal(): number {
     refetchOnWindowFocus: true,
   });
 
-  // Leave and reimbursement claims are decided on the Approvals page too (2026-10-15), so the
-  // badge counts them — read through the same queries the page lists, so the two cannot
-  // disagree. Each only for someone who may decide it, as on the page.
-  const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
-  const permissions = user.data?.permissions ?? [];
-  const leave = useQuery({
-    queryKey: ['approvals', 'leave', 'pending'],
-    queryFn: () => listLeaveApplications({ status: 'pending' }),
-    enabled: permissions.includes('ATTENDANCE'),
-    refetchInterval: APPROVAL_COUNT_POLL_MS,
-    refetchIntervalInBackground: false,
-  });
-  const claims = useQuery({
-    queryKey: ['approvals', 'claims', 'submitted'],
-    queryFn: () => listAdminClaims({ status: 'submitted' }),
-    enabled: permissions.includes('EMPLOYEES'),
-    refetchInterval: APPROVAL_COUNT_POLL_MS,
-    refetchIntervalInBackground: false,
-  });
-
-  // And the reporting-manager queues (2026-10-16), which anyone may have.
-  const teamLeave = useTeamLeave();
-  const teamClaims = useTeamClaims();
-
-  const count =
-    (data?.count ?? 0) +
-    (leave.data?.length ?? 0) +
-    (claims.data?.length ?? 0) +
-    (teamLeave.data?.length ?? 0) +
-    (teamClaims.data?.length ?? 0);
-  return count;
+  // Leave and claims are chains since 2026-10-20, so the spine's count already includes them.
+  return data?.count ?? 0;
 }

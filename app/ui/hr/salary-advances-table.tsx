@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { errorMessage } from '@/app/lib/api/client';
 import {
   approveSalaryAdvance,
+  rejectSalaryAdvance,
   createSalaryAdvance,
   listSalaryAdvances,
   type SalaryAdvance,
@@ -19,7 +20,7 @@ import { currentPeriod, money, periodLabel, rupees } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import EmployeePicker from '@/app/ui/hr/employee-picker';
 import { useApproverSelf } from '@/app/ui/hr/use-approver-self';
-import { confirmDialog } from '@/app/ui/dialogs';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
@@ -139,13 +140,30 @@ export default function SalaryAdvancesTable() {
   const { data } = advances;
   const approve = useMutation({
     mutationFn: approveSalaryAdvance,
-    onSuccess: () => {
+    onSuccess: (result) => {
       setError(null);
-      toast.success('Advance approved and disbursed.');
+      // The advance's approval chain may have further levels (2026-10-20): it is paid only once the
+      // last of them approves.
+      toast.success(
+        (result as { status?: string } | null)?.status === 'disbursed'
+          ? 'Advance approved and disbursed.'
+          : 'Approval recorded; the advance moves to the next approver.',
+      );
       queryClient.invalidateQueries({ queryKey: ['hr', 'advances'] });
     },
     // 403 SELF_APPROVAL arrives with the server's own sentence.
     onError: (err: Error) => setError(errorMessage(err, 'Could not approve the advance.')),
+  });
+
+  const reject = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      rejectSalaryAdvance(id, reason),
+    onSuccess: () => {
+      setError(null);
+      toast.success('Advance rejected.');
+      queryClient.invalidateQueries({ queryKey: ['hr', 'advances'] });
+    },
+    onError: (err: Error) => setError(errorMessage(err, 'Could not reject the advance.')),
   });
 
   const columns: Column<SalaryAdvance>[] = [
@@ -214,6 +232,7 @@ export default function SalaryAdvancesTable() {
             // 036 F19: maker-checker. Whoever recorded the advance, or receives it, cannot approve.
             <span className="text-xs text-gray-500">Another approver must approve</span>
           ) : row.status === 'pending' ? (
+            <>
             <RowAction
               type="button"
               loading={approve.isPending && approve.variables === row.id}
@@ -238,6 +257,26 @@ export default function SalaryAdvancesTable() {
             >
               Approve
             </RowAction>
+            <RowAction
+              type="button"
+              loading={reject.isPending && reject.variables?.id === row.id}
+              disabled={reject.isPending}
+              onClick={async () => {
+                const reason = await promptDialog({
+                  title: 'Reject this advance?',
+                  message: 'It will not be paid or recovered. Why?',
+                  label: 'Reason',
+                  required: true,
+                  multiline: true,
+                  confirmLabel: 'Reject',
+                  tone: 'danger',
+                });
+                if (reason?.trim()) reject.mutate({ id: row.id, reason: reason.trim() });
+              }}
+            >
+              Reject
+            </RowAction>
+            </>
           ) : (
             <span className="text-xs text-gray-500">—</span>
           )

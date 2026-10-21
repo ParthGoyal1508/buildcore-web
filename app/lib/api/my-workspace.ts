@@ -134,9 +134,8 @@ export const leaveApplicationSchema = z.object({
   adminRemarks: z.string().nullable(),
   decidedAt: z.string().nullable(),
   createdAt: z.string(),
-  // The reporting-manager stage (2026-10-16). Optional: a server predating it omits them.
-  managerUserId: z.string().nullable().optional(),
-  managerDecidedAt: z.string().nullable().optional(),
+  // A reporting manager's remark, from the 2026-10-16 to 2026-10-20 window when they decided
+  // first. History only: requests now go straight to head office.
   managerRemarks: z.string().nullable().optional(),
 });
 export type LeaveApplication = z.infer<typeof leaveApplicationSchema>;
@@ -219,74 +218,12 @@ export const reimbursementClaimSchema = z.object({
   status: z.enum(REIMBURSEMENT_STATUSES),
   paymentMode: z.enum(['payroll', 'direct']).nullable().optional(),
   createdAt: z.string(),
-  // The reporting-manager stage (2026-10-16), and the decision remark the employee reads.
-  managerUserId: z.string().nullable().optional(),
-  managerDecidedAt: z.string().nullable().optional(),
+  // The decision remark the employee reads, and a reporting manager's from the short-lived
+  // manager stage (see `leaveApplicationSchema`).
   managerRemarks: z.string().nullable().optional(),
   adminRemarks: z.string().nullable().optional(),
 });
 export type ReimbursementClaim = z.infer<typeof reimbursementClaimSchema>;
-
-/**
- * Where a request stands between the reporting manager and HR (2026-10-16): a pending one with a
- * manager who has not yet decided is with the manager; otherwise it is with HR.
- */
-export function requestStage(request: {
-  managerUserId?: string | null;
-  managerDecidedAt?: string | null;
-}): 'manager' | 'hr' {
-  return request.managerUserId && !request.managerDecidedAt ? 'manager' : 'hr';
-}
-
-// ------------------------------------------------------ Your team (2026-10-16)
-
-/**
- * Requests waiting on the caller as reporting manager. Self-service on the server — authority is
- * the reporting line stamped on each request — so these work for a manager holding nothing but
- * My Workspace.
- */
-const named = {
-  employeeCode: z.string().nullable().optional(),
-  employeeName: z.string().nullable().optional(),
-};
-export const teamLeaveSchema = leaveApplicationSchema.extend(named);
-export type TeamLeave = z.infer<typeof teamLeaveSchema>;
-export const teamClaimSchema = reimbursementClaimSchema.extend(named);
-export type TeamClaim = z.infer<typeof teamClaimSchema>;
-
-export async function listTeamLeave(): Promise<TeamLeave[]> {
-  return z
-    .array(teamLeaveSchema)
-    .parse(await authFetch<unknown>('/my/team/leave-applications'));
-}
-
-export async function decideTeamLeave(
-  id: string,
-  decision: 'approved' | 'rejected',
-  remarks?: string,
-) {
-  return authFetch<unknown>(`/my/team/leave-applications/${id}/decide`, {
-    method: 'POST',
-    body: JSON.stringify({ decision, remarks }),
-  });
-}
-
-export async function listTeamClaims(): Promise<TeamClaim[]> {
-  return z
-    .array(teamClaimSchema)
-    .parse(await authFetch<unknown>('/my/team/reimbursements'));
-}
-
-export async function decideTeamClaim(
-  id: string,
-  decision: 'approved' | 'rejected',
-  remarks?: string,
-) {
-  return authFetch<unknown>(`/my/team/reimbursements/${id}/decide`, {
-    method: 'POST',
-    body: JSON.stringify({ decision, remarks }),
-  });
-}
 
 // -------------------------------------------------------------- Face enrol
 
@@ -875,7 +812,9 @@ export const myDocumentsSchema = z.object({
       isMandatory: z.boolean(),
       documentNumber: z.string().nullable(),
       expiresAt: z.string().nullable(),
-      expiryState: z.string(),
+      // Null for a document with no expiry (PAN, Aadhaar) — a plain string here failed the whole
+      // list for anyone holding one.
+      expiryState: z.enum(['valid', 'expiring_soon', 'expired']).nullable(),
       daysToExpiry: z.number().nullable(),
       uploadedAt: z.string(),
     }),
