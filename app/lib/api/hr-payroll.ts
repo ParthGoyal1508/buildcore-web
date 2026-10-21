@@ -1418,6 +1418,14 @@ export async function approveLoan(id: string) {
   return authFetch<unknown>(`/hr/loans/${id}/approve`, { method: 'PATCH' });
 }
 
+/** A decision on the loan's approval chain (2026-10-20); it is never activated. */
+export async function rejectLoan(id: string, reason: string) {
+  return authFetch<unknown>(`/hr/loans/${id}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function closeLoan(id: string, reason: string) {
   return authFetch<unknown>(`/hr/loans/${id}/close`, {
     method: 'PATCH',
@@ -1483,6 +1491,14 @@ export async function createSalaryAdvance(input: SalaryAdvanceInput) {
 export async function approveSalaryAdvance(id: string) {
   return authFetch<unknown>(`/hr/salary-advances/${id}/approve`, {
     method: 'PATCH',
+  });
+}
+
+/** A decision on the advance's approval chain (2026-10-20); it is never paid. */
+export async function rejectSalaryAdvance(id: string, reason: string) {
+  return authFetch<unknown>(`/hr/salary-advances/${id}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
   });
 }
 

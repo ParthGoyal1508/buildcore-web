@@ -7,6 +7,7 @@ import { ApiError, errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   approveAdvance,
+  rejectAdvance,
   createAdvance,
   disburseAdvance,
   getAdvances,
@@ -21,7 +22,7 @@ import { labourLabel } from '@/app/lib/constants';
 import { rupees, todayIso } from '@/app/lib/format';
 import AsyncSelect from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
-import { confirmDialog } from '@/app/ui/dialogs';
+import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 import {
   RowAction,
   SecondaryButton,
@@ -58,11 +59,32 @@ export default function AdvancesPage() {
     queryClient.invalidateQueries({ queryKey: ['advances'] });
 
   const act = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'disburse' }) =>
-      action === 'approve' ? approveAdvance(id) : disburseAdvance(id),
+    mutationFn: ({
+      id,
+      action,
+      reason,
+    }: {
+      id: string;
+      action: 'approve' | 'reject' | 'disburse';
+      reason?: string;
+    }) =>
+      action === 'approve'
+        ? approveAdvance(id)
+        : action === 'reject'
+          ? rejectAdvance(id, reason ?? '')
+          : disburseAdvance(id),
     onMutate: ({ id }) => setActingId(id),
-    onSuccess: (_, { action }) => {
-      toast.success(action === 'approve' ? 'Advance approved.' : 'Advance disbursed.');
+    onSuccess: (advance, { action }) => {
+      toast.success(
+        action === 'disburse'
+          ? 'Advance disbursed.'
+          : action === 'reject'
+            ? 'Advance rejected.'
+            : // The approval chain may have further levels (2026-10-20).
+              advance.status === 'approved'
+              ? 'Advance approved.'
+              : 'Approval recorded; the advance moves to the next approver.',
+      );
       return invalidate();
     },
     onError: (e) =>
@@ -82,6 +104,18 @@ export default function AdvancesPage() {
       confirmLabel: 'Approve',
     });
     if (ok) act.mutate({ id: a.id, action: 'approve' });
+  };
+  const askReject = async (a: Advance) => {
+    const reason = await promptDialog({
+      title: 'Reject this advance?',
+      message: `${rupees(a.amount)} to ${who(a)}. It will not be paid or recovered. Why?`,
+      label: 'Reason',
+      required: true,
+      multiline: true,
+      confirmLabel: 'Reject',
+      tone: 'danger',
+    });
+    if (reason?.trim()) act.mutate({ id: a.id, action: 'reject', reason: reason.trim() });
   };
   const askDisburse = async (a: Advance) => {
     const ok = await confirmDialog({
@@ -173,6 +207,14 @@ export default function AdvancesPage() {
                   disabled={actingId === a.id}
                 >
                   Approve
+                </RowAction>
+              )}
+              {a.status === 'pending' && canApprove && !own && (
+                <RowAction
+                  onClick={() => void askReject(a)}
+                  disabled={actingId === a.id}
+                >
+                  Reject
                 </RowAction>
               )}
               {a.status === 'pending' && canApprove && own && (
