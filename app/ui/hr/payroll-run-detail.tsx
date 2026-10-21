@@ -9,6 +9,7 @@ import {
   discardPayrollRun,
   downloadBankSheet,
   exportSalaryRegister,
+  exportStatutoryRegister,
   getDeductionReport,
   getPayrollRun,
   getSalaryRegister,
@@ -266,6 +267,15 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
     },
     onError: (err: Error) =>
       setError(errorMessage(err, 'Could not export the register.')),
+  });
+
+  const exportStatutory = useMutation({
+    mutationFn: async () => {
+      const { blob, filename } = await exportStatutoryRegister(runId);
+      saveBlob(blob, filename);
+    },
+    onError: (err: Error) =>
+      setError(errorMessage(err, 'Could not export the statutory register.')),
   });
 
   const setStatus = useMutation({
@@ -763,7 +773,14 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
                 {register.reconciliation.message}
               </p>
             )}
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3 flex flex-wrap justify-end gap-2">
+              <SecondaryButton
+                type="button"
+                onClick={() => exportStatutory.mutate()}
+                loading={exportStatutory.isPending}
+              >
+                Statutory register
+              </SecondaryButton>
               <SecondaryButton
                 type="button"
                 onClick={() => exportRegister.mutate()}
