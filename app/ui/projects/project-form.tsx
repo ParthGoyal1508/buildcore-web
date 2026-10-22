@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { ApiError } from '@/app/lib/api/client';
 import { getEmployee } from '@/app/lib/api/hr-payroll';
 import { getCurrentUser } from '@/app/lib/api/users';
+import { branchOptionText, listBranchOptions } from '@/app/lib/api/company-branches';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { useUnsavedChanges } from '@/app/lib/unsaved-changes';
 import ProjectDocumentUploads, {
@@ -61,6 +62,8 @@ export const projectSchema = z
   .object({
     name: z.string().trim().min(1, 'Project name is required.').max(200),
     clientId: z.string().min(1, 'Choose a client.'),
+    /** 041: the GST registration the project bills from; blank → head office. */
+    branchId: z.string().optional(),
     location: z.string().trim().optional(),
     contractValue: z.coerce
       .number({ invalid_type_error: 'Contract value must be a number.' })
@@ -186,6 +189,15 @@ export default function ProjectForm({ project }: { project?: Project }) {
   // clients while this form wanted *active* ones — whichever screen loaded first decided both. The
   // current client is always shown, even when it has since been deactivated: it is read by id
   // here, so the select never empties and Save is never blocked by a value it cannot display.
+  // 041: the company's GST registrations, for "Bill from branch". Inactive ones are offered only
+  // when the project is already on one, so an edit does not silently move it.
+  const branches = useQuery({
+    queryKey: ['company-branches', 'options', project?.branchId ?? null],
+    queryFn: async () =>
+      (await listBranchOptions(null, true)).filter(
+        (b) => b.isActive || b.id === project?.branchId,
+      ),
+  });
   const currentClient = useQuery({
     queryKey: ['projects', 'clients', 'one', project?.clientId],
     queryFn: () => getClient(project!.clientId),
@@ -216,6 +228,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
     defaultValues: {
       name: project?.name ?? '',
       clientId: project?.clientId ?? '',
+      branchId: project?.branchId ?? '',
       location: project?.location ?? '',
       contractValue: project?.contractValue ?? 0,
       startDate: dateInput(project?.startDate),
@@ -278,6 +291,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
       const payload: ProjectInput = {
         name: values.name,
         clientId: values.clientId,
+        branchId: values.branchId || undefined,
         location: values.location,
         contractValue: values.contractValue,
         startDate: values.startDate,
@@ -466,6 +480,24 @@ export default function ProjectForm({ project }: { project?: Project }) {
               </p>
             )}
           </div>
+          {/* 041: only offered when the company has more than one GST registration. */}
+          {(branches.data?.length ?? 0) > 1 && (
+            <SelectField
+              id="project-branch"
+              label="Bill from branch"
+              hint="The GSTIN and address this project's bills, orders and store documents print"
+              error={errors.branchId?.message}
+              {...register('branchId')}
+            >
+              {/* Head office first, so a new project — whose value is still blank, which the API
+                  reads as the head office — shows the branch it will get. */}
+              {branches.data?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {branchOptionText(b)}
+                </option>
+              ))}
+            </SelectField>
+          )}
           <TextField
             id="project-location"
             label="Location"

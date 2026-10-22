@@ -34,7 +34,9 @@ import {
   CheckboxField,
   FormError,
   SecondaryButton,
+  inlineSelectClass,
 } from '@/app/ui/settings/form-fields';
+import { branchOptionText, listBranchOptions } from '@/app/lib/api/company-branches';
 import PageHeader from '@/app/ui/page-header';
 import QueryError from '@/app/ui/query-error';
 import { ListSkeleton } from '@/app/ui/skeletons';
@@ -217,6 +219,12 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   const [editing, setEditing] = useState<PayrollLineItem | null>(null);
   const [historyOf, setHistoryOf] = useState<PayrollLineItem | null>(null);
   const [editedOnly, setEditedOnly] = useState(false);
+  // 041: the statutory register is filed per PF / ESIC establishment — one per company branch.
+  const [registerBranchId, setRegisterBranchId] = useState('');
+  const { data: branches } = useQuery({
+    queryKey: ['company-branches', 'options', 'all'],
+    queryFn: () => listBranchOptions(null, true),
+  });
 
   const runQuery = useQuery({
     queryKey: ['hr', 'payrollRun', runId],
@@ -271,7 +279,9 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
 
   const exportStatutory = useMutation({
     mutationFn: async () => {
-      const { blob, filename } = await exportStatutoryRegister(runId);
+      const { blob, filename } = await exportStatutoryRegister(runId, {
+        branchId: registerBranchId || undefined,
+      });
       saveBlob(blob, filename);
     },
     onError: (err: Error) =>
@@ -773,7 +783,27 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
                 {register.reconciliation.message}
               </p>
             )}
-            <div className="mb-3 flex flex-wrap justify-end gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+              {(branches?.length ?? 0) > 1 && (
+                <>
+                  <label htmlFor="register-branch" className="sr-only">
+                    Statutory register establishment
+                  </label>
+                  <select
+                    id="register-branch"
+                    className={inlineSelectClass}
+                    value={registerBranchId}
+                    onChange={(event) => setRegisterBranchId(event.target.value)}
+                  >
+                    <option value="">All branches</option>
+                    {branches?.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {branchOptionText(b)}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
               <SecondaryButton
                 type="button"
                 onClick={() => exportStatutory.mutate()}

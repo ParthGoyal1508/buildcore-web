@@ -40,6 +40,7 @@ import {
   type SortableColumn,
 } from '@/app/ui/table';
 import { useToast } from '@/app/ui/toast';
+import { branchOptionText, listBranchOptions } from '@/app/lib/api/company-branches';
 
 // The inline draft preview now lives with the shared viewer (2026-10-14); re-exported so a screen
 // that took it from here keeps working.
@@ -615,6 +616,15 @@ export function LetterComposer({
   const [draft, setDraft] = useState<Blob | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // 041: which GST registration a letter with no project prints — a purchase order to a vendor.
+  // A project's or work order's letter is issued from the project's own branch, so it is not asked.
+  const [branchId, setBranchId] = useState('');
+  const asksBranch = subjectType !== 'project' && subjectType !== 'work_order';
+  const branches = useQuery({
+    queryKey: ['company-branches', 'options'],
+    queryFn: () => listBranchOptions(),
+    enabled: asksBranch,
+  });
 
   // What the records say for each field — the terms, from Settings — so an editable one opens
   // filled in rather than empty. It also carries the kind's declarations, which is what the form
@@ -678,6 +688,7 @@ export function LetterComposer({
     ...(kind.requiresSignature && chosenSignatory
       ? { signatoryId: chosenSignatory }
       : {}),
+    ...(asksBranch && branchId ? { branchId } : {}),
   });
 
   // The letter as it would be issued, before anything is written — marked DRAFT, with no
@@ -814,6 +825,26 @@ export function LetterComposer({
             );
           })}
         </div>
+      )}
+
+      {asksBranch && (branches.data?.length ?? 0) > 1 && (
+        <label className="flex flex-col gap-1 text-sm sm:max-w-sm">
+          <span className="font-medium text-gray-700">Bill from branch</span>
+          <select
+            value={branchId || branches.data?.find((b) => b.isHeadOffice)?.id || ''}
+            onChange={(event) => setBranchId(event.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2"
+          >
+            {branches.data?.map((b) => (
+              <option key={b.id} value={b.id}>
+                {branchOptionText(b)}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-500">
+            The GSTIN and address the letter prints — the registration the vendor invoices.
+          </span>
+        </label>
       )}
 
       {kind.requiresSignature &&

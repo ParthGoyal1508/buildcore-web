@@ -9,7 +9,13 @@ import { CHALLAN_TYPES, MESSAGES, hrLabel, type ChallanType } from '@/app/lib/co
 import { currentPeriod, money, periodLabel } from '@/app/lib/format';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import TabStrip, { TabPanel } from '@/app/ui/hr/tab-strip';
-import { FormError, SecondaryButton, TextField } from '@/app/ui/settings/form-fields';
+import {
+  FormError,
+  SecondaryButton,
+  SelectField,
+  TextField,
+} from '@/app/ui/settings/form-fields';
+import { branchOptionText, listBranchOptions } from '@/app/lib/api/company-branches';
 
 type Row = Record<string, unknown>;
 
@@ -39,20 +45,29 @@ function cell(value: unknown): string {
  * backend one filing season at a time. The keys the API returns *are* the
  * contract here.
  */
-function ChallanView({ type, period }: { type: ChallanType; period: string }) {
+function ChallanView({
+  type,
+  period,
+  branchId,
+}: {
+  type: ChallanType;
+  period: string;
+  /** 041: one establishment; blank → the whole company. */
+  branchId: string;
+}) {
   const [exportError, setExportError] = useState<string | null>(null);
 
   const download = useMutation({
     mutationFn: async () => {
-      const { blob, filename } = await exportChallan(type, period);
+      const { blob, filename } = await exportChallan(type, period, branchId || undefined);
       saveBlob(blob, filename);
     },
     onError: (err: Error) => setExportError(err.message),
   });
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['hr', 'challan', type, period],
-    queryFn: () => getChallan(type, period),
+    queryKey: ['hr', 'challan', type, period, branchId],
+    queryFn: () => getChallan(type, period, branchId || undefined),
     enabled: period.length > 0,
     // A 404 here means "no payroll run for that period", which is a normal state
     // for any month not yet run — retrying it four times just delays the answer.
@@ -80,7 +95,9 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
     header: hrLabel(key.replace(/([a-z])([A-Z])/g, '$1 $2')),
     sticky: index === 0,
     numeric: typeof rows[0][key] === 'number',
-    render: (row) => cell(row[key]),
+    // A UAN or ESIC number is all digits, and `cell` would print it as rupees.
+    render: (row) =>
+      key === 'statutoryNumber' ? String(row[key] ?? '—') : cell(row[key]),
   }));
 
   return (
@@ -95,6 +112,22 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
         </SecondaryButton>
       </div>
       <FormError message={exportError} />
+      {data?.branch && (
+        <p className="text-sm text-gray-700">
+          {data.branch.label}
+          {data.branch.establishmentCode && (
+            <>
+              {' — '}
+              <span className="font-mono">{data.branch.establishmentCode}</span>
+            </>
+          )}
+        </p>
+      )}
+      {data?.warnings?.map((warning) => (
+        <p key={warning} role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {warning}
+        </p>
+      ))}
       {expected ? (
         <p className="rounded-lg bg-brand-50 px-4 py-6 text-sm text-brand-800">
           {expected}
@@ -131,17 +164,44 @@ function ChallanView({ type, period }: { type: ChallanType; period: string }) {
 export default function ChallansPanel() {
   const [type, setType] = useState<ChallanType>('pf');
   const [period, setPeriod] = useState(currentPeriod());
+  const [branchId, setBranchId] = useState('');
+  // 041: each GST registration is its own PF / ESIC / PT establishment, filed separately. Inactive
+  // branches are listed too: last year's challan for a closed site is still filed.
+  const { data: branches } = useQuery({
+    queryKey: ['company-branches', 'options', 'all'],
+    queryFn: () => listBranchOptions(null, true),
+  });
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="max-w-xs">
-        <TextField
-          id="challan-period"
-          label="Period"
-          type="month"
-          value={period}
-          onChange={(event) => setPeriod(event.target.value)}
-        />
+      <div className="flex flex-wrap gap-4">
+        <div className="w-full max-w-xs">
+          <TextField
+            id="challan-period"
+            label="Period"
+            type="month"
+            value={period}
+            onChange={(event) => setPeriod(event.target.value)}
+          />
+        </div>
+        {(branches?.length ?? 0) > 1 && (
+          <div className="w-full max-w-sm">
+            <SelectField
+              id="challan-branch"
+              label="Establishment"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              <option value="">All branches (whole company)</option>
+              {branches?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {branchOptionText(b)}
+                  {b.isActive ? '' : ' (inactive)'}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+        )}
       </div>
 
       <TabStrip
@@ -153,7 +213,7 @@ export default function ChallansPanel() {
 
       {CHALLAN_TYPES.map((value) => (
         <TabPanel key={value} id={value} idPrefix="challan" active={type}>
-          <ChallanView type={value} period={period} />
+          <ChallanView type={value} period={period} branchId={branchId} />
         </TabPanel>
       ))}
     </div>
