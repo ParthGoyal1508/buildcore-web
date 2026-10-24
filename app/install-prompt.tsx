@@ -17,7 +17,7 @@ export default function InstallPrompt() {
 
   return (
     <div className="fixed inset-x-4 bottom-20 z-50 md:bottom-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg md:left-auto md:right-4 md:max-w-sm">
-      <p className="text-sm font-semibold text-slate-900">Install BuildCore</p>
+      <p className="text-sm font-semibold text-slate-900">Install Tirupati Groups</p>
       <p className="mt-1 text-sm text-slate-600">
         Add it to your home screen for faster access and offline use.
       </p>

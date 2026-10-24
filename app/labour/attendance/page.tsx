@@ -42,7 +42,7 @@ import { SecondaryButton } from '@/app/ui/button';
 import StatusBadge from '@/app/ui/status-badge';
 
 /** The last site picked on this phone, so a supervisor with several opens where they left off. */
-const SITE_STORAGE_KEY = 'buildcore.labour.attendanceSite';
+const SITE_STORAGE_KEY = 'tirupati.labour.attendanceSite';
 
 type Filter = 'all' | 'todo' | 'in' | 'done';
 

@@ -182,9 +182,9 @@ function signInFailure(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === NETWORK_ERROR || err.code === TIMEOUT_ERROR) return err.message;
     if (err.status >= 500) {
-      return 'BuildCore could not sign you in just now — the problem is on our side. Try again in a minute.';
+      return 'Tirupati Groups could not sign you in just now — the problem is on our side. Try again in a minute.';
     }
     return err.message;
   }
-  return 'BuildCore sent an answer this page could not read. Refresh the page and try again; if it keeps happening, tell your administrator.';
+  return 'Tirupati Groups sent an answer this page could not read. Refresh the page and try again; if it keeps happening, tell your administrator.';
 }

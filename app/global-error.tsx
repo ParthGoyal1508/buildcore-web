@@ -21,7 +21,7 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50 p-4 antialiased">
-        <title>Something went wrong | BuildCore</title>
+        <title>Something went wrong | Tirupati Groups</title>
         <RouteError error={error} retry={retry ?? reset} />
       </body>
     </html>

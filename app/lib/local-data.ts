@@ -31,7 +31,7 @@ export function ownedKey(key: string): string | null {
 }
 
 /** localStorage keys that remember a person's choices. */
-const LOCAL_STORAGE_KEYS = ['buildcore.labour.attendanceSite'];
+const LOCAL_STORAGE_KEYS = ['tirupati.labour.attendanceSite'];
 /** IndexedDB stores holding a person's work. The punch queue is the legacy one `drainQueue` reads. */
 const USER_STORES = [BILL_DRAFT_STORE, 'punch-queue'];
 

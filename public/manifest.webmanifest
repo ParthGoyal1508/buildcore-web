@@ -1,7 +1,7 @@
 {
-  "name": "BuildCore",
-  "short_name": "BuildCore",
-  "description": "BuildCore ERP for workforce, asset, and project management.",
+  "name": "Tirupati Groups",
+  "short_name": "Tirupati",
+  "description": "Tirupati Groups — workforce, asset, and project management.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
