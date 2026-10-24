@@ -28,6 +28,7 @@ import AttendanceCalendar from '@/app/ui/hr/attendance-calendar';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import DocumentsTab from '@/app/ui/hr/documents-tab';
 import SubjectLetters from '@/app/ui/letters/subject-letters';
+import { useBranches } from '@/app/ui/use-branch-names';
 import MaskedField from '@/app/ui/hr/masked-field';
 import OffboardingPanel from '@/app/ui/hr/offboarding-panel';
 import SalaryRevisions from '@/app/ui/hr/salary-revisions';
@@ -130,6 +131,7 @@ export default function EmployeeDetailTabs({
     queryKey: ['shifts'],
     queryFn: () => listShifts(),
   });
+  const branchOf = useBranches(employee?.companyId);
 
   const { data: balances } = useQuery({
     queryKey: ['hr', 'leaveBalances', employeeId],
@@ -259,6 +261,11 @@ export default function EmployeeDetailTabs({
             {dateLabel(employee.dateOfJoining)}
           </Field>
           <Field label="Shift">{lookup(shifts, employee.shiftId)}</Field>
+          {/* 041: the PF / ESIC establishment the employee is filed under. "Company branch", since
+              "Branch" below is the bank's. */}
+          <Field label="Company branch">
+            {orDash(branchOf.nameOf(employee.branchId))}
+          </Field>
           <Field label="Mobile">{orDash(employee.mobile)}</Field>
           <Field label="Email">{orDash(employee.email)}</Field>
           <Field label="Monthly gross">{rupees(grossMonthly)}</Field>

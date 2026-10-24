@@ -1,6 +1,11 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -219,7 +224,8 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   const [editing, setEditing] = useState<PayrollLineItem | null>(null);
   const [historyOf, setHistoryOf] = useState<PayrollLineItem | null>(null);
   const [editedOnly, setEditedOnly] = useState(false);
-  // 041: the statutory register is filed per PF / ESIC establishment — one per company branch.
+  // 041: the registers are filed per PF / ESIC establishment — one per company branch. The one
+  // picker filters the salary register on screen and both exports.
   const [registerBranchId, setRegisterBranchId] = useState('');
   const { data: branches } = useQuery({
     queryKey: ['company-branches', 'options', 'all'],
@@ -237,8 +243,10 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
   // Both reports refuse a draft run server-side, so they are only fetched once the
   // run is past draft — asking earlier would render a 400 as if it were a failure.
   const registerQuery = useQuery({
-    queryKey: ['hr', 'salaryRegister', runId],
-    queryFn: () => getSalaryRegister(runId),
+    queryKey: ['hr', 'salaryRegister', runId, registerBranchId],
+    queryFn: () =>
+      getSalaryRegister(runId, { branchId: registerBranchId || undefined }),
+    placeholderData: keepPreviousData,
     enabled: processed && tab === 'register',
   });
   const register = registerQuery.data;
@@ -270,7 +278,9 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
 
   const exportRegister = useMutation({
     mutationFn: async () => {
-      const { blob, filename } = await exportSalaryRegister(runId);
+      const { blob, filename } = await exportSalaryRegister(runId, {
+        branchId: registerBranchId || undefined,
+      });
       saveBlob(blob, filename);
     },
     onError: (err: Error) =>
@@ -787,7 +797,7 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
               {(branches?.length ?? 0) > 1 && (
                 <>
                   <label htmlFor="register-branch" className="sr-only">
-                    Statutory register establishment
+                    Branch
                   </label>
                   <select
                     id="register-branch"

@@ -246,6 +246,8 @@ export interface EmployeeFilters {
   search?: string;
   departmentId?: string;
   siteId?: string;
+  /** 041: employees filed under this branch only. */
+  branchId?: string;
   shiftId?: string;
   isActive?: boolean;
   page?: number;
@@ -1369,7 +1371,8 @@ export type SalaryRegister = z.infer<typeof salaryRegisterSchema>;
 
 export async function getSalaryRegister(
   runId: string,
-  filters: { departmentId?: string; projectId?: string; siteId?: string } = {},
+  /** `branchId` (041): the lines filed under one branch. */
+  filters: { departmentId?: string; projectId?: string; siteId?: string; branchId?: string } = {},
 ) {
   return salaryRegisterSchema.parse(
     await authFetch<unknown>(
@@ -1395,7 +1398,7 @@ const deductionReportSchema = z.object({
 
 export async function exportSalaryRegister(
   runId: string,
-  filters: { departmentId?: string; projectId?: string; siteId?: string } = {},
+  filters: { departmentId?: string; projectId?: string; siteId?: string; branchId?: string } = {},
 ) {
   return downloadFile(
     `/hr/payroll/runs/${runId}/salary-register/export${qs({ ...filters })}`,

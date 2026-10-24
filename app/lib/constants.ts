@@ -4879,6 +4879,8 @@ export const PROJECT_SHELL_COPY = {
   projectTypeLabel: 'Project type',
   siteStartLabel: 'Site start',
   cgstLabel: 'GST on bills',
+  /** 041: the GST registration the project's bills, POs and store documents are issued from. */
+  branchLabel: 'Bills from branch',
   cgstApplicable: 'CGST + SGST',
   cgstNotApplicable: 'IGST',
   retentionLabel: 'Client retention',

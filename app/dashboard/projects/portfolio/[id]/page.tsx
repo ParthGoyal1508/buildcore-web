@@ -9,6 +9,7 @@ import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import { useBranches } from '@/app/ui/use-branch-names';
 import { TABLE } from '@/app/ui/table';
 import { dateLabel } from '@/app/lib/format';
 
@@ -142,6 +143,8 @@ export default function ProjectOverviewPage() {
   const clientName =
     clients?.items.find((client) => client.id === project.clientId)?.name ??
     null;
+
+  const branch = useBranches(project.companyId).nameOf(project.branchId);
 
   const manager = project.projectManagerEmployeeId
     ? (tabs.employees.find(
@@ -498,6 +501,9 @@ export default function ProjectOverviewPage() {
               {project.siteStartDate
                 ? dateLabel(project.siteStartDate)
                 : PROJECT_SHELL_COPY.notRecorded}
+            </Fact>
+            <Fact term={PROJECT_SHELL_COPY.branchLabel}>
+              {branch ?? PROJECT_SHELL_COPY.notRecorded}
             </Fact>
             <Fact term={PROJECT_SHELL_COPY.cgstLabel}>
               {project.cgstApplicable
