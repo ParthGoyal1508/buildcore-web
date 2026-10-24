@@ -48,6 +48,8 @@ export const companySchema = z.object({
    * `.nullable().default(null)` so a company saved before the field existed still parses.
    */
   payrollDebitAccountNumber: z.string().nullable().default(null),
+  /** 041: how many branches (GST registrations) the company has; only the list carries it. */
+  branchCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
