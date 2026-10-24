@@ -287,6 +287,9 @@ export const projectListItemSchema = z.object({
   startDate: isoDate,
   expectedEndDate: nullableIsoDate,
   isLocked: z.boolean(),
+  /** 041: the branch the project bills from, already named. Optional for an older server. */
+  branchId: z.string().optional(),
+  branch: z.string().nullable().optional(),
   /**
    * How far the project is from fully papered (017 FR-008).
    *
@@ -312,6 +315,8 @@ export const projectSchema = z.object({
   code: z.string(),
   name: z.string(),
   clientId: z.string(),
+  /** 041: the company branch (GST registration) the project bills from. Optional for an older server. */
+  branchId: z.string().optional(),
   location: z.string().nullable(),
   contractValue: decimal,
   startDate: isoDate,
@@ -488,6 +493,8 @@ export async function getProjectDetail(id: string): Promise<ProjectDetail> {
 export interface ProjectInput {
   name: string;
   clientId: string;
+  /** 041: omitted → the head office. */
+  branchId?: string;
   location?: string;
   contractValue: number;
   startDate: string;

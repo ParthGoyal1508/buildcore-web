@@ -38,6 +38,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import BulkLocationAssignment from '@/app/ui/hr/bulk-location-assignment';
 import { NocStatusBadge, useNocStatuses } from '@/app/ui/nocs/noc-status';
+import { useBranches } from '@/app/ui/use-branch-names';
 
 /** Falls back to the code when an employee has no name recorded yet. */
 function displayName(employee: Employee): string {
@@ -66,6 +67,7 @@ export default function EmployeeList() {
       q: urlString(),
       department: urlString(),
       site: urlString(),
+      branch: urlString(),
       status: urlEnum(STATUSES, 'active'),
       page: urlNumber(1),
       sort: urlSort({ key: 'code', dir: 'asc' }),
@@ -79,10 +81,11 @@ export default function EmployeeList() {
       search: url.q.trim() || undefined,
       departmentId: url.department || undefined,
       siteId: url.site || undefined,
+      branchId: url.branch || undefined,
       isActive: url.status === 'active',
       sort: url.sort ? `${SERVER_SORT[url.sort.key] ?? 'code'}:${url.sort.dir}` : undefined,
     }),
-    [url.q, url.department, url.site, url.status, url.sort],
+    [url.q, url.department, url.site, url.branch, url.status, url.sort],
   );
 
   const employees = useQuery({
@@ -108,13 +111,14 @@ export default function EmployeeList() {
     onSuccess: (rows) =>
       downloadCsv(
         `Employees_${url.status}.csv`,
-        ['Code', 'Name', 'Department', 'Designation', 'Site', 'Mobile', 'Joined', 'Status'],
+        ['Code', 'Name', 'Department', 'Designation', 'Site', 'Branch', 'Mobile', 'Joined', 'Status'],
         rows.map((row) => [
           row.employeeCode,
           displayName(row),
           departmentName(row.departmentId),
           designationName(row.designationId),
           siteName(row.siteId),
+          branchOf.nameOf(row.branchId) ?? '',
           row.mobile ?? '',
           row.dateOfJoining ? dateLabel(row.dateOfJoining) : '',
           row.isActive ? 'Active' : 'Inactive',
@@ -144,6 +148,10 @@ export default function EmployeeList() {
   const designationName = (id: string | null) =>
     designations?.find((d) => d.id === id)?.name ?? '—';
   const siteName = (id: string) => sites?.find((s) => s.id === id)?.name ?? '—';
+  // 041: the PF / ESIC establishment each employee is filed under. Only worth a column and a filter
+  // for a company with more than one.
+  const branchOf = useBranches();
+  const multiBranch = branchOf.branches.length > 1;
 
   const columns: Column<Employee>[] = [
     {
@@ -173,6 +181,16 @@ export default function EmployeeList() {
       render: (row) => designationName(row.designationId),
     },
     { key: 'site', header: 'Site', sortable: false, render: (row) => siteName(row.siteId) },
+    ...(multiBranch
+      ? [
+          {
+            key: 'branch',
+            header: 'Branch',
+            sortable: false,
+            render: (row: Employee) => branchOf.nameOf(row.branchId) ?? '—',
+          },
+        ]
+      : []),
     { key: 'mobile', header: 'Mobile', sortable: false, render: (row) => row.mobile ?? '—' },
     {
       key: 'joining',
@@ -201,7 +219,11 @@ export default function EmployeeList() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="grid min-w-[min(100%,40rem)] flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          className={`grid min-w-[min(100%,40rem)] flex-1 gap-3 sm:grid-cols-2 ${
+            multiBranch ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+          }`}
+        >
           <TextField
             id="employee-search"
             label="Search"
@@ -236,6 +258,21 @@ export default function EmployeeList() {
               </option>
             ))}
           </SelectField>
+          {multiBranch && (
+            <SelectField
+              id="employee-branch"
+              label="Branch"
+              value={ui.branch}
+              onChange={(event) => setUi({ branch: event.target.value })}
+            >
+              <option value="">All branches</option>
+              {branchOf.branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branchOf.nameOf(branch.id)}
+                </option>
+              ))}
+            </SelectField>
+          )}
           <SelectField
             id="employee-status"
             label="Status"

@@ -42,6 +42,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { focusFirstInvalid } from '@/app/lib/form-focus';
+import { branchOptionText, listBranchOptions } from '@/app/lib/api/company-branches';
 
 const TABS = [
   { id: 'identity', label: 'Identity' },
@@ -112,6 +113,8 @@ const employeeFormSchema = z
     // Employment
     siteId: z.string().min(1, 'Site is required.'),
     shiftId: z.string().min(1, 'Shift is required.'),
+    /** 041: blank → the head office. */
+    branchId: optionalText,
     departmentId: optionalText,
     designationId: optionalText,
     employmentType: optionalText,
@@ -258,6 +261,7 @@ function defaultsFrom(employee?: Employee): EmployeeFormValues {
 
     siteId: employee.siteId,
     shiftId: employee.shiftId,
+    branchId: employee.branchId ?? '',
     departmentId: employee.departmentId ?? '',
     designationId: employee.designationId ?? '',
     employmentType: employee.employmentType ?? 'full_time',
@@ -347,6 +351,15 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
   });
 
   const { data: sites } = useQuery({ queryKey: ['sites'], queryFn: listSites });
+  // 041: the company's GST registrations / PF establishments. An inactive one is offered only to
+  // the employee already on it, so an edit does not silently move them.
+  const { data: branches } = useQuery({
+    queryKey: ['company-branches', 'options', employee?.branchId ?? null],
+    queryFn: async () =>
+      (await listBranchOptions(null, true)).filter(
+        (b) => b.isActive || b.id === employee?.branchId,
+      ),
+  });
   const { data: departments } = useQuery({
     queryKey: ['departments'],
     queryFn: () => listDepartments(),
@@ -455,7 +468,7 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
    */
   const TAB_FIELDS: Record<TabId, (keyof EmployeeFormValues)[]> = {
     identity: ['firstName', 'lastName', 'dob'],
-    employment: ['siteId', 'shiftId', 'dailyRate', 'hoursPerDay'],
+    employment: ['siteId', 'shiftId', 'branchId', 'dailyRate', 'hoursPerDay'],
     statutory: ['uan', 'pfNumber', 'esicNumber', 'aadhaar', 'pan'],
     pay: [
       'basic',
@@ -602,6 +615,21 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
               </option>
             ))}
           </SelectField>
+          {(branches?.length ?? 0) > 1 && (
+            <SelectField
+              id="branchId"
+              label="Branch"
+              hint="The PF / ESIC establishment they are filed under"
+              error={errorFor('branchId')}
+              {...register('branchId')}
+            >
+              {branches?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {branchOptionText(b)}
+                </option>
+              ))}
+            </SelectField>
+          )}
           <SelectField
             id="shiftId"
             label="Shift (required)"

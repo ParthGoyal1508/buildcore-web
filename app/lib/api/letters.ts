@@ -414,6 +414,11 @@ export interface ComposeLetterInput {
   subjectType?: string;
   subjectId?: string;
   /**
+   * 041: the company branch (GSTIN and address) to issue from, for a letter with no project or
+   * employee to take it from — a purchase order to a vendor. Ignored otherwise. Omitted → head office.
+   */
+  branchId?: string;
+  /**
    * Only what the records cannot supply, or what HR typed over them. Optional since the
    * api reads declared fields from the employee/candidate/company records itself
    * (`GET /letters/prefill`); a non-empty value here overrides the record.
