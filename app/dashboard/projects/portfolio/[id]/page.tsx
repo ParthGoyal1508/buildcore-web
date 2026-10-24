@@ -144,7 +144,10 @@ export default function ProjectOverviewPage() {
     clients?.items.find((client) => client.id === project.clientId)?.name ??
     null;
 
-  const branch = useBranches(project.companyId).nameOf(project.branchId);
+  const branches = useBranches(project.companyId);
+  const branch = branches.nameOf(project.branchId);
+  const branchGstin =
+    branches.branches.find((b) => b.id === project.branchId)?.gstin ?? null;
 
   const manager = project.projectManagerEmployeeId
     ? (tabs.employees.find(
@@ -250,6 +253,11 @@ export default function ProjectOverviewPage() {
               </span>
             </Fact>
             <Fact term="Status">{projectsLabel(project.status)}</Fact>
+            {/* 041: near the top, not in Details below the billing table where nobody scrolls to. */}
+            <Fact term={PROJECT_SHELL_COPY.branchLabel}>
+              {branch ?? PROJECT_SHELL_COPY.notRecorded}
+            </Fact>
+            <Fact term="GSTIN">{branchGstin ?? '—'}</Fact>
             <Fact term="Start">{dateLabel(project.startDate)}</Fact>
             <Fact term="Expected end">
               {project.expectedEndDate
@@ -501,9 +509,6 @@ export default function ProjectOverviewPage() {
               {project.siteStartDate
                 ? dateLabel(project.siteStartDate)
                 : PROJECT_SHELL_COPY.notRecorded}
-            </Fact>
-            <Fact term={PROJECT_SHELL_COPY.branchLabel}>
-              {branch ?? PROJECT_SHELL_COPY.notRecorded}
             </Fact>
             <Fact term={PROJECT_SHELL_COPY.cgstLabel}>
               {project.cgstApplicable

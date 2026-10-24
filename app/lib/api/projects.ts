@@ -287,6 +287,9 @@ export const projectListItemSchema = z.object({
   startDate: isoDate,
   expectedEndDate: nullableIsoDate,
   isLocked: z.boolean(),
+  /** 041: the branch the project bills from, already named. Optional for an older server. */
+  branchId: z.string().optional(),
+  branch: z.string().nullable().optional(),
   /**
    * How far the project is from fully papered (017 FR-008).
    *

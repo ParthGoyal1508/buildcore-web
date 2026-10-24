@@ -90,6 +90,11 @@ export default function ProjectListTable({
       hideOnCard: true,
     },
     {
+      key: 'branch',
+      header: 'Bills from',
+      render: (row) => row.branch ?? '—',
+    },
+    {
       key: 'contractValue',
       header: 'Contract value',
       // `tabular-nums` so the digits line up column-wise; without it, proportional
