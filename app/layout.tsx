@@ -13,16 +13,16 @@ import TopLoader from "@/app/ui/top-loader";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | BuildCore",
-    default: "BuildCore",
+    template: "%s | Tirupati Groups",
+    default: "Tirupati Groups",
   },
   description:
-    "BuildCore ERP — construction workforce, assets, and project management.",
+    "Tirupati Groups — construction workforce, assets, and project management.",
   manifest: "/manifest.webmanifest",
-  applicationName: "BuildCore",
+  applicationName: "Tirupati Groups",
   appleWebApp: {
     capable: true,
-    title: "BuildCore",
+    title: "Tirupati Groups",
     statusBarStyle: "default",
   },
   icons: [

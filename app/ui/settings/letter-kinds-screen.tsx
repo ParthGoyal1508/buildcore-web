@@ -117,7 +117,7 @@ export function LetterKindsScreen() {
               <p className="truncate text-sm text-gray-900">{kind.label}</p>
               <p className="text-xs text-gray-500">
                 <code>{kind.key}</code>
-                {kind.isShipped ? ' · provided by BuildCore' : ' · yours'}
+                {kind.isShipped ? ' · provided by Tirupati Groups' : ' · yours'}
                 {kind.requiresApproval ? ' · needs approval' : ''}
                 {kind.requiresSignature ? ' · signed' : ''}
               </p>

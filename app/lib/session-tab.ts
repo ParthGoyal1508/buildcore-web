@@ -11,7 +11,7 @@
  * screens, or onto the login page after a sign-out. Testing two roles side by side needs two
  * browser profiles or a private window, which is what a shared cookie means anyway.
  */
-const CHANNEL = "buildcore-session";
+const CHANNEL = "tirupati-session";
 
 function open(): BroadcastChannel | null {
   return typeof window !== "undefined" &&

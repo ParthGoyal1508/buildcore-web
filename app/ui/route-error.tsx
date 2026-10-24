@@ -17,7 +17,7 @@ import { Button } from '@/app/ui/button';
  * A failed chunk is fixed by loading the new build, so that case reloads by itself — **once**: the
  * marker in `sessionStorage` stops a chunk that is genuinely missing from reloading for ever.
  */
-const CHUNK_RELOAD_KEY = 'buildcore:chunk-reload-at';
+const CHUNK_RELOAD_KEY = 'tirupati:chunk-reload-at';
 const CHUNK_RELOAD_WINDOW_MS = 60_000;
 
 export function isChunkLoadError(error: unknown): boolean {
@@ -71,7 +71,7 @@ export default function RouteError({
       <ExclamationTriangleIcon className="w-10 text-amber-500" aria-hidden="true" />
       <h1 className="text-lg font-semibold text-gray-900">
         {chunk
-          ? 'A new version of BuildCore is available'
+          ? 'A new version of Tirupati Groups is available'
           : 'Something went wrong on this page'}
       </h1>
       <p className="text-sm text-gray-600">

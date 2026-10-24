@@ -69,7 +69,7 @@ function flag(companyId: string | null, name?: string | null) {
   listeners.forEach((listener) => listener());
 }
 
-const CHANNEL = 'buildcore-company';
+const CHANNEL = 'tirupati-company';
 let channel: BroadcastChannel | null | undefined;
 
 function getChannel(): BroadcastChannel | null {
