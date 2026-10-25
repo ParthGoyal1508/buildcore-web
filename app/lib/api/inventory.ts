@@ -484,6 +484,8 @@ export const purchaseSchema = z.object({
   purchaseOrderRef: z.string().nullable().optional(),
   purchaseOrderLineNo: z.number().nullable().optional(),
   hasPhoto: z.boolean().optional(),
+  /** 043: a site entry may carry up to five photos; `getPurchasePhoto(id, n)` fetches each. */
+  photoCount: z.number().optional(),
   remarks: z.string().nullable(),
   // 043: who recorded it, and what the site captured. Defaulted so an API not yet redeployed parses
   // as the Head Office purchases it only ever returned.
@@ -698,8 +700,8 @@ export interface SiteEntryInput {
   itemId: string;
   deliveredAt: string;
   vehicleNo: string;
-  /** Base64, without a data-URL prefix. */
-  photo: string;
+  /** One to five photos, each base64 (a data URL is accepted). The fix below is the first's. */
+  photos: string[];
   latitude: number;
   longitude: number;
   accuracyMeters: number;
@@ -741,9 +743,17 @@ export async function getPurchaseBill(id: string): Promise<Blob> {
   return authFetchBlob(`/inventory/purchases/${id}/bill`);
 }
 
-/** The delivery photograph (036 M11), served as the image it is. */
-export async function getPurchasePhoto(id: string): Promise<StoredFile> {
-  return authFetchFile(`/inventory/purchases/${encodeURIComponent(id)}/photo`);
+/**
+ * The delivery photograph (036 M11), served as the image it is. `n` picks which, from 1 — a site
+ * entry may carry up to five (043).
+ */
+export async function getPurchasePhoto(
+  id: string,
+  n = 1,
+): Promise<StoredFile> {
+  return authFetchFile(
+    `/inventory/purchases/${encodeURIComponent(id)}/photo${n > 1 ? `?n=${n}` : ''}`,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

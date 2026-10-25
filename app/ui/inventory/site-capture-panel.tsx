@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import {
   getPurchaseHistory,
@@ -45,19 +46,23 @@ function changesOf(entry: PurchaseHistoryEntry): string[] {
  * location are evidence, and the history is the record of what was changed.
  */
 export default function SiteCapturePanel({ purchase }: { purchase: Purchase }) {
-  // A data URL rather than an object URL, for the reason `company-logo.tsx` records: no lifecycle
-  // to revoke, so nothing for strict mode's double effect to break.
-  const photo = useQuery({
-    queryKey: ['inventory', 'purchases', purchase.id, 'photo'],
-    queryFn: async () =>
-      blobToBase64((await getPurchasePhoto(purchase.id)).blob),
-    enabled: Boolean(purchase.hasPhoto),
+  // Every photo the site took (up to five). Data URLs rather than object URLs, for the reason
+  // `company-logo.tsx` records: no lifecycle to revoke, so nothing for strict mode to break.
+  const count = purchase.photoCount ?? (purchase.hasPhoto ? 1 : 0);
+  const photos = useQueries({
+    queries: Array.from({ length: count }, (_, i) => ({
+      queryKey: ['inventory', 'purchases', purchase.id, 'photo', i + 1],
+      queryFn: async () =>
+        blobToBase64((await getPurchasePhoto(purchase.id, i + 1)).blob),
+    })),
   });
   const history = useQuery({
     queryKey: ['inventory', 'purchases', purchase.id, 'history'],
     queryFn: () => getPurchaseHistory(purchase.id),
   });
-  const photoUrl = photo.data ?? null;
+  // The photo shown large; the strip beneath picks it.
+  const [shown, setShown] = useState(0);
+  const shownUrl = photos[shown]?.data ?? null;
 
   const gps = purchase.gps;
   const corrections = (history.data ?? []).filter(
@@ -72,20 +77,48 @@ export default function SiteCapturePanel({ purchase }: { purchase: Purchase }) {
       <h3 id="site-capture-title" className="font-medium text-gray-900">
         Recorded at the site
       </h3>
-      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
-        {photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a fetched data URL
-          <img
-            src={photoUrl}
-            alt="The delivery as photographed at the site"
-            className="max-h-48 w-full rounded object-contain sm:w-40"
-          />
-        ) : (
-          <div className="flex h-32 items-center justify-center rounded bg-gray-100 text-xs text-gray-500 sm:w-40">
-            {photo.isPending && purchase.hasPhoto ? 'Loading photo…' : 'No photo'}
-          </div>
-        )}
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
+        <div className="flex flex-col gap-2">
+          {shownUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a fetched data URL
+            <img
+              src={shownUrl}
+              alt={`Delivery photo ${shown + 1} of ${count}`}
+              className="h-40 w-full rounded bg-gray-100 object-contain"
+            />
+          ) : (
+            <div className="flex h-40 items-center justify-center rounded bg-gray-100 text-xs text-gray-500">
+              {count > 0 ? 'Loading photo…' : 'No photo'}
+            </div>
+          )}
+          {count > 1 && (
+            <ul className="flex gap-1.5" aria-label="Delivery photos">
+              {photos.map((photo, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => setShown(i)}
+                    aria-label={`Show photo ${i + 1}`}
+                    aria-pressed={shown === i}
+                    className={`block h-10 w-10 overflow-hidden rounded border-2 bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 ${
+                      shown === i ? 'border-brand-600' : 'border-transparent'
+                    }`}
+                  >
+                    {photo.data && (
+                      // eslint-disable-next-line @next/next/no-img-element -- a fetched data URL
+                      <img
+                        src={photo.data}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <dl className="grid content-start grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-gray-500">Delivered</dt>
           <dd>{dateTimeLabel(purchase.deliveredAt)}</dd>
           <dt className="text-gray-500">Vehicle no.</dt>
@@ -94,7 +127,7 @@ export default function SiteCapturePanel({ purchase }: { purchase: Purchase }) {
           <dd>{purchase.createdByName ?? '—'}</dd>
           {gps && (
             <>
-              <dt className="text-gray-500">Photo taken</dt>
+              <dt className="text-gray-500">First photo taken</dt>
               <dd>{dateTimeLabel(gps.capturedAt)}</dd>
               <dt className="text-gray-500">Location</dt>
               <dd>
