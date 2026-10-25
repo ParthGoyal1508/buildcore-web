@@ -2033,6 +2033,39 @@ export async function getClaimReceipt(id: string) {
 }
 
 /**
+ * The Reimbursement Register (042): every non-draft claim with status subtotals.
+ *
+ * `totals` are computed figures from the service, so they arrive as plain numbers — unlike the
+ * row amounts, which are Decimal strings. The register reads at most the first 100 claims that
+ * match (the service pins the page), so the subtotals describe what is on screen.
+ */
+export const reimbursementRegisterSchema = z.object({
+  items: z.array(adminClaimSchema),
+  totals: z.object({
+    submitted: z.number(),
+    approved: z.number(),
+    paid: z.number(),
+    rejected: z.number(),
+    all: z.number(),
+  }),
+});
+export type ReimbursementRegister = z.infer<typeof reimbursementRegisterSchema>;
+
+/** Takes the same filters as the claims list (`ListClaimsQueryDto`). EMPLOYEES or PAYROLL. */
+export async function getReimbursementRegister(
+  filters: {
+    status?: string;
+    employeeId?: string;
+    from?: string;
+    to?: string;
+  } = {},
+): Promise<ReimbursementRegister> {
+  return reimbursementRegisterSchema.parse(
+    await authFetch<unknown>(`/hr/reimbursements/register${qs({ ...filters })}`),
+  );
+}
+
+/**
  * The company's reimbursement categories, for an admin resolving a claim's category name.
  *
  * Reads the **settings** master, not `/my/reimbursements/categories`. That one is
