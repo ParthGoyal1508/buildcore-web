@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Suspense, useState } from 'react';
 
 import { errorMessage } from '@/app/lib/api/client';
@@ -38,24 +38,29 @@ function BocwPageBody() {
   const [paying, setPaying] = useState<BocwRow | null>(null);
   const toast = useToast();
   // A project search and a status filter in the URL, with a way to clear them (036 N6,
-  // 2026-10-17). Filtered here: the list is every project in one response.
-  const [filters, setFilters, query] = useUrlState({
-    q: urlString(),
-    status: urlEnum(['', ...BOCW_STATUSES] as const, ''),
-  });
-  const filtered = Boolean(query.q.trim() || query.status);
+  // 2026-10-17). Since 042 the filtering is the server's: the request carries both, so the
+  // rows that come back are already the matching ones.
+  const [filters, setFilters, query] = useUrlState(
+    {
+      q: urlString(),
+      status: urlEnum(['', ...BOCW_STATUSES] as const, ''),
+    },
+    { debounce: ['q'] },
+  );
+  const search = query.q.trim();
+  const filtered = Boolean(search || query.status);
 
   const { data, isPending, error, refetch } = useQuery({
-    queryKey: ['partners', 'bocw'],
-    queryFn: getBocw,
+    queryKey: ['partners', 'bocw', search, query.status],
+    queryFn: () =>
+      getBocw({
+        search: search || undefined,
+        status: query.status || undefined,
+      }),
+    placeholderData: keepPreviousData,
   });
 
-  const needle = filters.q.trim().toLowerCase();
-  const rows = (data?.rows ?? []).filter(
-    (row) =>
-      (!needle || row.projectName.toLowerCase().includes(needle)) &&
-      (!query.status || row.status === query.status),
-  );
+  const rows = data?.rows ?? [];
 
   // What goes to the welfare board or an auditor (036 N6): built by the API from the same list.
   const download = useMutation({
@@ -123,13 +128,20 @@ function BocwPageBody() {
           title="BOCW cess"
           description="Liability is the project’s contract value times the company cess rate, computed at request time rather than stored — so correcting a payment corrects the balance immediately."
         />
+        {/* The export route takes no filters, so the label says "all" while any filter is
+            on — the workbook is always every project. */}
         <Button
           intent="read"
           loading={download.isPending}
-          disabled={!data || data.rows.length === 0}
+          disabled={!data || (data.rows.length === 0 && !filtered)}
+          title={
+            filtered
+              ? 'The Excel always holds every project — the filters above do not narrow it.'
+              : undefined
+          }
           onClick={() => download.mutate()}
         >
-          Export to Excel
+          {filtered ? 'Export all to Excel' : 'Export to Excel'}
         </Button>
       </div>
 
@@ -189,7 +201,7 @@ function BocwPageBody() {
         error={error}
         onRetry={() => refetch()}
         emptyMessage={
-          filtered && (data?.rows.length ?? 0) > 0
+          filtered
             ? 'No projects match these filters.'
             : unavailable.length > 0
               ? 'Nothing to show until the Projects module lands.'
