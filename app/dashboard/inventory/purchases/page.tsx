@@ -17,6 +17,7 @@ import {
   getPurchaseBill,
   getPurchasePhoto,
   getPurchases,
+  updatePurchase,
   type Purchase,
 } from '@/app/lib/api/inventory';
 import {
@@ -44,6 +45,7 @@ import {
 } from '@/app/ui/inventory/inventory-search';
 import Pager from '@/app/ui/inventory/pager';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
+import Modal from '@/app/ui/settings/modal';
 import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import PageHeader from '@/app/ui/page-header';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
@@ -89,6 +91,7 @@ function PurchasesList() {
   const rangeError = dateRangeError(filters.from, filters.to);
 
   const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Purchase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -386,6 +389,10 @@ function PurchasesList() {
               load={(format) => downloadStoreDocument('grn', row.id, format)}
               onError={setError}
             />
+            {/* Date and remarks only (042): everything else on a purchase is what the stock
+                ledger and the bill were computed from, so correcting it is delete + re-create —
+                the modal says so where a fuller edit would be looked for. */}
+            <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
             <RowAction
               onClick={async () => {
                 if (
@@ -417,7 +424,111 @@ function PurchasesList() {
       />
 
       {showModal && <PurchaseModal onClose={() => setShowModal(false)} />}
+      {editing && (
+        <EditPurchaseModal
+          purchase={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            toast.success('Purchase updated.');
+            void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            setEditing(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Edits the two fields a purchase can change after the fact (042): the date and the remarks —
+ * exactly what `PATCH /inventory/purchases/:id` accepts. Quantity, rate, item, store and vendor
+ * are what the stock ledger and the bill were computed from, so the modal says where that fuller
+ * correction lives: delete the purchase and record it again.
+ */
+function EditPurchaseModal({
+  purchase,
+  onClose,
+  onSaved,
+}: {
+  purchase: Purchase;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const initialDate = purchase.date.slice(0, 10);
+  const initialRemarks = purchase.remarks ?? '';
+  const [date, setDate] = useState(initialDate);
+  const [remarks, setRemarks] = useState(initialRemarks);
+  const [error, setError] = useState<string | null>(null);
+
+  const dateChanged = date !== '' && date !== initialDate;
+  const remarksChanged = remarks.trim() !== initialRemarks;
+  const dirty = dateChanged || remarksChanged;
+
+  const save = useMutation({
+    // Only what changed is sent, so the audit log records exactly what was touched.
+    mutationFn: () =>
+      updatePurchase(purchase.id, {
+        ...(dateChanged ? { date } : {}),
+        ...(remarksChanged ? { remarks: remarks.trim() } : {}),
+      }),
+    onSuccess: onSaved,
+    onError: (err) => setError(errorMessage(err, 'Could not save the purchase.')),
+  });
+
+  return (
+    <Modal
+      title="Edit purchase"
+      onClose={onClose}
+      isDirty={dirty}
+      pending={save.isPending}
+      footer={
+        <>
+          <SecondaryButton type="button" onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </SecondaryButton>
+          <Button
+            type="button"
+            disabled={!dirty || !date}
+            loading={save.isPending}
+            onClick={() => {
+              setError(null);
+              save.mutate();
+            }}
+          >
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <FormError message={error} />
+        <p className="text-sm text-gray-600">
+          {purchase.itemName} · {quantity(purchase.quantity)} {purchase.unit} @{' '}
+          {rupees(purchase.rate)} from {purchase.vendorName}, at {purchase.siteName}.
+        </p>
+        <TextField
+          id="edit-purchase-date"
+          label="Date"
+          type="date"
+          value={date}
+          max={todayIso()}
+          onChange={(e) => setDate(e.target.value)}
+        />
+        <TextField
+          id="edit-purchase-remarks"
+          label="Remarks"
+          value={remarks}
+          maxLength={500}
+          onChange={(e) => setRemarks(e.target.value)}
+        />
+        <p className="text-xs text-gray-500">
+          Only the date and remarks can change here — the GRN, the bill and the stock ledger move
+          with the date. Quantity, rate, item, store and vendor are what the stock and the bill
+          were computed from: to correct one of those, delete this purchase (its stock is
+          reversed) and record it again.
+        </p>
+      </div>
+    </Modal>
   );
 }
 

@@ -158,31 +158,31 @@ const ROW_FILTERS = RAG_CELL_STATUSES.filter((status) => status !== 'gray');
 function RagMatrixBody() {
   const toast = useToast();
   // The year, a contractor search and a status filter, all in the URL (036 N6, 2026-10-17) —
-  // the year always was; the other two are new, and so is a way to clear them. Filtering is
-  // done here: the matrix is one request for the whole year either way.
-  const [filters, setFilters, query] = useUrlState({
-    fy: urlString(financialYearOf()),
-    q: urlString(),
-    status: urlEnum(['', ...ROW_FILTERS] as const, ''),
-  });
+  // the year always was; the other two are new, and so is a way to clear them. Since 042 the
+  // filtering is the server's: the matrix request carries the search and status, so the rows
+  // that come back are already the matching ones.
+  const [filters, setFilters, query] = useUrlState(
+    {
+      fy: urlString(financialYearOf()),
+      q: urlString(),
+      status: urlEnum(['', ...ROW_FILTERS] as const, ''),
+    },
+    { debounce: ['q'] },
+  );
   const fy = query.fy;
-  const filtered = Boolean(query.q.trim() || query.status);
+  const search = query.q.trim();
+  const filtered = Boolean(search || query.status);
 
   const { data, isPending, error, refetch } = useQuery({
-    queryKey: ['partners', 'rag', fy],
-    queryFn: () => getRagMatrix(fy),
+    queryKey: ['partners', 'rag', fy, search, query.status],
+    queryFn: () =>
+      getRagMatrix({
+        fy,
+        search: search || undefined,
+        status: query.status || undefined,
+      }),
     placeholderData: keepPreviousData,
   });
-
-  const needle = filters.q.trim().toLowerCase();
-  const visible = data && {
-    ...data,
-    rows: data.rows.filter(
-      (row) =>
-        (!needle || row.contractorName.toLowerCase().includes(needle)) &&
-        (!query.status || row.cells.some((cell) => cell.status === query.status)),
-    ),
-  };
 
   // The regulator-facing copy (036 N6): built by the API from the same matrix.
   const download = useMutation({
@@ -199,13 +199,20 @@ function RagMatrixBody() {
           title="RAG matrix"
           description="One financial year of filings for every active contractor. A month that is not yet due is grey rather than red — a filing that is not due has not been missed."
         />
+        {/* The export route takes no filters, so the label says "all" while any filter is
+            on — the workbook is always the whole year. */}
         <Button
           intent="read"
           loading={download.isPending}
-          disabled={!data || data.rows.length === 0}
+          disabled={!data || (data.rows.length === 0 && !filtered)}
+          title={
+            filtered
+              ? 'The Excel always holds every contractor — the filters above do not narrow it.'
+              : undefined
+          }
           onClick={() => download.mutate()}
         >
-          Export to Excel
+          {filtered ? 'Export all to Excel' : 'Export to Excel'}
         </Button>
       </div>
 
@@ -270,19 +277,15 @@ function RagMatrixBody() {
 
       {data && data.rows.length === 0 && (
         <p className="rounded-lg bg-gray-50 p-6 text-sm text-gray-500">
-          No active contractors to report on.
+          {filtered
+            ? 'No contractors match these filters.'
+            : 'No active contractors to report on.'}
         </p>
       )}
 
-      {visible && data && data.rows.length > 0 && visible.rows.length === 0 && (
-        <p className="rounded-lg bg-gray-50 p-6 text-sm text-gray-500">
-          No contractors match these filters.
-        </p>
-      )}
-
-      {visible && visible.rows.length > 0 && (
+      {data && data.rows.length > 0 && (
         <>
-          <RagTable data={visible} />
+          <RagTable data={data} />
 
           <ul className="mt-4 flex flex-wrap gap-4 text-xs text-gray-600">
             {(Object.keys(DOT_CLASSES) as RagCellStatus[]).map((status) => (

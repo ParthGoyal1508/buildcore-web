@@ -7,6 +7,7 @@ import {
   MONTHLY_COMPLIANCE_STATUSES,
   RAG_CELL_STATUSES,
   VENDOR_TYPES,
+  type RagCellStatus,
 } from '@/app/lib/constants';
 import type { StoredFile } from '@/app/lib/api/client';
 import { authFetch, authFetchBlob, authFetchFile } from '@/app/lib/session';
@@ -511,12 +512,26 @@ export const ragMatrixSchema = z.object({
 });
 export type RagMatrix = z.infer<typeof ragMatrixSchema>;
 
-export async function getRagMatrix(fy: string): Promise<RagMatrix> {
-  const raw = await authFetch<unknown>(`/partners/rag${qs({ fy })}`);
+/** Row statuses the matrix can be narrowed to — `gray` (not yet due) is not a breach and
+ * deliberately not offered (042). */
+export type RagRowFilter = Exclude<RagCellStatus, 'gray'>;
+
+/**
+ * Filtered on the server since 042: `search` keeps rows whose contractor name contains it
+ * (case-insensitive); `status` keeps rows with at least one month in that state. The endpoint
+ * rejects any other query param with a 400, so nothing else is sent.
+ */
+export async function getRagMatrix(query: {
+  fy: string;
+  search?: string;
+  status?: RagRowFilter;
+}): Promise<RagMatrix> {
+  const raw = await authFetch<unknown>(`/partners/rag${qs({ ...query })}`);
   return ragMatrixSchema.parse(raw);
 }
 
-/** The matrix as an .xlsx workbook, built by the API from the same data (036 N6). */
+/** The matrix as an .xlsx workbook, built by the API from the same data (036 N6). The export
+ * route takes no filters: it is always the whole year. */
 export async function exportRagMatrix(fy: string): Promise<Blob> {
   return authFetchBlob(`/partners/rag/export${qs({ fy })}`);
 }
@@ -561,12 +576,23 @@ export const bocwPaymentSchema = z.object({
 });
 export type BocwPayment = z.infer<typeof bocwPaymentSchema>;
 
-export async function getBocw(): Promise<BocwList> {
-  const raw = await authFetch<unknown>('/partners/bocw');
+/**
+ * Filtered on the server since 042: `search` keeps rows whose project name contains it
+ * (case-insensitive); `status` is an exact payment-state match. The endpoint rejects any
+ * other query param with a 400, so nothing else is sent.
+ */
+export async function getBocw(
+  query: {
+    search?: string;
+    status?: (typeof BOCW_STATUSES)[number];
+  } = {},
+): Promise<BocwList> {
+  const raw = await authFetch<unknown>(`/partners/bocw${qs({ ...query })}`);
   return bocwListSchema.parse(raw);
 }
 
-/** The cess list as an .xlsx workbook, built by the API from the same data (036 N6). */
+/** The cess list as an .xlsx workbook, built by the API from the same data (036 N6). The
+ * export route takes no filters: it is always every project. */
 export async function exportBocw(): Promise<Blob> {
   return authFetchBlob('/partners/bocw/export');
 }

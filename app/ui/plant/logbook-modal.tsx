@@ -293,6 +293,15 @@ export default function LogbookModal({ onClose }: { onClose: () => void }) {
             label="Operator"
             emptyLabel="Not recorded"
             value={operatorId}
+            // Scoped to the machine's deployed site (042): `/hr/employees` has filtered on
+            // `siteId` since 005, so the picker offers the people who are actually there rather
+            // than the whole company. A machine deployed nowhere searches everyone, as before.
+            siteId={machine?.deployedSiteId ?? undefined}
+            hint={
+              machine?.deployedSiteId
+                ? `Employees at ${machine.siteName ?? 'the machine’s site'}.`
+                : undefined
+            }
             onChange={(id) => setOperatorId(id)}
           />
 

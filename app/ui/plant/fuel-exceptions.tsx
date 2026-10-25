@@ -3,11 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { ApiError } from '@/app/lib/api/client';
+import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   listFuelExceptions,
   recoverFromHireBill,
   recoverFromOperator,
+  reverseFuelRecovery,
   reviewFuelException,
   type FuelAttribution,
   type FuelException,
@@ -15,6 +16,7 @@ import {
 import { FUEL_EXCEPTIONS, MESSAGES } from '@/app/lib/constants';
 import { dateLabel, money } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import { confirmDialog } from '@/app/ui/dialogs';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
@@ -242,6 +244,16 @@ function EntryDetail({ exception }: { exception: FuelException }) {
   );
 }
 
+/**
+ * A dead operator recovery (042). `reversed` and `rejected` leave the row behind as history, but
+ * the loss stands unrecovered — so recovery is offered again, and reversal is not.
+ * The same two states `assertNoOtherRecovery` treats as dead on the server.
+ */
+function deadRecovery(exception: FuelException): boolean {
+  const status = exception.operatorRecovery?.status;
+  return status === 'reversed' || status === 'rejected';
+}
+
 /** Where an exception has got to, and — for a recovery — whether any money has actually moved. */
 function StatusCell({ exception }: { exception: FuelException }) {
   if (exception.status === 'dismissed') {
@@ -265,10 +277,18 @@ function StatusCell({ exception }: { exception: FuelException }) {
            recovery taken. A reviewer who believes the money is already docked will say so to the
            operator, and then either an unapproved recovery never happens or an approved one
            arrives as a surprise. */
-        <p className="text-xs text-amber-800">
+        <p
+          className={
+            deadRecovery(exception) ? 'text-xs text-gray-500' : 'text-xs text-amber-800'
+          }
+        >
           {exception.operatorRecovery.status === 'approved'
             ? FUEL_EXCEPTIONS.recoveryApproved
-            : FUEL_EXCEPTIONS.recoveryAwaitingApproval}
+            : exception.operatorRecovery.status === 'reversed'
+              ? FUEL_EXCEPTIONS.recoveryReversed
+              : exception.operatorRecovery.status === 'rejected'
+                ? FUEL_EXCEPTIONS.recoveryRejected
+                : FUEL_EXCEPTIONS.recoveryAwaitingApproval}
         </p>
       )}
     </div>
@@ -286,12 +306,19 @@ function RecoveryActions({ exception }: { exception: FuelException }) {
   const toHireBill = useMutation({
     mutationFn: () => recoverFromHireBill(exception.id),
     onSuccess: invalidate,
-    onError: (err: Error) => setError(err.message),
+    // `FUEL_RECOVERY_EXCEEDS_BILL` (409, 042) among them: the deduction would take the bill's net
+    // payable below zero. The server's message names the bill and the figure, so it is shown as is.
+    onError: (err: unknown) => setError(errorMessage(err, MESSAGES.saveFailed)),
   });
   const toOperator = useMutation({
     mutationFn: () => recoverFromOperator(exception.id),
     onSuccess: invalidate,
-    onError: (err: Error) => setError(err.message),
+    onError: (err: unknown) => setError(errorMessage(err, MESSAGES.saveFailed)),
+  });
+  const reverse = useMutation({
+    mutationFn: () => reverseFuelRecovery(exception.id),
+    onSuccess: invalidate,
+    onError: (err: unknown) => setError(errorMessage(err, MESSAGES.saveFailed)),
   });
 
   // FR-004. Absent, not disabled — there is no hirer on an owned machine, and a disabled control
@@ -300,6 +327,13 @@ function RecoveryActions({ exception }: { exception: FuelException }) {
   const attribution = exception.attribution;
   const wantsHirer = attribution === 'hirer' || attribution === 'both';
   const wantsOperator = attribution === 'operator' || attribution === 'both';
+  // A reversed or rejected recovery is dead, not live (042): the loss stands, so recovering is
+  // offered again — the same rule as the server's `assertNoOtherRecovery`.
+  const liveOperatorRecovery = Boolean(
+    exception.operatorRecovery && !deadRecovery(exception),
+  );
+  // What Reverse undoes: a deduction still on the bill, or a recovery that is still live.
+  const reversible = Boolean(exception.hireBillDeduction) || liveOperatorRecovery;
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -312,13 +346,34 @@ function RecoveryActions({ exception }: { exception: FuelException }) {
           {FUEL_EXCEPTIONS.recoverHireBill}
         </RowAction>
       )}
-      {wantsOperator && !exception.operatorRecovery && (
+      {wantsOperator && !liveOperatorRecovery && (
         <RowAction
           type="button"
           onClick={() => toOperator.mutate()}
           disabled={toOperator.isPending}
         >
           {FUEL_EXCEPTIONS.recoverOperator}
+        </RowAction>
+      )}
+      {reversible && (
+        <RowAction
+          type="button"
+          disabled={reverse.isPending}
+          onClick={async () => {
+            // Confirmed before anything moves: the two reversals leave different trails, and the
+            // dialog says which this one is (020 FR-010, 042).
+            const confirmed = await confirmDialog({
+              title: FUEL_EXCEPTIONS.reverseConfirmTitle,
+              message: exception.hireBillDeduction
+                ? FUEL_EXCEPTIONS.reverseConfirmHireBill
+                : FUEL_EXCEPTIONS.reverseConfirmOperator,
+              confirmLabel: FUEL_EXCEPTIONS.reverseConfirmLabel,
+              tone: 'danger',
+            });
+            if (confirmed) reverse.mutate();
+          }}
+        >
+          {FUEL_EXCEPTIONS.reverse}
         </RowAction>
       )}
       {error && <span className="text-xs text-red-600">{error}</span>}

@@ -3997,6 +3997,25 @@ export const FUEL_EXCEPTIONS = {
     `${amount} proposed as a salary recovery. It is waiting for approval and has not been deducted from anyone's pay.`,
   recoveryAwaitingApproval: 'Awaiting approval — not yet deducted',
   recoveryApproved: 'Approved — applies on the next payroll run',
+  /** A dead recovery is not an absent one: the loss stands and can be recovered again (042). */
+  recoveryReversed: 'Recovery reversed — the loss stands unrecovered',
+  recoveryRejected: 'Recovery rejected — the loss stands unrecovered',
+
+  /**
+   * 042: undoing a recovery after the reading behind it is corrected (020 FR-010).
+   *
+   * The confirmation spells out the server's asymmetry, because the two reversals leave different
+   * trails: a deduction on an unpaid bill never left the company so its row is deleted outright,
+   * while an operator recovery may already have reduced somebody's pay, so its row is kept and
+   * marked — a row deleted from under a payslip makes that payslip unexplainable.
+   */
+  reverse: 'Reverse recovery',
+  reverseConfirmTitle: 'Reverse this recovery?',
+  reverseConfirmHireBill:
+    'The deduction is removed from the hire bill and its net payable recomputed. A bill already paid is refused — a paid figure is never rewritten.',
+  reverseConfirmOperator:
+    'The salary recovery is marked reversed and taken off the payroll. The record of it is kept, so a payslip it already reached stays explainable.',
+  reverseConfirmLabel: 'Reverse',
 
   /**
    * T047. The pattern worth catching before fifty deductions are raised.
