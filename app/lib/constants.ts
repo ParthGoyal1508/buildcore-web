@@ -3346,7 +3346,7 @@ export const SITE_ENTRY_COPY = {
   description:
     'Record a delivery as it arrives. Head Office adds the vendor, quantity, rate and bill later.',
   photoHint:
-    'Photograph the delivered material at the site. The photo is taken live and your location is checked against the site.',
+    'Photograph the delivered material at the site — up to 5 photos. They are taken live, and your location is checked against the site.',
   locating: 'Finding your location…',
   offline:
     'You are offline, so the delivery was not recorded. Connect and press Submit again — it will not be saved twice.',

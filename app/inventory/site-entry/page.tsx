@@ -1,6 +1,11 @@
 'use client';
 
-import { CameraIcon, CheckCircleIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import {
+  CameraIcon,
+  CheckCircleIcon,
+  MapPinIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -25,7 +30,7 @@ import AsyncSelect, {
   type AsyncSearchPage,
   type SearchableOption,
 } from '@/app/ui/async-select';
-import { Button } from '@/app/ui/button';
+import { Button, IconButton } from '@/app/ui/button';
 import { itemOption } from '@/app/ui/inventory/inventory-search';
 import CameraCapture from '@/app/ui/my/camera-capture';
 import PageHeader from '@/app/ui/page-header';
@@ -46,6 +51,9 @@ interface Capture {
   accuracyMeters: number;
   capturedAt: string;
 }
+
+/** Photos one delivery may carry (the client, 2026-10-25: "max 5") — the API refuses a sixth. */
+const MAX_PHOTOS = 5;
 
 /** Uppercase with every space removed — what the server stores, shown as it will be saved. */
 const normaliseVehicleNo = (value: string) =>
@@ -95,7 +103,7 @@ export default function SiteEntryPage() {
   const [date, setDate] = useState(todayIso());
   const [time, setTime] = useState(nowTime());
   const [vehicleNo, setVehicleNo] = useState('');
-  const [capture, setCapture] = useState<Capture | null>(null);
+  const [captures, setCaptures] = useState<Capture[]>([]);
   const [camera, setCamera] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,16 +135,18 @@ export default function SiteEntryPage() {
         if (process.env.NODE_ENV === 'production') throw e;
         coords = { ...DEV_FALLBACK_POSITION, accuracy: 10 };
       }
-      setCapture({
+      // Read before the state update: the setter's callback may run more than once.
+      const capture: Capture = {
         // The data URL is both the preview and what is sent — no object URL to revoke.
         photo: await blobToBase64(blob),
         latitude: coords.latitude,
         longitude: coords.longitude,
         accuracyMeters: Math.round(coords.accuracy * 100) / 100,
         capturedAt: new Date().toISOString(),
-      });
+      };
+      setCaptures((list) => [...list, capture].slice(0, MAX_PHOTOS));
     } catch (e) {
-      setCapture(null);
+      // Only this photo is dropped; those already taken keep their own fixes.
       setError(e instanceof Error ? e.message : MESSAGES.locationUnavailable);
     } finally {
       setLocating(false);
@@ -145,26 +155,28 @@ export default function SiteEntryPage() {
 
   const submit = useMutation({
     mutationFn: async () => {
-      if (!capture || !deliveredAt) throw new Error(MESSAGES.saveFailed);
+      const [first] = captures;
+      if (!first || !deliveredAt) throw new Error(MESSAGES.saveFailed);
+      // The location checked is the first photo's — where and when the delivery was first shot.
       return createSiteEntry({
         ...(storeList.length > 1 ? { siteId } : {}),
         itemId,
         deliveredAt: deliveredAt.toISOString(),
         vehicleNo: normaliseVehicleNo(vehicleNo),
-        photo: capture.photo,
-        latitude: capture.latitude,
-        longitude: capture.longitude,
-        accuracyMeters: capture.accuracyMeters,
-        capturedAt: capture.capturedAt,
+        photos: captures.map((c) => c.photo),
+        latitude: first.latitude,
+        longitude: first.longitude,
+        accuracyMeters: first.accuracyMeters,
+        capturedAt: first.capturedAt,
         clientRequestId: requestId,
       });
     },
     onSuccess: (entry) => setSaved(entry),
     onError: (e) => {
       setError(entryErrorMessage(e));
-      // Refused for where or when the photo was taken: only a new photo can fix that.
+      // Refused for where or when the photos were taken: only new photos can fix that.
       if (e instanceof ApiError && e.code && SITE_ENTRY_RETAKE_CODES.includes(e.code)) {
-        setCapture(null);
+        setCaptures([]);
       }
     },
   });
@@ -176,7 +188,7 @@ export default function SiteEntryPage() {
     setDate(todayIso());
     setTime(nowTime());
     setVehicleNo('');
-    setCapture(null);
+    setCaptures([]);
     setError(null);
     setRequestId(crypto.randomUUID());
     submit.reset();
@@ -237,7 +249,7 @@ export default function SiteEntryPage() {
     Boolean(store) &&
     Boolean(itemId) &&
     Boolean(vehicle) &&
-    Boolean(capture) &&
+    captures.length > 0 &&
     Boolean(deliveredAt) &&
     !locating;
 
@@ -342,9 +354,43 @@ export default function SiteEntryPage() {
 
         <section className="flex flex-col gap-2" aria-labelledby="site-entry-photo">
           <h2 id="site-entry-photo" className="text-sm font-medium text-gray-700">
-            Delivery photo <span className="text-red-600">*</span>
+            Delivery photos <span className="text-red-600">*</span>
           </h2>
           <p className="text-xs text-gray-500">{SITE_ENTRY_COPY.photoHint}</p>
+
+          {captures.length > 0 && (
+            <>
+              <ul className="grid grid-cols-3 gap-2">
+                {captures.map((capture, index) => (
+                  <li key={capture.capturedAt} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL */}
+                    <img
+                      src={capture.photo}
+                      alt={`Delivery photo ${index + 1}`}
+                      className="aspect-square w-full rounded-lg bg-gray-100 object-cover"
+                    />
+                    <IconButton
+                      label={`Remove photo ${index + 1}`}
+                      tone="overlay"
+                      size="sm"
+                      disabled={submit.isPending}
+                      onClick={() =>
+                        setCaptures((list) => list.filter((c) => c !== capture))
+                      }
+                      className="absolute right-1 top-1"
+                    >
+                      <XMarkIcon className="w-4" aria-hidden="true" />
+                    </IconButton>
+                  </li>
+                ))}
+              </ul>
+              <p className="flex items-center gap-1 text-xs text-gray-600">
+                <MapPinIcon className="w-4" aria-hidden="true" />
+                Location captured with the first photo, accurate to about{' '}
+                {Math.round(captures[0].accuracyMeters)} m
+              </p>
+            </>
+          )}
 
           {camera ? (
             <CameraCapture
@@ -356,34 +402,21 @@ export default function SiteEntryPage() {
             <p className="py-6 text-center text-sm" role="status">
               <LoadingText>{SITE_ENTRY_COPY.locating}</LoadingText>
             </p>
-          ) : capture ? (
-            <div className="flex flex-col gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL */}
-              <img
-                src={capture.photo}
-                alt="The delivery as photographed"
-                className="max-h-64 w-full rounded-lg object-contain bg-gray-100"
-              />
-              <p className="flex items-center gap-1 text-xs text-gray-600">
-                <MapPinIcon className="w-4" aria-hidden="true" />
-                Location captured, accurate to about {Math.round(capture.accuracyMeters)} m
-              </p>
-              <SecondaryButton
-                type="button"
-                onClick={() => {
-                  setCapture(null);
-                  setCamera(true);
-                }}
-                disabled={submit.isPending}
-              >
-                Retake photo
-              </SecondaryButton>
-            </div>
-          ) : (
-            <SecondaryButton type="button" onClick={() => setCamera(true)}>
+          ) : captures.length < MAX_PHOTOS ? (
+            <SecondaryButton
+              type="button"
+              onClick={() => setCamera(true)}
+              disabled={submit.isPending}
+            >
               <CameraIcon className="mr-1 w-5" aria-hidden="true" />
-              Take photo
+              {captures.length === 0
+                ? 'Take photo'
+                : `Add another photo (${captures.length} of ${MAX_PHOTOS})`}
             </SecondaryButton>
+          ) : (
+            <p className="text-xs text-gray-500">
+              {MAX_PHOTOS} photos — the most one delivery can carry. Remove one to take another.
+            </p>
           )}
         </section>
 
