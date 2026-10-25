@@ -454,6 +454,10 @@ export async function getStockHint(
 // Purchases
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** A site entry waits as `partial_site` until Head Office completes it (043). */
+export const PURCHASE_STATUSES = ['partial_site', 'completed'] as const;
+export type PurchaseStatus = (typeof PURCHASE_STATUSES)[number];
+
 export const purchaseSchema = z.object({
   id: z.string(),
   siteId: z.string(),
@@ -462,12 +466,13 @@ export const purchaseSchema = z.object({
   itemName: z.string(),
   itemCode: z.string(),
   unit: z.string(),
-  vendorId: z.string(),
-  vendorName: z.string(),
+  // Null, with quantity, rate and amount, on a site entry Head Office has not completed (043).
+  vendorId: z.string().nullable(),
+  vendorName: z.string().nullable(),
   date: isoDate,
-  quantity: decimal,
-  rate: decimal,
-  amount: decimal,
+  quantity: nullableDecimal,
+  rate: nullableDecimal,
+  amount: nullableDecimal,
   grnNumber: z.string().nullable(),
   hasBillFile: z.boolean(),
   paymentStatus: z.enum(PURCHASE_BILL_STATUSES).nullable(),
@@ -480,6 +485,25 @@ export const purchaseSchema = z.object({
   purchaseOrderLineNo: z.number().nullable().optional(),
   hasPhoto: z.boolean().optional(),
   remarks: z.string().nullable(),
+  // 043: who recorded it, and what the site captured. Defaulted so an API not yet redeployed parses
+  // as the Head Office purchases it only ever returned.
+  status: z.enum(PURCHASE_STATUSES).default('completed'),
+  source: z.enum(['head_office', 'site']).default('head_office'),
+  vehicleNo: z.string().nullable().optional(),
+  deliveredAt: z.string().nullable().optional(),
+  gps: z
+    .object({
+      latitude: z.number(),
+      longitude: z.number(),
+      accuracyMeters: z.number().nullable(),
+      capturedAt: z.string().nullable(),
+      distanceMeters: z.number().nullable(),
+    })
+    .nullable()
+    .optional(),
+  createdByName: z.string().nullable().optional(),
+  completedByName: z.string().nullable().optional(),
+  completedAt: z.string().nullable().optional(),
 });
 export type Purchase = z.infer<typeof purchaseSchema>;
 
@@ -504,6 +528,8 @@ export interface PurchaseQuery {
   vendorId?: string;
   itemId?: string;
   paymentStatus?: string;
+  /** 043: `partial_site` lists the site entries waiting for Head Office. */
+  status?: PurchaseStatus;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -579,13 +605,129 @@ export async function deletePurchase(id: string): Promise<void> {
  */
 export async function updatePurchase(
   id: string,
-  input: { date?: string; remarks?: string },
+  input: {
+    date?: string;
+    remarks?: string;
+    // 043: a site entry waiting for Head Office only.
+    itemId?: string;
+    vehicleNo?: string;
+  },
 ): Promise<Purchase> {
   const raw = await authFetch<unknown>(
     `/inventory/purchases/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify(input) },
   );
   return purchaseSchema.parse(raw);
+}
+
+/**
+ * Head Office completing a site entry (043): everything the create form takes except the store and
+ * the photo, which the site captured. Only now does the delivery move stock. 409 when another
+ * office user completed it first.
+ */
+export async function completePurchase(
+  id: string,
+  input: Omit<PurchaseInput, 'siteId' | 'photoFile'>,
+): Promise<Purchase> {
+  const raw = await authFetch<unknown>(
+    `/inventory/purchases/${encodeURIComponent(id)}/complete`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return purchaseSchema.parse(raw);
+}
+
+const purchaseHistoryEntrySchema = z.object({
+  action: z.string(),
+  at: z.string(),
+  byName: z.string().nullable(),
+  changes: z
+    .object({
+      event: z.string().optional(),
+      before: z.record(z.string(), z.unknown()).optional(),
+      after: z.record(z.string(), z.unknown()).optional(),
+    })
+    .passthrough()
+    .nullable(),
+});
+export type PurchaseHistoryEntry = z.infer<typeof purchaseHistoryEntrySchema>;
+
+/** A purchase's change history, oldest first (043). */
+export async function getPurchaseHistory(
+  id: string,
+): Promise<PurchaseHistoryEntry[]> {
+  const raw = await authFetch<unknown>(
+    `/inventory/purchases/${encodeURIComponent(id)}/history`,
+  );
+  return z.array(purchaseHistoryEntrySchema).parse(raw);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Site entries (043): the site's "Create Inventory Purchase" page
+// ─────────────────────────────────────────────────────────────────────────────
+
+const siteEntryStoreSchema = z.object({ id: z.string(), name: z.string() });
+export type SiteEntryStore = z.infer<typeof siteEntryStoreSchema>;
+
+/** The stores the caller may record against — their assigned sites. Empty means none. */
+export async function getSiteEntryStores(): Promise<SiteEntryStore[]> {
+  const raw = await authFetch<unknown>('/inventory/site-entries/stores');
+  return z.array(siteEntryStoreSchema).parse(raw);
+}
+
+const siteEntryItemSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  unit: z.string(),
+});
+export type SiteEntryItem = z.infer<typeof siteEntryItemSchema>;
+
+/** Active items from the item master Head Office's form reads. */
+export async function getSiteEntryItems(
+  search?: string,
+): Promise<SiteEntryItem[]> {
+  const raw = await authFetch<unknown>(
+    `/inventory/site-entries/items${qs({ search })}`,
+  );
+  return z.array(siteEntryItemSchema).parse(raw);
+}
+
+export interface SiteEntryInput {
+  /** Only when the caller has more than one store; with one, the server uses it. */
+  siteId?: string;
+  itemId: string;
+  deliveredAt: string;
+  vehicleNo: string;
+  /** Base64, without a data-URL prefix. */
+  photo: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  capturedAt: string;
+  /** Made once per entry, so a double tap or a retry returns the entry already saved. */
+  clientRequestId: string;
+}
+
+const siteEntrySchema = z.object({
+  id: z.string(),
+  status: z.enum(PURCHASE_STATUSES),
+  siteName: z.string(),
+  itemName: z.string(),
+  unit: z.string(),
+  vehicleNo: z.string(),
+  deliveredAt: z.string(),
+  distanceMeters: z.number(),
+});
+export type SiteEntry = z.infer<typeof siteEntrySchema>;
+
+export async function createSiteEntry(
+  input: SiteEntryInput,
+): Promise<SiteEntry> {
+  const raw = await authFetch<unknown>('/inventory/site-entries', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return siteEntrySchema.parse(raw);
 }
 
 /**

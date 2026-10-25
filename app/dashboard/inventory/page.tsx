@@ -11,6 +11,7 @@ import {
 
 import { INVENTORY_ISSUE_LABEL, ROUTES } from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
+import SiteEntryTile from '@/app/ui/inventory/site-entry-tile';
 import TileGrid, { type Tile } from '@/app/ui/tile-grid';
 
 export const metadata: Metadata = { title: 'Inventory' };
@@ -72,6 +73,7 @@ export default function InventoryPage() {
         title="Inventory"
         description="Material in, material out, and what each store is holding."
       />
+      <SiteEntryTile />
       <TileGrid tiles={SECTIONS} />
     </div>
   );
