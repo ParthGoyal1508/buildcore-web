@@ -8,11 +8,12 @@ import {
 } from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 
 import {
   exportApprovalHistory,
   getApprovalHistoryList,
+  reassignApproval,
   resubmitApproval,
   type ApprovalHistoryEntry,
   type ApprovalHistoryStatus,
@@ -22,7 +23,8 @@ import {
 import { errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { searchActivityUsers, triggerDownload } from '@/app/lib/api/dashboard';
-import { getCurrentUser } from '@/app/lib/api/users';
+import { listUsersPage } from '@/app/lib/api/settings';
+import { getCurrentUser, hasWrite } from '@/app/lib/api/users';
 import { approvalActionTypeLabel } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
 import {
@@ -32,16 +34,19 @@ import {
   useUrlState,
 } from '@/app/lib/use-url-state';
 import AsyncSelect from '@/app/ui/async-select';
+import { Button } from '@/app/ui/button';
 import DateRangeFilter, {
   RANGE_PRESETS,
   rangeOf,
 } from '@/app/ui/dashboard/date-range-filter';
 import QueryError from '@/app/ui/query-error';
 import {
+  FormError,
   inlineSelectClass,
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import Modal from '@/app/ui/settings/modal';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import { toast } from '@/app/ui/toast';
 
@@ -465,6 +470,127 @@ function ResubmitButton({ item }: { item: ApprovalHistoryEntry }) {
   );
 }
 
+/**
+ * Hands a pending item to a named person at its current level (016 FR-019, wired 042).
+ *
+ * Offered only to `SETTINGS` holders — the same permission the endpoint requires — and only on a
+ * pending item. The target picker lists the company's **active accounts**, not the level's role
+ * holders: the backend deliberately puts no holder check on the grant, because the stall this
+ * exists to clear is a level whose only holder already decided earlier in the chain (FR-021a still
+ * stops the delegate deciding twice). The server refuses the one person who must not use it — the
+ * person the item is awaiting (`APPROVAL_REASSIGN_FORBIDDEN`) — and that refusal is shown as sent.
+ */
+function ReassignButton({ item }: { item: ApprovalHistoryEntry }) {
+  const queryClient = useQueryClient();
+  const me = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const [open, setOpen] = useState(false);
+  const [toUserId, setToUserId] = useState('');
+  const [toUserLabel, setToUserLabel] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const reassign = useMutation({
+    mutationFn: () => reassignApproval(item.instanceId, { toUserId, reason: reason.trim() }),
+    onSuccess: (state) => {
+      toast.success(
+        `Reassigned to ${toUserLabel ?? 'the chosen person'} at level ${state.currentPosition}.`,
+      );
+      setOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ['approvalHistoryList'] });
+      void queryClient.invalidateQueries({ queryKey: ['approvalQueue'] });
+    },
+    onError: (err) =>
+      setError(errorMessage(err, 'Could not reassign this item.')),
+  });
+
+  if (!hasWrite(me.data, 'SETTINGS')) return null;
+
+  return (
+    <>
+      <SecondaryButton type="button" size="sm" onClick={() => setOpen(true)}>
+        Reassign
+      </SecondaryButton>
+      {open && (
+        <Modal
+          title={`Reassign — ${item.subject}`}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <SecondaryButton type="button" onClick={() => setOpen(false)}>
+                Cancel
+              </SecondaryButton>
+              <Button
+                type="button"
+                loading={reassign.isPending}
+                disabled={!toUserId || !reason.trim()}
+                onClick={() => {
+                  setError(null);
+                  reassign.mutate();
+                }}
+              >
+                Reassign
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-gray-600">
+              Hands the decision at level {item.currentPosition}
+              {item.awaitingLabel ? ` (${item.awaitingLabel})` : ''} to the
+              person named below. They need not hold the level&apos;s role — this
+              exists for when its only holder has already decided or is
+              unavailable — and the grant clears as soon as the chain moves on.
+            </p>
+            <div>
+              <label
+                htmlFor="approval-reassign-to"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Hand it to
+              </label>
+              <AsyncSelect
+                id="approval-reassign-to"
+                value={toUserId}
+                onChange={(id, option) => {
+                  setToUserId(id);
+                  setToUserLabel(option?.label ?? null);
+                }}
+                placeholder="Search by name or email"
+                cacheKey={['approval-reassign-users']}
+                search={(term, page) =>
+                  listUsersPage({
+                    q: term || undefined,
+                    status: 'active',
+                    page,
+                    pageSize: 25,
+                  }).then((r) => ({
+                    items: r.items.map((u) => ({
+                      id: u.id,
+                      label: u.name,
+                      sublabel: u.email,
+                    })),
+                    total: r.total,
+                  }))
+                }
+              />
+            </div>
+            <TextField
+              id="approval-reassign-reason"
+              label="Why"
+              required
+              maxLength={500}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              hint="Written to the audit log with your name and the level. A reassignment nobody explains is exactly what the trail exists to explain."
+            />
+            <FormError message={error} />
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
 /** One item: what it is, who raised it, where it stands, and its chain. */
 function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
   const badge = STATE_BADGE[item.state];
@@ -511,11 +637,14 @@ function HistoryCard({ item }: { item: ApprovalHistoryEntry }) {
       </div>
 
       {item.state === 'pending' && item.awaitingLabel && (
-        <p className="mt-2 text-xs text-brand-800">
-          Waiting on {item.delegatedToName ?? item.awaitingLabel}
-          {item.delegatedToName ? ` (reassigned, ${item.awaitingLabel})` : ''} —
-          level {item.currentPosition} of {item.totalLevels}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-brand-800">
+            Waiting on {item.delegatedToName ?? item.awaitingLabel}
+            {item.delegatedToName ? ` (reassigned, ${item.awaitingLabel})` : ''} —
+            level {item.currentPosition} of {item.totalLevels}
+          </p>
+          <ReassignButton item={item} />
+        </div>
       )}
       {item.state === 'returned' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">

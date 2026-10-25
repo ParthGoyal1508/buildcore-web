@@ -27,9 +27,9 @@ import { EquipmentThumb } from '@/app/ui/plant/equipment-photos';
 import DisposeModal from '@/app/ui/plant/dispose-modal';
 import { getCurrentUser } from '@/app/lib/api/users';
 import Pager from '@/app/ui/inventory/pager';
+import { SitePicker } from '@/app/ui/plant/pickers';
 import {
   usePlantCategories,
-  usePlantSites,
   usePlantCompanyId,
 } from '@/app/ui/plant/use-plant-refs';
 import {
@@ -45,7 +45,6 @@ import PageHeader from '@/app/ui/page-header';
 
 export default function AssetRegisterPage() {
   const categories = usePlantCategories();
-  const sites = usePlantSites();
 
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -303,22 +302,18 @@ export default function AssetRegisterPage() {
           <option value="">All categories</option>
           <CategoryOptions categories={categories.data ?? []} />
         </SelectField>
-        <SelectField
+        {/* Server-searched (036 kit, wired 042): the list was one page of 200, so the register
+            could not be narrowed to the 201st site. */}
+        <SitePicker
           id="equipment-filter-site"
           label="Site"
+          emptyLabel="All sites"
           value={siteId}
-          onChange={(event) => {
-            setSiteId(event.target.value);
+          onChange={(id) => {
+            setSiteId(id);
             setPage(1);
           }}
-        >
-          <option value="">All sites</option>
-          {(sites.data ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        />
         <SelectField
           id="equipment-filter-status"
           label="Status"

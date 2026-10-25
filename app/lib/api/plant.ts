@@ -1643,6 +1643,27 @@ export async function recoverFromOperator(exceptionId: string) {
   );
 }
 
+/**
+ * Reverses a recovery after the reading behind it is corrected (020 FR-010, 042).
+ *
+ * The server's asymmetry, worth knowing before offering the button: a hire-bill deduction is
+ * **deleted** and the bill's net recomputed, while an operator recovery is **marked reversed and
+ * kept** — a row deleted from under a payslip makes that payslip unexplainable. Refusals carry
+ * codes: `FUEL_RECOVERY_BILL_PAID` (the deduction sits on a bill already paid),
+ * `FUEL_RECOVERY_ALREADY_REVERSED`, `FUEL_RECOVERY_NOTHING_TO_REVERSE`.
+ *
+ * Schema derived from `fuel-recovery.service.ts` (`return { reversed: true }`), not checked
+ * against a live response yet — flagged for the 042 Wave 3 verification pass.
+ */
+export async function reverseFuelRecovery(exceptionId: string) {
+  return z.object({ reversed: z.boolean() }).parse(
+    await authFetch<unknown>(
+      `/plant/fuel-exceptions/${exceptionId}/recover/reverse`,
+      { method: 'POST' },
+    ),
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Disposal — scrapping and selling machines (2026-10-17)
 // ─────────────────────────────────────────────────────────────────────────────
