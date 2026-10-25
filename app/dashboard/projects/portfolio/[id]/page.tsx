@@ -9,6 +9,7 @@ import { getDocumentRequirements } from '@/app/lib/api/project-documents';
 import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
+import { useBranches } from '@/app/ui/use-branch-names';
 import { TABLE } from '@/app/ui/table';
 import { dateLabel } from '@/app/lib/format';
 
@@ -143,6 +144,11 @@ export default function ProjectOverviewPage() {
     clients?.items.find((client) => client.id === project.clientId)?.name ??
     null;
 
+  const branches = useBranches(project.companyId);
+  const branch = branches.nameOf(project.branchId);
+  const branchGstin =
+    branches.branches.find((b) => b.id === project.branchId)?.gstin ?? null;
+
   const manager = project.projectManagerEmployeeId
     ? (tabs.employees.find(
         (employee) => employee.id === project.projectManagerEmployeeId,
@@ -247,6 +253,11 @@ export default function ProjectOverviewPage() {
               </span>
             </Fact>
             <Fact term="Status">{projectsLabel(project.status)}</Fact>
+            {/* 041: near the top, not in Details below the billing table where nobody scrolls to. */}
+            <Fact term={PROJECT_SHELL_COPY.branchLabel}>
+              {branch ?? PROJECT_SHELL_COPY.notRecorded}
+            </Fact>
+            <Fact term="GSTIN">{branchGstin ?? '—'}</Fact>
             <Fact term="Start">{dateLabel(project.startDate)}</Fact>
             <Fact term="Expected end">
               {project.expectedEndDate

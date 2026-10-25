@@ -17,7 +17,7 @@ const STEPS = {
   'mac-safari': ['In the menu bar, choose File → Add to Dock.', 'Click “Add”.'],
   other: [
     'Open the browser menu (⋮ or ⋯).',
-    'Choose “Install app”, “Install BuildCore” or “Add to Home screen”.',
+    'Choose “Install app”, “Install Tirupati Groups” or “Add to Home screen”.',
     'If neither is listed, open this page in Chrome or Edge and try again.',
   ],
 } as const;
@@ -50,8 +50,8 @@ export default function InstallAppCard() {
           </h2>
           <p className="mt-1 text-sm text-gray-600">
             {state.kind === 'installed'
-              ? 'BuildCore is installed on this device. Open it from your home screen or app list.'
-              : 'Add BuildCore to your home screen for faster access, full-screen use and offline pages.'}
+              ? 'Tirupati Groups is installed on this device. Open it from your home screen or app list.'
+              : 'Add Tirupati Groups to your home screen for faster access, full-screen use and offline pages.'}
           </p>
 
           {state.kind === 'promptable' && (

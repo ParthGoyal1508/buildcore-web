@@ -25,6 +25,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { focusFirstInvalid } from '@/app/lib/form-focus';
+import CompanyBranchesPanel from '@/app/ui/settings/company-branches-panel';
 
 // Same statutory formats the API validates against, checked here first so an
 // obvious typo never costs a round trip.
@@ -82,9 +83,11 @@ type FormValues = z.input<typeof schema>;
 const TABS = [
   { id: 'basic', label: 'Basic Info' },
   { id: 'registration', label: 'Registration' },
-  { id: 'address', label: 'Address' },
+  // The head office's (041): every other GST registration is on the Branches tab.
+  { id: 'address', label: 'Head Office' },
   { id: 'statutory', label: 'Statutory' },
   { id: 'payroll', label: 'Payroll Settings' },
+  { id: 'branches', label: 'Branches' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -278,6 +281,13 @@ export default function CompanyModal({
       isDirty={isDirty || pendingLogo !== null}
       pending={mutation.isPending}
       footer={
+        // The Branches tab saves each branch on its own; the company form's Save there would read
+        // as saving the branches, which it does not.
+        tab === 'branches' ? (
+          <SecondaryButton type="button" onClick={onClose}>
+            Done
+          </SecondaryButton>
+        ) : (
         <>
           <SecondaryButton
             type="button"
@@ -297,10 +307,12 @@ export default function CompanyModal({
             Save
           </Button>
         </>
+        )
       }
     >
       <div className="mb-4 flex flex-wrap gap-1 border-b" role="tablist">
-        {TABS.map((t) => (
+        {/* Branches exist once the company does: they are saved on their own, not with this form. */}
+        {TABS.filter((t) => t.id !== 'branches' || company).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -380,7 +392,7 @@ export default function CompanyModal({
         </div>
 
         <div className={tab === 'registration' ? 'space-y-4' : 'hidden'}>
-          <TextField id="gstin" label="GSTIN" hint="15 characters, e.g. 27AAPFU0939F1ZV" error={err('gstin')} {...register('gstin')} />
+          <TextField id="gstin" label="Head office GSTIN" hint="15 characters, e.g. 27AAPFU0939F1ZV. Other GSTINs are added as branches." error={err('gstin')} {...register('gstin')} />
           <TextField id="pan" label="PAN" hint="10 characters, e.g. AAPFU0939F" error={err('pan')} {...register('pan')} />
           <TextField id="cin" label="CIN" error={err('cin')} {...register('cin')} />
           <TextField id="tan" label="TAN" error={err('tan')} {...register('tan')} />
@@ -397,7 +409,7 @@ export default function CompanyModal({
         </div>
 
         <div className={tab === 'statutory' ? 'space-y-4' : 'hidden'}>
-          <TextField id="pfEstablishmentCode" label="PF establishment code" error={err('pfEstablishmentCode')} {...register('pfEstablishmentCode')} />
+          <TextField id="pfEstablishmentCode" label="PF establishment code" hint="The head office's; each branch can carry its own on the Branches tab" error={err('pfEstablishmentCode')} {...register('pfEstablishmentCode')} />
           <TextField id="esicCode" label="ESIC code" error={err('esicCode')} {...register('esicCode')} />
           <TextField id="professionalTaxRegNumber" label="Professional tax registration number" error={err('professionalTaxRegNumber')} {...register('professionalTaxRegNumber')} />
           <TextField id="bocwRegNumber" label="BOCW registration number" error={err('bocwRegNumber')} {...register('bocwRegNumber')} />
@@ -412,6 +424,8 @@ export default function CompanyModal({
           <TextField id="bonusRate" label="Bonus rate (%)" type="number" step="0.01" placeholder="Uses the configured default" error={err('bonusRate')} {...register('bonusRate')} />
         </div>
       </form>
+
+      {company && tab === 'branches' && <CompanyBranchesPanel companyId={company.id} />}
     </Modal>
   );
 }

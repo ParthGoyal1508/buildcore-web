@@ -147,6 +147,8 @@ export const employeeSchema = z.object({
   companyId: z.string(),
   siteId: z.string(),
   shiftId: z.string(),
+  /** 041: the company branch whose PF / ESIC establishment the employee is filed under. */
+  branchId: z.string().optional(),
   /** Null for staff with no login — most of them (the API made it optional on 2026-10-10). */
   userId: z.string().nullable(),
 
@@ -244,6 +246,8 @@ export interface EmployeeFilters {
   search?: string;
   departmentId?: string;
   siteId?: string;
+  /** 041: employees filed under this branch only. */
+  branchId?: string;
   shiftId?: string;
   isActive?: boolean;
   page?: number;
@@ -1367,7 +1371,8 @@ export type SalaryRegister = z.infer<typeof salaryRegisterSchema>;
 
 export async function getSalaryRegister(
   runId: string,
-  filters: { departmentId?: string; projectId?: string; siteId?: string } = {},
+  /** `branchId` (041): the lines filed under one branch. */
+  filters: { departmentId?: string; projectId?: string; siteId?: string; branchId?: string } = {},
 ) {
   return salaryRegisterSchema.parse(
     await authFetch<unknown>(
@@ -1393,10 +1398,24 @@ const deductionReportSchema = z.object({
 
 export async function exportSalaryRegister(
   runId: string,
-  filters: { departmentId?: string; projectId?: string; siteId?: string } = {},
+  filters: { departmentId?: string; projectId?: string; siteId?: string; branchId?: string } = {},
 ) {
   return downloadFile(
     `/hr/payroll/runs/${runId}/salary-register/export${qs({ ...filters })}`,
+  );
+}
+
+/**
+ * The month's Statutory Compliance Register (040): employee register, Form B wage register, Form C
+ * loans/recoveries and Form D attendance, in the client's workbook format. Processed or paid runs only.
+ */
+export async function exportStatutoryRegister(
+  runId: string,
+  /** `branchId` (041): one PF / ESIC establishment, whose address and codes head the register. */
+  filters: { projectId?: string; siteId?: string; branchId?: string } = {},
+) {
+  return downloadFile(
+    `/hr/payroll/runs/${runId}/statutory-register/export${qs({ ...filters })}`,
   );
 }
 
@@ -1416,18 +1435,26 @@ const challanSchema = z.object({
   rows: z.array(z.record(z.string(), z.unknown())).optional(),
   items: z.array(z.record(z.string(), z.unknown())).optional(),
   totals: z.record(z.string(), z.unknown()).optional(),
+  /** 041: the one establishment this challan covers, or null for the whole company. */
+  branch: z
+    .object({ id: z.string(), label: z.string(), establishmentCode: z.string().nullable() })
+    .nullable()
+    .optional(),
+  /** 041: said, never refused — e.g. a branch with no PF establishment code recorded. */
+  warnings: z.array(z.string()).optional(),
 });
 
 export type Challan = z.infer<typeof challanSchema>;
 
-export async function getChallan(type: ChallanType, period: string) {
+/** `branchId` (041): one PF / ESIC / PT establishment; omitted → the whole company. */
+export async function getChallan(type: ChallanType, period: string, branchId?: string) {
   return challanSchema.parse(
-    await authFetch<unknown>(`/hr/challans/${type}${qs({ period })}`),
+    await authFetch<unknown>(`/hr/challans/${type}${qs({ period, branchId })}`),
   );
 }
 
-export async function exportChallan(type: ChallanType, period: string) {
-  return downloadFile(`/hr/challans/${type}/export${qs({ period })}`);
+export async function exportChallan(type: ChallanType, period: string, branchId?: string) {
+  return downloadFile(`/hr/challans/${type}/export${qs({ period, branchId })}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

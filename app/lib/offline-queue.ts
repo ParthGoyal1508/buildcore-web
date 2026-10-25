@@ -25,7 +25,7 @@
  * worker is waiting to see whether their punch registered.
  */
 
-const DB_NAME = 'buildcore-my-workspace';
+const DB_NAME = 'tirupati-my-workspace';
 /**
  * 3 since feature 018: the bill-draft store was added (`app/lib/bill-drafts.ts`).
  *

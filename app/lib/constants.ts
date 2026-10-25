@@ -508,7 +508,7 @@ export const DEV_FALLBACK_POSITION = {
  * gate needs, since there the rear camera is the one pointing at the worker.
  */
 export type CameraFacing = 'user' | 'environment';
-export const CAMERA_FACING_STORAGE_KEY = 'buildcore.my.cameraFacing';
+export const CAMERA_FACING_STORAGE_KEY = 'tirupati.my.cameraFacing';
 export const DEFAULT_CAMERA_FACING: CameraFacing = 'user';
 
 /** Photos required to enrol, mirroring the backend's configured bounds. */
@@ -1981,7 +1981,7 @@ export const MESSAGES = {
    */
   moduleInProgressTitle: (name: string) => `${name} is in progress`,
   moduleInProgressBody:
-    'This part of BuildCore is still being built. Check back soon.',
+    'This part of Tirupati Groups is still being built. Check back soon.',
   /** The nine permissions that gate content *inside* a module rather than a sidebar
    * entry. Said once, here, rather than repeated on every checkbox: an admin who
    * clears one of these expecting the menu to change is misled, and the section this
@@ -4292,7 +4292,7 @@ export const DOCUMENT_COPY = {
    * is that editing these makes them theirs.
    */
   requirementsDefaults:
-    'These are the documents BuildCore expects every project to hold. They become this company’s own set the moment you save.',
+    'These are the documents Tirupati Groups expects every project to hold. They become this company’s own set the moment you save.',
   requirementsConfigured:
     'This company’s own set. Every project is measured against it.',
   requirementsAddHeading: 'Require another document',
@@ -4309,12 +4309,12 @@ export const DOCUMENT_COPY = {
     'No documents are required. Every project will report itself fully papered.',
   requirementsUndefinedHeading: 'Not available to require yet',
   requirementsUndefinedHint:
-    'BuildCore expects these, but this company has no document type for them. Projects are not measured against a kind that does not exist.',
+    'Tirupati Groups expects these, but this company has no document type for them. Projects are not measured against a kind that does not exist.',
   requirementsDefineIt: 'Define it',
   requirementsDefineFailed:
     'The document kind could not be defined. Please try again.',
   requirementsKindHint:
-    'For a document BuildCore does not name — a site handover note, a client NOC. It becomes available to require immediately.',
+    'For a document Tirupati Groups does not name — a site handover note, a client NOC. It becomes available to require immediately.',
   defineFailed: 'The document type could not be defined. Please try again.',
   expiryRequired: 'This document expires, so an expiry date is required.',
   restrictedNotice:
@@ -4879,6 +4879,8 @@ export const PROJECT_SHELL_COPY = {
   projectTypeLabel: 'Project type',
   siteStartLabel: 'Site start',
   cgstLabel: 'GST on bills',
+  /** 041: the GST registration the project's bills, POs and store documents are issued from. */
+  branchLabel: 'Bills from branch',
   cgstApplicable: 'CGST + SGST',
   cgstNotApplicable: 'IGST',
   retentionLabel: 'Client retention',
@@ -5152,7 +5154,7 @@ export const TERMS_COPY = {
   } as Record<string, string>,
   shippedBadge: 'standard',
   stillShipped:
-    'These are the clauses BuildCore ships. Nobody at your company has reviewed them yet — edit and save to make them yours.',
+    'These are the clauses Tirupati Groups ships. Nobody at your company has reviewed them yet — edit and save to make them yours.',
   bodyLabel: 'Clauses',
   bodyHint:
     'Plain text, one clause per line. No formatting: what renders this is a PDF table cell and this box, and neither interprets any.',

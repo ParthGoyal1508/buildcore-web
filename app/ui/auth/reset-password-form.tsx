@@ -65,7 +65,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
           Your password has been changed, and you have been signed out on every device.
         </p>
         <p>
-          Sign in with your new password. If you use the BuildCore app on your phone, open it
+          Sign in with your new password. If you use the Tirupati Groups app on your phone, open it
           and sign in there too.
         </p>
         <Link
