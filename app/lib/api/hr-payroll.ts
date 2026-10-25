@@ -877,6 +877,12 @@ export async function getLateComingReport(
  * The admin counterpart to My Workspace's `/my/punch/history`: that route derives
  * the employee from the caller's own token and takes no employee parameter by
  * design, so it cannot serve an admin looking at somebody else's month.
+ *
+ * Served under the **employee's own company** since 042 — the server resolves it from the
+ * employee row, exactly as the profile endpoint does, so a cross-company profile's attendance
+ * tab answers wherever the profile itself does. The route's `companyId` query parameter was
+ * removed with that change, and the API refuses undeclared query parameters with a 400, so
+ * nothing here may ever send one.
  */
 export const attendanceDaySchema = z.object({
   date: z.string(),
