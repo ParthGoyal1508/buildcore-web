@@ -1,10 +1,9 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
-import { getItems } from '@/app/lib/api/inventory';
 import {
   createSparePart,
   receiveSparePart,
@@ -13,13 +12,14 @@ import {
 } from '@/app/lib/api/plant';
 import { MESSAGES } from '@/app/lib/constants';
 import { formatRupees } from '@/app/lib/utils';
+import AsyncSelect from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
+import { searchItems, useItemOption } from '@/app/ui/inventory/inventory-search';
 import Modal from '@/app/ui/settings/modal';
 import {
   CheckboxField,
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import {
@@ -50,12 +50,6 @@ export default function SparePartModal({
   const categories = usePlantCategories();
   const isEdit = part !== undefined;
 
-  const items = useQuery({
-    queryKey: ['plant', 'inventory-items'],
-    queryFn: () => getItems({ active: true, pageSize: 200 }),
-    select: (page) => page.items,
-  });
-
   const [partNumber, setPartNumber] = useState(part?.partNumber ?? '');
   const [name, setName] = useState(part?.name ?? '');
   const [unitOfMeasure, setUnitOfMeasure] = useState(
@@ -74,6 +68,8 @@ export default function SparePartModal({
   );
   const [active, setActive] = useState(part?.active ?? true);
   const [error, setError] = useState<string | null>(null);
+  // The current link's own row, for an edit whose item is on no page searched yet (036 kit).
+  const linkedItemOption = useItemOption(linkedInventoryItemId);
 
   const save = useMutation({
     mutationFn: () => {
@@ -187,20 +183,30 @@ export default function SparePartModal({
           </div>
         </fieldset>
 
-        <SelectField
-          id="part-inventory-link"
-          label="Also stocked as an inventory item"
-          value={linkedInventoryItemId}
-          onChange={(event) => setLinkedInventoryItemId(event.target.value)}
-          hint="The two stocks stay separate. Declaring the link only makes a divergence visible on the reconciliation view."
-        >
-          <option value="">Not linked</option>
-          {(items.data ?? []).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.code} · {item.name}
-            </option>
-          ))}
-        </SelectField>
+        {/* Server-searched (036 kit, wired 042): the list was one page of 200, so the 201st
+            inventory item could not be linked. */}
+        <div>
+          <label
+            htmlFor="part-inventory-link"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Also stocked as an inventory item
+          </label>
+          <AsyncSelect
+            id="part-inventory-link"
+            value={linkedInventoryItemId}
+            onChange={(id) => setLinkedInventoryItemId(id)}
+            emptyLabel="Not linked"
+            placeholder="Search item code or name"
+            cacheKey={['inventory', 'items', 'spare-part-link']}
+            search={searchItems}
+            selectedOption={linkedItemOption}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            The two stocks stay separate. Declaring the link only makes a
+            divergence visible on the reconciliation view.
+          </p>
+        </div>
 
         {isEdit && (
           <CheckboxField

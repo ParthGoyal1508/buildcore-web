@@ -10,8 +10,6 @@ import {
   getEquipmentDocTypes,
   getSpareParts,
 } from '@/app/lib/api/plant';
-import { getVendors } from '@/app/lib/api/partners';
-import { getSites } from '@/app/lib/api/projects';
 
 /**
  * The dropdown sources every plant form needs.
@@ -80,21 +78,6 @@ export function usePlantSpareParts() {
   });
 }
 
-/** Shared with Inventory's own hook by intent, not by import: the two modules key
- * their caches separately so one invalidating its vendor list does not refetch the
- * other's. */
-export function usePlantVendors() {
-  return useQuery({
-    queryKey: ['plant', 'vendors'],
-    queryFn: () => getVendors({ active: true, pageSize: 200 }),
-    select: (page) => page.items,
-  });
-}
-
-export function usePlantSites() {
-  return useQuery({
-    queryKey: ['plant', 'sites'],
-    queryFn: () => getSites({ pageSize: 200 }),
-    select: (page) => page.items,
-  });
-}
+// `usePlantVendors` and `usePlantSites` lived here until 042: one page of 200 into a `<select>`,
+// so the 201st vendor or site did not exist on the form. Their consumers use the server-searched
+// pickers in `pickers.tsx` now.
