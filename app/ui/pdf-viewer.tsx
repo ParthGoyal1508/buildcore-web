@@ -4,7 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { saveBlob } from '@/app/lib/download-file';
+import { isIosSafari, openBlobInTab, saveBlob } from '@/app/lib/download-file';
 import { IconButton, SecondaryButton, TextButton } from '@/app/ui/button';
 
 /**
@@ -89,6 +89,20 @@ function renderable(file: ViewableFile): { blob: Blob; isImage: boolean } {
  */
 function printFile(file: ViewableFile) {
   const { blob, isImage } = renderable(file);
+
+  // 042: iOS prints a PDF frame **blank** — it renders only a PDF's own view into the print
+  // surface, never a frame's — and its frame print of an image is unreliable the same way. So on
+  // an iPhone or iPad the file opens in a tab instead (still inside the click, so the pop-up
+  // blocker allows it; blocked anyway, it becomes a named download), and the tab's own
+  // share/print sheet prints it.
+  if (isIosSafari()) {
+    openBlobInTab(
+      blob,
+      isImage ? (file.filename ?? 'image') : pdfName(file.filename ?? 'document'),
+    );
+    return;
+  }
+
   const url = URL.createObjectURL(blob);
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
@@ -111,9 +125,11 @@ function printFile(file: ViewableFile) {
       // Some browsers never send `afterprint` for a frame; release it eventually regardless.
       setTimeout(cleanup, 5 * 60_000);
     } catch {
-      window.open(url, '_blank', 'noopener');
+      // `onload` is past the click, so this open can itself be pop-up-blocked; `openBlobInTab`
+      // degrades to a named download then (042).
+      openBlobInTab(blob, file.filename ?? 'document');
       frame.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      URL.revokeObjectURL(url);
       done = true;
     }
   };
