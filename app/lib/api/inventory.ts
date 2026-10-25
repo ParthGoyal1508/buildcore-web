@@ -572,6 +572,23 @@ export async function deletePurchase(id: string): Promise<void> {
 }
 
 /**
+ * Date and remarks only, matching `UpdatePurchaseDto` (042). Quantity, rate, item, store and
+ * vendor are what the stock ledger and the bill were computed from, so they are absent by
+ * design — the API answers 400 to any other field — and correcting one of them is delete plus
+ * re-create. The ledger entry's and bill's dates move with the purchase on the server.
+ */
+export async function updatePurchase(
+  id: string,
+  input: { date?: string; remarks?: string },
+): Promise<Purchase> {
+  const raw = await authFetch<unknown>(
+    `/inventory/purchases/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+  return purchaseSchema.parse(raw);
+}
+
+/**
  * The uploaded bill, as a blob the caller can hand to the browser.
  *
  * Not a plain `<a href>`: the endpoint is behind the bearer token, which lives in

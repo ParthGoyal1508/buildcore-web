@@ -24,7 +24,12 @@ import {
   ROUTES,
 } from '@/app/lib/constants';
 import { dateLabel, todayIso } from '@/app/lib/format';
-import { urlNumber, urlString, useUrlState } from '@/app/lib/use-url-state';
+import {
+  urlEnum,
+  urlNumber,
+  urlString,
+  useUrlState,
+} from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
 import Pager from '@/app/ui/inventory/pager';
 import { ListSkeleton } from '@/app/ui/skeletons';
@@ -43,11 +48,9 @@ import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { NocModal } from '@/app/ui/nocs/noc-panel';
 import {
-  filterByNoc,
   NocFilterField,
   NocStatusBadge,
   useNocStatuses,
-  type NocFilter,
 } from '@/app/ui/nocs/noc-status';
 
 /**
@@ -62,9 +65,16 @@ function WorkersPageBody() {
   const toast = useToast();
   const companyId = useSelectedCompanyId();
   // 036 O11: paged on the server, search debounced, filters in the URL. The list loaded
-  // `pageSize: 200` with no pager, so the 201st worker silently did not exist.
+  // `pageSize: 200` with no pager, so the 201st worker silently did not exist. 042: the NOC
+  // filter joins them — on the server too, so it narrows the whole register and the pager's
+  // totals stay honest (it used to filter only the loaded page).
   const [filters, setFilters, query] = useUrlState(
-    { site: urlString(), q: urlString(), page: urlNumber(1) },
+    {
+      site: urlString(),
+      q: urlString(),
+      noc: urlEnum(['', 'open', 'closed'] as const, ''),
+      page: urlNumber(1),
+    },
     { debounce: ['q'], resetPage: 'page' },
   );
   // The worker a NOC is being managed for (2026-10-15).
@@ -81,6 +91,7 @@ function WorkersPageBody() {
   const params = {
     siteId: query.site || undefined,
     search: query.q.trim() || undefined,
+    nocStatus: query.noc || undefined,
     page: query.page,
     pageSize: PAGE_SIZE,
   };
@@ -89,8 +100,7 @@ function WorkersPageBody() {
     queryFn: () => getWorkers(params),
     placeholderData: keepPreviousData,
   });
-  // Open until the labour's NOC is uploaded, then closed (2026-10-17).
-  const [nocFilter, setNocFilter] = useState<NocFilter>('');
+  // The per-row badge still needs each listed worker's status (2026-10-17).
   const nocStatuses = useNocStatuses(
     'labour_worker',
     (workers.data?.items ?? []).map((w) => w.id),
@@ -189,19 +199,14 @@ function WorkersPageBody() {
         />
         <NocFilterField
           id="filter-noc"
-          value={nocFilter}
-          onChange={setNocFilter}
+          value={filters.noc}
+          onChange={(noc) => setFilters({ noc })}
         />
       </div>
 
       <ResponsiveList
         columns={columns}
-        rows={filterByNoc(
-          workers.data?.items ?? [],
-          nocFilter,
-          nocStatuses,
-          (w) => w.id,
-        )}
+        rows={workers.data?.items ?? []}
         rowKey={(w) => w.id}
         isLoading={workers.isPending}
         error={workers.error}

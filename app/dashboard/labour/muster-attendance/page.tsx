@@ -1,7 +1,12 @@
 'use client';
 
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
@@ -84,7 +89,8 @@ const timeOf = (iso: string) => clockTime(iso);
 const messageOf = (e: unknown, fallback: string) =>
   e instanceof ApiError && e.status < 500 ? e.message : fallback;
 
-/** A worker row matches the search box by name or labour code (036 O7). */
+/** A worker row matches the search box by name or labour code (036 O7). The monthly view still
+ * filters here; the daily view sends the search to the API since 042. */
 function matches(row: { fullName: string; labourCode: string }, q: string): boolean {
   const term = q.trim().toLowerCase();
   if (!term) return true;
@@ -366,14 +372,21 @@ function DailyView({
   onFilter: (f: MusterFilter | '') => void;
   onCorrect: (row: MusterDailyRow) => void;
 }) {
+  // 042: the search is the server's — name or labour code, ANDed with the filter — so it finds
+  // a worker wherever they are in the day, not just in the loaded rows. The summary chips are
+  // untouched by it: like the filter, a search narrows the list while the chips keep counting
+  // the whole day.
+  const term = search.trim();
   const daily = useQuery({
-    queryKey: ['labour', 'muster-daily', siteId, date, filter],
+    queryKey: ['labour', 'muster-daily', siteId, date, filter, term],
     queryFn: () =>
       getMusterDaily({
         date,
         ...(siteId ? { siteId } : {}),
         ...(filter ? { filter } : {}),
+        ...(term ? { search: term } : {}),
       }),
+    placeholderData: keepPreviousData,
   });
   const s = daily.data?.summary;
 
@@ -507,13 +520,14 @@ function DailyView({
       )}
       <ResponsiveList
         columns={columns}
-        rows={(daily.data?.items ?? []).filter((r) => matches(r, search))}
+        rows={daily.data?.items ?? []}
         rowKey={(r) => `${r.workerId}|${r.siteId}`}
         isLoading={daily.isPending}
+        isRefreshing={daily.isPlaceholderData && daily.isFetching}
         error={daily.error}
         onRetry={daily.refetch}
         emptyMessage={
-          filter || search.trim()
+          filter || term
             ? 'Nobody matches this filter.'
             : 'No labour at this site yet.'
         }
