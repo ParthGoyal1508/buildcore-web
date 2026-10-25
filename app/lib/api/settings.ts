@@ -326,6 +326,18 @@ export async function listRoles(): Promise<Role[]> {
 }
 
 /**
+ * Only the roles the caller may actually assign (042) — the same grant ceiling the invite and
+ * user endpoints enforce on submit, applied by the server to the list itself. The invite form
+ * reads this under its own query key, distinct from the Roles screen's `['roles']`, so the two
+ * lists never serve from each other's cache.
+ */
+export async function listGrantableRoles(): Promise<Role[]> {
+  return z
+    .array(roleSchema)
+    .parse(await authFetch('/settings/roles?grantable=true'));
+}
+
+/**
  * Creating or editing a role (019 FR-018).
  *
  * `grants` is optional on the wire and means something specific when omitted: **read and write on

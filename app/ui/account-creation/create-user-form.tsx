@@ -15,7 +15,7 @@ import {
   listSelectableCompanies,
   useSelectedCompanyId,
 } from '@/app/lib/api/company-selection';
-import { listRoles } from '@/app/lib/api/settings';
+import { listGrantableRoles } from '@/app/lib/api/settings';
 import { USERS_NOTICE_KEY } from '@/app/ui/settings/user-list';
 import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
@@ -59,10 +59,14 @@ export default function CreateUserForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
-  // `['roles']`, the key the Users and Roles screens read (036 C18), so a role added there is here.
+  // The server's own grantable list (042): `?grantable=true` returns only the roles the caller
+  // may actually assign, by the same ceiling the invite endpoint enforces on submit. Under
+  // `['roles', 'grantable']` — a child of the Roles screen's `['roles']`, so a role created or
+  // edited there still invalidates this list, while the two never serve from each other's cache
+  // (the Roles screen must keep showing roles the viewer cannot grant).
   const { data: allRoles = [] } = useQuery({
-    queryKey: ['roles'],
-    queryFn: listRoles,
+    queryKey: ['roles', 'grantable'],
+    queryFn: listGrantableRoles,
   });
   // Only roles the creator may give (2026-10-16 access-control audit, C2): the API refuses a role
   // carrying any permission its creator lacks — Super Admin, for a company administrator — so the
@@ -71,7 +75,8 @@ export default function CreateUserForm() {
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
-  // The same ceiling the Users screen applies, levels included (036 C10).
+  // The same ceiling the Users screen applies, levels included (036 C10) — kept as
+  // belt-and-braces over the server's own filtering above.
   const roles = allRoles.filter((role) => mayAssignRole(me, role));
   // The companies the caller may work in — exactly their own for a company administrator — rather
   // than the Companies settings list, which needs COMPANY_SETTINGS an account administrator may
