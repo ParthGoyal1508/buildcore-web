@@ -293,6 +293,9 @@ export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
 export const registrationPaperSchema = z.object({
   kind: z.enum(REGISTRATION_KINDS),
   status: z.enum(REGISTRATION_STATUSES),
+  // 2026-10-26. Nullish rather than nullable so the page still reads an API deployed a few
+  // minutes behind it, which sends no issue date at all.
+  issuedAt: isoDate.nullish(),
   expiresAt: isoDate.nullable(),
   number: z.string().nullable(),
   hasDocument: z.boolean(),
@@ -412,6 +415,8 @@ export async function getEquipmentDetail(id: string): Promise<EquipmentDetail> {
 export interface RegistrationPaperInput {
   kind: RegistrationKind;
   status: RegistrationStatus;
+  /** YYYY-MM-DD; meaningful when held or life time. */
+  issuedAt?: string;
   /** YYYY-MM-DD; only meaningful when held. */
   expiresAt?: string;
   number?: string;
