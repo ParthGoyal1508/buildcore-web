@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { authFetch } from '@/app/lib/session';
+import { ApiError } from '@/app/lib/api/client';
+import { authFetch, authFetchBlob } from '@/app/lib/session';
 
 /**
  * Every Settings response is parsed through a zod schema before it reaches a
@@ -50,6 +51,16 @@ export const companySchema = z.object({
   payrollDebitAccountNumber: z.string().nullable().default(null),
   /** 041: how many branches (GST registrations) the company has; only the list carries it. */
   branchCount: z.number().optional(),
+  /**
+   * The worst GPS accuracy a punch may report and still be located, in metres (020 FR-012b,
+   * surfaced 042). Null is "no decision": the company follows the product default, which only
+   * the API knows — see `setPunchAccuracy`. Optional because the DTO does not declare it; it
+   * reaches the wire through `CompanyResponseDto.fromEntity`'s spread of the row.
+   */
+  punchAccuracyMaxMetres: z.number().nullable().optional(),
+  /** Whether a punch that fails location or face validation is refused outright (020 FR-013)
+   * rather than recorded as an exception. Optional for the same reason as above. */
+  punchBlockEnforced: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -91,6 +102,96 @@ export async function uploadCompanyLogo(id: string, file: File): Promise<void> {
     method: 'PUT',
     body: JSON.stringify({ data: btoa(binary) }),
   });
+}
+
+/**
+ * Uploads the company's printed letterhead (042) — a **full-page** image (header, blank middle,
+ * footer), exactly as the pre-printed stationery is. The letter renderer draws it to the page
+ * edges behind every letter and lays the body in the clear band. Same transport as the logo
+ * above: base64 in a JSON body, type detected from the bytes server-side, anything that is not
+ * an image refused with a 400.
+ *
+ * Replacing it changes every letter issued **from now on**; letters already issued keep their
+ * own rendered PDF and are unaffected.
+ */
+export async function uploadCompanyLetterhead(
+  id: string,
+  file: File,
+): Promise<{ contentType: string; sizeBytes: number }> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1)
+    binary += String.fromCharCode(bytes[i]);
+  return z
+    .object({ contentType: z.string(), sizeBytes: z.number() })
+    .parse(
+      await authFetch(`/settings/companies/${id}/letterhead`, {
+        method: 'PUT',
+        body: JSON.stringify({ data: btoa(binary) }),
+      }),
+    );
+}
+
+/**
+ * The letterhead currently in force, as the image itself — what letters will print on.
+ *
+ * `null` when the company has none, which the API reports as a 404 and is a legitimate state,
+ * not an error: those companies' letters render on plain paper.
+ */
+export async function getCompanyLetterhead(id: string): Promise<Blob | null> {
+  try {
+    return await authFetchBlob(`/settings/companies/${id}/letterhead`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/**
+ * Sets the acceptable GPS accuracy for a punch, in metres (020 FR-012b, surfaced 042).
+ *
+ * `null` clears the company's decision and returns it to the product default — a different act
+ * from setting it to the default's current value: a cleared company follows the default if it
+ * ever changes. The response's `effective` is the number punches will actually be judged by,
+ * which is the only way the client learns the default without restating it.
+ */
+export async function setPunchAccuracy(
+  companyId: string,
+  metres: number | null,
+): Promise<{ punchAccuracyMaxMetres: number | null; effective: number }> {
+  return z
+    .object({
+      punchAccuracyMaxMetres: z.number().nullable(),
+      effective: z.number(),
+    })
+    .parse(
+      await authFetch(`/settings/companies/${companyId}/punch-accuracy`, {
+        method: 'PUT',
+        body: JSON.stringify({ punchAccuracyMaxMetres: metres }),
+      }),
+    );
+}
+
+/**
+ * Switches the hard punch refusal on or off (020 FR-013, surfaced 042).
+ *
+ * While off — the default — a failing punch is recorded as an exception for an admin and the
+ * would-be refusal logged; while on it is refused outright and nothing is written to attendance.
+ * Takes effect on the next punch. The refusal log (`/hr/attendance/refusals`) keeps the same
+ * shape either way, so before and after are directly comparable.
+ */
+export async function setPunchEnforcement(
+  companyId: string,
+  enforced: boolean,
+): Promise<{ punchBlockEnforced: boolean }> {
+  return z
+    .object({ punchBlockEnforced: z.boolean() })
+    .parse(
+      await authFetch(`/settings/companies/${companyId}/punch-enforcement`, {
+        method: 'PUT',
+        body: JSON.stringify({ punchBlockEnforced: enforced }),
+      }),
+    );
 }
 
 export async function updateCompany(
@@ -222,6 +323,18 @@ export function roleFitsCompany(
 
 export async function listRoles(): Promise<Role[]> {
   return z.array(roleSchema).parse(await authFetch('/settings/roles'));
+}
+
+/**
+ * Only the roles the caller may actually assign (042) — the same grant ceiling the invite and
+ * user endpoints enforce on submit, applied by the server to the list itself. The invite form
+ * reads this under its own query key, distinct from the Roles screen's `['roles']`, so the two
+ * lists never serve from each other's cache.
+ */
+export async function listGrantableRoles(): Promise<Role[]> {
+  return z
+    .array(roleSchema)
+    .parse(await authFetch('/settings/roles?grantable=true'));
 }
 
 /**

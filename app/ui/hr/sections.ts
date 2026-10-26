@@ -38,7 +38,7 @@ export const HR_SECTIONS: {
     key: 'attendance',
     href: ROUTES.hrAttendance,
     title: 'Attendance',
-    description: 'Daily register, exceptions, holidays, bulk import.',
+    description: 'Daily register, exceptions, refusals, holidays, bulk import.',
     icon: CalendarDaysIcon,
   },
   {
@@ -87,7 +87,8 @@ export const HR_SECTIONS: {
     key: 'reimbursements',
     href: ROUTES.hrReimbursements,
     title: 'Reimbursements',
-    description: 'Review, approve and pay employee claims.',
+    description:
+      'Review, approve and pay employee claims; the register totals them by status.',
     icon: ReceiptPercentIcon,
   },
   {

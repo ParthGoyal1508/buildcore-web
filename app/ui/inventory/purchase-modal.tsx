@@ -6,11 +6,13 @@ import { useState } from 'react';
 import { errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
+  completePurchase,
   createPurchase,
   getItem,
   getOpenPurchaseOrderLines,
   GRN_CONDITIONS,
   type GrnDetails,
+  type Purchase,
   type PurchaseInput,
 } from '@/app/lib/api/inventory';
 import { getSite } from '@/app/lib/api/projects';
@@ -33,6 +35,7 @@ import {
   searchVendors,
   siteOption,
 } from './inventory-search';
+import SiteCapturePanel from './site-capture-panel';
 
 /** Photos only, for the delivery photograph (the API refuses anything else with 415). */
 const ACCEPT_PHOTOS =
@@ -83,17 +86,27 @@ function grnFrom(draft: typeof EMPTY_GRN): GrnDetails | undefined {
 export default function PurchaseModal({
   onClose,
   indentLineId,
-  defaults,
+  defaults: given,
+  completing,
 }: {
   onClose: () => void;
   /** Set when the purchase is raised from an indent line, so the fulfilment is
    * recorded against it (009 FR-023). */
   indentLineId?: string;
   defaults?: Partial<PurchaseInput>;
+  /**
+   * A site entry to complete (043): the same form, opened on what the site captured. The store and
+   * photo stay as the site recorded them; the item, date and vehicle are prefilled and may be
+   * corrected; vendor, quantity, rate and bill are Head Office's to add.
+   */
+  completing?: Purchase;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
+  const defaults = completing
+    ? { siteId: completing.siteId, itemId: completing.itemId }
+    : given;
 
   const [siteId, setSiteId] = useState(defaults?.siteId ?? '');
   const [itemId, setItemId] = useState(defaults?.itemId ?? '');
@@ -106,16 +119,21 @@ export default function PurchaseModal({
   const [poLineId, setPoLineId] = useState('');
   const [billFile, setBillFile] = useState<PreparedFile | null>(null);
   const [photoFile, setPhotoFile] = useState<PreparedFile | null>(null);
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(completing?.date.slice(0, 10) ?? today());
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [grnDraft, setGrnDraft] = useState(EMPTY_GRN);
+  const [remarks, setRemarks] = useState(completing?.remarks ?? '');
+  const [grnDraft, setGrnDraft] = useState({
+    ...EMPTY_GRN,
+    vehicleNo: completing?.vehicleNo ?? '',
+  });
   const [error, setError] = useState<string | null>(null);
 
   // An indent line fixes the store and the item (the API refuses any other, 036 M2), and a form
-  // opened on known ids needs their names: the pickers no longer hold every row (036 M5).
+  // opened on known ids needs their names: the pickers no longer hold every row (036 M5). A site
+  // entry fixes the store alone — it is where the photo was taken.
   const fixed = Boolean(indentLineId);
+  const storeFixed = fixed || Boolean(completing);
   const defaultSite = useQuery({
     queryKey: ['inventory', 'site', defaults?.siteId],
     queryFn: () => getSite(defaults?.siteId ?? ''),
@@ -166,8 +184,8 @@ export default function PurchaseModal({
 
   const save = useMutation({
     mutationFn: async () => {
-      const input: PurchaseInput = {
-        siteId,
+      // Without the store: a completion keeps the site's, where the photo was taken (043).
+      const input: Omit<PurchaseInput, 'siteId'> = {
         itemId,
         vendorId,
         date,
@@ -184,14 +202,15 @@ export default function PurchaseModal({
         input.billFile = billFile.base64;
         input.billContentType = billFile.mimeType;
       }
+      if (completing) return completePurchase(completing.id, input);
       if (photoFile) input.photoFile = photoFile.base64;
-      return createPurchase(input);
+      return createPurchase({ ...input, siteId });
     },
     onSuccess: (purchase) => {
       // Every stock figure on every open screen is now stale.
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success(
-        `Purchase recorded${purchase.grnNumber ? ` — ${purchase.grnNumber}` : ''}`,
+        `Purchase ${completing ? 'completed' : 'recorded'}${purchase.grnNumber ? ` — ${purchase.grnNumber}` : ''}`,
       );
       onClose();
     },
@@ -218,7 +237,7 @@ export default function PurchaseModal({
 
   return (
     <Modal
-      title="New purchase"
+      title={completing ? 'Complete site entry' : 'New purchase'}
       onClose={onClose}
       wide
       isDirty={Boolean(
@@ -236,7 +255,7 @@ export default function PurchaseModal({
             disabled={!ready}
             loading={save.isPending}
           >
-            Record purchase
+            {completing ? 'Complete purchase' : 'Record purchase'}
           </Button>
         </>
       }
@@ -250,6 +269,8 @@ export default function PurchaseModal({
           save.mutate();
         }}
       >
+        {completing && <SiteCapturePanel purchase={completing} />}
+
         <div className="flex flex-col gap-1 text-sm">
           {pickerLabel('purchase-site', 'Store')}
           <AsyncSelect
@@ -262,7 +283,7 @@ export default function PurchaseModal({
             search={searchSites}
             cacheKey={['inventory', 'sites', 'search', companyId]}
             selectedOption={siteSelected}
-            disabled={fixed}
+            disabled={storeFixed}
             placeholder="Search stores"
           />
         </div>
@@ -334,7 +355,7 @@ export default function PurchaseModal({
 
         <TextField
           id="purchase-date"
-          label="Date *"
+          label="Date"
           type="date"
           required
           max={today()}
@@ -344,7 +365,7 @@ export default function PurchaseModal({
 
         <TextField
           id="purchase-quantity"
-          label="Quantity *"
+          label="Quantity"
           type="number"
           inputMode="decimal"
           required
@@ -362,7 +383,7 @@ export default function PurchaseModal({
 
         <TextField
           id="purchase-rate"
-          label="Rate (₹) *"
+          label="Rate (₹)"
           type="number"
           inputMode="decimal"
           required
@@ -389,13 +410,16 @@ export default function PurchaseModal({
           onSelect={setBillFile}
         />
 
-        <FileUpload
-          id="purchase-photo"
-          label="Delivery photo"
-          accept={ACCEPT_PHOTOS}
-          hint="Optional. The load as it arrived at the gate."
-          onSelect={setPhotoFile}
-        />
+        {/* A site entry's photo is the site's live capture, shown above and not replaceable. */}
+        {!completing && (
+          <FileUpload
+            id="purchase-photo"
+            label="Delivery photo"
+            accept={ACCEPT_PHOTOS}
+            hint="Optional. The load as it arrived at the gate."
+            onSelect={setPhotoFile}
+          />
+        )}
 
         <div className="sm:col-span-2">
           <TextField

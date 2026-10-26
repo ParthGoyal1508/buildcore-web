@@ -229,6 +229,8 @@ export const ROUTES = {
   inventoryIndents: '/dashboard/inventory/indents',
   inventoryIndent: (id: string) => `/dashboard/inventory/indents/${id}`,
   inventoryProcurement: '/dashboard/inventory/indents/procurement',
+  /** 043: the site's "Create Inventory Purchase" page — a field screen outside /dashboard, like labour's. */
+  inventorySiteEntry: '/inventory/site-entry',
 
   // --- Labour (feature 013) ---
   // Back-office surfaces under the /dashboard shell (desktop-first, responsive); the
@@ -2169,6 +2171,11 @@ export const PERMISSIONS = [
   /** 037: the Bank Guarantees register under Projects, and its 30-day expiry alerts. */
   'BANK_GUARANTEES',
   /**
+   * 043: record a delivery from the site — the Create Inventory Purchase page and nothing else of
+   * Inventory. Site Incharge holds it.
+   */
+  'INVENTORY_SITE_ENTRY',
+  /**
    * 039: Head Office paying a job card's final bill (Plant → Maintenance). Super Admin and HO User
    * hold it; site roles keep MAINTENANCE to raise and correct cards.
    */
@@ -2178,6 +2185,7 @@ export const PERMISSIONS = [
 export type Permission = (typeof PERMISSIONS)[number];
 
 const PERMISSION_LABELS: Record<string, string> = {
+  INVENTORY_SITE_ENTRY: 'Inventory Site Delivery Entry',
   HR_LETTERS: 'HR Letters',
   MAINTENANCE_PAY: 'Maintenance Payments',
 };
@@ -3309,6 +3317,43 @@ export const LABOUR_PUNCH_MESSAGES = {
     'This labour is already on a muster for today that was entered another way.',
 } as const;
 
+/**
+ * A refused site delivery entry (043), by the API's code. The location sentences are attendance's,
+ * for the same person holding the same phone.
+ */
+export const SITE_ENTRY_MESSAGES = {
+  SITE_ENTRY_REFUSED_LOCATION:
+    'You are too far from this site for the delivery to be recorded. Move to the site and take the photo again.',
+  SITE_ENTRY_REFUSED_UNLOCATABLE:
+    'Your phone could not work out where you are accurately enough. Step outside or somewhere with a clearer view of the sky, then take the photo again.',
+  SITE_ENTRY_REFUSED_STALE_PHOTO:
+    'This photo was taken too long ago. Take the photo again, then submit straight away.',
+  SITE_ENTRY_NO_STORE:
+    'No store is assigned to you, so a delivery cannot be recorded. Ask the HR office to assign your site.',
+  SITE_ENTRY_STORE_NOT_ASSIGNED:
+    'You are not assigned to this store. Ask the HR office to assign it to you.',
+} as const;
+
+/** The codes after which the photo must be taken again, rather than the form resubmitted. */
+export const SITE_ENTRY_RETAKE_CODES: readonly string[] = [
+  'SITE_ENTRY_REFUSED_LOCATION',
+  'SITE_ENTRY_REFUSED_UNLOCATABLE',
+  'SITE_ENTRY_REFUSED_STALE_PHOTO',
+];
+
+export const SITE_ENTRY_COPY = {
+  title: 'Create Inventory Purchase',
+  description:
+    'Record a delivery as it arrives. Head Office adds the vendor, quantity, rate and bill later.',
+  photoHint:
+    'Photograph the delivered material at the site — up to 5 photos. They are taken live, and your location is checked against the site.',
+  locating: 'Finding your location…',
+  offline:
+    'You are offline, so the delivery was not recorded. Connect and press Submit again — it will not be saved twice.',
+  saved: 'Delivery recorded. It is waiting for Head Office to complete it.',
+  partialBadge: 'Partially filled (Site)',
+} as const;
+
 /** 034: how a labour day counts, from the hours between punch in and out. */
 export const LABOUR_DAY_STATUS_LABELS: Record<string, string> = {
   full_day: 'Full day',
@@ -3997,6 +4042,25 @@ export const FUEL_EXCEPTIONS = {
     `${amount} proposed as a salary recovery. It is waiting for approval and has not been deducted from anyone's pay.`,
   recoveryAwaitingApproval: 'Awaiting approval — not yet deducted',
   recoveryApproved: 'Approved — applies on the next payroll run',
+  /** A dead recovery is not an absent one: the loss stands and can be recovered again (042). */
+  recoveryReversed: 'Recovery reversed — the loss stands unrecovered',
+  recoveryRejected: 'Recovery rejected — the loss stands unrecovered',
+
+  /**
+   * 042: undoing a recovery after the reading behind it is corrected (020 FR-010).
+   *
+   * The confirmation spells out the server's asymmetry, because the two reversals leave different
+   * trails: a deduction on an unpaid bill never left the company so its row is deleted outright,
+   * while an operator recovery may already have reduced somebody's pay, so its row is kept and
+   * marked — a row deleted from under a payslip makes that payslip unexplainable.
+   */
+  reverse: 'Reverse recovery',
+  reverseConfirmTitle: 'Reverse this recovery?',
+  reverseConfirmHireBill:
+    'The deduction is removed from the hire bill and its net payable recomputed. A bill already paid is refused — a paid figure is never rewritten.',
+  reverseConfirmOperator:
+    'The salary recovery is marked reversed and taken off the payroll. The record of it is kept, so a payslip it already reached stays explainable.',
+  reverseConfirmLabel: 'Reverse',
 
   /**
    * T047. The pattern worth catching before fifty deductions are raised.

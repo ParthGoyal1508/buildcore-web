@@ -580,6 +580,35 @@ export async function decideApproval(
 }
 
 /**
+ * Hands a pending item to a named person at its current level (016 FR-019, wired 042).
+ *
+ * Requires `SETTINGS`: reassignment is an administrative act, not an approval. The target does
+ * **not** have to hold the level's role — deliberately, per the backend's `ReassignApprovalDto`:
+ * the stall this clears is a level whose only holder already decided earlier in the chain, and a
+ * holder check would make exactly that case unclearable. So the eligible targets are simply the
+ * company's active accounts, and the picker lists them from `/settings/users` (which the same
+ * `SETTINGS` permission reads). The reason is **mandatory** (`APPROVAL_REASON_REQUIRED`) — an
+ * unexplained reassignment of an approval is exactly what an audit trail exists to explain.
+ *
+ * Refusals carry codes: `APPROVAL_NOT_PENDING` (409 — nothing is awaiting anyone),
+ * `APPROVAL_REASSIGN_FORBIDDEN` (403 — the item is awaiting the caller, who cannot use an
+ * administrative right to pass on a decision that is theirs), `APPROVAL_REASON_REQUIRED`.
+ *
+ * Response parsed with the same schema as `decide` — the service returns `toView(...)` from both.
+ * Derived from `approvals.service.ts`, not yet checked against a live response (042 Wave 3).
+ */
+export async function reassignApproval(
+  instanceId: string,
+  input: { toUserId: string; reason: string },
+): Promise<ApprovalState> {
+  const raw = await authFetch<unknown>(
+    `/approvals/${encodeURIComponent(instanceId)}/reassign`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return approvalStateObjectSchema.parse(raw);
+}
+
+/**
  * Sends a returned item back up its chain, as a new round.
  *
  * Keyed by entity rather than by instance id, matching the endpoint: `returned` is a live

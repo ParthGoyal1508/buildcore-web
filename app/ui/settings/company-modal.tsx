@@ -2,14 +2,16 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ApiError, errorMessage } from '@/app/lib/api/client';
 import {
   Company,
   createCompany,
+  getCompanyLetterhead,
   updateCompany,
+  uploadCompanyLetterhead,
   uploadCompanyLogo,
 } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
@@ -26,6 +28,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { focusFirstInvalid } from '@/app/lib/form-focus';
 import CompanyBranchesPanel from '@/app/ui/settings/company-branches-panel';
+import PunchSettingsPanel from '@/app/ui/settings/punch-settings-panel';
 
 // Same statutory formats the API validates against, checked here first so an
 // obvious typo never costs a round trip.
@@ -87,9 +90,15 @@ const TABS = [
   { id: 'address', label: 'Head Office' },
   { id: 'statutory', label: 'Statutory' },
   { id: 'payroll', label: 'Payroll Settings' },
+  // Face-punch controls (042): accuracy threshold and the hard refusal. Like Branches, it
+  // saves on its own rather than with the form, and exists only once the company does.
+  { id: 'attendance', label: 'Attendance' },
   { id: 'branches', label: 'Branches' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+
+/** The tabs that save on their own and so exist only once the company does. */
+const SELF_SAVING_TABS: readonly TabId[] = ['attendance', 'branches'];
 
 /** Which tab each field lives on, so a rejection can send the user straight to it. */
 const FIELD_TAB: Record<string, TabId> = {
@@ -281,9 +290,9 @@ export default function CompanyModal({
       isDirty={isDirty || pendingLogo !== null}
       pending={mutation.isPending}
       footer={
-        // The Branches tab saves each branch on its own; the company form's Save there would read
-        // as saving the branches, which it does not.
-        tab === 'branches' ? (
+        // The Branches and Attendance tabs save on their own; the company form's Save there
+        // would read as saving them, which it does not.
+        SELF_SAVING_TABS.includes(tab) ? (
           <SecondaryButton type="button" onClick={onClose}>
             Done
           </SecondaryButton>
@@ -311,8 +320,8 @@ export default function CompanyModal({
       }
     >
       <div className="mb-4 flex flex-wrap gap-1 border-b" role="tablist">
-        {/* Branches exist once the company does: they are saved on their own, not with this form. */}
-        {TABS.filter((t) => t.id !== 'branches' || company).map((t) => (
+        {/* Branches and Attendance exist once the company does: each saves on its own, not with this form. */}
+        {TABS.filter((t) => !SELF_SAVING_TABS.includes(t.id) || company).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -389,6 +398,11 @@ export default function CompanyModal({
               one thing, one of which does nothing, is worse than one.
               Still registered below and still submitted unchanged, so whatever rows
               already hold is preserved rather than blanked by a save. */}
+          {/* The letterhead needs the company to exist (042) — on create it can be added from
+              Edit, like the branches, rather than held pending like the logo: it is a rarer
+              act and holding two pending uploads doubles the "saved but its file was not"
+              states a create can end in. */}
+          {company && <LetterheadUpload companyId={company.id} />}
         </div>
 
         <div className={tab === 'registration' ? 'space-y-4' : 'hidden'}>
@@ -425,6 +439,7 @@ export default function CompanyModal({
         </div>
       </form>
 
+      {company && tab === 'attendance' && <PunchSettingsPanel company={company} />}
       {company && tab === 'branches' && <CompanyBranchesPanel companyId={company.id} />}
     </Modal>
   );
@@ -458,5 +473,80 @@ function LogoUpload({ companyId }: { companyId: string }) {
         toast.success('Logo saved.');
       }}
     />
+  );
+}
+
+/** Letterheads keep their pixels too: they print full-page, and the canvas resize that shrinks a
+ * photo would soften the artwork on every letter the company ever issues. */
+const LETTERHEAD_ACCEPT = 'image/png,image/jpeg';
+
+/**
+ * The company's printed letterhead — view and replace (042).
+ *
+ * Shows the stationery currently in force so whoever replaces it can see what they are
+ * replacing, and says plainly what a replacement means: letters issued from now on change,
+ * letters already issued keep their own rendered PDF (the same freeze a signature gets).
+ * "No letterhead" is a legitimate state, not an error — those companies' letters render on
+ * plain paper.
+ */
+function LetterheadUpload({ companyId }: { companyId: string }) {
+  const queryClient = useQueryClient();
+  const current = useQuery({
+    queryKey: ['companies', companyId, 'letterhead'],
+    queryFn: () => getCompanyLetterhead(companyId),
+  });
+
+  // The preview's object URL — derived from the blob, released when it changes or the
+  // control goes away.
+  const previewUrl = useMemo(
+    () => (current.data ? URL.createObjectURL(current.data) : null),
+    [current.data],
+  );
+  useEffect(() => {
+    if (!previewUrl) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  return (
+    <div className="space-y-2">
+      <p className="block text-sm font-medium text-gray-700">
+        Letterhead in force
+      </p>
+      {current.isPending ? (
+        <p className="text-sm text-gray-500" role="status">
+          Loading the letterhead…
+        </p>
+      ) : current.isError ? (
+        <p className="text-sm text-red-700" role="alert">
+          {errorMessage(current.error, 'The letterhead could not be loaded.')}
+        </p>
+      ) : previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an asset.
+        <img
+          src={previewUrl}
+          alt="The letterhead every letter currently prints on"
+          className="max-h-64 rounded-md border border-gray-200 bg-white object-contain"
+        />
+      ) : (
+        <p className="text-sm text-gray-500">
+          No letterhead yet — letters print on plain paper.
+        </p>
+      )}
+      <FileUpload
+        label={current.data ? 'Replace letterhead' : 'Upload letterhead'}
+        accept={LETTERHEAD_ACCEPT}
+        compress={false}
+        hint="A full-page PNG or JPEG — header, blank middle, footer — exactly as the pre-printed stationery is. It is drawn to the page edges behind every letter. Replacing it changes letters issued from now on; letters already issued keep their rendered PDF."
+        onUpload={async (prepared) => {
+          await uploadCompanyLetterhead(companyId, prepared.file);
+          await queryClient.invalidateQueries({
+            queryKey: ['companies', companyId, 'letterhead'],
+          });
+          toast.success(
+            'Letterhead saved. Letters issued from now on print on it; letters already issued keep their rendered PDF.',
+          );
+        }}
+      />
+    </div>
   );
 }

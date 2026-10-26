@@ -42,10 +42,12 @@ export const config = {
   // `/labour/:path*` is the supervisor's field tree (013, 031) — outside `/dashboard` for the same
   // reason `/my` is, and it was missing here, so a signed-out phone saw the shell and then a
   // "could not load" instead of the sign-in page. It also sends `no-store` on a screen of photos.
+  // `/inventory/:path*` is the site's delivery entry (043), a field screen on the same terms.
   matcher: [
     '/dashboard/:path*',
     '/my/:path*',
     '/labour/:path*',
+    '/inventory/:path*',
     '/login',
     '/home',
     '/change-password',

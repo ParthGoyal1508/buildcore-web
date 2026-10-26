@@ -20,12 +20,11 @@ import {
   FormError,
   RowAction,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
-import { usePlantVendors } from './use-plant-refs';
+import { VendorPicker } from './pickers';
 import { promptDialog } from '@/app/ui/dialogs';
 import { todayIso } from '@/app/lib/format';
 
@@ -46,7 +45,6 @@ function ServiceBillModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const vendors = usePlantVendors();
 
   const [vendorId, setVendorId] = useState('');
   const [billNumber, setBillNumber] = useState('');
@@ -101,7 +99,8 @@ function ServiceBillModal({
           <Button
             type="submit"
             form="service-bill-form"
-            disabled={save.isPending}
+            // The picker has no native `required`, so the gate the old `<select>` gave is here.
+            disabled={save.isPending || !vendorId}
           >
             {save.isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -120,20 +119,15 @@ function ServiceBillModal({
         <FormError message={error} />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
+          {/* Server-searched (036 kit, wired 042): the list was one page of 200, so the 201st
+              workshop could not be billed. */}
+          <VendorPicker
             id="bill-vendor"
             label="Workshop"
             required
             value={vendorId}
-            onChange={(event) => setVendorId(event.target.value)}
-          >
-            <option value="">Select a vendor</option>
-            {(vendors.data ?? []).map((vendor) => (
-              <option key={vendor.id} value={vendor.id}>
-                {vendor.name}
-              </option>
-            ))}
-          </SelectField>
+            onChange={(id) => setVendorId(id)}
+          />
 
           <TextField
             id="bill-number"

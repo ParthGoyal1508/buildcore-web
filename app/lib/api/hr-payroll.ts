@@ -774,6 +774,63 @@ export async function getAttendanceModifications(
 }
 
 /**
+ * One refused punch — or, while the hard block is off, one that was accepted and *would* have
+ * been refused (020 FR-013c, surfaced 042).
+ *
+ * A **log**, not a queue: nothing here can be resolved, approved or promoted into attendance,
+ * because a refused punch was never recorded — the way back is a manual attendance correction.
+ * The same shape whether or not the block is on, which is what makes a fortnight of measured
+ * would-be refusals directly comparable with a fortnight of real ones.
+ *
+ * `latitude`/`longitude` arrive too (as Decimal strings) and are deliberately not declared:
+ * nothing on this screen plots a point — the same decision `flaggedPunchSchema` above records.
+ * `faceMatchDistance` *is* read: it is the one piece of evidence that distinguishes "the camera
+ * saw somebody else" from "the light was bad". There is no photo — a refused punch stores none.
+ */
+export const punchRefusalRowSchema = z.object({
+  id: z.string(),
+  employeeId: z.string(),
+  type: z.enum(['in', 'out']),
+  reason: z.enum([
+    'outside_geofence',
+    'unlocatable',
+    'face_mismatch',
+    'no_face_detected',
+  ]),
+  /** How far outside the fence, in metres — the real distance, unadjusted. Null where the
+   * refusal was not about distance. */
+  distanceMeters: nullableDecimal,
+  /** What the device claimed to know, in metres. Null where the browser reported none. */
+  accuracyMeters: z.number().nullable(),
+  faceMatchDistance: nullableDecimal,
+  /** When the punch was taken — not when it reached the server; an offline punch can arrive
+   * days later. */
+  capturedAt: isoDate,
+  createdAt: isoDate,
+});
+export type PunchRefusalRow = z.infer<typeof punchRefusalRowSchema>;
+
+/**
+ * The company's punch refusal log, filterable (020 FR-013c).
+ *
+ * Needs **write** on ATTENDANCE, not read — the server's rule: this surface carries where a
+ * named person physically was and how well their face matched, a narrower audience than "can
+ * read attendance". `from`/`to` filter on when the punch was taken.
+ */
+export async function getPunchRefusals(
+  filters: {
+    employeeId?: string;
+    reason?: PunchRefusalRow['reason'];
+    from?: string;
+    to?: string;
+  } = {},
+) {
+  return z
+    .array(punchRefusalRowSchema)
+    .parse(await authFetch<unknown>(`/hr/attendance/refusals${qs({ ...filters })}`));
+}
+
+/**
  * Late-coming, early-departure and short-hours figures for a month.
  *
  * `marker` is the load-bearing field: a day with no shift configured, or no punch
@@ -820,6 +877,12 @@ export async function getLateComingReport(
  * The admin counterpart to My Workspace's `/my/punch/history`: that route derives
  * the employee from the caller's own token and takes no employee parameter by
  * design, so it cannot serve an admin looking at somebody else's month.
+ *
+ * Served under the **employee's own company** since 042 — the server resolves it from the
+ * employee row, exactly as the profile endpoint does, so a cross-company profile's attendance
+ * tab answers wherever the profile itself does. The route's `companyId` query parameter was
+ * removed with that change, and the API refuses undeclared query parameters with a 400, so
+ * nothing here may ever send one.
  */
 export const attendanceDaySchema = z.object({
   date: z.string(),
@@ -1973,6 +2036,39 @@ export async function listAdminClaimsPage(filters: {
 /** A claim's receipt — a photo or a PDF — for the approver to open (036 F17). */
 export async function getClaimReceipt(id: string) {
   return authFetchFile(`/hr/reimbursements/${id}/receipt`);
+}
+
+/**
+ * The Reimbursement Register (042): every non-draft claim with status subtotals.
+ *
+ * `totals` are computed figures from the service, so they arrive as plain numbers — unlike the
+ * row amounts, which are Decimal strings. The register reads at most the first 100 claims that
+ * match (the service pins the page), so the subtotals describe what is on screen.
+ */
+export const reimbursementRegisterSchema = z.object({
+  items: z.array(adminClaimSchema),
+  totals: z.object({
+    submitted: z.number(),
+    approved: z.number(),
+    paid: z.number(),
+    rejected: z.number(),
+    all: z.number(),
+  }),
+});
+export type ReimbursementRegister = z.infer<typeof reimbursementRegisterSchema>;
+
+/** Takes the same filters as the claims list (`ListClaimsQueryDto`). EMPLOYEES or PAYROLL. */
+export async function getReimbursementRegister(
+  filters: {
+    status?: string;
+    employeeId?: string;
+    from?: string;
+    to?: string;
+  } = {},
+): Promise<ReimbursementRegister> {
+  return reimbursementRegisterSchema.parse(
+    await authFetch<unknown>(`/hr/reimbursements/register${qs({ ...filters })}`),
+  );
 }
 
 /**

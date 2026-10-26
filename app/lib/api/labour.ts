@@ -230,6 +230,9 @@ export interface WorkerQuery {
   skillCategoryId?: string;
   status?: string;
   search?: string;
+  /** Open until the labour's NOC is uploaded, closed from then on — filtered on the server
+   * across the whole register, so the pager's totals stay honest (042). */
+  nocStatus?: 'open' | 'closed';
   page?: number;
   pageSize?: number;
 }
@@ -1145,6 +1148,9 @@ export async function getMusterDaily(query: {
   date?: string;
   siteId?: string;
   filter?: MusterFilter;
+  /** Name or labour-code substring, case-insensitive, trimmed on the server; ANDed with
+   * `filter`. Narrows `items` only — `summary` still counts the whole day (042). */
+  search?: string;
 }): Promise<MusterDaily> {
   const data = await authFetch<unknown>(
     `/labour/muster-attendance/daily${qs({ ...query })}`,

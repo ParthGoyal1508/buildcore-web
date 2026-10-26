@@ -17,11 +17,14 @@ import {
   getPurchaseBill,
   getPurchasePhoto,
   getPurchases,
+  PURCHASE_STATUSES,
+  updatePurchase,
   type Purchase,
 } from '@/app/lib/api/inventory';
 import {
   MESSAGES,
   PURCHASE_BILL_STATUSES,
+  SITE_ENTRY_COPY,
   inventoryLabel,
 } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
@@ -44,6 +47,7 @@ import {
 } from '@/app/ui/inventory/inventory-search';
 import Pager from '@/app/ui/inventory/pager';
 import PurchaseModal from '@/app/ui/inventory/purchase-modal';
+import Modal from '@/app/ui/settings/modal';
 import StoreDocumentDownload from '@/app/ui/inventory/store-document-download';
 import PageHeader from '@/app/ui/page-header';
 import { useFileViewer } from '@/app/ui/pdf-viewer';
@@ -78,6 +82,7 @@ function PurchasesList() {
       siteId: urlString(),
       vendorId: urlString(),
       paymentStatus: urlEnum(['', ...PURCHASE_BILL_STATUSES] as const, ''),
+      status: urlEnum(['', ...PURCHASE_STATUSES] as const, ''),
       from: urlString(),
       to: urlString(),
       page: urlNumber(1),
@@ -89,6 +94,8 @@ function PurchasesList() {
   const rangeError = dateRangeError(filters.from, filters.to);
 
   const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Purchase | null>(null);
+  const [completing, setCompleting] = useState<Purchase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -100,6 +107,7 @@ function PurchasesList() {
     siteId: query.siteId || undefined,
     vendorId: query.vendorId || undefined,
     paymentStatus: query.paymentStatus || undefined,
+    status: query.status || undefined,
     dateFrom: query.from || undefined,
     dateTo: query.to || undefined,
   };
@@ -142,9 +150,13 @@ function PurchasesList() {
 
   const remove = useMutation({
     mutationFn: (id: string) => deletePurchase(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       setError(null);
-      toast.success('Purchase deleted and its stock reversed');
+      toast.success(
+        data?.purchases.find((row) => row.id === id)?.status === 'partial_site'
+          ? 'Site entry deleted'
+          : 'Purchase deleted and its stock reversed',
+      );
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
     },
     onError: (err) =>
@@ -196,7 +208,7 @@ function PurchasesList() {
       header: 'Item',
       render: (row) => `${row.itemName} (${row.unit})`,
     },
-    { key: 'vendor', header: 'Vendor', render: (row) => row.vendorName },
+    { key: 'vendor', header: 'Vendor', render: (row) => row.vendorName ?? '—' },
     {
       key: 'quantity',
       header: 'Qty',
@@ -248,12 +260,20 @@ function PurchasesList() {
     {
       key: 'paymentStatus',
       header: 'Payment',
-      render: (row) => (
-        <StatusBadge
-          status={row.paymentStatus}
-          label={inventoryLabel(row.paymentStatus)}
-        />
-      ),
+      // 043: a site entry has no bill yet — what it is waiting for is Head Office.
+      render: (row) =>
+        row.status === 'partial_site' ? (
+          <StatusBadge
+            status={row.status}
+            label={SITE_ENTRY_COPY.partialBadge}
+            tone="warning"
+          />
+        ) : (
+          <StatusBadge
+            status={row.paymentStatus}
+            label={inventoryLabel(row.paymentStatus)}
+          />
+        ),
     },
   ];
 
@@ -277,7 +297,7 @@ function PurchasesList() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div className="flex flex-col gap-1 text-sm">
           <label
             htmlFor="purchases-site"
@@ -335,6 +355,21 @@ function PurchasesList() {
           ))}
         </SelectField>
 
+        <SelectField
+          id="purchases-entry-status"
+          label="Entry"
+          value={filters.status}
+          onChange={(event) =>
+            setFilters({
+              status: event.target.value as (typeof filters)['status'],
+            })
+          }
+        >
+          <option value="">All entries</option>
+          <option value="partial_site">Partial (Site)</option>
+          <option value="completed">Completed</option>
+        </SelectField>
+
         <TextField
           id="purchases-from"
           label="From"
@@ -377,7 +412,34 @@ function PurchasesList() {
         onRetry={() => void list.refetch()}
         serverPaged
         emptyMessage={MESSAGES.purchasesEmpty}
-        actions={(row) => (
+        actions={(row) =>
+          row.status === 'partial_site' ? (
+            // 043: a site entry moved nothing yet. Head Office completes it (correcting the item,
+            // date or vehicle on the way, kept in its history), or deletes a wrong one.
+            <div className="flex flex-wrap gap-2">
+              <RowAction onClick={() => setCompleting(row)}>Complete</RowAction>
+              <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this site entry?',
+                      message:
+                        'It has moved no stock and has no bill, so nothing else changes. The site will need to record the delivery again if it was real.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  ) {
+                    remove.mutate(row.id);
+                  }
+                }}
+                loading={remove.isPending && remove.variables === row.id}
+                disabled={remove.isPending}
+              >
+                Delete
+              </RowAction>
+            </div>
+          ) : (
           <div className="flex flex-wrap gap-2">
             {/* The client's GRN (2026-10-15), filled from the purchase and what the gate counted. */}
             <StoreDocumentDownload
@@ -386,6 +448,10 @@ function PurchasesList() {
               load={(format) => downloadStoreDocument('grn', row.id, format)}
               onError={setError}
             />
+            {/* Date and remarks only (042): everything else on a purchase is what the stock
+                ledger and the bill were computed from, so correcting it is delete + re-create —
+                the modal says so where a fuller edit would be looked for. */}
+            <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
             <RowAction
               onClick={async () => {
                 if (
@@ -405,7 +471,8 @@ function PurchasesList() {
               Delete
             </RowAction>
           </div>
-        )}
+          )
+        }
       />
 
       <Pager
@@ -417,7 +484,135 @@ function PurchasesList() {
       />
 
       {showModal && <PurchaseModal onClose={() => setShowModal(false)} />}
+      {completing && (
+        <PurchaseModal
+          completing={completing}
+          onClose={() => setCompleting(null)}
+        />
+      )}
+      {editing && (
+        <EditPurchaseModal
+          purchase={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            toast.success('Purchase updated.');
+            void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            setEditing(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Edits the two fields a purchase can change after the fact (042): the date and the remarks —
+ * exactly what `PATCH /inventory/purchases/:id` accepts. Quantity, rate, item, store and vendor
+ * are what the stock ledger and the bill were computed from, so the modal says where that fuller
+ * correction lives: delete the purchase and record it again.
+ */
+function EditPurchaseModal({
+  purchase,
+  onClose,
+  onSaved,
+}: {
+  purchase: Purchase;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const partial = purchase.status === 'partial_site';
+  const initialDate = purchase.date.slice(0, 10);
+  const initialRemarks = purchase.remarks ?? '';
+  const initialVehicle = purchase.vehicleNo ?? '';
+  const [date, setDate] = useState(initialDate);
+  const [remarks, setRemarks] = useState(initialRemarks);
+  const [vehicleNo, setVehicleNo] = useState(initialVehicle);
+  const [error, setError] = useState<string | null>(null);
+
+  const vehicle = vehicleNo.replace(/\s+/g, '').toUpperCase();
+  const dateChanged = date !== '' && date !== initialDate;
+  const remarksChanged = remarks.trim() !== initialRemarks;
+  const vehicleChanged = partial && vehicle !== initialVehicle;
+  const dirty = dateChanged || remarksChanged || vehicleChanged;
+
+  const save = useMutation({
+    // Only what changed is sent, so the audit log records exactly what was touched.
+    mutationFn: () =>
+      updatePurchase(purchase.id, {
+        ...(dateChanged ? { date } : {}),
+        ...(remarksChanged ? { remarks: remarks.trim() } : {}),
+        ...(vehicleChanged ? { vehicleNo: vehicle } : {}),
+      }),
+    onSuccess: onSaved,
+    onError: (err) => setError(errorMessage(err, 'Could not save the purchase.')),
+  });
+
+  return (
+    <Modal
+      title="Edit purchase"
+      onClose={onClose}
+      isDirty={dirty}
+      pending={save.isPending}
+      footer={
+        <>
+          <SecondaryButton type="button" onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </SecondaryButton>
+          <Button
+            type="button"
+            disabled={!dirty || !date || (partial && !vehicle)}
+            loading={save.isPending}
+            onClick={() => {
+              setError(null);
+              save.mutate();
+            }}
+          >
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <FormError message={error} />
+        <p className="text-sm text-gray-600">
+          {partial
+            ? `${purchase.itemName}, delivered at ${purchase.siteName} — waiting for Head Office.`
+            : `${purchase.itemName} · ${quantity(purchase.quantity)} ${purchase.unit} @ ${rupees(purchase.rate)} from ${purchase.vendorName}, at ${purchase.siteName}.`}
+        </p>
+        <TextField
+          id="edit-purchase-date"
+          label="Date"
+          type="date"
+          value={date}
+          max={todayIso()}
+          onChange={(e) => setDate(e.target.value)}
+        />
+        {partial && (
+          <TextField
+            id="edit-purchase-vehicle"
+            label="Vehicle number"
+            required
+            autoComplete="off"
+            maxLength={30}
+            value={vehicleNo}
+            onChange={(e) => setVehicleNo(e.target.value)}
+            hint={vehicle ? `Saved as ${vehicle}` : undefined}
+          />
+        )}
+        <TextField
+          id="edit-purchase-remarks"
+          label="Remarks"
+          value={remarks}
+          maxLength={500}
+          onChange={(e) => setRemarks(e.target.value)}
+        />
+        <p className="text-xs text-gray-500">
+          {partial
+            ? 'The item can be corrected when you complete this entry. Every change is kept in its history.'
+            : 'Only the date and remarks can change here — the GRN, the bill and the stock ledger move with the date. Quantity, rate, item, store and vendor are what the stock and the bill were computed from: to correct one of those, delete this purchase (its stock is reversed) and record it again.'}
+        </p>
+      </div>
+    </Modal>
   );
 }
 

@@ -155,8 +155,8 @@ function PayClaimModal({
 const STATUS_FILTERS = ['submitted', 'approved', 'rejected', 'paid', 'all'] as const;
 const PAGE_SIZE = 25;
 
-/** `YYYY-MM` → the first and last day of that month. */
-function monthRange(month: string): { from?: string; to?: string } {
+/** `YYYY-MM` → the first and last day of that month. Shared with the Register tab (042). */
+export function monthRange(month: string): { from?: string; to?: string } {
   const [y, m] = month.split('-').map(Number);
   if (!y || !m) return {};
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
