@@ -244,6 +244,9 @@ export default function EquipmentModal({
           {
             kind,
             status: paper.status,
+            ...(paper.status !== 'not_applicable' && paper.issuedAt
+              ? { issuedAt: paper.issuedAt }
+              : {}),
             ...(paper.status === 'held' && paper.expiresAt
               ? { expiresAt: paper.expiresAt }
               : {}),
@@ -574,10 +577,11 @@ export default function EquipmentModal({
           </legend>
           <div
             aria-hidden="true"
-            className="hidden gap-3 text-xs font-medium uppercase tracking-wide text-gray-500 sm:grid sm:grid-cols-[6rem_repeat(3,minmax(0,1fr))_8rem]"
+            className="hidden gap-3 text-xs font-medium uppercase tracking-wide text-gray-500 sm:grid sm:grid-cols-[6rem_repeat(4,minmax(0,1fr))_8rem]"
           >
             <span>Paper</span>
             <span>Status</span>
+            <span>Issued</span>
             <span>Expires</span>
             <span>Number</span>
             <span>Document</span>
@@ -588,7 +592,7 @@ export default function EquipmentModal({
             return (
               <div
                 key={kind}
-                className="grid grid-cols-2 items-center gap-2 border-b border-gray-100 pb-3 last:border-b-0 sm:grid-cols-[6rem_repeat(3,minmax(0,1fr))_8rem] sm:gap-3 sm:border-b-0 sm:pb-0"
+                className="grid grid-cols-2 items-center gap-2 border-b border-gray-100 pb-3 last:border-b-0 sm:grid-cols-[6rem_repeat(4,minmax(0,1fr))_8rem] sm:gap-3 sm:border-b-0 sm:pb-0"
               >
                 <span className="col-span-2 text-sm font-medium text-gray-700 sm:col-span-1">
                   {label}
@@ -614,6 +618,23 @@ export default function EquipmentModal({
                     </option>
                   ))}
                 </select>
+                {/* A held or life-time paper was issued on a day; one that does not apply was not. */}
+                <input
+                  type="date"
+                  aria-label={`${label} issue date`}
+                  className={`${fieldClass} disabled:bg-gray-50 disabled:text-gray-400`}
+                  disabled={
+                    paper.status === '' || paper.status === 'not_applicable'
+                  }
+                  value={
+                    paper.status === '' || paper.status === 'not_applicable'
+                      ? ''
+                      : paper.issuedAt
+                  }
+                  onChange={(event) =>
+                    setPaper(kind, { issuedAt: event.target.value })
+                  }
+                />
                 {/* Only a held paper lapses; N/A and life-time ones have no date. */}
                 <input
                   type="date"
@@ -630,7 +651,7 @@ export default function EquipmentModal({
                   aria-label={`${label} number`}
                   placeholder="Number"
                   maxLength={60}
-                  className={`${fieldClass} disabled:bg-gray-50`}
+                  className={`${fieldClass} col-span-2 disabled:bg-gray-50 sm:col-span-1`}
                   disabled={paper.status === ''}
                   value={paper.number}
                   onChange={(event) =>
@@ -706,6 +727,7 @@ export default function EquipmentModal({
 /** One registration paper as the form holds it; `''` is "Not recorded". */
 interface PaperDraft {
   status: RegistrationPaperInput['status'] | '';
+  issuedAt: string;
   expiresAt: string;
   number: string;
 }
@@ -723,6 +745,7 @@ function papersOf(
         kind,
         {
           status: paper?.status ?? '',
+          issuedAt: paper?.issuedAt?.slice(0, 10) ?? '',
           expiresAt: paper?.expiresAt?.slice(0, 10) ?? '',
           number: paper?.number ?? '',
         },

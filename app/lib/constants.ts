@@ -2867,6 +2867,7 @@ const ENUM_LABEL_OVERRIDES: Record<string, string> = {
   ok: 'OK',
   km: 'Kilometres',
   hours: 'Hours',
+  cng: 'CNG',
 
   // Billing (023). The hyphen is GST's own spelling and the one on every invoice;
   // `enumLabel` would give "Inter State", which reads as two words that got separated.
@@ -3421,6 +3422,8 @@ export const POWER_SOURCES = [
   'petrol',
   'electric',
   'manual',
+  // 2026-10-26: the client's Tiago, Tigor and Eicher run on compressed natural gas.
+  'cng',
 ] as const;
 export type PowerSource = (typeof POWER_SOURCES)[number];
 

@@ -187,6 +187,11 @@ export default function EquipmentDetailPage() {
       render: (row) => REGISTRATION_STATUS_LABELS[row.status],
     },
     {
+      key: 'issued',
+      header: 'Issued',
+      render: (row) => dateLabel(row.issuedAt),
+    },
+    {
       key: 'expires',
       header: 'Expires',
       render: (row) => <PaperExpiry paper={row} />,
