@@ -56,9 +56,7 @@ export default function SiteModal({
   const [radius, setRadius] = useState(
     site ? String(site.geofenceRadiusMeters) : '',
   );
-  const [weeklyOffDay, setWeeklyOffDay] = useState(
-    site ? String(site.weeklyOffDay) : '0',
-  );
+  const [weeklyOffDay, setWeeklyOffDay] = useState(weeklyOffOf(site));
   const [status, setStatus] = useState<string>(site?.status ?? 'active');
 
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
@@ -82,7 +80,7 @@ export default function SiteModal({
     latitude !== (site ? String(site.latitude) : '') ||
     longitude !== (site ? String(site.longitude) : '') ||
     radius !== (site ? String(site.geofenceRadiusMeters) : '') ||
-    weeklyOffDay !== (site ? String(site.weeklyOffDay) : '0') ||
+    weeklyOffDay !== weeklyOffOf(site) ||
     status !== (site?.status ?? 'active');
 
   // 036 I24: "Use my location" — coordinates were typed by hand, from a phone's map app, digit by
@@ -125,7 +123,7 @@ export default function SiteModal({
         latitude: Number(latitude),
         longitude: Number(longitude),
         geofenceRadiusMeters: Number(radius),
-        weeklyOffDay: Number(weeklyOffDay),
+        weeklyOffDay: weeklyOffDay === NO_WEEKLY_OFF ? null : Number(weeklyOffDay),
         // Explicitly null, not undefined: clearing the project is a real edit, and
         // undefined would leave the existing link in place.
         projectId: projectId || null,
@@ -320,6 +318,8 @@ export default function SiteModal({
               </option>
             ),
           )}
+          {/* 2026-10-27: the client's O&M sites run every day of the week. */}
+          <option value={NO_WEEKLY_OFF}>No weekly off</option>
         </SelectField>
 
         <SelectField
@@ -337,4 +337,13 @@ export default function SiteModal({
       </form>
     </Modal>
   );
+}
+
+/** The select's value for a site with no weekly off; the API stores it as null. */
+const NO_WEEKLY_OFF = 'none';
+
+/** The weekly-off select's value for a site: its day, "none", or Sunday for a new site. */
+function weeklyOffOf(site: { weeklyOffDay: number | null } | undefined | null): string {
+  if (!site) return '0';
+  return site.weeklyOffDay === null ? NO_WEEKLY_OFF : String(site.weeklyOffDay);
 }
