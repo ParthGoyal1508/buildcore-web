@@ -115,7 +115,9 @@ export default function SiteDetailPage() {
               <span className="tabular-nums">{row.geofenceRadiusMeters}</span> m
             </Fact>
             <Fact term="Weekly off">
-              {DAYS[row.weeklyOffDay] ?? `Day ${row.weeklyOffDay}`}
+              {row.weeklyOffDay === null
+                ? 'No weekly off'
+                : (DAYS[row.weeklyOffDay] ?? `Day ${row.weeklyOffDay}`)}
             </Fact>
           </dl>
           <p className="mt-3 text-xs text-gray-500">

@@ -204,7 +204,11 @@ export default function ApplyLeaveForm() {
                           {dateLabel(day.date)} —{' '}
                           {day.reason === 'holiday'
                             ? 'holiday'
-                            : `weekly off (${WEEKDAY_NAMES[preview.weeklyOffDay] ?? 'site'})`}
+                            : `weekly off (${
+                                preview.weeklyOffDay === null
+                                  ? 'site'
+                                  : (WEEKDAY_NAMES[preview.weeklyOffDay] ?? 'site')
+                              })`}
                         </li>
                       ))}
                     </ul>

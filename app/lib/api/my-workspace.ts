@@ -396,8 +396,8 @@ export async function getLeaveBalance(
  */
 export const leaveDayCountSchema = z.object({
   days: z.number(),
-  /** 0 = Sunday … 6 = Saturday. */
-  weeklyOffDay: z.number(),
+  /** 0 = Sunday … 6 = Saturday; null for a site with no weekly off. */
+  weeklyOffDay: z.number().nullable(),
   excluded: z.array(
     z.object({
       date: z.string(),

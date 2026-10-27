@@ -199,7 +199,8 @@ export const siteSchema = z.object({
   latitude: decimal,
   longitude: decimal,
   geofenceRadiusMeters: z.number(),
-  weeklyOffDay: z.number(),
+  /** 0 = Sunday … 6 = Saturday; null for a site with no weekly off. */
+  weeklyOffDay: z.number().nullable(),
   projectId: z.string().nullable(),
   address: z.string().nullable(),
   status: z.enum(SITE_STATUSES),
@@ -242,7 +243,8 @@ export interface SiteInput {
   latitude: number;
   longitude: number;
   geofenceRadiusMeters: number;
-  weeklyOffDay: number;
+  /** Null for a site with no weekly off. */
+  weeklyOffDay: number | null;
   projectId?: string | null;
   address?: string;
   status?: string;
