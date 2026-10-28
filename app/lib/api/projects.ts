@@ -586,6 +586,38 @@ export const BOQ_LINE_STATES = [
   'onTrack',
 ] as const;
 
+/**
+ * How a BOQ line is priced against the client (api 047).
+ *
+ * `percentage` — the schedule rate with the project's quoted percentage applied, which is what a
+ * "Percentage BoQ" tender means. `item_rate` — the bidder's own rate, billed as quoted. One tender
+ * can carry both in separate schedules, and pricing an item-rate line with the percentage bills it
+ * wrong on every RA.
+ */
+export const BOQ_PRICING_BASES = ['percentage', 'item_rate'] as const;
+export type BoqPricingBasis = (typeof BOQ_PRICING_BASES)[number];
+const pricingBasisSchema = z.enum(BOQ_PRICING_BASES);
+
+/**
+ * Whether the quoted percentage applies to a line — the API's `takesQuotedPercentage`, mirrored
+ * so every screen that prices a line applies one rule: never to a non-BOQ item, never to an
+ * item-rate line. A missing basis reads as `percentage`, which every pre-047 line is.
+ */
+export function takesQuotedPercentage(line: {
+  nonBoq?: boolean | null;
+  pricingBasis?: BoqPricingBasis | null;
+}): boolean {
+  return !line.nonBoq && line.pricingBasis !== 'item_rate';
+}
+
+/** The percentage to price a line at: the project's, or 0 where it does not apply. */
+export function quotedPercentageFor(
+  line: { nonBoq?: boolean | null; pricingBasis?: BoqPricingBasis | null },
+  quotedPercentage: number,
+): number {
+  return takesQuotedPercentage(line) ? quotedPercentage : 0;
+}
+
 const boqItemSchema = z.object({
   id: z.string(),
   boqNo: z.string(),
@@ -615,6 +647,8 @@ const boqItemSchema = z.object({
   isVariation: z.boolean(),
   /** Added on a bill to the client, outside the tendered BOQ (NB-1…). Never measured by a DWR. */
   nonBoq: z.boolean().default(false),
+  /** Defaulted so a response from an API before 047 still parses — every such line is percentage. */
+  pricingBasis: pricingBasisSchema.default('percentage'),
   state: z.enum(BOQ_LINE_STATES),
 });
 
@@ -651,6 +685,8 @@ export type BoqAlerts = z.infer<typeof boqAlertsSchema>;
 
 /** A rejected row, or a row accepted with something worth saying about it. */
 const rowProblemSchema = z.object({
+  /** The sheet the row is on (api 047) — a workbook can carry more than one schedule. */
+  sheet: z.string().optional(),
   row: z.number(),
   column: z.string(),
   reason: z.string(),
@@ -670,8 +706,61 @@ const importTotalsSchema = z.object({
   reconciles: z.boolean(),
 });
 
+/** One schedule sheet of the workbook, reconciled on its own (api 047). */
+const importScheduleSchema = z.object({
+  sheetName: z.string(),
+  pricingBasis: pricingBasisSchema,
+  groups: z.number(),
+  lines: z.number(),
+  /** The percentage schedule's own quote; null on an item-rate sheet. Never 0 for "not found". */
+  quotedPercentage: decimal.nullable(),
+  /** Tax rows the sheet adds under its lines and includes in its total, not imported (api 047). */
+  excludedTaxAmount: decimal,
+  totals: importTotalsSchema,
+});
+
+export type BoqImportSchedule = z.infer<typeof importScheduleSchema>;
+
 const importReportSchema = z.object({
-  batchId: z.string(),
+  /** Null when a blocker stands: a batch that can never be confirmed is not issued (api 047). */
+  batchId: z.string().nullable(),
+  confirmable: z.boolean().default(true),
+  schedules: z.array(importScheduleSchema).default([]),
+  /** Tax and total rows read and deliberately not imported as lines (api 047). */
+  excludedRows: z
+    .array(
+      z.object({
+        sheet: z.string(),
+        row: z.number(),
+        description: z.string(),
+        kind: z.enum(['tax', 'total']),
+        amount: decimal.nullable(),
+      }),
+    )
+    .default([]),
+  /** Why this cannot be confirmed — a schedule that does not add up, conflicting quotes. */
+  blockers: z
+    .array(
+      z.object({
+        code: z.string(),
+        sheet: z.string().nullable(),
+        message: z.string(),
+      }),
+    )
+    .default([]),
+  /** What the project holds now, so it can be shown beside the file's figure. */
+  projectQuotedPercentage: decimal.nullable().default(null),
+  /** True when confirming must say which quoted percentage the project keeps. */
+  quotedPercentageDiffers: z.boolean().default(false),
+  /** Present when the project already has lines this import can replace. */
+  replace: z
+    .object({
+      existingLines: z.number(),
+      existingGroups: z.number(),
+      replaceable: z.boolean(),
+    })
+    .nullable()
+    .default(null),
   sheetName: z.string(),
   groups: z.number(),
   lines: z.number(),
@@ -723,6 +812,8 @@ export interface BoqItemInput {
   finishDate?: string;
   duration?: number;
   perDayQty?: string;
+  /** Omitted means `percentage` (api 047). */
+  pricingBasis?: BoqPricingBasis;
 }
 
 /**
@@ -780,6 +871,8 @@ export async function planBOQItem(
     finishDate?: string | null;
     duration?: number | null;
     perDayQty?: string | null;
+    /** 047. Refused (409 `BOQ_PRICING_BASIS_LOCKED`) once a client bill measures the line. */
+    pricingBasis?: BoqPricingBasis;
   },
 ): Promise<BoqItem> {
   const raw = await authFetch<unknown>(
@@ -787,6 +880,19 @@ export async function planBOQItem(
     { method: 'PATCH', body: JSON.stringify(input) },
   );
   return boqItemSchema.parse(raw);
+}
+
+/**
+ * Deletes an empty section (api 047). One holding lines is refused with 409
+ * `BOQ_GROUP_NOT_EMPTY` rather than taking its lines with it.
+ */
+export async function deleteBOQGroup(
+  projectId: string,
+  groupId: string,
+): Promise<void> {
+  await authFetch<unknown>(`/projects/${projectId}/boq/groups/${groupId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function deleteBOQItem(
@@ -840,27 +946,44 @@ export async function validateEstimateImport(
   return importReportSchema.parse(raw);
 }
 
+/**
+ * What confirm needs besides the batch (api 047): which quoted percentage the project keeps when
+ * the file's differs, and whether to replace the lines already there. Both are explicit because
+ * the old confirm did each silently.
+ */
+export interface BoqImportChoices {
+  quotedPercentageSource?: 'file' | 'project';
+  replaceExisting?: boolean;
+}
+
+export interface BoqImportResult {
+  groups: number;
+  lines: number;
+  quotedPercentageSet: boolean;
+  /** What the project's quoted percentage is now. */
+  quotedPercentage?: string;
+  /** Lines removed because this import replaced them. */
+  replaced?: number;
+}
+
 export async function confirmEstimateImport(
   projectId: string,
   batchId: string,
-): Promise<{ groups: number; lines: number; quotedPercentageSet: boolean }> {
+  choices: BoqImportChoices = {},
+): Promise<BoqImportResult> {
   return authFetch(`/projects/${projectId}/boq/estimate-import/confirm`, {
     method: 'POST',
-    body: JSON.stringify({ batchId }),
+    body: JSON.stringify({ batchId, ...choices }),
   });
 }
 
 export async function confirmBOQImport(
   projectId: string,
   batchId: string,
-): Promise<{ groups: number; lines: number; quotedPercentageSet: boolean }> {
-  return authFetch<{
-    groups: number;
-    lines: number;
-    quotedPercentageSet: boolean;
-  }>(`/projects/${projectId}/boq/import/confirm`, {
+  choices: BoqImportChoices = {},
+): Promise<BoqImportResult> {
+  return authFetch<BoqImportResult>(`/projects/${projectId}/boq/import/confirm`, {
     method: 'POST',
-    body: JSON.stringify({ batchId }),
+    body: JSON.stringify({ batchId, ...choices }),
   });
 }
-

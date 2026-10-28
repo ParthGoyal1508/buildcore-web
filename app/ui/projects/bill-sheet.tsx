@@ -294,7 +294,8 @@ export default function BillSheet({ projectId }: { projectId: string }) {
         previouslyBilledQty: item.previouslyBilledQty,
         scopeQty: item.scopeQty,
       },
-      quotedPercentage,
+      // 047: the premium only where it applies — not on an item-rate line.
+      item.takesQuotedPercentage ? quotedPercentage : 0,
     ),
   );
   const grossOnly = billTotals(perLine);
@@ -314,7 +315,7 @@ export default function BillSheet({ projectId }: { projectId: string }) {
           previouslyBilledQty: item.previouslyBilledQty,
           scopeQty: item.scopeQty,
         },
-        quotedPercentage,
+        item.takesQuotedPercentage ? quotedPercentage : 0,
       ).exceedsScope && !reasons[item.id],
   );
 
@@ -664,7 +665,7 @@ function HeadingAndItems({
           previouslyBilledQty: item.previouslyBilledQty,
           scopeQty: item.scopeQty,
         },
-        quotedPercentage,
+        item.takesQuotedPercentage ? quotedPercentage : 0,
       ).amount,
     0,
   );
@@ -724,6 +725,8 @@ function HeadingAndItems({
             isVariation={item.isVariation}
             variationRef={item.variationRef}
             quotedPercentage={quotedPercentage}
+            takesQuotedPercentage={item.takesQuotedPercentage}
+            pricingBasis={item.pricingBasis}
             initialQuantity={settled[item.id]}
             onQuantityChange={onQuantityChange}
             onReasonChange={onReasonChange}

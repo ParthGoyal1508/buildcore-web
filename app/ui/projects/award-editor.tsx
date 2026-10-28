@@ -451,8 +451,12 @@ export default function AwardEditor({
                   ? boqById.get(row.boqTaskItemId)
                   : undefined;
                 const amount = Number(row.awardedQty) * Number(row.rate);
+                // 047: an item-rate line earns its own rate — the premium is not on it.
                 const earned = item
-                  ? earnedRate(item.rate, quotedPercentage)
+                  ? earnedRate(
+                      item.rate,
+                      item.takesQuotedPercentage ? quotedPercentage : 0,
+                    )
                   : null;
                 // Only when both are real numbers: a half-typed rate is not yet a rate,
                 // and warning about one is how a field becomes annoying to type in.

@@ -23,6 +23,7 @@ import {
   withdrawBillPackage,
 } from '@/app/lib/api/bill-packages';
 import { downloadCertificate, downloadSignedCopy } from '@/app/lib/api/billing';
+import { quotedPercentageFor } from '@/app/lib/api/projects';
 import { ApiError } from '@/app/lib/api/client';
 import { saveBlob } from '@/app/lib/download-file';
 import { dateLabel, rupees } from '@/app/lib/format';
@@ -856,7 +857,8 @@ function CertifyForm({
 
   const quoted = reading?.quotedPercentage ?? 0;
   const priced = (qty: number, row: CertifyRow) =>
-    paise(qty * row.rate * (1 + (row.nonBoq ? 0 : quoted)));
+    // The server's rule (047): no premium on a non-BOQ item or an item-rate line.
+    paise(qty * row.rate * (1 + quotedPercentageFor(row, quoted)));
   const parsed = rows.map((row) => {
     const text = row.value.trim();
     const qty = text === '' ? NaN : Number(text);

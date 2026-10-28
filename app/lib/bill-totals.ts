@@ -252,16 +252,30 @@ export interface ScheduleTotals {
  * quantity of nothing.
  */
 export function scheduleTotals(
-  items: { scopeQty: number; rate: number }[],
+  items: {
+    scopeQty: number;
+    rate: number;
+    /** False for an item-rate line or a non-BOQ item (047); omitted means it takes the quote. */
+    takesQuotedPercentage?: boolean;
+  }[],
   quotedPercentage = 0,
 ): ScheduleTotals {
   const estimated = items.reduce(
     (total, item) => total + item.scopeQty * item.rate,
     0,
   );
+  // 047: the percentage applies only to the lines that take it. An item-rate schedule's total is
+  // already its quote, so a mixed tender's quoted total is the item-rate part plus the rest quoted.
+  const quotedBase = items.reduce(
+    (total, item) =>
+      item.takesQuotedPercentage === false
+        ? total
+        : total + item.scopeQty * item.rate,
+    0,
+  );
   return {
     estimatedTotal: money(estimated),
-    quotedTotal: money(estimated * (1 + quotedPercentage)),
+    quotedTotal: money(estimated + quotedBase * quotedPercentage),
   };
 }
 

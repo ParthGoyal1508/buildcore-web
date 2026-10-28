@@ -5119,6 +5119,8 @@ export const BOQ_COPY = {
   reportLines: (lines: number, groups: number) =>
     `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}`,
   reportSheet: (sheet: string) => `Read from sheet “${sheet}”`,
+  reportSheets: (sheets: string[]) =>
+    `Read from ${sheets.length} sheets: ${sheets.map((s) => `“${s}”`).join(', ')}`,
   reportScheduleTotal: 'Schedule total',
   reportQuotedTotal: 'Quoted total',
   reportStated: 'Stated in the file',
@@ -5127,6 +5129,57 @@ export const BOQ_COPY = {
   reportReconciles: 'Both totals agree with the figures in your file.',
   reportDoesNotReconcile:
     'The totals do not agree with the figures stated in your file. Check the schedule before confirming.',
+  /**
+   * How a line is priced against the client (047). One tender can carry both kinds, in separate
+   * schedules — and the quoted percentage applied to an item-rate line bills it wrong.
+   */
+  pricingBasisLabel: 'Priced by',
+  pricingBasis: {
+    percentage: 'Percentage',
+    item_rate: 'Item rate',
+  } as const,
+  pricingBasisHint: {
+    percentage:
+      'The schedule rate, with the project’s quoted percentage added or taken off on every bill.',
+    item_rate:
+      'The bidder’s own rate, billed as quoted — the project’s quoted percentage never applies.',
+  } as const,
+  pricingBasisLocked:
+    'This line is already on a client bill, so how it is priced cannot change.',
+  deleteSection: 'Delete section',
+  deleteSectionConfirm: (boqNo: string, name: string) =>
+    `Section ${boqNo} “${name}” has no lines and will be removed. This cannot be undone.`,
+  sectionDeleted: 'The section was deleted.',
+  // The import report, per schedule (047)
+  reportSchedules: 'Schedules in this workbook',
+  reportScheduleLines: (lines: number, groups: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}`,
+  reportScheduleReconciles: 'Adds up',
+  reportScheduleDoesNotReconcile: 'Does not add up',
+  reportExcludedTax: (amount: string) =>
+    `Includes ${amount} of tax rows that were not imported as lines.`,
+  reportCombined: 'All schedules together',
+  reportExcluded: (count: number) =>
+    `${count} row${count === 1 ? '' : 's'} read as totals or tax, not imported`,
+  reportExcludedHint:
+    'Totals and taxes are arithmetic about the schedule, not work in it. They are listed so you can check nothing real was left out.',
+  reportExcludedKind: { tax: 'Tax', total: 'Total' } as const,
+  reportBlocked: 'This workbook cannot be imported as it is',
+  reportBlockedHint:
+    'Correct the workbook and upload it again. Nothing has been saved.',
+  quotedChoiceHeading: 'Which quoted percentage should the project keep?',
+  quotedChoiceHint:
+    'Every bill on this project is priced with it. The two figures below disagree.',
+  quotedChoiceFile: (label: string) => `The workbook’s: ${label}`,
+  quotedChoiceProject: (label: string) => `The project’s current figure: ${label}`,
+  quotedChoiceRequired: 'Choose which quoted percentage to keep.',
+  replaceHeading: 'This project already has a BOQ',
+  replaceBody: (lines: number, groups: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}. Nothing has been measured, billed, reported or awarded against them, so they can be replaced.`,
+  replaceConfirm: 'Replace the existing BOQ with this workbook',
+  replaceRequired: 'Tick “Replace” to import over the existing BOQ.',
+  importReplaced: (lines: number) =>
+    ` ${lines} earlier line${lines === 1 ? ' was' : 's were'} replaced.`,
   reportPercentage: 'Quoted percentage',
   /**
    * The direction said in words, not left to a minus sign (027).
@@ -5186,7 +5239,11 @@ export const BOQ_COPY = {
     BOQ_IMPORT_WRITE_INTERRUPTED:
       'The database did not finish writing this schedule in time, so nothing was saved and the project is exactly as it was. The import is still held — press Confirm again. If it fails a second time, import the schedule’s sections separately.',
     BOQ_ALREADY_POPULATED:
-      'This project already has a BOQ. Importing again would add a second copy rather than replace the first, and the existing lines cannot be removed automatically because bills may already measure against them. Add or revise lines instead.',
+      'This project already has a BOQ. Tick “Replace the existing BOQ” to import over it.',
+    BOQ_QUOTED_PERCENTAGE_CHOICE_REQUIRED:
+      'The workbook’s quoted percentage differs from the project’s. Choose which one to keep, then confirm.',
+    BOQ_IMPORT_NOT_RECONCILED:
+      'A schedule in this workbook does not add up to the total it states. Correct the workbook and upload it again.',
     BOQ_BATCH_NOT_FOUND:
       'That import is no longer available. Upload the file again.',
     BOQ_BATCH_EXPIRED:
