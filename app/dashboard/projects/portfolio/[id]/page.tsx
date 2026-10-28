@@ -6,7 +6,18 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getClients } from '@/app/lib/api/projects';
 import { getDocumentRequirements } from '@/app/lib/api/project-documents';
-import { PROJECT_SHELL_COPY, ROUTES, projectsLabel } from '@/app/lib/constants';
+import {
+  PROJECT_SECTOR_COPY,
+  PROJECT_SHELL_COPY,
+  ROUTES,
+  projectsLabel,
+} from '@/app/lib/constants';
+import ClientHoldingsPanel from '@/app/ui/projects/client-holdings-panel';
+import { useProjectLock } from '@/app/ui/projects/project-lock-context';
+import {
+  clientHoldingKeys,
+  getClientHoldings,
+} from '@/app/lib/api/client-holdings';
 import { formatRupees } from '@/app/lib/utils';
 import { useProjectShell } from '@/app/ui/projects/project-shell-context';
 import { useBranches } from '@/app/ui/use-branch-names';
@@ -129,6 +140,22 @@ function Card({
 export default function ProjectOverviewPage() {
   const { project, tabs, documentReadiness, unavailableModules } =
     useProjectShell();
+
+  const { isLocked } = useProjectLock();
+  // 048: what the client has settled, for the billing table. Same key as the held-by-client
+  // panel, so it is one request; absent (403) for a reader without PROJECT_FINANCIALS.
+  const { data: holdings } = useQuery({
+    queryKey: clientHoldingKeys.project(project.id),
+    queryFn: () => getClientHoldings(project.id),
+    retry: false,
+  });
+  const clientSettled = holdings
+    ? holdings.received +
+      holdings.retention.withheld +
+      holdings.cpbg.deducted +
+      holdings.tds +
+      holdings.otherDeductions
+    : null;
 
   const unavailable = unavailableModules.map(
     (module) => PROJECT_SHELL_COPY.moduleNames[module] ?? module,
@@ -253,6 +280,11 @@ export default function ProjectOverviewPage() {
               </span>
             </Fact>
             <Fact term="Status">{projectsLabel(project.status)}</Fact>
+            <Fact term={PROJECT_SECTOR_COPY.label}>
+              {project.sector
+                ? PROJECT_SECTOR_COPY.badge[project.sector]
+                : PROJECT_SHELL_COPY.notRecorded}
+            </Fact>
             {/* 041: near the top, not in Details below the billing table where nobody scrolls to. */}
             <Fact term={PROJECT_SHELL_COPY.branchLabel}>
               {branch ?? PROJECT_SHELL_COPY.notRecorded}
@@ -436,13 +468,17 @@ export default function ProjectOverviewPage() {
                 >
                   {PROJECT_SHELL_COPY.billingSettled}
                 </th>
-                {/* Not a zero. Nothing records a receipt against a client bill, and ₹0 would read
-                    as "they have paid nothing" — a claim this system cannot make. */}
-                <td
-                  className={clsx(TABLE.td, 'text-right text-xs text-gray-500')}
-                >
-                  {PROJECT_SHELL_COPY.billingClientReceiptsUnrecorded}
-                </td>
+                {/* 048: receipts against client bills are recorded now — received plus what the
+                    client withheld. Unknown (not zero) to a reader who may not see the money. */}
+                {clientSettled === null ? (
+                  <td
+                    className={clsx(TABLE.td, 'text-right text-xs text-gray-500')}
+                  >
+                    —
+                  </td>
+                ) : (
+                  <Amount amount={clientSettled} />
+                )}
                 <Amount amount={tabs.billSummary.paidAmount} />
               </tr>
               <tr className={TABLE.row}>
@@ -467,6 +503,9 @@ export default function ProjectOverviewPage() {
         <p className="mt-3 text-xs text-gray-500">
           {PROJECT_SHELL_COPY.billingClientReceiptsNote}
         </p>
+        <div className="mt-4">
+          <ClientHoldingsPanel projectId={project.id} isLocked={isLocked} />
+        </div>
 
         <div className="mt-4 border-t border-gray-100 pt-3">
           <h3 className="text-xs uppercase tracking-wide text-gray-500">
@@ -502,7 +541,7 @@ export default function ProjectOverviewPage() {
             <Fact term={PROJECT_SHELL_COPY.departmentLabel}>
               {project.departmentType || PROJECT_SHELL_COPY.notRecorded}
             </Fact>
-            <Fact term={PROJECT_SHELL_COPY.projectTypeLabel}>
+            <Fact term={PROJECT_SHELL_COPY.projectCategoryLabel}>
               {project.projectType || PROJECT_SHELL_COPY.notRecorded}
             </Fact>
             <Fact term={PROJECT_SHELL_COPY.siteStartLabel}>

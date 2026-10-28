@@ -16,6 +16,9 @@ const requirementSchema = z.object({
   code: z.string(),
   name: z.string(),
   isMandatory: z.boolean().default(true),
+  /** Which project types the kind is required of (api 048). Defaulted: both, as before. */
+  forGovernment: z.boolean().default(true),
+  forPrivate: z.boolean().default(true),
   /**
    * Whether the kind lapses, and whether it carries a printed number.
    *
@@ -263,7 +266,12 @@ export async function getDocumentRequirements(
  * expression.
  */
 export async function putDocumentRequirements(
-  requirements: { documentTypeId: string; isMandatory?: boolean }[],
+  requirements: {
+    documentTypeId: string;
+    isMandatory?: boolean;
+    forGovernment?: boolean;
+    forPrivate?: boolean;
+  }[],
   companyId?: string,
 ): Promise<ProjectDocumentRequirementSet> {
   const raw = await authFetch<unknown>(

@@ -34,6 +34,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import StatusBadge from '@/app/ui/status-badge';
 import { TABLE } from '@/app/ui/table';
+import ClientBillReceipts from '@/app/ui/projects/client-bill-receipts';
 
 /**
  * The shared table look at the bill's density (2026-10-15): the schedule reads like the printed
@@ -696,6 +697,13 @@ export default function ClientBillView({
           )}
         </div>
       )}
+      {/* 048: what the client paid against this bill, and what it held back. */}
+      <ClientBillReceipts
+        billId={bill.id}
+        projectId={projectId}
+        isDraft={bill.status === 'draft'}
+        isLocked={isLocked}
+      />
     </section>
   );
 }

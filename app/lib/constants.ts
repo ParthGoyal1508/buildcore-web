@@ -4317,6 +4317,17 @@ export function approvalActionTypeLabel(actionType: string): string {
  * precisely so they can.
  */
 export const DOCUMENT_COPY = {
+  // 048: which project types a kind is required of.
+  forGovernment: 'Government',
+  forPrivate: 'Private',
+  appliesToLabel: (government: boolean, privateProjects: boolean) =>
+    government && privateProjects
+      ? 'all projects'
+      : government
+        ? 'government projects'
+        : privateProjects
+          ? 'private projects'
+          : 'no project type',
   missingHeading: 'Still to be uploaded',
   presentHeading: 'On file',
   expiringHeading: 'Expiring soon',
@@ -4876,7 +4887,7 @@ export const PROJECT_SHELL_COPY = {
    */
   billingClientReceiptsUnrecorded: 'Not recorded',
   billingClientReceiptsNote:
-    'Money received against a client bill is not recorded anywhere yet, so what the client has actually paid — and what is still outstanding from them — cannot be shown. The revenue figures below are a separate ledger kept by hand, not receipts against these bills.',
+    'Settled to the client is what they paid plus what they withheld (retention, CPBG, TDS), recorded on each client bill. Outstanding is shown per bill. The revenue figures below are a separate ledger kept by hand.',
   billingRevenueHeading: 'Revenue ledger, kept separately',
   billsCount: (count: number) =>
     count === 1 ? '1 bill booked' : `${count} bills booked`,
@@ -4944,6 +4955,8 @@ export const PROJECT_SHELL_COPY = {
   locationLabel: 'Location',
   departmentLabel: 'Department',
   projectTypeLabel: 'Project type',
+  /** The older free-text field, now that "Project type" means Government / Private (048). */
+  projectCategoryLabel: 'Category',
   siteStartLabel: 'Site start',
   cgstLabel: 'GST on bills',
   /** 041: the GST registration the project's bills, POs and store documents are issued from. */
@@ -4992,6 +5005,108 @@ export const PROJECT_SHELL_COPY = {
  * still see why they are there.
  */
 export const PROJECT_MOVED_PARAM = 'movedCompany';
+
+/** Project type — government or private (048). Decides the documents a project must hold. */
+export const PROJECT_SECTOR_COPY = {
+  label: 'Project type',
+  choose: 'Choose…',
+  government: 'Government',
+  private: 'Private',
+  required: 'Choose whether this is a government or a private project.',
+  hintEmpty: 'Government or private decides which documents the project must hold.',
+  hint: {
+    government:
+      'Needs the LOA/LOI, work order, agreement, BOQ, insurances and mining permission. The PBG is kept in Bank Guarantees.',
+    private: 'Needs the work order or PO, BOQ and insurances.',
+  },
+  badge: { government: 'Government', private: 'Private' },
+} as const;
+
+/** Client receipts, and the retention / CPBG a client holds of ours (048). */
+export const CLIENT_HOLDINGS_COPY = {
+  loadFailed: 'The payments received could not be loaded.',
+  receiptsHeading: 'Payments received',
+  billValue: 'Bill value',
+  basis: {
+    package: 'issued package, GST included',
+    certified: 'as certified',
+    billed: 'as billed',
+  },
+  settled: 'Settled',
+  outstanding: 'Outstanding',
+  noReceipts: 'No payment recorded against this bill yet.',
+  receivedOn: 'Received on',
+  received: 'Received',
+  retention: 'Retention',
+  cpbg: 'CPBG',
+  tds: 'TDS',
+  other: 'Other',
+  settles: 'Settles',
+  instrument: {
+    bank_transfer: 'Bank transfer',
+    cheque: 'Cheque',
+    cash: 'Cash',
+    adjustment: 'Adjustment',
+  },
+  recordReceipt: 'Record payment received',
+  recordReceiptTitle: (bill: string) => `Payment received — ${bill}`,
+  saveReceipt: 'Save payment',
+  receiptRecorded: 'The payment was recorded.',
+  receiptRemoved: 'The payment was removed.',
+  removeTitle: 'Remove this payment?',
+  removeMessage: (amount: string) =>
+    `This payment settled ${amount}. Remove it only if it was entered in error — the bill's outstanding goes back up.`,
+  draftHint: 'Payments can be recorded once the bill has been sent to the client.',
+  outstandingNow: (amount: string) => `Outstanding on this bill: ${amount}.`,
+  amountLabel: 'Amount received',
+  amountHint: 'What actually reached the bank.',
+  retentionLabel: 'Retention withheld',
+  retentionHint: 'Pre-filled from the bill’s retention. Change it to what the client actually withheld.',
+  cpbgLabel: 'CPBG deducted',
+  cpbgHint: 'Performance security the client deducted in place of a bank guarantee. Pre-filled from the project’s CPBG %.',
+  cpbgPbgRunning:
+    'A PBG is running for this project, so CPBG should no longer be deducted. Enter it only if the client still did.',
+  tdsLabel: 'TDS deducted',
+  otherLabel: 'Other deduction',
+  otherNoteLabel: 'What the other deduction was',
+  instrumentLabel: 'Paid by',
+  referenceLabel: 'Reference (UTR / cheque no.)',
+  moneyInvalid: 'Rupees, at most two decimals.',
+  settlesSummary: (amount: string) => `This payment settles ${amount} of the bill.`,
+  overOutstanding: (amount: string, outstanding: string) =>
+    `This settles ${amount}, more than the ${outstanding} outstanding. Check for a double entry or a typed digit.`,
+  // The project panel
+  heldHeading: 'Held by the client',
+  heldHint: 'Our money the client is holding back — retention until completion or the defect liability period, CPBG until a PBG is submitted.',
+  heldTotal: 'Total held',
+  receivedTotal: (amount: string, count: number) =>
+    `${amount} received in ${count} payment${count === 1 ? '' : 's'}.`,
+  withheld: 'Withheld',
+  released: 'Released',
+  deducted: 'Deducted',
+  refunded: 'Refunded',
+  held: 'Held',
+  termRetention: (pct: string) => `Contract retention ${pct}`,
+  termCpbg: (pct: string) => `Contract CPBG ${pct}`,
+  pbgHeading: 'Performance bank guarantees',
+  noPbg: 'No PBG running for this project. Tenders and guarantees are kept in Bank Guarantees.',
+  refundDue: (amount: string) =>
+    `A PBG is running, but the client still holds ${amount} of CPBG — that cash should come back.`,
+  releaseButton: 'Record release / refund',
+  releaseTitle: 'Retention released or CPBG refunded',
+  releaseKind: 'What came back',
+  releaseKinds: { retention: 'Retention released', cpbg: 'CPBG refunded' },
+  releaseAmount: 'Amount',
+  releaseOn: 'Released on',
+  releaseReason: 'Reason',
+  releaseReasonHint: 'Completion, end of defect liability, PBG submitted.',
+  releaseGuarantee: 'Against PBG',
+  releaseGuaranteeNone: 'Not against a guarantee',
+  releaseSave: 'Save',
+  releaseSaved: 'The release was recorded.',
+  releaseOver: (amount: string) => `The client holds only ${amount} of this.`,
+  releasesHeading: 'Releases and refunds',
+} as const;
 
 export const BOQ_COPY = {
   heading: 'Bill of Quantities',

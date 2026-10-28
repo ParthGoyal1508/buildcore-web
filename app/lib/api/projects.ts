@@ -326,6 +326,8 @@ export const projectSchema = z.object({
   status: z.enum(PROJECT_STATUSES),
   projectManagerEmployeeId: z.string().nullable(),
   division: z.enum(PROJECT_DIVISIONS),
+  /** Government or private (api 048). Null on a project nobody has typed yet. */
+  sector: z.enum(['government', 'private']).nullable().optional(),
   departmentType: z.string().nullable(),
   projectType: z.string().nullable(),
   siteType: z.enum(PROJECT_SITE_TYPES),
@@ -341,6 +343,8 @@ export const projectSchema = z.object({
    * refused until it is set.
    */
   clientRetentionFraction: decimal.nullable().optional(),
+  /** The client CPBG term as a fraction (api 048). */
+  clientCpbgFraction: decimal.nullable().optional(),
   /**
    * The tender's quoted percentage **as a signed fraction** — `-0.1079` is 10.79% below the
    * schedule, `0.0246` is 2.46% above it, `0` is at par.
@@ -504,6 +508,8 @@ export interface ProjectInput {
   status?: string;
   projectManagerEmployeeId?: string | null;
   division?: string;
+  /** 048. `null` on an edit clears it. */
+  sector?: 'government' | 'private' | null;
   departmentType?: string;
   projectType?: string;
   siteType?: string;
@@ -514,6 +520,8 @@ export interface ProjectInput {
   cgstApplicable?: boolean;
   /** A fraction — the form collects a percentage and divides by 100 before sending. */
   clientRetentionFraction?: number;
+  /** 048. A fraction; `null` on an edit clears it. */
+  clientCpbgFraction?: number | null;
   description?: string;
   isLocked?: boolean;
   /**

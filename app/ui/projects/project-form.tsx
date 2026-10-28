@@ -35,6 +35,7 @@ import {
   PROJECT_STATUSES,
   ROUTES,
   projectsLabel,
+  PROJECT_SECTOR_COPY,
 } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import {
@@ -73,6 +74,12 @@ export const projectSchema = z
     status: z.enum(PROJECT_STATUSES),
     projectManagerEmployeeId: z.string().optional(),
     division: z.enum(PROJECT_DIVISIONS),
+    /**
+     * Government or private (048). Decides which documents the project must hold. Required on a new
+     * project — checked in `onSubmit`, because the schema is shared with an edit, where an older
+     * project may legitimately still be untyped.
+     */
+    sector: z.enum(['', 'government', 'private']),
     departmentType: z.string().trim().optional(),
     projectType: z.string().trim().optional(),
     siteType: z.enum(PROJECT_SITE_TYPES),
@@ -93,6 +100,8 @@ export const projectSchema = z
      * and nothing downstream would notice.
      */
     clientRetentionPercent: z.string().optional(),
+    /** The client's CPBG term as a percentage (048). Only pre-fills a receipt's deduction. */
+    clientCpbgPercent: z.string().optional(),
     description: z.string().trim().optional(),
     isLocked: z.boolean(),
   })
@@ -180,8 +189,9 @@ export default function ProjectForm({ project }: { project?: Project }) {
    * disagreed. An existing project is past FR-009's gate; its documents are filed through its own
    * documents screen.
    */
-  const requirements = project ? [] : (requirementSet?.requirements ?? []);
-  const outstanding = unstagedMandatory(requirements, staged);
+  const allRequirements = project
+    ? []
+    : (requirementSet?.requirements ?? []);
 
   // 036 I21/I22: the client and project-manager pickers search the server (`AsyncSelect`), so the
   // 201st client exists and the list is never another screen's cached answer. They used to share
@@ -222,6 +232,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
     handleSubmit,
     control,
     setValue,
+    setError,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -236,6 +247,7 @@ export default function ProjectForm({ project }: { project?: Project }) {
       status: project?.status ?? 'planning',
       projectManagerEmployeeId: project?.projectManagerEmployeeId ?? '',
       division: project?.division ?? 'contract',
+      sector: project?.sector ?? '',
       departmentType: project?.departmentType ?? '',
       projectType: project?.projectType ?? '',
       siteType: project?.siteType ?? 'site',
@@ -250,6 +262,11 @@ export default function ProjectForm({ project }: { project?: Project }) {
         project?.clientRetentionFraction === undefined
           ? ''
           : String(Number(project.clientRetentionFraction) * 100),
+      clientCpbgPercent:
+        project?.clientCpbgFraction === null ||
+        project?.clientCpbgFraction === undefined
+          ? ''
+          : String(Number(project.clientCpbgFraction) * 100),
       description: project?.description ?? '',
       isLocked: project?.isLocked ?? false,
     },
@@ -285,6 +302,18 @@ export default function ProjectForm({ project }: { project?: Project }) {
   // render, which makes React Compiler skip memoizing this whole component.
   const isLocked = useWatch({ control, name: 'isLocked' });
   const cgstApplicable = useWatch({ control, name: 'cgstApplicable' });
+  const sector = useWatch({ control, name: 'sector' });
+
+  // 048: the documents a new project must hold depend on its type. Until a type is chosen the
+  // whole set shows, which is what the server holds an untyped project to.
+  const requirements = allRequirements.filter((requirement) =>
+    !sector
+      ? true
+      : sector === 'government'
+        ? requirement.forGovernment
+        : requirement.forPrivate,
+  );
+  const outstanding = unstagedMandatory(requirements, staged);
 
   const mutation = useMutation({
     mutationFn: (values: ProjectFormValues) => {
@@ -314,6 +343,13 @@ export default function ProjectForm({ project }: { project?: Project }) {
         clientRetentionFraction: values.clientRetentionPercent?.trim()
           ? Number(values.clientRetentionPercent) / 100
           : undefined,
+        clientCpbgFraction: values.clientCpbgPercent?.trim()
+          ? Number(values.clientCpbgPercent) / 100
+          : project
+            ? null
+            : undefined,
+        // An edit may clear the type; a new project always has one (checked in `onSubmit`).
+        sector: values.sector || (project ? null : undefined),
         description: values.description,
       };
       if (project) {
@@ -370,6 +406,10 @@ export default function ProjectForm({ project }: { project?: Project }) {
     // Cleared here, not in `onError`: a refusal from a previous attempt must stay on its controls
     // until the user tries again, or the explanation vanishes before it has been read.
     setMissingTypeIds([]);
+    if (!project && !values.sector) {
+      setError('sector', { message: PROJECT_SECTOR_COPY.required });
+      return;
+    }
     // Confirmed only on the transition, not on every save of an already-locked
     // project — re-asking on each edit trains people to click through it.
     if (values.isLocked !== wasLocked) {
@@ -596,6 +636,14 @@ export default function ProjectForm({ project }: { project?: Project }) {
             error={errors.clientRetentionPercent?.message}
             {...register('clientRetentionPercent')}
           />
+          <TextField
+            id="project-client-cpbg"
+            label="Client CPBG (%)"
+            hint="The contract performance bank guarantee the client deducts from payments until a PBG is submitted — 3 for 3%. Only pre-fills a receipt."
+            inputMode="decimal"
+            error={errors.clientCpbgPercent?.message}
+            {...register('clientCpbgPercent')}
+          />
         </div>
       </section>
 
@@ -696,15 +744,32 @@ export default function ProjectForm({ project }: { project?: Project }) {
               </option>
             ))}
           </SelectField>
+          <SelectField
+            id="project-sector"
+            label={PROJECT_SECTOR_COPY.label}
+            hint={
+              sector
+                ? PROJECT_SECTOR_COPY.hint[sector]
+                : PROJECT_SECTOR_COPY.hintEmpty
+            }
+            error={errors.sector?.message}
+            {...register('sector')}
+          >
+            <option value="">{PROJECT_SECTOR_COPY.choose}</option>
+            <option value="government">{PROJECT_SECTOR_COPY.government}</option>
+            <option value="private">{PROJECT_SECTOR_COPY.private}</option>
+          </SelectField>
           <TextField
             id="project-department-type"
-            label="Department type"
+            label="Department"
+            hint="The department or authority — PWD, NHAI."
             error={errors.departmentType?.message}
             {...register('departmentType')}
           />
           <TextField
             id="project-type"
-            label="Project type"
+            label="Category"
+            hint="Free text — road, building, O&M."
             error={errors.projectType?.message}
             {...register('projectType')}
           />
