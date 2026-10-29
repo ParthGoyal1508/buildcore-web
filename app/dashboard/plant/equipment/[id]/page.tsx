@@ -17,6 +17,7 @@ import {
   type RegistrationPaper,
 } from '@/app/lib/api/plant';
 import {
+  DISPOSED_EQUIPMENT_STATUSES,
   MESSAGES,
   ROUTES,
   formatReading,
@@ -139,6 +140,12 @@ export default function EquipmentDetailPage() {
     );
   }
 
+  // A scrapped or sold machine's papers are history (049): the dates show, the amber/red marks
+  // that ask someone to renew do not. The api already sends `expiring: false` for its documents.
+  const disposed = (DISPOSED_EQUIPMENT_STATUSES as readonly string[]).includes(
+    data.status,
+  );
+
   const documentColumns: Column<EquipmentDocument>[] = [
     { key: 'type', header: 'Type', render: (row) => row.docTypeName },
     {
@@ -165,7 +172,9 @@ export default function EquipmentDetailPage() {
       // Expired and expiring are different things and get different words. Both
       // read as orange rather than red: neither is a failure, both are a task.
       render: (row) =>
-        row.expired ? (
+        disposed ? (
+          <span className="text-sm text-gray-500">—</span>
+        ) : row.expired ? (
           <StatusBadge tone="danger" label={'Expired'} />
         ) : row.expiring ? (
           <StatusBadge tone="warning" label={'Expiring soon'} />
@@ -194,7 +203,7 @@ export default function EquipmentDetailPage() {
     {
       key: 'expires',
       header: 'Expires',
-      render: (row) => <PaperExpiry paper={row} />,
+      render: (row) => <PaperExpiry paper={row} disposed={disposed} />,
     },
     { key: 'number', header: 'Number', render: (row) => row.number ?? '—' },
     {
@@ -521,10 +530,17 @@ export default function EquipmentDetailPage() {
  * downloaded vehicle register uses (2026-10-15). Compared as calendar dates, so a paper
  * expiring today is still in force today.
  */
-function PaperExpiry({ paper }: { paper: RegistrationPaper }) {
+function PaperExpiry({
+  paper,
+  disposed,
+}: {
+  paper: RegistrationPaper;
+  disposed: boolean;
+}) {
   if (paper.status !== 'held') return <>—</>;
   if (!paper.expiresAt) return <>Not recorded</>;
   const date = paper.expiresAt.slice(0, 10);
+  if (disposed) return <>{date}</>;
   const today = todayIso();
   const days = Math.round(
     (Date.parse(date) - Date.parse(today)) / (24 * 60 * 60 * 1000),

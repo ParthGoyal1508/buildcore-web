@@ -15,6 +15,7 @@ import {
 } from '@/app/lib/api/assets';
 import { ApiError } from '@/app/lib/api/client';
 import {
+  ACTIVE_ASSET_STATUSES,
   MESSAGES,
   ROUTES,
   assetsLabel,
@@ -126,6 +127,11 @@ export default function AssetDetailPage() {
     (entry) => entry.status === 'open',
   );
 
+  // A scrapped asset's papers are history (049): the date shows, the expired/expiring marks
+  // that ask someone to renew do not. The api already sends `expiring: false` for it.
+  const alerts =
+    !asset.data || ACTIVE_ASSET_STATUSES.includes(asset.data.status);
+
   const documentColumns: Column<AssetDocument>[] = [
     { key: 'type', header: 'Type', render: (doc) => doc.docTypeName },
     {
@@ -140,15 +146,23 @@ export default function AssetDetailPage() {
         doc.expiryDate ? (
           <span
             className={
-              doc.expired
-                ? 'text-red-700'
-                : doc.expiring
-                  ? 'text-orange-700'
-                  : undefined
+              !alerts
+                ? undefined
+                : doc.expired
+                  ? 'text-red-700'
+                  : doc.expiring
+                    ? 'text-orange-700'
+                    : undefined
             }
           >
             {dateLabel(doc.expiryDate)}
-            {doc.expired ? ' — expired' : doc.expiring ? ' — expiring' : ''}
+            {!alerts
+              ? ''
+              : doc.expired
+                ? ' — expired'
+                : doc.expiring
+                  ? ' — expiring'
+                  : ''}
           </span>
         ) : (
           '—'
