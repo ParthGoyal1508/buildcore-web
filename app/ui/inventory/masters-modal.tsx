@@ -21,13 +21,14 @@ import {
 } from '@/app/lib/api/inventory';
 import { ApiError } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
-import { ITEM_UNITS, MESSAGES } from '@/app/lib/constants';
+import { DAILY_RATE_COPY, ITEM_UNITS, MESSAGES } from '@/app/lib/constants';
 import { quantity } from '@/app/lib/format';
 import { useDebounced } from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
 import Pager from './pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import {
+  CheckboxField,
   FormError,
   RowAction,
   SecondaryButton,
@@ -297,6 +298,17 @@ function ItemTab() {
       render: (row) => row.hsnCode ?? '—',
     },
     {
+      key: 'dailyRate',
+      header: 'Rate',
+      hideOnCard: true,
+      render: (row) =>
+        row.machineFuel
+          ? DAILY_RATE_COPY.fuelBadge
+          : row.dailyRate
+            ? DAILY_RATE_COPY.dailyBadge
+            : '—',
+    },
+    {
       key: 'active',
       header: 'Status',
       render: (row) => (row.active ? 'Active' : 'Retired'),
@@ -384,6 +396,32 @@ function ItemTab() {
             setDraft({ ...draft, hsnCode: event.target.value })
           }
         />
+        {/* 050: diesel, cement — priced day by day on Update today's rates. */}
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <CheckboxField
+            id="item-daily-rate"
+            label={DAILY_RATE_COPY.itemFlag}
+            description={DAILY_RATE_COPY.itemFlagHint}
+            checked={Boolean(draft.dailyRate || draft.machineFuel)}
+            disabled={Boolean(draft.machineFuel)}
+            onChange={(event) =>
+              setDraft({ ...draft, dailyRate: event.target.checked })
+            }
+          />
+          <CheckboxField
+            id="item-machine-fuel"
+            label={DAILY_RATE_COPY.fuelFlag}
+            description={DAILY_RATE_COPY.fuelFlagHint}
+            checked={Boolean(draft.machineFuel)}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                machineFuel: event.target.checked,
+                ...(event.target.checked ? { dailyRate: true } : {}),
+              })
+            }
+          />
+        </div>
         <div className="flex items-end gap-2">
           <Button type="submit" loading={save.isPending}>
             {editingId ? 'Save changes' : 'Add item'}
@@ -454,6 +492,8 @@ function ItemTab() {
                   reorderLevel: row.reorderLevel ?? undefined,
                   hsnCode: row.hsnCode ?? undefined,
                   description: row.description ?? undefined,
+                  dailyRate: row.dailyRate,
+                  machineFuel: row.machineFuel,
                 });
               }}
             >
