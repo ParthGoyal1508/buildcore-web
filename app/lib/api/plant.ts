@@ -895,6 +895,25 @@ export interface FuelInput {
   siteId?: string;
 }
 
+/** 050: the diesel rate a fuel entry on `date` is offered — null when none is set. */
+export const offeredFuelRateSchema = z.object({
+  itemId: z.string().nullable(),
+  itemName: z.string().nullable(),
+  rate: z.number().nullable(),
+  effectiveFrom: z.string().nullable(),
+  source: z.enum(['market', 'vendor']).nullable(),
+});
+export type OfferedFuelRate = z.infer<typeof offeredFuelRateSchema>;
+
+export async function getOfferedFuelRate(query: {
+  date: string;
+  equipmentId?: string;
+  vendorId?: string;
+}): Promise<OfferedFuelRate> {
+  const raw = await authFetch<unknown>(`/plant/fuel/rate${qs({ ...query })}`);
+  return offeredFuelRateSchema.parse(raw);
+}
+
 export async function createFuelEntry(input: FuelInput): Promise<FuelEntry> {
   const raw = await authFetch<unknown>('/plant/fuel', {
     method: 'POST',

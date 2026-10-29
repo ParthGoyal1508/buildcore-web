@@ -9,6 +9,7 @@ import {
   completePurchase,
   createPurchase,
   getItem,
+  getOfferedDailyRate,
   getOpenPurchaseOrderLines,
   GRN_CONDITIONS,
   type GrnDetails,
@@ -16,7 +17,8 @@ import {
   type PurchaseInput,
 } from '@/app/lib/api/inventory';
 import { getSite } from '@/app/lib/api/projects';
-import { quantity as qty, rupees, todayIso } from '@/app/lib/format';
+import { DAILY_RATE_COPY } from '@/app/lib/constants';
+import { dateLabel, quantity as qty, rupees, todayIso } from '@/app/lib/format';
 import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
 import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
@@ -122,6 +124,8 @@ export default function PurchaseModal({
   const [date, setDate] = useState(completing?.date.slice(0, 10) ?? today());
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('');
+  // 050: once the person types a rate, the day's rate is no longer offered over it.
+  const [rateTyped, setRateTyped] = useState(false);
   const [remarks, setRemarks] = useState(completing?.remarks ?? '');
   const [grnDraft, setGrnDraft] = useState({
     ...EMPTY_GRN,
@@ -163,10 +167,29 @@ export default function PurchaseModal({
     Math.round(Number(quantity) * 1000) >
       Math.round(poLine.remainingQuantity * 1000);
 
+  // 050: a daily-rate item (diesel, cement) is offered the rate of the purchase date — the vendor's
+  // own if it has a newer one — until somebody types over it. Ordinary items answer `dailyRate:
+  // false` and nothing is offered.
+  const offered = useQuery({
+    queryKey: ['inventory', 'daily-rate', 'offered', itemId, vendorId, date],
+    queryFn: () =>
+      getOfferedDailyRate({ itemId, vendorId: vendorId || undefined, date }),
+    enabled: Boolean(itemId && date),
+  });
+  const offeredRate = offered.data?.dailyRate ? offered.data : null;
+  const shownRate =
+    rate !== '' || rateTyped
+      ? rate
+      : offeredRate
+        ? String(offeredRate.rate)
+        : '';
+
   // Live, because the number a storekeeper is really checking is the total on the
   // vendor's bill — not the two figures it came from (009 FR-002).
   const amount =
-    quantity && rate ? Number(quantity) * Number(rate) : Number.NaN;
+    quantity && shownRate
+      ? Number(quantity) * Number(shownRate)
+      : Number.NaN;
 
   const setGrn = (field: keyof typeof EMPTY_GRN) => (value: string) =>
     setGrnDraft((draft) => ({ ...draft, [field]: value }));
@@ -190,7 +213,7 @@ export default function PurchaseModal({
         vendorId,
         date,
         quantity: Number(quantity),
-        rate: Number(rate),
+        rate: Number(shownRate),
         ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
         ...(indentLineId ? { indentLineId } : {}),
       };
@@ -225,7 +248,7 @@ export default function PurchaseModal({
     vendorId &&
     date &&
     Number(quantity) > 0 &&
-    rate !== '' &&
+    shownRate !== '' &&
     !grnMismatch &&
     !overPo;
 
@@ -389,8 +412,20 @@ export default function PurchaseModal({
           required
           min={0}
           step="any"
-          value={rate}
-          onChange={(event) => setRate(event.target.value)}
+          value={shownRate}
+          onChange={(event) => {
+            setRateTyped(true);
+            setRate(event.target.value);
+          }}
+          hint={
+            offeredRate
+              ? DAILY_RATE_COPY.offered(
+                  rupees(offeredRate.rate),
+                  dateLabel(offeredRate.effectiveFrom),
+                  offeredRate.source === 'vendor',
+                )
+              : undefined
+          }
         />
 
         <div className="sm:col-span-2">

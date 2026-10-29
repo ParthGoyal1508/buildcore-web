@@ -1,12 +1,16 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { errorMessage } from '@/app/lib/api/client';
-import { createFuelEntry, type Equipment } from '@/app/lib/api/plant';
-import { MESSAGES } from '@/app/lib/constants';
-import { rupees, todayIso } from '@/app/lib/format';
+import {
+  createFuelEntry,
+  getOfferedFuelRate,
+  type Equipment,
+} from '@/app/lib/api/plant';
+import { DAILY_RATE_COPY, MESSAGES } from '@/app/lib/constants';
+import { dateLabel, rupees, todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import {
@@ -51,12 +55,37 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
   const [siteId, setSiteId] = useState('');
   const [date, setDate] = useState(todayIso());
   const [quantity, setQuantity] = useState('');
-  const [rate, setRate] = useState('');
+  const [typedRate, setRate] = useState('');
+  // 050: once the person types a rate, the day's diesel rate is no longer offered over it.
+  const [rateTyped, setRateTyped] = useState(false);
   const [amountPaid, setAmountPaid] = useState('');
   const [priceBy, setPriceBy] = useState<'rate' | 'amount'>('rate');
   const [cardNo, setCardNo] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // 050: the diesel rate of the entry's date, from Inventory's daily rates — the pump's own if it
+  // has a newer one. Nothing is offered when no item is marked as machine fuel or no rate is set.
+  const offered = useQuery({
+    queryKey: ['plant', 'fuel-rate', date, equipmentId, vendorId],
+    queryFn: () =>
+      getOfferedFuelRate({
+        date,
+        equipmentId: equipmentId || undefined,
+        vendorId: vendorId || undefined,
+      }),
+    enabled: Boolean(date),
+  });
+  const offeredRate =
+    offered.data?.rate != null && offered.data.effectiveFrom
+      ? offered.data
+      : null;
+  const rate =
+    typedRate !== '' || rateTyped
+      ? typedRate
+      : offeredRate
+        ? String(offeredRate.rate)
+        : '';
 
   const amount =
     quantity !== '' && rate !== ''
@@ -72,7 +101,13 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
   const deployedSiteName = machine?.siteName ?? null;
   const quantityInvalid = quantity !== '' && !(Number(quantity) > 0);
   const isDirty = Boolean(
-    machine || quantity || rate || amountPaid || cardNo || vendorId || siteId,
+    machine ||
+      quantity ||
+      typedRate ||
+      amountPaid ||
+      cardNo ||
+      vendorId ||
+      siteId,
   );
 
   const save = useMutation({
@@ -175,7 +210,19 @@ export default function FuelModal({ onClose }: { onClose: () => void }) {
               min={0}
               step="0.01"
               value={rate}
-              onChange={(event) => setRate(event.target.value)}
+              onChange={(event) => {
+                setRateTyped(true);
+                setRate(event.target.value);
+              }}
+              hint={
+                offeredRate?.rate != null && offeredRate.effectiveFrom
+                  ? DAILY_RATE_COPY.offeredFuel(
+                      rupees(offeredRate.rate),
+                      dateLabel(offeredRate.effectiveFrom),
+                      offeredRate.source === 'vendor',
+                    )
+                  : undefined
+              }
             />
           ) : (
             <TextField

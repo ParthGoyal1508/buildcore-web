@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
 
-import { getItems } from '@/app/lib/api/inventory';
+import { getItems, getOfferedDailyRate } from '@/app/lib/api/inventory';
 import { getBOQ, boqKeys } from '@/app/lib/api/projects';
-import { money, rupees, unitRate } from '@/app/lib/format';
+import { DAILY_RATE_COPY } from '@/app/lib/constants';
+import { dateLabel, money, rupees, todayIso, unitRate } from '@/app/lib/format';
 import SearchableSelect, {
   type SearchableOption,
 } from '@/app/ui/searchable-select';
@@ -42,6 +43,8 @@ interface Row {
   hsn: string;
   /** The client's rate for a BOQ line, shown for reference and never sent. */
   boqRate: number | null;
+  /** 050: today's rate of a daily-rate item (diesel, cement) when the row was added — prefilled, shown. */
+  dailyRate?: { rate: number; effectiveFrom: string } | null;
 }
 
 let nextKey = 1;
@@ -105,9 +108,12 @@ export default function LineItemsEditor({
   onChange,
   withHsn,
   source,
+  vendorId,
 }: {
   /** The project whose BOQ is offered. Needed only for `source: 'boq'`. */
   projectId?: string;
+  /** 050: the vendor a purchase order is addressed to, for its own daily rate. */
+  vendorId?: string;
   value: string;
   onChange: (value: string) => void;
   /** The work order prints an HSN column; the LOI and purchase order do not. */
@@ -134,6 +140,35 @@ export default function LineItemsEditor({
     queryFn: () => getItems({ active: true, pageSize: 200 }),
     select: (page) => page.items,
     enabled: fromItems,
+  });
+  // 050: today's rate of each daily-rate item (diesel, cement) for this vendor, so a line added for
+  // one opens at it. A handful of items, fetched once; the person can still type over it.
+  const dailyItems = (master.data ?? []).filter((item) => item.dailyRate);
+  const dailyRates = useQuery({
+    queryKey: [
+      'inventory',
+      'daily-rate',
+      'offered-for-order',
+      vendorId ?? '',
+      dailyItems.map((item) => item.id).join(','),
+    ],
+    queryFn: async () => {
+      const date = todayIso();
+      const offers = await Promise.all(
+        dailyItems.map((item) =>
+          getOfferedDailyRate({ itemId: item.id, vendorId, date }),
+        ),
+      );
+      return new Map(
+        dailyItems.flatMap((item, i) => {
+          const offer = offers[i];
+          return offer.dailyRate
+            ? [[item.id, { rate: offer.rate, effectiveFrom: offer.effectiveFrom }] as const]
+            : [];
+        }),
+      );
+    },
+    enabled: fromItems && dailyItems.length > 0,
   });
   const itemOptions: SearchableOption[] = (master.data ?? []).map((item) => ({
     id: item.id,
@@ -192,9 +227,12 @@ export default function LineItemsEditor({
         description: `${item.code} - ${item.name}`,
         unit: item.unit,
         quantity: '',
-        rate: '',
+        rate: dailyRates.data?.has(item.id)
+          ? String(dailyRates.data.get(item.id)?.rate)
+          : '',
         hsn: item.hsnCode ?? '',
         boqRate: null,
+        dailyRate: dailyRates.data?.get(item.id) ?? null,
       },
     ]);
   };
@@ -345,6 +383,14 @@ export default function LineItemsEditor({
                       {row.boqRate !== null && (
                         <span className="mt-0.5 block text-xs text-gray-500">
                           BOQ rate {unitRate(row.boqRate)}
+                        </span>
+                      )}
+                      {row.dailyRate && (
+                        <span className="mt-0.5 block text-xs text-gray-500">
+                          {DAILY_RATE_COPY.orderHint(
+                            unitRate(row.dailyRate.rate),
+                            dateLabel(row.dailyRate.effectiveFrom),
+                          )}
                         </span>
                       )}
                     </td>

@@ -227,6 +227,8 @@ export const ROUTES = {
   inventoryTransfers: '/dashboard/inventory/transfers',
   inventoryPayments: '/dashboard/inventory/payments',
   inventoryIndents: '/dashboard/inventory/indents',
+  /** 050: Update today's rates — diesel, cement and the other daily-rate items. */
+  inventoryDailyRates: '/dashboard/inventory/daily-rates',
   inventoryIndent: (id: string) => `/dashboard/inventory/indents/${id}`,
   inventoryProcurement: '/dashboard/inventory/indents/procurement',
   /** 043: the site's "Create Inventory Purchase" page — a field screen outside /dashboard, like labour's. */
@@ -5403,4 +5405,42 @@ export const TERMS_COPY = {
   loading: 'Loading the standard terms…',
   loadFailed: 'The standard terms could not be loaded.',
   saveFailed: 'Those terms could not be saved.',
+} as const;
+
+/**
+ * 050: daily-changing item rates (diesel, cement). One place for the screen's words, so the item
+ * master, the rates board and the forms that offer a rate say the same thing.
+ */
+export const DAILY_RATE_COPY = {
+  tab: 'Daily rates',
+  title: "Update today's rates",
+  description:
+    'Items whose price changes every day — diesel, cement. Set the market rate once and every vendor follows it; give a vendor its own rate only where it charges differently. Purchases, purchase orders and fuel entries are offered the rate of their date, and can still be changed on the document.',
+  dateLabel: 'Rates for',
+  marketLabel: 'Market rate',
+  lastSet: (date: string) => `last set ${date}`,
+  neverSet: 'not set yet',
+  followsMarket: 'follows market',
+  vendorPlaceholder: 'Same as market',
+  save: 'Save rates',
+  saved: (count: number) => `${count} rate${count === 1 ? '' : 's'} saved`,
+  nothingChanged: 'No rate was changed.',
+  history: 'History',
+  historyTitle: (name: string) => `Rate history — ${name}`,
+  historyEmpty: 'No rate has been set for this item yet.',
+  empty:
+    'No item is marked as changing daily. Mark diesel, cement and the like in Stock → Item masters ("Rate changes daily").',
+  itemFlag: 'Rate changes daily',
+  itemFlagHint:
+    "Listed on Update today's rates; purchases are offered the day's rate instead of being held to a vendor's agreed rate.",
+  fuelFlag: 'Machine fuel (diesel)',
+  fuelFlagHint:
+    "Fuel entries in Machinery are offered this item's rate for their date. One item per company.",
+  dailyBadge: 'Daily',
+  fuelBadge: 'Daily · fuel',
+  offered: (rate: string, date: string, vendor: boolean) =>
+    `Today's rate list: ${rate}${vendor ? " (this vendor's rate)" : ''}, set ${date}. Change it if the bill says otherwise.`,
+  orderHint: (rate: string, date: string) => `Daily rate ${rate} (set ${date})`,
+  offeredFuel: (rate: string, date: string, vendor: boolean) =>
+    `Diesel rate ${rate}${vendor ? ' at this pump' : ''}, set ${date}. Change it if the slip says otherwise.`,
 } as const;
