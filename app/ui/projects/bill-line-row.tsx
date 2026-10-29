@@ -5,6 +5,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 
 import { BILLING_COPY } from '@/app/lib/constants';
 import { earnedRate, lineTotals } from '@/app/lib/bill-totals';
+import { BasisChip } from '@/app/ui/projects/boq-basis-chip';
 import { rupees, unitRate } from '@/app/lib/format';
 
 /**
@@ -46,6 +47,12 @@ export interface BillLineRowProps {
   /** The quoted excess as a fraction, applied to the line amount. */
   quotedPercentage: number;
   /**
+   * False for an item-rate line (api 047): billed at its own rate, so the premium is neither
+   * applied to the amount nor shown in the quoted-rate column. Defaults to true.
+   */
+  takesQuotedPercentage?: boolean;
+  pricingBasis?: 'percentage' | 'item_rate';
+  /**
    * The value this row starts from, if a draft was restored.
    *
    * Read **once**, at mount. A restored draft arrives after the first render, and syncing it into
@@ -77,7 +84,9 @@ function BillLineRowImpl({
   previouslyBilledQty,
   isVariation,
   variationRef,
-  quotedPercentage,
+  quotedPercentage: projectQuotedPercentage,
+  takesQuotedPercentage = true,
+  pricingBasis = 'percentage',
   initialQuantity,
   initialReason,
   onQuantityChange,
@@ -97,6 +106,9 @@ function BillLineRowImpl({
     return () => registerInput(id, null);
   }, [id, registerInput]);
 
+  // The column still renders whenever the project is quoted (so the table keeps its shape); this
+  // line's own figure is its rate where the premium does not apply.
+  const quotedPercentage = takesQuotedPercentage ? projectQuotedPercentage : 0;
   const quantity = Number(raw) || 0;
   const totals = lineTotals(
     { quantity, rate, previouslyBilledQty, scopeQty },
@@ -121,6 +133,11 @@ function BillLineRowImpl({
         {isVariation && (
           <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-800">
             {variationRef ? `Variation ${variationRef}` : 'Variation'}
+          </span>
+        )}
+        {pricingBasis === 'item_rate' && (
+          <span className="ml-2">
+            <BasisChip basis="item_rate" />
           </span>
         )}
         {unpriced && (
@@ -182,7 +199,7 @@ function BillLineRowImpl({
         out to the amount at the end of the same row — which is the confusion this column was added
         to remove, not to restate in smaller type.
       */}
-      {quotedPercentage !== 0 && (
+      {projectQuotedPercentage !== 0 && (
         <td className="px-2 py-1.5 align-top text-right text-sm tabular-nums text-gray-600">
           {unpriced ? '—' : unitRate(earnedRate(rate, quotedPercentage))}
         </td>

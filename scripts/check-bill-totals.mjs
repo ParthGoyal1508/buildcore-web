@@ -49,9 +49,34 @@ const VECTORS = [
   },
 ];
 
-function check(name, impl) {
+/**
+ * Web-only (047): `scheduleTotals` has no API twin by that name — the API's `billableBoq` computes
+ * the same figure — so these run against the web copy alone. NEWAI SHAHID SMARAK's shape: an
+ * item-rate schedule at ₹4,88,000 beside a percentage schedule at ₹97,52,823 quoted −19.12%.
+ */
+const WEB_ONLY = [
+  {
+    label: 'scheduleTotals mixed item-rate + percentage at -19.12%',
+    run: (m) =>
+      m.scheduleTotals(
+        [
+          { scopeQty: 1, rate: 488000, takesQuotedPercentage: false },
+          { scopeQty: 1, rate: 9752823, takesQuotedPercentage: true },
+        ],
+        -0.1912,
+      ),
+    expected: { estimatedTotal: 10240823, quotedTotal: 8376083.24 },
+  },
+  {
+    label: 'scheduleTotals with no basis given still quotes every line',
+    run: (m) => m.scheduleTotals([{ scopeQty: 2, rate: 100 }], 0.1).quotedTotal,
+    expected: 220,
+  },
+];
+
+function check(name, impl, vectors = VECTORS) {
   let failures = 0;
-  for (const vector of VECTORS) {
+  for (const vector of vectors) {
     const actual = vector.run(impl);
     if (JSON.stringify(actual) !== JSON.stringify(vector.expected)) {
       failures++;
@@ -60,11 +85,11 @@ function check(name, impl) {
       );
     }
   }
-  console.log(`${name}: ${VECTORS.length - failures}/${VECTORS.length} vectors match`);
+  console.log(`${name}: ${vectors.length - failures}/${vectors.length} vectors match`);
   return failures;
 }
 
-let failures = check('web', web);
+let failures = check('web', web) + check('web (047 schedule totals)', web, WEB_ONLY);
 const apiPath = process.argv[2];
 if (apiPath) {
   const api = await import(new URL(apiPath, `file://${process.cwd()}/`).href);
