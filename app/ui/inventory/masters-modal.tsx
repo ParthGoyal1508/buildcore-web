@@ -21,7 +21,12 @@ import {
 } from '@/app/lib/api/inventory';
 import { ApiError } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
-import { DAILY_RATE_COPY, ITEM_UNITS, MESSAGES } from '@/app/lib/constants';
+import {
+  DAILY_RATE_COPY,
+  ITEM_UNIT_LABELS,
+  ITEM_UNITS,
+  MESSAGES,
+} from '@/app/lib/constants';
 import { quantity } from '@/app/lib/format';
 import { useDebounced } from '@/app/lib/use-url-state';
 import { Button } from '@/app/ui/button';
@@ -365,7 +370,7 @@ function ItemTab() {
         >
           {ITEM_UNITS.map((unit) => (
             <option key={unit} value={unit}>
-              {unit}
+              {unit} — {ITEM_UNIT_LABELS[unit]}
             </option>
           ))}
         </SelectField>

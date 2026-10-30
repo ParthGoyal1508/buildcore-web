@@ -8,11 +8,15 @@ import {
   ClipboardDocumentListIcon,
   CurrencyRupeeIcon,
   DocumentTextIcon,
+  InboxArrowDownIcon,
+  ScaleIcon,
   ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 
 import {
+  AGREED_RATE_COPY,
   DAILY_RATE_COPY,
+  OPENING_STOCK_COPY,
   INVENTORY_ISSUE_LABEL_SHORT,
   ROUTES,
 } from '@/app/lib/constants';
@@ -66,6 +70,17 @@ const TABS = [
     name: DAILY_RATE_COPY.tab,
     href: ROUTES.inventoryDailyRates,
     icon: CurrencyRupeeIcon,
+  },
+  // 051: the rates purchases are held to, and the stock each store started with.
+  {
+    name: AGREED_RATE_COPY.tab,
+    href: ROUTES.inventoryAgreedRates,
+    icon: ScaleIcon,
+  },
+  {
+    name: OPENING_STOCK_COPY.tab,
+    href: ROUTES.inventoryOpeningStock,
+    icon: InboxArrowDownIcon,
   },
 ];
 

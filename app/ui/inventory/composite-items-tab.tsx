@@ -18,7 +18,7 @@ import {
   type CompositeItem,
   type CompositeItemInput,
 } from '@/app/lib/api/inventory';
-import { ITEM_UNITS } from '@/app/lib/constants';
+import { ITEM_UNITS, ITEM_UNIT_LABELS } from '@/app/lib/constants';
 import { useDebounced } from '@/app/lib/use-url-state';
 import AsyncSelect, { type SearchableOption } from '@/app/ui/async-select';
 import { Button } from '@/app/ui/button';
@@ -241,7 +241,7 @@ export default function CompositeItemsTab() {
           >
             {ITEM_UNITS.map((unit) => (
               <option key={unit} value={unit}>
-                {unit}
+                {unit} — {ITEM_UNIT_LABELS[unit]}
               </option>
             ))}
           </SelectField>
