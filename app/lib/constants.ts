@@ -229,6 +229,8 @@ export const ROUTES = {
   inventoryIndents: '/dashboard/inventory/indents',
   /** 050: Update today's rates — diesel, cement and the other daily-rate items. */
   inventoryDailyRates: '/dashboard/inventory/daily-rates',
+  inventoryOpeningStock: '/dashboard/inventory/opening-stock',
+  inventoryAgreedRates: '/dashboard/inventory/agreed-rates',
   inventoryIndent: (id: string) => `/dashboard/inventory/indents/${id}`,
   inventoryProcurement: '/dashboard/inventory/indents/procurement',
   /** 043: the site's "Create Inventory Purchase" page — a field screen outside /dashboard, like labour's. */
@@ -3120,7 +3122,7 @@ export const HR_MESSAGES = {
 // Inventory (feature 009)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The eight units the item master accepts (009 FR-018). */
+/** The units the item master accepts (009 FR-018; KL added by 051 — bitumen is bought by the KL). */
 export const ITEM_UNITS = [
   'BAG',
   'CUM',
@@ -3130,8 +3132,22 @@ export const ITEM_UNITS = [
   'LTR',
   'RMT',
   'SQM',
+  'KL',
 ] as const;
 export type ItemUnit = (typeof ITEM_UNITS)[number];
+
+/** What each unit code means, for the unit pickers: "KL — Kilolitre". */
+export const ITEM_UNIT_LABELS: Record<ItemUnit, string> = {
+  BAG: 'Bag',
+  CUM: 'Cubic metre',
+  KG: 'Kilogram',
+  NOS: 'Numbers',
+  MT: 'Metric tonne',
+  LTR: 'Litre',
+  RMT: 'Running metre',
+  SQM: 'Square metre',
+  KL: 'Kilolitre',
+};
 
 export const PURCHASE_BILL_STATUSES = ['unpaid', 'part_paid', 'paid'] as const;
 export type PurchaseBillStatus = (typeof PURCHASE_BILL_STATUSES)[number];
@@ -5443,4 +5459,71 @@ export const DAILY_RATE_COPY = {
   orderHint: (rate: string, date: string) => `Daily rate ${rate} (set ${date})`,
   offeredFuel: (rate: string, date: string, vendor: boolean) =>
     `Diesel rate ${rate}${vendor ? ' at this pump' : ''}, set ${date}. Change it if the slip says otherwise.`,
+} as const;
+
+/** Opening stock (051): what each store held when the company started recording it here. */
+export const OPENING_STOCK_COPY = {
+  tab: 'Opening stock',
+  title: 'Opening stock',
+  description:
+    'What each store already held when you started recording it here. It counts as stock received, at its rate, with no purchase or bill behind it. An entry can be replaced or deleted until stock of that item moves at that store.',
+  add: 'Add opening stock',
+  addTitle: 'Add opening stock',
+  replaceTitle: (item: string, store: string) => `Replace opening stock — ${item} at ${store}`,
+  import: 'Import from Excel',
+  importTitle: 'Import opening stock',
+  importHelp:
+    'Columns: Store / Site, Item Name, Quantity, Rate (₹ per Unit), As On Date (DD-MM-YYYY). The whole inventory workbook can be uploaded — the Opening Stock tab is found by its header row. Store and item names must match the masters (case and spacing are ignored). A blank rate is recorded at 0 and marked "no rate"; a blank date is today.',
+  template: 'Download template',
+  check: 'Check file',
+  confirm: (rows: number) => `Import ${rows} row${rows === 1 ? '' : 's'}`,
+  replaceExisting: (rows: number) =>
+    `Replace the ${rows} existing entr${rows === 1 ? 'y' : 'ies'} this file repeats`,
+  imported: (created: number, replaced: number) =>
+    `${created} added${replaced ? `, ${replaced} replaced` : ''}.`,
+  noRate: 'No rate',
+  noRateHint: 'Valued at 0 until a rate is given — replace the entry with one.',
+  locked: 'Stock has moved at this store since — correct it with a purchase, issue or transfer.',
+  confirmDelete: (item: string, store: string) =>
+    `Delete the opening stock of ${item} at ${store}? Its quantity leaves the store's stock.`,
+  deleted: 'Opening stock deleted.',
+  saved: 'Opening stock saved.',
+  empty: 'No opening stock recorded yet. Add it one item at a time, or import the Opening Stock sheet.',
+  rateHint: 'Leave blank if not known — valued at 0 and marked "no rate".',
+  asOnHint: 'The day the stock was counted. Not in the future.',
+} as const;
+
+/** Agreed vendor rates (028), listed and imported up front (051). */
+export const AGREED_RATE_COPY = {
+  tab: 'Agreed rates',
+  title: 'Agreed vendor rates',
+  description:
+    "The rate agreed with each vendor for each item. Purchases from that vendor are held to it; a change needs an approved rate change. A rate is set by the vendor's first purchase, or imported here up front.",
+  vendorFilter: 'Vendor',
+  allVendors: 'All vendors',
+  import: 'Import from Excel',
+  importTitle: 'Import agreed vendor rates',
+  importHelp:
+    'Columns: Vendor Name, Item Name, Rate (₹ per Unit), Valid From (DD-MM-YYYY; blank is today). Names are matched ignoring case, spaces and punctuation. A rate already in force is never overwritten: a different one is reported as a conflict, to be changed through a rate change.',
+  template: 'Download template',
+  check: 'Check file',
+  confirm: (rows: number) => `Record ${rows} new rate${rows === 1 ? '' : 's'}`,
+  imported: (created: number, conflicts: number) =>
+    `${created} rate${created === 1 ? '' : 's'} recorded${conflicts ? `; ${conflicts} conflict${conflicts === 1 ? '' : 's'} left as they were` : ''}.`,
+  source: { purchase: 'First purchase', import: 'Imported' },
+  status: {
+    create: 'New',
+    unchanged: 'Unchanged',
+    conflict: 'Conflict',
+    daily: 'Daily-rate item',
+    error: 'Error',
+  },
+  statusHint: {
+    create: 'No rate in force — will be recorded.',
+    unchanged: 'The same rate is already in force.',
+    conflict: (rate: string, date: string) =>
+      `${rate} is in force from ${date}. Not overwritten — raise a rate change.`,
+    daily: 'Its rate changes daily — set it on Daily rates instead.',
+  },
+  empty: 'No agreed rates yet. They are set by a vendor’s first purchase of an item, or imported here.',
 } as const;
