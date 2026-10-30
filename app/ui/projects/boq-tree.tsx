@@ -7,11 +7,15 @@ import { useMemo, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
 import {
+  deleteBOQGroup,
   deleteBOQItem,
   getBOQ,
   planBOQItem,
+  takesQuotedPercentage,
   type BoqGroup,
   type BoqItem,
+  type BoqPricingBasis,
+  BOQ_PRICING_BASES,
   boqKeys,
 } from '@/app/lib/api/projects';
 import { percentLabel, scheduleTotals } from '@/app/lib/bill-totals';
@@ -31,6 +35,7 @@ import { ListSkeleton } from '@/app/ui/skeletons';
 import { TABLE } from '@/app/ui/table';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
+import { BasisChip } from '@/app/ui/projects/boq-basis-chip';
 
 /**
  * The shared table look at the BOQ's density (2026-10-15): eleven columns over a tender of a few
@@ -197,6 +202,19 @@ export default function BoqTree({
     onError: (err: Error) => setError(deleteErrorMessage(err)),
   });
 
+  /** 047: an empty section can go. One with lines is refused by the API, and never offered here. */
+  const removeGroup = useMutation({
+    mutationFn: (groupId: string) => deleteBOQGroup(projectId, groupId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: boqKeys.project(projectId),
+      });
+      setError(null);
+      toast.success(BOQ_COPY.sectionDeleted);
+    },
+    onError: (err: Error) => setError(projectErrorMessage(err)),
+  });
+
   const toggle = (groupId: string) =>
     setCollapsed((current) => {
       const next = new Set(current);
@@ -253,7 +271,11 @@ export default function BoqTree({
   const quotedFraction = Number(project.quotedPercentage ?? 0) || 0;
   const totals = scheduleTotals(
     groups.flatMap((group) =>
-      group.items.map((item) => ({ scopeQty: item.scopeQty, rate: item.rate })),
+      group.items.map((item) => ({
+        scopeQty: item.scopeQty,
+        rate: item.rate,
+        takesQuotedPercentage: takesQuotedPercentage(item),
+      })),
     ),
     quotedFraction,
   );
@@ -445,6 +467,9 @@ export default function BoqTree({
                 collapsed={!term && collapsed.has(group.id)}
                 onToggle={() => toggle(group.id)}
                 onDelete={isLocked ? null : (itemId) => remove.mutate(itemId)}
+                onDeleteGroup={
+                  isLocked ? null : (groupId) => removeGroup.mutate(groupId)
+                }
                 planningId={planning}
                 onPlanOpen={isLocked ? null : setPlanning}
                 onPlanSave={(itemId, input) => plan.mutate({ itemId, input })}
@@ -481,12 +506,15 @@ function GroupRows({
   collapsed,
   onToggle,
   onDelete,
+  onDeleteGroup,
   planningId,
   onPlanOpen,
   onPlanSave,
   planSaving,
 }: {
   group: BoqGroup;
+  /** 047. Null when the project is locked. Offered only on a section with no lines. */
+  onDeleteGroup: ((groupId: string) => void) | null;
   /** A costing section rather than a contract one — six columns, and no programme to plan. */
   isEstimate: boolean;
   collapsed: boolean;
@@ -515,11 +543,13 @@ function GroupRows({
           title: blank there reads as missing data and 0 reads as a real figure. */}
       <tr className="border-t border-gray-200 bg-gray-50">
         <th scope="rowgroup" colSpan={columns} className="px-3 py-2 text-left">
+          {/* The heading and, on an empty section, its delete sit on one line (047). */}
+          <div className="sticky left-3 flex items-center gap-3">
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={!collapsed}
-            className="sticky left-3 flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+            className="flex items-center gap-2 font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
           >
             <span aria-hidden="true" className="text-gray-500">
               {collapsed ? '▸' : '▾'}
@@ -537,6 +567,27 @@ function GroupRows({
               </span>
             )}
           </button>
+          {onDeleteGroup && group.items.length === 0 && (
+            <RowAction
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: `${BOQ_COPY.deleteSection}?`,
+                    message: BOQ_COPY.deleteSectionConfirm(
+                      group.boqNo,
+                      group.name,
+                    ),
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  })
+                )
+                  onDeleteGroup(group.id);
+              }}
+            >
+              {BOQ_COPY.deleteSection}
+            </RowAction>
+          )}
+          </div>
         </th>
       </tr>
 
@@ -565,6 +616,12 @@ function GroupRows({
                       {BOQ_COPY.variation}
                     </span>
                   )
+                )}
+                {/* 047: every line says how it is priced — a mixed tender has both kinds. */}
+                {!item.nonBoq && (
+                  <span className="ml-2">
+                    <BasisChip basis={item.pricingBasis} />
+                  </span>
                 )}
               </td>
               {/* FR-030: exactly as the client spelled it. Tidying `R. mtr` to `R.Mtr.` creates a
@@ -701,6 +758,9 @@ function PlanRow({
   const [perDayQty, setPerDayQty] = useState(
     item.perDayQty === null ? '' : String(item.perDayQty),
   );
+  const [pricingBasis, setPricingBasis] = useState<BoqPricingBasis>(
+    item.pricingBasis,
+  );
 
   return (
     <form
@@ -711,6 +771,9 @@ function PlanRow({
           startDate: startDate || null,
           finishDate: finishDate || null,
           perDayQty: perDayQty.trim() || null,
+          // Sent only when changed: the API refuses a change on a billed line, and an unchanged
+          // basis on one must not turn a date edit into that refusal.
+          ...(pricingBasis !== item.pricingBasis ? { pricingBasis } : {}),
         });
       }}
     >
@@ -744,6 +807,28 @@ function PlanRow({
           placeholder={item.unit}
         />
       </label>
+
+      {!item.nonBoq && (
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-gray-700">
+            {BOQ_COPY.pricingBasisLabel}
+          </span>
+          <select
+            value={pricingBasis}
+            onChange={(event) =>
+              setPricingBasis(event.target.value as BoqPricingBasis)
+            }
+            className="rounded-md border border-gray-300 px-3 py-2"
+            title={BOQ_COPY.pricingBasisHint[pricingBasis]}
+          >
+            {BOQ_PRICING_BASES.map((basis) => (
+              <option key={basis} value={basis}>
+                {BOQ_COPY.pricingBasis[basis]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="flex items-center gap-2 pb-1">
         <RowAction type="submit" disabled={saving}>

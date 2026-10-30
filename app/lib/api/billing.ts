@@ -113,6 +113,13 @@ export const billableBoqItemSchema = z.object({
   remainingQty: decimal,
   isVariation: z.boolean(),
   variationRef: z.string().nullable(),
+  /** How the line is priced (api 047). Defaulted so a pre-047 API still parses. */
+  pricingBasis: z.enum(['percentage', 'item_rate']).default('percentage'),
+  /**
+   * Whether the quoted percentage applies — the server's rule, sent so the sheet prices with it
+   * rather than with its own copy. False for item-rate lines and non-BOQ items.
+   */
+  takesQuotedPercentage: z.boolean().default(true),
 });
 export type BillableBoqItem = z.infer<typeof billableBoqItemSchema>;
 
@@ -195,6 +202,8 @@ export const clientBillLineSchema = z.object({
   overScopeReason: z.string().nullable(),
   isVariation: z.boolean(),
   variationRef: z.string().nullable(),
+  /** api 047. `quotedRate` equals `rate` on an item-rate line. */
+  pricingBasis: z.enum(['percentage', 'item_rate']).default('percentage'),
 });
 export type ClientBillLine = z.infer<typeof clientBillLineSchema>;
 

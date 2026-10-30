@@ -30,6 +30,9 @@ interface Draft {
   code: string;
   name: string;
   isMandatory: boolean;
+  /** Required of government / private projects (048). */
+  forGovernment: boolean;
+  forPrivate: boolean;
 }
 
 /**
@@ -95,6 +98,8 @@ export function ProjectDocumentsScreen() {
         rows.map((r) => ({
           documentTypeId: r.documentTypeId,
           isMandatory: r.isMandatory,
+          forGovernment: r.forGovernment,
+          forPrivate: r.forPrivate,
         })),
       ),
     onSuccess: async () => {
@@ -215,8 +220,40 @@ export function ProjectDocumentsScreen() {
                     {requirement.isMandatory
                       ? DOCUMENT_COPY.strengthMandatory
                       : DOCUMENT_COPY.strengthAdvisory}
+                    {' · '}
+                    {DOCUMENT_COPY.appliesToLabel(
+                      requirement.forGovernment,
+                      requirement.forPrivate,
+                    )}
                   </span>
                 )}
+                {/* 048: which project types the kind is required of. */}
+                {mayConfigure &&
+                  (['forGovernment', 'forPrivate'] as const).map((flag) => (
+                    <label
+                      key={flag}
+                      className="flex items-center gap-1.5 text-xs text-gray-700"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-brand-700"
+                        checked={requirement[flag]}
+                        onChange={(event) =>
+                          edit(
+                            rows.map((r) =>
+                              r.documentTypeId === requirement.documentTypeId
+                                ? { ...r, [flag]: event.target.checked }
+                                : r,
+                            ),
+                          )
+                        }
+                      />
+                      {flag === 'forGovernment'
+                        ? DOCUMENT_COPY.forGovernment
+                        : DOCUMENT_COPY.forPrivate}
+                      <span className="sr-only"> — {requirement.name}</span>
+                    </label>
+                  ))}
                 {mayConfigure && (
                   <label className="flex items-center gap-2 text-xs text-gray-600">
                     <span className="sr-only">
@@ -336,6 +373,8 @@ export function ProjectDocumentsScreen() {
                       code: type.code,
                       name: type.name,
                       isMandatory: true,
+                      forGovernment: true,
+                      forPrivate: true,
                     },
                   ]);
                   setToAdd('');

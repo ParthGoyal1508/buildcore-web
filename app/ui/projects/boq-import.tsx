@@ -24,6 +24,7 @@ import {
 } from '@/app/ui/projects/project-lock-context';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { TABLE } from '@/app/ui/table';
+import { BasisChip } from '@/app/ui/projects/boq-basis-chip';
 
 /**
  * The tender import: upload, read the report, then confirm (008 FR-027 – FR-031).
@@ -60,6 +61,12 @@ export default function BoqImport({
   const [report, setReport] = useState<BoqImportReport | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /** 047: which quoted percentage the project keeps, when the file's differs from it. */
+  const [quotedSource, setQuotedSource] = useState<'file' | 'project' | null>(
+    null,
+  );
+  /** 047: the person has said, in so many words, to replace the BOQ already there. */
+  const [replaceExisting, setReplaceExisting] = useState(false);
 
   const read = useMutation({
     mutationFn: (file: File) =>
@@ -69,6 +76,9 @@ export default function BoqImport({
     onSuccess: (next) => {
       setReport(next);
       setRefusal(null);
+      // A new report is a new decision — neither choice carries over from the last file.
+      setQuotedSource(null);
+      setReplaceExisting(false);
     },
     onError: (error: Error) => {
       setReport(null);
@@ -77,12 +87,20 @@ export default function BoqImport({
   });
 
   const commit = useMutation({
-    mutationFn: (batchId: string) =>
-      isEstimate
-        ? confirmEstimateImport(projectId, batchId)
-        : confirmBOQImport(projectId, batchId),
+    mutationFn: (batchId: string) => {
+      const choices = {
+        ...(quotedSource ? { quotedPercentageSource: quotedSource } : {}),
+        ...(replaceExisting ? { replaceExisting: true } : {}),
+      };
+      return isEstimate
+        ? confirmEstimateImport(projectId, batchId, choices)
+        : confirmBOQImport(projectId, batchId, choices);
+    },
     onSuccess: (result) => {
-      setDone(BOQ_COPY.importDone(result.groups, result.lines));
+      setDone(
+        BOQ_COPY.importDone(result.groups, result.lines) +
+          (result.replaced ? BOQ_COPY.importReplaced(result.replaced) : ''),
+      );
       setReport(null);
       setRefusal(null);
       void queryClient.invalidateQueries({
@@ -106,7 +124,17 @@ export default function BoqImport({
 
   if (isLocked) return null;
 
-  const blocked = report !== null && !report.totals.reconciles;
+  // 047: a report with blockers carries no batch at all; the two choices are asked, not assumed.
+  const needsQuotedChoice =
+    report !== null && report.quotedPercentageDiffers && quotedSource === null;
+  const needsReplace =
+    report !== null && report.replace !== null && !replaceExisting;
+  const blocked =
+    report === null ||
+    !report.confirmable ||
+    report.batchId === null ||
+    needsQuotedChoice ||
+    needsReplace;
 
   return (
     <section className="space-y-3">
@@ -180,12 +208,36 @@ export default function BoqImport({
       {report && (
         <>
           <Report report={report} />
+          {report.confirmable && report.replace && (
+            <ReplaceChoice
+              replace={report.replace}
+              checked={replaceExisting}
+              onChange={setReplaceExisting}
+            />
+          )}
+          {report.confirmable && report.quotedPercentageDiffers && (
+            <QuotedChoice
+              file={report.quotedPercentage}
+              project={report.projectQuotedPercentage}
+              value={quotedSource}
+              onChange={setQuotedSource}
+            />
+          )}
+          {report.confirmable && (needsQuotedChoice || needsReplace) && (
+            <p className="text-xs text-amber-800">
+              {needsQuotedChoice
+                ? BOQ_COPY.quotedChoiceRequired
+                : BOQ_COPY.replaceRequired}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {/* FR-031: unavailable while the report says the file would be rejected. */}
             <Button
               type="button"
               disabled={commit.isPending || blocked}
-              onClick={() => commit.mutate(report.batchId)}
+              onClick={() => {
+                if (report.batchId) commit.mutate(report.batchId);
+              }}
             >
               {commit.isPending
                 ? BOQ_COPY.importConfirming
@@ -232,10 +284,35 @@ function Report({ report }: { report: BoqImportReport }) {
           {BOQ_COPY.reportLines(report.lines, report.groups)}
         </p>
         <p className="text-xs text-gray-500">
-          {BOQ_COPY.reportSheet(report.sheetName)}
+          {report.schedules.length > 1
+            ? BOQ_COPY.reportSheets(report.schedules.map((x) => x.sheetName))
+            : BOQ_COPY.reportSheet(report.sheetName)}
         </p>
         <p className="text-xs text-gray-500">{BOQ_COPY.reportNothingWritten}</p>
       </div>
+
+      {/* 047: a blocker stops the import outright — no batch was issued, so there is nothing to
+          confirm. Said first, because everything below it is the evidence. */}
+      {report.blockers.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2"
+        >
+          <p className="text-sm font-semibold text-red-900">
+            {BOQ_COPY.reportBlocked}
+          </p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-800">
+            {report.blockers.map((blocker, index) => (
+              <li key={`${blocker.code}-${index}`}>{blocker.message}</li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-red-700">
+            {BOQ_COPY.reportBlockedHint}
+          </p>
+        </div>
+      )}
+
+      {report.schedules.length > 0 && <Schedules report={report} />}
 
       {/* FR-027. Both derived totals beside the file's own, with the difference — the only thing
           on this screen that can show the import read the file correctly rather than merely
@@ -325,6 +402,8 @@ function Report({ report }: { report: BoqImportReport }) {
         </ul>
       </div>
 
+      {report.excludedRows.length > 0 && <Excluded rows={report.excludedRows} />}
+
       {report.errors.length > 0 && (
         <Problems
           title={BOQ_COPY.reportErrors(report.errors.length)}
@@ -383,7 +462,7 @@ function Problems({
   tone,
 }: {
   title: string;
-  rows: { row: number; column: string; reason: string }[];
+  rows: { sheet?: string; row: number; column: string; reason: string }[];
   tone: 'red' | 'amber';
 }) {
   return (
@@ -413,10 +492,11 @@ function Problems({
           <tbody>
             {rows.map((problem) => (
               <tr
-                key={`${problem.row}-${problem.column}`}
+                key={`${problem.sheet ?? ''}-${problem.row}-${problem.column}`}
                 className={TABLE.row}
               >
                 <td className={clsx(TABLE.td, 'tabular-nums')}>
+                  {problem.sheet ? `${problem.sheet} · ` : ''}
                   {problem.row}
                 </td>
                 <td className={TABLE.td}>{problem.column}</td>
@@ -429,5 +509,234 @@ function Problems({
         </table>
       </div>
     </details>
+  );
+}
+
+/** A fraction as a signed, worded percentage — `-0.1912` → "19.12% below the schedule rate". */
+function percentText(fraction: number | null): string {
+  if (fraction === null) return '—';
+  return `${Math.abs(fraction * 100).toFixed(2)}% ${BOQ_COPY.reportPercentageDirection(fraction)}`;
+}
+
+/**
+ * Each schedule sheet on its own row (047): its basis, its lines, its own totals against its own
+ * footer. A mixed tender's item-rate sheet carries no quoted percentage, and says so.
+ */
+function Schedules({ report }: { report: BoqImportReport }) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray-900">
+        {BOQ_COPY.reportSchedules}
+      </p>
+      <div className={clsx(TABLE.wrap, 'mt-1')}>
+        <table className={clsx(TABLE.table, 'w-full')}>
+          <thead className={TABLE.thead}>
+            <tr>
+              <th scope="col" className={TABLE.th}>
+                Sheet
+              </th>
+              <th scope="col" className={TABLE.th}>
+                {BOQ_COPY.pricingBasisLabel}
+              </th>
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportScheduleTotal}
+              </th>
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportStated}
+              </th>
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportPercentage}
+              </th>
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.reportQuotedTotal}
+              </th>
+              <th scope="col" className={TABLE.th} />
+            </tr>
+          </thead>
+          <tbody>
+            {report.schedules.map((schedule) => (
+              <tr key={schedule.sheetName} className={TABLE.row}>
+                <th
+                  scope="row"
+                  className={clsx(TABLE.td, 'text-left font-medium text-gray-900')}
+                >
+                  {schedule.sheetName}
+                  <span className="block text-xs font-normal text-gray-500">
+                    {BOQ_COPY.reportScheduleLines(
+                      schedule.lines,
+                      schedule.groups,
+                    )}
+                  </span>
+                </th>
+                <td className={TABLE.td}>
+                  <BasisChip basis={schedule.pricingBasis} />
+                </td>
+                <td className={clsx(TABLE.td, TABLE.numeric)}>
+                  {rupees(schedule.totals.scheduleDerived)}
+                  {schedule.excludedTaxAmount > 0 && (
+                    <span className="block text-xs text-gray-500">
+                      {BOQ_COPY.reportExcludedTax(
+                        rupees(schedule.excludedTaxAmount),
+                      )}
+                    </span>
+                  )}
+                </td>
+                <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}>
+                  {schedule.totals.scheduleStated === null
+                    ? '—'
+                    : rupees(schedule.totals.scheduleStated)}
+                </td>
+                <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}>
+                  {schedule.pricingBasis === 'item_rate'
+                    ? '—'
+                    : percentText(schedule.quotedPercentage)}
+                </td>
+                <td className={clsx(TABLE.td, TABLE.numeric, 'text-gray-600')}>
+                  {schedule.pricingBasis === 'item_rate'
+                    ? rupees(schedule.totals.scheduleDerived)
+                    : schedule.totals.quotedDerived === null
+                      ? '—'
+                      : rupees(schedule.totals.quotedDerived)}
+                </td>
+                <td className={TABLE.td}>
+                  <span
+                    className={clsx(
+                      'whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium',
+                      schedule.totals.reconciles
+                        ? 'bg-green-50 text-green-800'
+                        : 'bg-red-50 text-red-800',
+                    )}
+                  >
+                    {schedule.totals.reconciles
+                      ? BOQ_COPY.reportScheduleReconciles
+                      : BOQ_COPY.reportScheduleDoesNotReconcile}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Excluded({ rows }: { rows: BoqImportReport['excludedRows'] }) {
+  return (
+    <details>
+      <summary className="cursor-pointer text-sm font-medium text-gray-800">
+        {BOQ_COPY.reportExcluded(rows.length)}
+      </summary>
+      <p className="mt-1 text-xs text-gray-500">
+        {BOQ_COPY.reportExcludedHint}
+      </p>
+      <div className={clsx(TABLE.wrap, 'mt-2')}>
+        <table className={clsx(TABLE.table, 'w-full')}>
+          <thead className={TABLE.thead}>
+            <tr>
+              <th scope="col" className={TABLE.th}>
+                {BOQ_COPY.reportColumnRow}
+              </th>
+              <th scope="col" className={TABLE.th}>
+                {BOQ_COPY.columnTask}
+              </th>
+              <th scope="col" className={TABLE.th} />
+              <th scope="col" className={clsx(TABLE.th, 'text-right')}>
+                {BOQ_COPY.columnAmount}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={`${row.sheet}-${row.row}`} className={TABLE.row}>
+                <td className={clsx(TABLE.td, 'tabular-nums')}>
+                  {row.sheet} · {row.row}
+                </td>
+                <td className={TABLE.td}>{row.description}</td>
+                <td className={clsx(TABLE.td, 'text-xs text-gray-600')}>
+                  {BOQ_COPY.reportExcludedKind[row.kind]}
+                </td>
+                <td className={clsx(TABLE.td, TABLE.numeric)}>
+                  {row.amount === null ? '—' : rupees(row.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
+/** The two quoted percentages, and a choice between them (047). Neither is pre-selected. */
+function QuotedChoice({
+  file,
+  project,
+  value,
+  onChange,
+}: {
+  file: number | null;
+  project: number | null;
+  value: 'file' | 'project' | null;
+  onChange: (next: 'file' | 'project') => void;
+}) {
+  return (
+    <fieldset className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+      <legend className="px-1 text-sm font-semibold text-amber-900">
+        {BOQ_COPY.quotedChoiceHeading}
+      </legend>
+      <p className="text-xs text-amber-800">{BOQ_COPY.quotedChoiceHint}</p>
+      <div className="mt-2 flex flex-col gap-2">
+        {(['file', 'project'] as const).map((option) => (
+          <label
+            key={option}
+            className="flex items-center gap-2 text-sm text-gray-900"
+          >
+            <input
+              type="radio"
+              name="quoted-percentage-source"
+              value={option}
+              checked={value === option}
+              onChange={() => onChange(option)}
+              className="h-4 w-4 accent-brand-700"
+            />
+            {option === 'file'
+              ? BOQ_COPY.quotedChoiceFile(percentText(file))
+              : BOQ_COPY.quotedChoiceProject(percentText(project ?? 0))}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Replacing an untouched BOQ — asked for explicitly, never by default (047). */
+function ReplaceChoice({
+  replace,
+  checked,
+  onChange,
+}: {
+  replace: NonNullable<BoqImportReport['replace']>;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+      <p className="text-sm font-semibold text-amber-900">
+        {BOQ_COPY.replaceHeading}
+      </p>
+      <p className="text-xs text-amber-800">
+        {BOQ_COPY.replaceBody(replace.existingLines, replace.existingGroups)}
+      </p>
+      <label className="mt-2 flex items-center gap-2 text-sm text-gray-900">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+          className="h-4 w-4 accent-brand-700"
+        />
+        {BOQ_COPY.replaceConfirm}
+      </label>
+    </div>
   );
 }

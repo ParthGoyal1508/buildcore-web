@@ -787,6 +787,9 @@ export function LetterComposer({
                     }
                     withHsn={kind.key === 'letter_work_order'}
                     source={itemsSource}
+                    vendorId={
+                      subjectType === 'vendor' ? subjectId : undefined
+                    }
                   />
                 </div>
               );

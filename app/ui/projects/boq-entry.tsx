@@ -8,6 +8,8 @@ import {
   createBOQItem,
   getBOQ,
   type BoqGroup,
+  type BoqPricingBasis,
+  BOQ_PRICING_BASES,
   boqKeys,
 } from '@/app/lib/api/projects';
 import { BOQ_COPY } from '@/app/lib/constants';
@@ -169,6 +171,8 @@ function LineModal({
   const [startDate, setStartDate] = useState('');
   const [finishDate, setFinishDate] = useState('');
   const [perDayQty, setPerDayQty] = useState('');
+  // 047: percentage unless said otherwise — the same default the API applies.
+  const [pricingBasis, setPricingBasis] = useState<BoqPricingBasis>('percentage');
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({
@@ -185,6 +189,7 @@ function LineModal({
         startDate: startDate || undefined,
         finishDate: finishDate || undefined,
         perDayQty: perDayQty.trim() || undefined,
+        pricingBasis,
       }),
     onSuccess: () => {
       invalidate();
@@ -265,6 +270,21 @@ function LineModal({
           value={rate}
           onChange={(event) => setRate(event.target.value)}
         />
+        <SelectField
+          id="boq-line-basis"
+          label={BOQ_COPY.pricingBasisLabel}
+          hint={BOQ_COPY.pricingBasisHint[pricingBasis]}
+          value={pricingBasis}
+          onChange={(event) =>
+            setPricingBasis(event.target.value as BoqPricingBasis)
+          }
+        >
+          {BOQ_PRICING_BASES.map((basis) => (
+            <option key={basis} value={basis}>
+              {BOQ_COPY.pricingBasis[basis]}
+            </option>
+          ))}
+        </SelectField>
 
         <p className="text-xs text-gray-500">{BOQ_COPY.programmeHint}</p>
         {/* 025 FR-014. The API has accepted a start date since 008 and no screen ever sent one, so

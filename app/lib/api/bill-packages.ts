@@ -854,6 +854,9 @@ const certifiedCopyLineSchema = z
     /** The frozen rate, before the tender premium. */
     rate: z.number(),
     nonBoq: z.boolean().optional(),
+    /** api 047: an item-rate line is billed, and so certified, at its own rate. */
+    pricingBasis: z.enum(['percentage', 'item_rate']).optional(),
+    takesQuotedPercentage: z.boolean().optional(),
     certifiedQty: z.number().nullable(),
     source: z.object({ sheet: z.string(), row: z.number() }).nullable(),
     matchedBy: z.enum(['item_number', 'description']).nullable(),

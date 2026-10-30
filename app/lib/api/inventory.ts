@@ -121,6 +121,10 @@ export const itemSchema = z.object({
   hsnCode: z.string().nullable(),
   description: z.string().nullable(),
   active: z.boolean(),
+  /** 050: the price changes day to day (diesel, cement). */
+  dailyRate: z.boolean().default(false),
+  /** 050: the fuel machines draw; its daily rate is offered on fuel entries. */
+  machineFuel: z.boolean().default(false),
 });
 export type Item = z.infer<typeof itemSchema>;
 
@@ -136,6 +140,7 @@ export interface ItemQuery {
   search?: string;
   categoryId?: string;
   active?: boolean;
+  dailyRate?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -161,6 +166,8 @@ export interface ItemInput {
   hsnCode?: string;
   description?: string;
   active?: boolean;
+  dailyRate?: boolean;
+  machineFuel?: boolean;
 }
 
 export async function createItem(input: ItemInput): Promise<Item> {
@@ -1562,4 +1569,106 @@ export async function getEquipmentChoices(): Promise<EquipmentChoice[]> {
     `/plant/equipment${qs({ pageSize: 100 })}`,
   );
   return z.object({ items: z.array(equipmentChoiceSchema) }).parse(raw).items;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Daily-changing item rates (050)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const datedRateSchema = z.object({ rate: decimal, effectiveFrom: isoDate });
+
+const effectiveDailyRateSchema = datedRateSchema.extend({
+  source: z.enum(['market', 'vendor']),
+});
+export type EffectiveDailyRate = z.infer<typeof effectiveDailyRateSchema>;
+
+export const dailyRateBoardSchema = z.object({
+  date: isoDate,
+  items: z.array(
+    z.object({
+      itemId: z.string(),
+      code: z.string(),
+      name: z.string(),
+      unit: z.string(),
+      machineFuel: z.boolean(),
+      market: datedRateSchema.nullable(),
+      vendors: z.array(
+        z.object({
+          vendorId: z.string(),
+          vendorName: z.string(),
+          override: datedRateSchema.nullable(),
+          effective: effectiveDailyRateSchema.nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+export type DailyRateBoard = z.infer<typeof dailyRateBoardSchema>;
+export type DailyRateBoardItem = DailyRateBoard['items'][number];
+
+/** Every daily-rate item with its market rate and vendors, as in force on `date`. */
+export async function getDailyRateBoard(date?: string): Promise<DailyRateBoard> {
+  const raw = await authFetch<unknown>(`/inventory/daily-rates${qs({ date })}`);
+  return dailyRateBoardSchema.parse(raw);
+}
+
+export interface DailyRateInput {
+  itemId: string;
+  /** Null for the market rate. */
+  vendorId: string | null;
+  /** Null removes that day's row. */
+  rate: number | null;
+}
+
+/** Saves one day's changed rates; answers with the board for that day. */
+export async function setDailyRates(
+  date: string,
+  rates: DailyRateInput[],
+): Promise<DailyRateBoard> {
+  const raw = await authFetch<unknown>('/inventory/daily-rates', {
+    method: 'PUT',
+    body: JSON.stringify({ date, rates }),
+  });
+  return dailyRateBoardSchema.parse(raw);
+}
+
+const offeredDailyRateSchema = z.union([
+  effectiveDailyRateSchema.extend({ dailyRate: z.literal(true) }),
+  z.object({ dailyRate: z.literal(false) }),
+]);
+export type OfferedDailyRate = z.infer<typeof offeredDailyRateSchema>;
+
+/**
+ * The rate a document dated `date` is offered for an item (and vendor). `dailyRate: false` for an
+ * ordinary item, or a daily one with no rate set yet.
+ */
+export async function getOfferedDailyRate(query: {
+  itemId: string;
+  vendorId?: string;
+  date: string;
+}): Promise<OfferedDailyRate> {
+  const raw = await authFetch<unknown>(
+    `/inventory/daily-rates/effective${qs({ ...query })}`,
+  );
+  return offeredDailyRateSchema.parse(raw);
+}
+
+export const dailyRateHistorySchema = z.array(
+  z.object({
+    id: z.string(),
+    effectiveFrom: isoDate,
+    vendorId: z.string().nullable(),
+    vendorName: z.string(),
+    rate: decimal,
+    setAt: z.string(),
+  }),
+);
+export type DailyRateHistory = z.infer<typeof dailyRateHistorySchema>;
+
+/** One item's dated rates, newest first. */
+export async function getDailyRateHistory(itemId: string): Promise<DailyRateHistory> {
+  const raw = await authFetch<unknown>(
+    `/inventory/daily-rates/history${qs({ itemId })}`,
+  );
+  return dailyRateHistorySchema.parse(raw);
 }

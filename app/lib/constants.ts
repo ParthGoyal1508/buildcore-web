@@ -227,6 +227,8 @@ export const ROUTES = {
   inventoryTransfers: '/dashboard/inventory/transfers',
   inventoryPayments: '/dashboard/inventory/payments',
   inventoryIndents: '/dashboard/inventory/indents',
+  /** 050: Update today's rates — diesel, cement and the other daily-rate items. */
+  inventoryDailyRates: '/dashboard/inventory/daily-rates',
   inventoryIndent: (id: string) => `/dashboard/inventory/indents/${id}`,
   inventoryProcurement: '/dashboard/inventory/indents/procurement',
   /** 043: the site's "Create Inventory Purchase" page — a field screen outside /dashboard, like labour's. */
@@ -4317,6 +4319,17 @@ export function approvalActionTypeLabel(actionType: string): string {
  * precisely so they can.
  */
 export const DOCUMENT_COPY = {
+  // 048: which project types a kind is required of.
+  forGovernment: 'Government',
+  forPrivate: 'Private',
+  appliesToLabel: (government: boolean, privateProjects: boolean) =>
+    government && privateProjects
+      ? 'all projects'
+      : government
+        ? 'government projects'
+        : privateProjects
+          ? 'private projects'
+          : 'no project type',
   missingHeading: 'Still to be uploaded',
   presentHeading: 'On file',
   expiringHeading: 'Expiring soon',
@@ -4876,7 +4889,7 @@ export const PROJECT_SHELL_COPY = {
    */
   billingClientReceiptsUnrecorded: 'Not recorded',
   billingClientReceiptsNote:
-    'Money received against a client bill is not recorded anywhere yet, so what the client has actually paid — and what is still outstanding from them — cannot be shown. The revenue figures below are a separate ledger kept by hand, not receipts against these bills.',
+    'Settled to the client is what they paid plus what they withheld (retention, CPBG, TDS), recorded on each client bill. Outstanding is shown per bill. The revenue figures below are a separate ledger kept by hand.',
   billingRevenueHeading: 'Revenue ledger, kept separately',
   billsCount: (count: number) =>
     count === 1 ? '1 bill booked' : `${count} bills booked`,
@@ -4944,6 +4957,8 @@ export const PROJECT_SHELL_COPY = {
   locationLabel: 'Location',
   departmentLabel: 'Department',
   projectTypeLabel: 'Project type',
+  /** The older free-text field, now that "Project type" means Government / Private (048). */
+  projectCategoryLabel: 'Category',
   siteStartLabel: 'Site start',
   cgstLabel: 'GST on bills',
   /** 041: the GST registration the project's bills, POs and store documents are issued from. */
@@ -4992,6 +5007,108 @@ export const PROJECT_SHELL_COPY = {
  * still see why they are there.
  */
 export const PROJECT_MOVED_PARAM = 'movedCompany';
+
+/** Project type — government or private (048). Decides the documents a project must hold. */
+export const PROJECT_SECTOR_COPY = {
+  label: 'Project type',
+  choose: 'Choose…',
+  government: 'Government',
+  private: 'Private',
+  required: 'Choose whether this is a government or a private project.',
+  hintEmpty: 'Government or private decides which documents the project must hold.',
+  hint: {
+    government:
+      'Needs the LOA/LOI, work order, agreement, BOQ, insurances and mining permission. The PBG is kept in Bank Guarantees.',
+    private: 'Needs the work order or PO, BOQ and insurances.',
+  },
+  badge: { government: 'Government', private: 'Private' },
+} as const;
+
+/** Client receipts, and the retention / CPBG a client holds of ours (048). */
+export const CLIENT_HOLDINGS_COPY = {
+  loadFailed: 'The payments received could not be loaded.',
+  receiptsHeading: 'Payments received',
+  billValue: 'Bill value',
+  basis: {
+    package: 'issued package, GST included',
+    certified: 'as certified',
+    billed: 'as billed',
+  },
+  settled: 'Settled',
+  outstanding: 'Outstanding',
+  noReceipts: 'No payment recorded against this bill yet.',
+  receivedOn: 'Received on',
+  received: 'Received',
+  retention: 'Retention',
+  cpbg: 'CPBG',
+  tds: 'TDS',
+  other: 'Other',
+  settles: 'Settles',
+  instrument: {
+    bank_transfer: 'Bank transfer',
+    cheque: 'Cheque',
+    cash: 'Cash',
+    adjustment: 'Adjustment',
+  },
+  recordReceipt: 'Record payment received',
+  recordReceiptTitle: (bill: string) => `Payment received — ${bill}`,
+  saveReceipt: 'Save payment',
+  receiptRecorded: 'The payment was recorded.',
+  receiptRemoved: 'The payment was removed.',
+  removeTitle: 'Remove this payment?',
+  removeMessage: (amount: string) =>
+    `This payment settled ${amount}. Remove it only if it was entered in error — the bill's outstanding goes back up.`,
+  draftHint: 'Payments can be recorded once the bill has been sent to the client.',
+  outstandingNow: (amount: string) => `Outstanding on this bill: ${amount}.`,
+  amountLabel: 'Amount received',
+  amountHint: 'What actually reached the bank.',
+  retentionLabel: 'Retention withheld',
+  retentionHint: 'Pre-filled from the bill’s retention. Change it to what the client actually withheld.',
+  cpbgLabel: 'CPBG deducted',
+  cpbgHint: 'Performance security the client deducted in place of a bank guarantee. Pre-filled from the project’s CPBG %.',
+  cpbgPbgRunning:
+    'A PBG is running for this project, so CPBG should no longer be deducted. Enter it only if the client still did.',
+  tdsLabel: 'TDS deducted',
+  otherLabel: 'Other deduction',
+  otherNoteLabel: 'What the other deduction was',
+  instrumentLabel: 'Paid by',
+  referenceLabel: 'Reference (UTR / cheque no.)',
+  moneyInvalid: 'Rupees, at most two decimals.',
+  settlesSummary: (amount: string) => `This payment settles ${amount} of the bill.`,
+  overOutstanding: (amount: string, outstanding: string) =>
+    `This settles ${amount}, more than the ${outstanding} outstanding. Check for a double entry or a typed digit.`,
+  // The project panel
+  heldHeading: 'Held by the client',
+  heldHint: 'Our money the client is holding back — retention until completion or the defect liability period, CPBG until a PBG is submitted.',
+  heldTotal: 'Total held',
+  receivedTotal: (amount: string, count: number) =>
+    `${amount} received in ${count} payment${count === 1 ? '' : 's'}.`,
+  withheld: 'Withheld',
+  released: 'Released',
+  deducted: 'Deducted',
+  refunded: 'Refunded',
+  held: 'Held',
+  termRetention: (pct: string) => `Contract retention ${pct}`,
+  termCpbg: (pct: string) => `Contract CPBG ${pct}`,
+  pbgHeading: 'Performance bank guarantees',
+  noPbg: 'No PBG running for this project. Tenders and guarantees are kept in Bank Guarantees.',
+  refundDue: (amount: string) =>
+    `A PBG is running, but the client still holds ${amount} of CPBG — that cash should come back.`,
+  releaseButton: 'Record release / refund',
+  releaseTitle: 'Retention released or CPBG refunded',
+  releaseKind: 'What came back',
+  releaseKinds: { retention: 'Retention released', cpbg: 'CPBG refunded' },
+  releaseAmount: 'Amount',
+  releaseOn: 'Released on',
+  releaseReason: 'Reason',
+  releaseReasonHint: 'Completion, end of defect liability, PBG submitted.',
+  releaseGuarantee: 'Against PBG',
+  releaseGuaranteeNone: 'Not against a guarantee',
+  releaseSave: 'Save',
+  releaseSaved: 'The release was recorded.',
+  releaseOver: (amount: string) => `The client holds only ${amount} of this.`,
+  releasesHeading: 'Releases and refunds',
+} as const;
 
 export const BOQ_COPY = {
   heading: 'Bill of Quantities',
@@ -5119,6 +5236,8 @@ export const BOQ_COPY = {
   reportLines: (lines: number, groups: number) =>
     `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}`,
   reportSheet: (sheet: string) => `Read from sheet “${sheet}”`,
+  reportSheets: (sheets: string[]) =>
+    `Read from ${sheets.length} sheets: ${sheets.map((s) => `“${s}”`).join(', ')}`,
   reportScheduleTotal: 'Schedule total',
   reportQuotedTotal: 'Quoted total',
   reportStated: 'Stated in the file',
@@ -5127,6 +5246,57 @@ export const BOQ_COPY = {
   reportReconciles: 'Both totals agree with the figures in your file.',
   reportDoesNotReconcile:
     'The totals do not agree with the figures stated in your file. Check the schedule before confirming.',
+  /**
+   * How a line is priced against the client (047). One tender can carry both kinds, in separate
+   * schedules — and the quoted percentage applied to an item-rate line bills it wrong.
+   */
+  pricingBasisLabel: 'Priced by',
+  pricingBasis: {
+    percentage: 'Percentage',
+    item_rate: 'Item rate',
+  } as const,
+  pricingBasisHint: {
+    percentage:
+      'The schedule rate, with the project’s quoted percentage added or taken off on every bill.',
+    item_rate:
+      'The bidder’s own rate, billed as quoted — the project’s quoted percentage never applies.',
+  } as const,
+  pricingBasisLocked:
+    'This line is already on a client bill, so how it is priced cannot change.',
+  deleteSection: 'Delete section',
+  deleteSectionConfirm: (boqNo: string, name: string) =>
+    `Section ${boqNo} “${name}” has no lines and will be removed. This cannot be undone.`,
+  sectionDeleted: 'The section was deleted.',
+  // The import report, per schedule (047)
+  reportSchedules: 'Schedules in this workbook',
+  reportScheduleLines: (lines: number, groups: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}`,
+  reportScheduleReconciles: 'Adds up',
+  reportScheduleDoesNotReconcile: 'Does not add up',
+  reportExcludedTax: (amount: string) =>
+    `Includes ${amount} of tax rows that were not imported as lines.`,
+  reportCombined: 'All schedules together',
+  reportExcluded: (count: number) =>
+    `${count} row${count === 1 ? '' : 's'} read as totals or tax, not imported`,
+  reportExcludedHint:
+    'Totals and taxes are arithmetic about the schedule, not work in it. They are listed so you can check nothing real was left out.',
+  reportExcludedKind: { tax: 'Tax', total: 'Total' } as const,
+  reportBlocked: 'This workbook cannot be imported as it is',
+  reportBlockedHint:
+    'Correct the workbook and upload it again. Nothing has been saved.',
+  quotedChoiceHeading: 'Which quoted percentage should the project keep?',
+  quotedChoiceHint:
+    'Every bill on this project is priced with it. The two figures below disagree.',
+  quotedChoiceFile: (label: string) => `The workbook’s: ${label}`,
+  quotedChoiceProject: (label: string) => `The project’s current figure: ${label}`,
+  quotedChoiceRequired: 'Choose which quoted percentage to keep.',
+  replaceHeading: 'This project already has a BOQ',
+  replaceBody: (lines: number, groups: number) =>
+    `${lines} line${lines === 1 ? '' : 's'} in ${groups} section${groups === 1 ? '' : 's'}. Nothing has been measured, billed, reported or awarded against them, so they can be replaced.`,
+  replaceConfirm: 'Replace the existing BOQ with this workbook',
+  replaceRequired: 'Tick “Replace” to import over the existing BOQ.',
+  importReplaced: (lines: number) =>
+    ` ${lines} earlier line${lines === 1 ? ' was' : 's were'} replaced.`,
   reportPercentage: 'Quoted percentage',
   /**
    * The direction said in words, not left to a minus sign (027).
@@ -5186,7 +5356,11 @@ export const BOQ_COPY = {
     BOQ_IMPORT_WRITE_INTERRUPTED:
       'The database did not finish writing this schedule in time, so nothing was saved and the project is exactly as it was. The import is still held — press Confirm again. If it fails a second time, import the schedule’s sections separately.',
     BOQ_ALREADY_POPULATED:
-      'This project already has a BOQ. Importing again would add a second copy rather than replace the first, and the existing lines cannot be removed automatically because bills may already measure against them. Add or revise lines instead.',
+      'This project already has a BOQ. Tick “Replace the existing BOQ” to import over it.',
+    BOQ_QUOTED_PERCENTAGE_CHOICE_REQUIRED:
+      'The workbook’s quoted percentage differs from the project’s. Choose which one to keep, then confirm.',
+    BOQ_IMPORT_NOT_RECONCILED:
+      'A schedule in this workbook does not add up to the total it states. Correct the workbook and upload it again.',
     BOQ_BATCH_NOT_FOUND:
       'That import is no longer available. Upload the file again.',
     BOQ_BATCH_EXPIRED:
@@ -5231,4 +5405,42 @@ export const TERMS_COPY = {
   loading: 'Loading the standard terms…',
   loadFailed: 'The standard terms could not be loaded.',
   saveFailed: 'Those terms could not be saved.',
+} as const;
+
+/**
+ * 050: daily-changing item rates (diesel, cement). One place for the screen's words, so the item
+ * master, the rates board and the forms that offer a rate say the same thing.
+ */
+export const DAILY_RATE_COPY = {
+  tab: 'Daily rates',
+  title: "Update today's rates",
+  description:
+    'Items whose price changes every day — diesel, cement. Set the market rate once and every vendor follows it; give a vendor its own rate only where it charges differently. Purchases, purchase orders and fuel entries are offered the rate of their date, and can still be changed on the document.',
+  dateLabel: 'Rates for',
+  marketLabel: 'Market rate',
+  lastSet: (date: string) => `last set ${date}`,
+  neverSet: 'not set yet',
+  followsMarket: 'follows market',
+  vendorPlaceholder: 'Same as market',
+  save: 'Save rates',
+  saved: (count: number) => `${count} rate${count === 1 ? '' : 's'} saved`,
+  nothingChanged: 'No rate was changed.',
+  history: 'History',
+  historyTitle: (name: string) => `Rate history — ${name}`,
+  historyEmpty: 'No rate has been set for this item yet.',
+  empty:
+    'No item is marked as changing daily. Mark diesel, cement and the like in Stock → Item masters ("Rate changes daily").',
+  itemFlag: 'Rate changes daily',
+  itemFlagHint:
+    "Listed on Update today's rates; purchases are offered the day's rate instead of being held to a vendor's agreed rate.",
+  fuelFlag: 'Machine fuel (diesel)',
+  fuelFlagHint:
+    "Fuel entries in Machinery are offered this item's rate for their date. One item per company.",
+  dailyBadge: 'Daily',
+  fuelBadge: 'Daily · fuel',
+  offered: (rate: string, date: string, vendor: boolean) =>
+    `Today's rate list: ${rate}${vendor ? " (this vendor's rate)" : ''}, set ${date}. Change it if the bill says otherwise.`,
+  orderHint: (rate: string, date: string) => `Daily rate ${rate} (set ${date})`,
+  offeredFuel: (rate: string, date: string, vendor: boolean) =>
+    `Diesel rate ${rate}${vendor ? ' at this pump' : ''}, set ${date}. Change it if the slip says otherwise.`,
 } as const;

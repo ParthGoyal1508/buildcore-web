@@ -6,11 +6,16 @@ import {
   ArrowUpTrayIcon,
   BanknotesIcon,
   ClipboardDocumentListIcon,
+  CurrencyRupeeIcon,
   DocumentTextIcon,
   ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 
-import { INVENTORY_ISSUE_LABEL_SHORT, ROUTES } from '@/app/lib/constants';
+import {
+  DAILY_RATE_COPY,
+  INVENTORY_ISSUE_LABEL_SHORT,
+  ROUTES,
+} from '@/app/lib/constants';
 import SectionTabs from '@/app/ui/section-tabs';
 
 /**
@@ -55,6 +60,12 @@ const TABS = [
     name: 'Indents',
     href: ROUTES.inventoryIndents,
     icon: ClipboardDocumentListIcon,
+  },
+  // 050: diesel, cement — the items priced day by day.
+  {
+    name: DAILY_RATE_COPY.tab,
+    href: ROUTES.inventoryDailyRates,
+    icon: CurrencyRupeeIcon,
   },
 ];
 
