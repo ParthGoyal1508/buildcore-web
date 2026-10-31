@@ -2,7 +2,7 @@
   "name": "Tirupati Groups",
   "short_name": "Tirupati",
   "description": "Tirupati Groups — workforce, asset, and project management.",
-  "start_url": "/",
+  "start_url": "/login",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#002d4e",

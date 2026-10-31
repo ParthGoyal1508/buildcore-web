@@ -175,7 +175,7 @@ export default function ResponsiveList<T>({
               </div>
             )}
             {actions && (
-              <div className="mt-3 flex justify-end gap-2 border-t border-gray-100 pt-3">
+              <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3">
                 {actions(row)}
               </div>
             )}
@@ -232,7 +232,7 @@ export default function ResponsiveList<T>({
                     ))}
                     {actions && (
                       <td className={TABLE.td} data-row-actions>
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           {actions(row)}
                         </div>
                       </td>
