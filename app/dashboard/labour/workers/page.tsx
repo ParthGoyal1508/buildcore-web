@@ -36,6 +36,10 @@ import { ListSkeleton } from '@/app/ui/skeletons';
 import { useToast } from '@/app/ui/toast';
 import FacePhotoPicker from '@/app/ui/labour/face-photo-picker';
 import {
+  EditWorkerForm,
+  TransferWorkerForm,
+} from '@/app/ui/labour/worker-edit-forms';
+import {
   FormError,
   RowAction,
   SecondaryButton,
@@ -83,6 +87,9 @@ function WorkersPageBody() {
   );
   const [deactivating, setDeactivating] = useState<Worker | null>(null);
   const [photosFor, setPhotosFor] = useState<Worker | null>(null);
+  // 052: editing a worker's details, and moving them to another site.
+  const [editing, setEditing] = useState<Worker | null>(null);
+  const [transferring, setTransferring] = useState<Worker | null>(null);
 
   const sites = useQuery({
     queryKey: ['labour', 'my-sites'],
@@ -111,12 +118,25 @@ function WorkersPageBody() {
 
   const columns: Column<Worker>[] = [
     { key: 'code', header: 'Code', render: (w) => w.labourCode },
-    { key: 'name', header: 'Name', render: (w) => w.fullName },
     {
-      key: 'father',
-      header: "Father's name",
-      render: (w) => w.fatherName ?? '—',
-      hideOnCard: true,
+      key: 'name',
+      header: 'Name',
+      sortValue: (w) => w.fullName,
+      // 052: father's name and mobile sit under the name, which leaves room for the contractor and
+      // the Edit and Transfer actions without the table scrolling sideways.
+      render: (w) => (
+        <>
+          {w.fullName}
+          {w.fatherName && (
+            <span className="block text-xs text-gray-500">
+              Father: {w.fatherName}
+            </span>
+          )}
+          {w.phone && (
+            <span className="block text-xs text-gray-500">{w.phone}</span>
+          )}
+        </>
+      ),
     },
     {
       key: 'gender',
@@ -131,32 +151,34 @@ function WorkersPageBody() {
         ),
     },
     {
-      key: 'phone',
-      header: 'Mobile',
-      render: (w) => w.phone ?? '—',
-      hideOnCard: true,
+      key: 'contractor',
+      header: 'Contractor',
+      // 052: who engaged them; direct labour is paid in cash from the site sheet.
+      render: (w) =>
+        w.engagementType === 'contractor' ? (
+          w.contractorName ?? '—'
+        ) : (
+          <span className="text-gray-500">Direct</span>
+        ),
     },
     { key: 'site', header: 'Site', render: (w) => siteName(w.siteId) },
     {
-      key: 'face',
-      header: 'Face',
-      render: (w) =>
-        w.faceEnrolled ? (
-          <StatusBadge status="active" label="Registered" />
-        ) : (
-          <StatusBadge status="pending" label="No photos" />
-        ),
-    },
-    {
+      // 052: status, face photos and NOC stacked in one column, which leaves room for the Edit and
+      // Transfer actions without the table scrolling sideways.
       key: 'status',
       header: 'Status',
-      render: (w) => <StatusBadge status={w.status} />,
-    },
-    {
-      key: 'noc',
-      header: 'NOC',
-      sortValue: (w) => nocStatuses?.get(w.id)?.status ?? '',
-      render: (w) => <NocStatusBadge status={nocStatuses?.get(w.id)} />,
+      sortValue: (w) => w.status,
+      render: (w) => (
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge status={w.status} />
+          {w.faceEnrolled ? (
+            <StatusBadge status="active" label="Photos" />
+          ) : (
+            <StatusBadge status="pending" label="No photos" />
+          )}
+          <NocStatusBadge status={nocStatuses?.get(w.id)} />
+        </div>
+      ),
     },
   ];
 
@@ -216,6 +238,11 @@ function WorkersPageBody() {
         emptyMessage="No labour matches these filters."
         actions={(w) => (
           <>
+            <RowAction onClick={() => setEditing(w)}>Edit</RowAction>
+            {/* A transfer needs a second site the caller works at. */}
+            {w.status === 'active' && (sites.data?.length ?? 0) > 1 && (
+              <RowAction onClick={() => setTransferring(w)}>Transfer</RowAction>
+            )}
             {w.status === 'active' && (
               <RowAction onClick={() => setPhotosFor(w)}>
                 {w.faceEnrolled ? 'Retake photos' : 'Add photos'}
@@ -267,6 +294,34 @@ function WorkersPageBody() {
         />
       )}
 
+      {editing && (
+        <EditWorkerForm
+          worker={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(saved) => {
+            toast.success(`${saved.fullName}'s details saved.`);
+            void queryClient.invalidateQueries({ queryKey: ['workers'] });
+            void queryClient.invalidateQueries({ queryKey: ['worker', saved.id] });
+            setEditing(null);
+          }}
+        />
+      )}
+
+      {transferring && (
+        <TransferWorkerForm
+          worker={transferring}
+          sites={sites.data ?? []}
+          currentSiteName={siteName(transferring.siteId)}
+          onClose={() => setTransferring(null)}
+          onSaved={(saved) => {
+            toast.success(`${saved.fullName} moved to ${siteName(saved.siteId)}.`);
+            void queryClient.invalidateQueries({ queryKey: ['workers'] });
+            void queryClient.invalidateQueries({ queryKey: ['worker', saved.id] });
+            setTransferring(null);
+          }}
+        />
+      )}
+
       {deactivating && (
         <DeactivateForm
           worker={deactivating}
@@ -288,7 +343,7 @@ export default function WorkersPage() {
     <Suspense
       fallback={
         <ListSkeleton
-          headers={['Code', 'Name', 'Gender', 'Site', 'Face', 'Status']}
+          headers={['Code', 'Name', 'Gender', 'Contractor', 'Site', 'Status']}
           rows={8}
         />
       }

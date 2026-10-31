@@ -203,6 +203,8 @@ const workerSchema = z.object({
   skillCategoryId: z.string().nullable(),
   engagementType,
   contractorId: z.string().nullable(),
+  /** 052: the contractor's (vendor's) name; null for direct labour. */
+  contractorName: optionalName,
   siteId: z.string(),
   status: z.enum(['active', 'inactive']),
   aadhaarNumber: z.string().nullable(),
@@ -221,6 +223,18 @@ export type WorkerPage = z.infer<typeof workerPageSchema>;
 
 const workerDetailSchema = workerSchema.extend({
   rateOverride: nullableDecimal,
+  // 052: what the edit form needs, and the worker's moves between sites.
+  dateOfBirth: optionalName,
+  transfers: z
+    .array(
+      z.object({
+        fromSiteId: z.string(),
+        toSiteId: z.string(),
+        transferredOn: z.string(),
+        reason: z.string().nullable(),
+      }),
+    )
+    .catch([]),
 });
 export type WorkerDetail = z.infer<typeof workerDetailSchema>;
 
@@ -299,6 +313,61 @@ export async function createWorker(input: WorkerInput): Promise<Worker> {
     body: JSON.stringify(input),
   });
   return workerSchema.parse(data);
+}
+
+/**
+ * 052: an edit to a worker. Omitted fields are unchanged; `null` clears an optional one. The site is
+ * not here — moving a worker is `transferWorker`.
+ */
+export interface WorkerUpdate {
+  fullName?: string;
+  gender?: LabourGender;
+  fatherName?: string | null;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  skillCategoryId?: string | null;
+  engagementType?: 'direct' | 'contractor';
+  contractorId?: string | null;
+  aadhaarNumber?: string | null;
+  bankAccount?: string | null;
+  /** Needs LABOUR_APPROVE. */
+  rateOverride?: number | null;
+}
+
+export async function updateWorker(
+  id: string,
+  input: WorkerUpdate,
+): Promise<WorkerDetail> {
+  const data = await authFetch<unknown>(`/labour/workers/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  return workerDetailSchema.parse(data);
+}
+
+/** 052: moves a worker to another site from today; earlier days stay with the old site. */
+export async function transferWorker(
+  id: string,
+  input: { siteId: string; reason?: string },
+): Promise<WorkerDetail> {
+  const data = await authFetch<unknown>(`/labour/workers/${id}/transfer`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return workerDetailSchema.parse(data);
+}
+
+const contractorOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+});
+export type ContractorOption = z.infer<typeof contractorOptionSchema>;
+
+/** 052: the active vendors a worker can be engaged through, labour contractors first. */
+export async function getContractorOptions(): Promise<ContractorOption[]> {
+  const data = await authFetch<unknown>('/labour/workers/contractor-options');
+  return z.array(contractorOptionSchema).parse(data);
 }
 
 export async function deactivateWorker(
@@ -497,6 +566,8 @@ const paymentSheetLineSchema = z.object({
   workerId: z.string(),
   workerName: optionalName,
   labourCode: optionalName,
+  /** 052: the contractor the line was priced under; null for direct labour. */
+  contractorName: optionalName,
   /** 036 O4: `carry_forward` pays an earlier sheet's shortfall and has no days of its own. */
   kind: z.enum(['wage', 'carry_forward']).catch('wage'),
   carriedFromLineId: z.string().nullable().optional().catch(null),
