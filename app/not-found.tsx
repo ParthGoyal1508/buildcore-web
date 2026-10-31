@@ -7,7 +7,8 @@ export const metadata = { title: 'Page not found' };
 /**
  * The branded 404 (036 A1), in place of Next's bare black-on-white one.
  *
- * Links to `/`, the app's own entry point, so this page needs to know nothing about the session.
+ * Links to `/home`, the app's own entry point (it sends a signed-out visitor to sign-in), so this
+ * page needs to know nothing about the session. `/` is the public website since 053.
  */
 export default function NotFound() {
   return (
@@ -25,7 +26,7 @@ export default function NotFound() {
           wrongly.
         </p>
         <Link
-          href="/"
+          href="/home"
           className="flex h-10 items-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
         >
           Go to home
