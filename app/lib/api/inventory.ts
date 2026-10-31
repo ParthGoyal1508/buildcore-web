@@ -1672,3 +1672,223 @@ export async function getDailyRateHistory(itemId: string): Promise<DailyRateHist
   );
   return dailyRateHistorySchema.parse(raw);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Opening stock (051)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const openingStockSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  siteName: z.string(),
+  itemId: z.string(),
+  itemCode: z.string(),
+  itemName: z.string(),
+  unit: z.string(),
+  quantity: decimal,
+  rate: decimal,
+  /** Recorded without a rate: valued at 0 until one is given. */
+  noRate: z.boolean(),
+  value: decimal,
+  asOnDate: isoDate,
+  /** False once stock of the item has moved at the store since: no replace, no delete. */
+  editable: z.boolean(),
+});
+export type OpeningStock = z.infer<typeof openingStockSchema>;
+
+const openingStockListSchema = z.object({
+  rows: z.array(openingStockSchema),
+  totals: z.object({ value: decimal, noRate: z.number() }),
+});
+export type OpeningStockList = z.infer<typeof openingStockListSchema>;
+
+/** Every opening entry of the company, or one store's. */
+export async function getOpeningStock(siteId?: string): Promise<OpeningStockList> {
+  const raw = await authFetch<unknown>(`/inventory/opening-stock${qs({ siteId })}`);
+  return openingStockListSchema.parse(raw);
+}
+
+export interface OpeningStockInput {
+  quantity: number;
+  /** Null when not known: valued at 0 and flagged "no rate". */
+  rate: number | null;
+  asOnDate: string;
+}
+
+export async function createOpeningStock(
+  input: OpeningStockInput & { siteId: string; itemId: string },
+): Promise<OpeningStock> {
+  const raw = await authFetch<unknown>('/inventory/opening-stock', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return openingStockSchema.parse(raw);
+}
+
+export async function replaceOpeningStock(
+  id: string,
+  input: OpeningStockInput,
+): Promise<OpeningStock> {
+  const raw = await authFetch<unknown>(`/inventory/opening-stock/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+  return openingStockSchema.parse(raw);
+}
+
+export async function deleteOpeningStock(id: string): Promise<void> {
+  await authFetch<unknown>(`/inventory/opening-stock/${id}`, { method: 'DELETE' });
+}
+
+export const openingImportReportSchema = z.object({
+  rows: z.array(
+    z.object({
+      line: z.number(),
+      store: z.string().nullable(),
+      item: z.string().nullable(),
+      siteName: z.string().nullable(),
+      itemName: z.string().nullable(),
+      unit: z.string().nullable(),
+      quantity: nullableDecimal,
+      rate: nullableDecimal,
+      noRate: z.boolean(),
+      asOnDate: isoDate.nullable(),
+      value: decimal,
+      replaces: z.boolean(),
+      errors: z.array(z.string()),
+    }),
+  ),
+  summary: z.object({
+    rows: z.number(),
+    valid: z.number(),
+    invalid: z.number(),
+    noRate: z.number(),
+    replacing: z.number(),
+    value: decimal,
+  }),
+  unmatched: z.object({ stores: z.array(z.string()), items: z.array(z.string()) }),
+  canConfirm: z.boolean(),
+});
+export type OpeningImportReport = z.infer<typeof openingImportReportSchema>;
+
+/** Checks an Opening Stock sheet (base64 .xlsx, no prefix) and writes nothing. */
+export async function validateOpeningStockImport(
+  file: string,
+): Promise<OpeningImportReport> {
+  const raw = await authFetch<unknown>('/inventory/opening-stock/import/validate', {
+    method: 'POST',
+    body: JSON.stringify({ file }),
+  });
+  return openingImportReportSchema.parse(raw);
+}
+
+/** Imports every row in one go, or none. `replaceExisting` replaces entries the sheet repeats. */
+export async function confirmOpeningStockImport(
+  file: string,
+  replaceExisting: boolean,
+): Promise<{ created: number; replaced: number }> {
+  const raw = await authFetch<unknown>('/inventory/opening-stock/import/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ file, replaceExisting }),
+  });
+  return z.object({ created: z.number(), replaced: z.number() }).parse(raw);
+}
+
+export async function downloadOpeningStockTemplate(): Promise<Blob> {
+  return authFetchBlob('/inventory/opening-stock/import/template');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Agreed vendor rates (028, imported up front by 051)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const agreedRateSchema = z.object({
+  id: z.string(),
+  vendorId: z.string(),
+  vendorName: z.string(),
+  itemId: z.string(),
+  itemCode: z.string(),
+  itemName: z.string(),
+  unit: z.string(),
+  rate: decimal,
+  effectiveFrom: isoDate,
+  /** `purchase`: a first purchase set it. `import`: entered up front. */
+  source: z.enum(['purchase', 'import']),
+});
+export type AgreedRate = z.infer<typeof agreedRateSchema>;
+
+/** The agreed rates in force, optionally one vendor's. */
+export async function getAgreedRates(vendorId?: string): Promise<AgreedRate[]> {
+  const raw = await authFetch<unknown>(`/inventory/vendor-rates${qs({ vendorId })}`);
+  return z.object({ rows: z.array(agreedRateSchema) }).parse(raw).rows;
+}
+
+export const VENDOR_RATE_IMPORT_STATUSES = [
+  'create',
+  'unchanged',
+  'conflict',
+  'daily',
+  'error',
+] as const;
+
+export const vendorRateImportReportSchema = z.object({
+  rows: z.array(
+    z.object({
+      line: z.number(),
+      vendor: z.string().nullable(),
+      item: z.string().nullable(),
+      vendorName: z.string().nullable(),
+      itemName: z.string().nullable(),
+      unit: z.string().nullable(),
+      rate: nullableDecimal,
+      validFrom: isoDate.nullable(),
+      status: z.enum(VENDOR_RATE_IMPORT_STATUSES),
+      current: z.object({ rate: decimal, effectiveFrom: isoDate }).nullable(),
+      errors: z.array(z.string()),
+    }),
+  ),
+  summary: z.object({
+    rows: z.number(),
+    create: z.number(),
+    unchanged: z.number(),
+    conflict: z.number(),
+    daily: z.number(),
+    error: z.number(),
+  }),
+  unmatched: z.object({ vendors: z.array(z.string()), items: z.array(z.string()) }),
+  canConfirm: z.boolean(),
+});
+export type VendorRateImportReport = z.infer<typeof vendorRateImportReportSchema>;
+
+/** Checks a Vendor Rates sheet (base64 .xlsx, no prefix) and writes nothing. */
+export async function validateVendorRateImport(
+  file: string,
+): Promise<VendorRateImportReport> {
+  const raw = await authFetch<unknown>('/inventory/vendor-rates/import/validate', {
+    method: 'POST',
+    body: JSON.stringify({ file }),
+  });
+  return vendorRateImportReportSchema.parse(raw);
+}
+
+/** Records the sheet's new rates; conflicts and unchanged rows are left alone. */
+export async function confirmVendorRateImport(
+  file: string,
+): Promise<{ created: number; unchanged: number; conflicts: number; daily: number }> {
+  const raw = await authFetch<unknown>('/inventory/vendor-rates/import/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ file }),
+  });
+  return z
+    .object({
+      created: z.number(),
+      unchanged: z.number(),
+      conflicts: z.number(),
+      daily: z.number(),
+    })
+    .parse(raw);
+}
+
+export async function downloadVendorRateTemplate(): Promise<Blob> {
+  return authFetchBlob('/inventory/vendor-rates/import/template');
+}
