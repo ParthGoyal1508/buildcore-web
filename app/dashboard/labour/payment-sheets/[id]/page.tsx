@@ -79,6 +79,12 @@ const lineColumns: Column<PaymentSheetLine>[] = [
         {l.labourCode && (
           <span className="ml-1 text-xs text-gray-500">{l.labourCode}</span>
         )}
+        {/* 052: the contractor the line was priced under. */}
+        {l.contractorName && (
+          <span className="mt-0.5 block text-xs text-gray-600">
+            {l.contractorName}
+          </span>
+        )}
         {/* 036 O4: a short payment on an earlier sheet, paid here as a line of its own. */}
         {isCarry(l) && (
           <span className="mt-0.5 block text-xs text-amber-800">

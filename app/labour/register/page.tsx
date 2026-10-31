@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
+import { getCurrentUser } from '@/app/lib/api/users';
 import {
   blobToBase64,
   createWorker,
@@ -24,8 +25,14 @@ import {
   MESSAGES,
   ROUTES,
 } from '@/app/lib/constants';
+import { todayIso } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
 import FacePhotoPicker from '@/app/ui/labour/face-photo-picker';
+import WorkerDetailsFields, {
+  EMPTY_WORKER_DETAILS,
+  workerDetailsErrors,
+  type WorkerDetailsValue,
+} from '@/app/ui/labour/worker-details-fields';
 import PageHeader from '@/app/ui/page-header';
 import {
   FormError,
@@ -45,6 +52,10 @@ function registerErrorMessage(error: unknown): string {
     // Validation and no-face messages name the field or photo, which is what the supervisor
     // needs to fix it.
     if (error.status === 400 && error.message) return error.message;
+    // 052: a duplicate Aadhaar (409) and a special rate without the permission (403) say why.
+    if ((error.status === 409 || error.status === 403) && error.message) {
+      return error.message;
+    }
   }
   return MESSAGES.saveFailed;
 }
@@ -52,7 +63,9 @@ function registerErrorMessage(error: unknown): string {
 /**
  * Registering labour on site (031): name and gender, father's name and mobile if known, and 3–5
  * face photos. Everything goes in one request, so a labour is never left registered with no face
- * to match; the code (LAB-0001, LAB-0002…) is issued by the server.
+ * to match; the code (LAB-0001, LAB-0002…) is issued by the server. 052: engagement, contractor,
+ * skill, date of birth, Aadhaar, bank account and (for the HR office) a special rate sit under "More
+ * details", collapsed, so the gate flow stays short; the office can fill them in later by editing.
  */
 export default function RegisterLabourPage() {
   // `useSearchParams` needs a Suspense boundary to prerender.
@@ -85,7 +98,14 @@ function RegisterLabourForm() {
   const [fatherName, setFatherName] = useState('');
   const [phone, setPhone] = useState('');
   const [photos, setPhotos] = useState<Blob[]>([]);
+  const [details, setDetails] =
+    useState<WorkerDetailsValue>(EMPTY_WORKER_DETAILS);
+  const [showDetails, setShowDetails] = useState(false);
   const [touched, setTouched] = useState(false);
+  const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
+  const canSetRate = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
+  const today = todayIso();
+  const detailErrors = workerDetailsErrors(details, today);
   const [registered, setRegistered] = useState<Worker | null>(null);
 
   // The site passed from the attendance screen, else the only one assigned.
@@ -104,6 +124,7 @@ function RegisterLabourForm() {
       photos.length < LABOUR_ENROLMENT_PHOTOS.min
         ? `Take at least ${LABOUR_ENROLMENT_PHOTOS.min} photos.`
         : undefined,
+    ...detailErrors,
   };
   const valid = Object.values(errors).every((e) => !e);
 
@@ -115,6 +136,23 @@ function RegisterLabourForm() {
         gender: gender as LabourGender,
         ...(fatherName.trim() ? { fatherName: fatherName.trim() } : {}),
         ...(phone.trim() ? { phone: phone.trim() } : {}),
+        engagementType: details.engagementType,
+        ...(details.engagementType === 'contractor'
+          ? { contractorId: details.contractorId }
+          : {}),
+        ...(details.skillCategoryId
+          ? { skillCategoryId: details.skillCategoryId }
+          : {}),
+        ...(details.dateOfBirth ? { dateOfBirth: details.dateOfBirth } : {}),
+        ...(details.aadhaarNumber.trim()
+          ? { aadhaarNumber: details.aadhaarNumber.trim() }
+          : {}),
+        ...(details.bankAccount.trim()
+          ? { bankAccount: details.bankAccount.trim() }
+          : {}),
+        ...(canSetRate && details.rateOverride.trim()
+          ? { rateOverride: Number(details.rateOverride.trim()) }
+          : {}),
         photos: await Promise.all(photos.map((p) => blobToBase64(p))),
       }),
     onSuccess: (worker) => {
@@ -129,6 +167,8 @@ function RegisterLabourForm() {
     setFatherName('');
     setPhone('');
     setPhotos([]);
+    setDetails(EMPTY_WORKER_DETAILS);
+    setShowDetails(false);
     setTouched(false);
     setRegistered(null);
     register.reset();
@@ -289,6 +329,36 @@ function RegisterLabourForm() {
         onChange={(e) => setPhone(e.target.value)}
         error={touched ? errors.phone : undefined}
       />
+
+      <div className="rounded-lg border border-gray-200">
+        <button
+          type="button"
+          aria-expanded={showDetails}
+          aria-controls="reg-more"
+          onClick={() => setShowDetails((v) => !v)}
+          className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-gray-800"
+        >
+          <span>
+            More details{' '}
+            <span className="font-normal text-gray-500">
+              (contractor, skill, Aadhaar, bank — optional)
+            </span>
+          </span>
+          <span aria-hidden="true">{showDetails ? '−' : '+'}</span>
+        </button>
+        {(showDetails || (touched && Object.keys(detailErrors).length > 0)) && (
+          <div id="reg-more" className="border-t border-gray-200 p-3">
+            <WorkerDetailsFields
+              idPrefix="reg"
+              value={details}
+              onChange={setDetails}
+              canSetRate={canSetRate}
+              errors={touched ? detailErrors : {}}
+              today={today}
+            />
+          </div>
+        )}
+      </div>
 
       <FacePhotoPicker
         photos={photos}
