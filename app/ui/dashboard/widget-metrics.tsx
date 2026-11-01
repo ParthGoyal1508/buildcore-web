@@ -2,6 +2,7 @@
 
 import {
   ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
   BanknotesIcon,
   BellAlertIcon,
   BriefcaseIcon,
@@ -13,7 +14,9 @@ import {
   CubeIcon,
   DocumentTextIcon,
   FireIcon,
+  LockClosedIcon,
   TruckIcon,
+  UserGroupIcon,
   UserMinusIcon,
   UsersIcon,
   WrenchScrewdriverIcon,
@@ -74,6 +77,24 @@ const LOOK: Record<
   'receivable-amount': {
     icon: ClockIcon,
     hint: 'billed, not yet settled',
+    tone: (v) => (typeof v === 'number' && v > 0 ? 'warning' : 'default'),
+  },
+  // 054: what is held back, and what the company still has to pay.
+  'held-by-clients': { icon: LockClosedIcon, hint: 'retention and CPBG' },
+  'held-from-subcontractors': {
+    icon: LockClosedIcon,
+    hint: 'retention we hold',
+  },
+  'payable-material': { icon: CubeIcon, hint: 'unpaid purchase bills' },
+  'payable-subcontractors': {
+    icon: BriefcaseIcon,
+    hint: 'certified RA bills unpaid',
+  },
+  'payable-labour': { icon: UserGroupIcon, hint: 'wages not yet paid' },
+  'payable-plant': { icon: TruckIcon, hint: 'hire, service and repair bills' },
+  'payable-total': {
+    icon: ArrowUpTrayIcon,
+    hint: 'all bills still to clear',
     tone: (v) => (typeof v === 'number' && v > 0 ? 'warning' : 'default'),
   },
   'employees-on-muster': {
@@ -182,5 +203,72 @@ export function SummaryBanner({
         <p className="text-sm text-brand-100">No figures to show yet.</p>
       )}
     </section>
+  );
+}
+
+/**
+ * Which money panel a `money` widget belongs in (054): what comes in from clients, what is held
+ * back on either side, and what the company still has to pay out.
+ */
+const MONEY_PANELS: { title: string; subtitle: string; ids: string[] }[] = [
+  {
+    title: 'From Clients',
+    subtitle: 'Billed to clients and collected',
+    ids: ['billed-amount', 'received-amount', 'receivable-amount'],
+  },
+  {
+    title: 'Held',
+    subtitle: 'Kept back, to be released later',
+    ids: ['held-by-clients', 'held-from-subcontractors'],
+  },
+  {
+    title: 'Outgoing',
+    subtitle: 'Bills the company still has to pay',
+    ids: [
+      'payable-total',
+      'payable-material',
+      'payable-subcontractors',
+      'payable-labour',
+      'payable-plant',
+    ],
+  },
+];
+
+/** The three money panels, each holding the cards the caller may see; an empty panel is left out. */
+export function MoneyPanels({ widgets }: { widgets: WidgetResult[] }) {
+  const byId = new Map(widgets.map((w) => [w.id, w]));
+  const panels = MONEY_PANELS.map((panel) => ({
+    ...panel,
+    metrics: panel.ids
+      .map((id) => byId.get(id))
+      .map((w) => (w ? widgetMetric(w) : null))
+      .filter((m): m is Metric => m !== null)
+      // The total heads its panel across both columns.
+      .map((m) => (m.key === 'payable-total' ? { ...m, wide: true } : m)),
+  })).filter((panel) => panel.metrics.length > 0);
+  if (panels.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
+      {panels.map((panel) => (
+        <section
+          key={panel.title}
+          aria-label={panel.title}
+          className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+        >
+          <header className="mb-3">
+            <h2 className="text-base font-semibold text-gray-900">
+              {panel.title}
+            </h2>
+            <p className="text-xs text-gray-500">{panel.subtitle}</p>
+          </header>
+          <dl className="grid grid-cols-2 gap-2">
+            {panel.metrics.map((metric) => (
+              <MetricTile key={metric.key} metric={metric} />
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
   );
 }
