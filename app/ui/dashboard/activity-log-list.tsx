@@ -68,7 +68,7 @@ export const actionLabel = (action: string) =>
 
 /**
  * What happened, in words: the API's sentence where it has one ("Confirmed their password for
- * Personal Settings"), otherwise the action and what it was done to ("Updated PRPL-2401 —
+ * App Settings"), otherwise the action and what it was done to ("Updated PRPL-2401 —
  * Whitefield"). The record's id is never the reader's answer (2026-10-15).
  */
 export const activityWhat = (e: ActivityLogEntry) =>

@@ -1,4 +1,5 @@
 import {
+  AdjustmentsHorizontalIcon,
   BanknotesIcon,
   BuildingOffice2Icon,
   CheckCircleIcon,
@@ -7,15 +8,11 @@ import {
   HashtagIcon,
   IdentificationIcon,
   PencilSquareIcon,
-  UserCircleIcon,
   UsersIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 
-import {
-  ROUTES,
-  SETTINGS_PERMISSIONS,
-} from '@/app/lib/constants';
+import { ROUTES, SETTINGS_PERMISSIONS } from '@/app/lib/constants';
 
 /**
  * The sections of Settings, in the order both the index tiles and the in-module tab
@@ -132,17 +129,14 @@ export const SETTINGS_SECTIONS: {
   },
   {
     // 2026-10-14. Listed only for a Super Admin — `visibleSettingsSections` filters on
-    // `SETTINGS_PERMISSIONS['personal-settings']`, which is `CROSS_COMPANY_ACCESS` — so nobody
-    // else learns the setting exists. Even a Super Admin sees only a password prompt inside.
-    // Named for what it is rather than its one setting since 2026-10-15 — the client: "we do not
-    // want to show 'Cash Visibility', instead rename it to 'Personal Settings'". Last in the list,
-    // and neither its description nor its icon says what is behind the password.
-    key: 'personal-settings',
-    href: ROUTES.settingsPersonal,
-    title: 'Personal Settings',
-    description:
-      'Sensitive settings. Super Admin only — your password reveals them.',
-    icon: UserCircleIcon,
+    // `SETTINGS_PERMISSIONS['app-settings']`, which is `CROSS_COMPANY_ACCESS`. Inside, behind the
+    // password, the cash switch is one row of a preferences table. App Settings since 2026-11-01
+    // (Personal Settings before): the client wants nothing on screen to say what it is.
+    key: 'app-settings',
+    href: ROUTES.settingsApp,
+    title: 'App Settings',
+    description: 'Display, regional and navigation preferences.',
+    icon: AdjustmentsHorizontalIcon,
   },
 ];
 

@@ -128,6 +128,75 @@ export async function confirmPassword(
   );
 }
 
+// ─── Face unlock (054, 2026-11-01) ───────────────────────────────────────────
+
+/** Refusal codes for face unlock. */
+export const FACE_NOT_RECOGNISED = "FACE_NOT_RECOGNISED";
+export const FACE_UNLOCK_NOT_SET_UP = "FACE_UNLOCK_NOT_SET_UP";
+
+const faceUnlockStatusSchema = z.object({
+  enrolled: z.boolean(),
+  enrolledAt: z.string().nullable(),
+});
+export type FaceUnlockStatus = z.infer<typeof faceUnlockStatusSchema>;
+
+/** Whether the signed-in user has a face registered for this purpose's confirmations. */
+export async function getFaceUnlock(
+  purpose: "cash-visibility",
+): Promise<FaceUnlockStatus> {
+  return faceUnlockStatusSchema.parse(
+    await authFetch<unknown>(`/auth/face-unlock?purpose=${purpose}`),
+  );
+}
+
+/**
+ * One camera frame in place of the password: the server matches it against the registered face
+ * and returns the same ten-minute confirmation `confirmPassword` does. A mismatch is a 403 coded
+ * `FACE_NOT_RECOGNISED`.
+ */
+export async function confirmFace(
+  photo: string,
+  purpose: "cash-visibility",
+): Promise<PasswordConfirmation> {
+  return passwordConfirmationSchema.parse(
+    await authFetch<unknown>("/auth/face-unlock/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photo, purpose }),
+    }),
+  );
+}
+
+/** Registers or replaces the face. Needs a confirmation made with the *password*, not a face. */
+export async function enrolFaceUnlock(
+  photos: string[],
+  purpose: "cash-visibility",
+  confirmationToken: string,
+): Promise<FaceUnlockStatus> {
+  return faceUnlockStatusSchema.parse(
+    await authFetch<unknown>("/auth/face-unlock", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Confirmation-Token": confirmationToken,
+      },
+      body: JSON.stringify({ photos, purpose }),
+    }),
+  );
+}
+
+export async function removeFaceUnlock(
+  purpose: "cash-visibility",
+  confirmationToken: string,
+): Promise<FaceUnlockStatus> {
+  return faceUnlockStatusSchema.parse(
+    await authFetch<unknown>(`/auth/face-unlock?purpose=${purpose}`, {
+      method: "DELETE",
+      headers: { "X-Confirmation-Token": confirmationToken },
+    }),
+  );
+}
+
 /**
  * Changes the signed-in user's own password.
  *

@@ -25,6 +25,11 @@ export const WIDGET_LINKS: Record<string, string> = {
   'active-projects': ROUTES.projectsPortfolio,
   'total-machinery': ROUTES.plantEquipment,
   'contract-value': ROUTES.projectsPortfolio,
+  // 054: billing is per project, so the money cards open the portfolio too.
+  'contract-value-completed': ROUTES.projectsPortfolio,
+  'billed-amount': ROUTES.projectsPortfolio,
+  'received-amount': ROUTES.projectsPortfolio,
+  'receivable-amount': ROUTES.projectsPortfolio,
   'employees-on-muster': ROUTES.hrAttendance,
   'alerts-reminders': ROUTES.reminders,
   'today-attendance': ROUTES.hrAttendance,
