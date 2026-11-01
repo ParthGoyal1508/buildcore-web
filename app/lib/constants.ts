@@ -38,10 +38,10 @@ export const ROUTES = {
   settingsBillingRates: '/dashboard/settings/billing-rates',
   settingsNumbering: '/dashboard/settings/numbering',
   /**
-   * Personal Settings — the cash visibility switch and whatever joins it; Super Admin only, behind
-   * their own password (2026-10-14; renamed from "Cash visibility" on 2026-10-15).
+   * App Settings — the cash visibility switch, disguised among display preferences; Super Admin
+   * only, behind their own password (2026-10-14; "Personal Settings" until 2026-11-01).
    */
-  settingsPersonal: '/dashboard/settings/personal-settings',
+  settingsApp: '/dashboard/settings/app-settings',
   /** Feature 010 (Account Creation) owns this route; it does not exist yet, so the
    * Users screen's "Add User" control is rendered disabled rather than linked. */
   accountCreation: '/dashboard/account-creation',
@@ -2241,8 +2241,8 @@ export const SETTINGS_PERMISSIONS = {
   terms: 'SETTINGS',
   // 2026-10-14. Super Admin only — which is `CROSS_COMPANY_ACCESS` here, as on the backend,
   // never the role's display name. The API refuses everybody else on both routes, and the
-  // change itself also needs a password confirmation (`app/ui/settings/cash-visibility.tsx`).
-  'personal-settings': 'CROSS_COMPANY_ACCESS',
+  // change itself also needs a password confirmation (`app/ui/settings/app-settings.tsx`).
+  'app-settings': 'CROSS_COMPANY_ACCESS',
 } as const;
 
 

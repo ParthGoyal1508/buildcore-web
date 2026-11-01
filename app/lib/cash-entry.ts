@@ -54,7 +54,7 @@ export const cashPolicyKey = (companyId: string | null) =>
  * Whether cash is hidden for the company being worked in (038 FR-004).
  *
  * Keyed by the selected company, so switching company asks again rather than serving the other
- * company's answer. Saving the setting (`app/ui/settings/cash-visibility.tsx`) invalidates the whole
+ * company's answer. Saving the setting (`app/ui/settings/app-settings.tsx`) invalidates the whole
  * cache, this included, and a write refused with `CASH_HIDDEN` invalidates it too (`providers.tsx`),
  * so a stale "shown" corrects itself on the first refusal. Until the answer arrives — and whenever
  * the API cannot give one — cash counts as shown; the server enforces the rule either way.

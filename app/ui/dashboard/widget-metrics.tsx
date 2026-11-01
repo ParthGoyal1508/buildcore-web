@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowDownTrayIcon,
   BanknotesIcon,
   BellAlertIcon,
   BriefcaseIcon,
@@ -8,7 +9,9 @@ import {
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
   ClipboardDocumentListIcon,
+  ClockIcon,
   CubeIcon,
+  DocumentTextIcon,
   FireIcon,
   TruckIcon,
   UserMinusIcon,
@@ -56,7 +59,23 @@ const LOOK: Record<
   },
   'active-projects': { icon: BriefcaseIcon, hint: 'ongoing' },
   'total-machinery': { icon: TruckIcon, hint: 'in the register' },
-  'contract-value': { icon: BanknotesIcon, hint: 'order book, ongoing' },
+  // 054: contract value split by status, and what has been billed and collected against it.
+  'contract-value': { icon: BanknotesIcon, hint: 'ongoing projects' },
+  'contract-value-completed': {
+    icon: BanknotesIcon,
+    hint: 'completed projects',
+  },
+  'billed-amount': { icon: DocumentTextIcon, hint: 'client bills raised' },
+  'received-amount': {
+    icon: ArrowDownTrayIcon,
+    hint: 'received from clients',
+    tone: (v) => (typeof v === 'number' && v > 0 ? 'ok' : 'default'),
+  },
+  'receivable-amount': {
+    icon: ClockIcon,
+    hint: 'billed, not yet settled',
+    tone: (v) => (typeof v === 'number' && v > 0 ? 'warning' : 'default'),
+  },
   'employees-on-muster': {
     icon: ClipboardDocumentListIcon,
     hint: 'marked on a muster',
