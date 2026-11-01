@@ -106,9 +106,12 @@ export type PasswordConfirmation = z.infer<typeof passwordConfirmationSchema>;
 /** The refusal codes `confirmPassword` and the act it unlocks can answer with. */
 export const PASSWORD_INCORRECT = "PASSWORD_INCORRECT";
 export const PASSWORD_CONFIRMATION_REQUIRED = "PASSWORD_CONFIRMATION_REQUIRED";
+export const CONFIRMATION_NOT_SET_UP = "CONFIRMATION_NOT_SET_UP";
 
 /**
- * Re-enters the signed-in user's own password before a sensitive act (2026-10-14).
+ * Checks a purpose's password before a sensitive act (2026-10-14). Since 054 that is the
+ * purpose's own password, generated on the server — not the signed-in user's — and a purpose with
+ * none generated yet is refused as `CONFIRMATION_NOT_SET_UP`.
  *
  * Returns a short-lived confirmation (ten minutes) for that one purpose, which the act's own
  * request then carries. Held in component state only — never stored — so it ends with the

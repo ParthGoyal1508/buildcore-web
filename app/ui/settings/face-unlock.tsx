@@ -5,18 +5,25 @@ import { useState } from 'react';
 
 import {
   confirmFace,
+  confirmPassword,
   enrolFaceUnlock,
   FACE_NOT_RECOGNISED,
   type FaceUnlockStatus,
+  PASSWORD_INCORRECT,
   type PasswordConfirmation,
   removeFaceUnlock,
 } from '@/app/lib/api/auth';
 import { ApiError, errorMessage } from '@/app/lib/api/client';
 import { ENROLMENT_PHOTO_RANGE, MESSAGES } from '@/app/lib/constants';
 import { fileToBase64 } from '@/app/lib/files';
-import { Button, IconButton, SecondaryButton } from '@/app/ui/button';
+import {
+  Button,
+  IconButton,
+  SecondaryButton,
+  TextButton,
+} from '@/app/ui/button';
 import CameraCapture from '@/app/ui/my/camera-capture';
-import { FormError } from '@/app/ui/settings/form-fields';
+import { FormError, TextField } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { toast } from '@/app/ui/toast';
 
@@ -24,9 +31,112 @@ import { toast } from '@/app/ui/toast';
  * Face unlock for App Settings (054, 2026-11-01): the client asked for the face in place of the
  * password, with the password kept as the fallback. The match runs on the server — this only
  * takes the picture — and returns the same confirmation the password does.
+ *
+ * The password is the settings password the server generates (`settings-password:rotate`), not
+ * the sign-in password, and nothing here can show or change it.
  */
 
 export const FACE_UNLOCK_QUERY = ['face-unlock', 'cash-visibility'] as const;
+
+export type Confirmation = PasswordConfirmation & {
+  method: 'password' | 'face';
+};
+
+/**
+ * Asked at the moment of a protected change, not on opening the screen: the face when one is
+ * registered (unless `passwordOnly`), the settings password otherwise or on request.
+ */
+export function ConfirmModal({
+  faceEnrolled,
+  passwordOnly = false,
+  onConfirmed,
+  onClose,
+}: {
+  faceEnrolled: boolean;
+  passwordOnly?: boolean;
+  onConfirmed: (confirmation: Confirmation) => void;
+  onClose: () => void;
+}) {
+  const [usePassword, setUsePassword] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const faceOffered = faceEnrolled && !passwordOnly;
+  const faceGate = faceOffered && !usePassword;
+
+  const confirm = useMutation({
+    mutationFn: () => confirmPassword(password, 'cash-visibility'),
+    onSuccess: (result) => onConfirmed({ ...result, method: 'password' }),
+    onError: (err) => {
+      setPassword('');
+      setError(
+        err instanceof ApiError && err.code === PASSWORD_INCORRECT
+          ? 'That password is not correct.'
+          : errorMessage(err, MESSAGES.saveFailed),
+      );
+    },
+  });
+
+  return (
+    <Modal
+      title="Confirm it's you"
+      onClose={onClose}
+      pending={confirm.isPending}
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-gray-600">
+          {faceGate
+            ? 'Look at the camera to save this setting.'
+            : 'Enter the settings password to save this setting.'}
+        </p>
+        {faceGate ? (
+          <FaceGate
+            onConfirmed={(result) => onConfirmed({ ...result, method: 'face' })}
+          />
+        ) : (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!password) return;
+              setError(null);
+              confirm.mutate();
+            }}
+          >
+            <FormError message={error} />
+            <TextField
+              id="app-settings-password"
+              label="Settings password"
+              type="password"
+              autoComplete="off"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <div>
+              <Button
+                type="submit"
+                intent="read"
+                disabled={confirm.isPending || password.length === 0}
+              >
+                {confirm.isPending ? 'Checking…' : 'Confirm'}
+              </Button>
+            </div>
+          </form>
+        )}
+        {faceOffered && (
+          <TextButton
+            onClick={() => {
+              setError(null);
+              setUsePassword((v) => !v);
+            }}
+          >
+            {faceGate ? 'Use password instead' : 'Use face unlock instead'}
+          </TextButton>
+        )}
+      </div>
+    </Modal>
+  );
+}
 
 /** The camera, in place of the password prompt. */
 export function FaceGate({
@@ -65,27 +175,26 @@ export function FaceGate({
   );
 }
 
-/** The table row that registers, replaces or removes the face. */
+/**
+ * The table row that registers, replaces or removes the face. Each asks for the settings password
+ * first — never the face, so a face that once passed cannot re-register itself.
+ */
 export function FaceUnlockRow({
   status,
-  confirmation,
   rowClass,
   cellClass,
 }: {
   status: FaceUnlockStatus | undefined;
-  confirmation: PasswordConfirmation & { method: 'password' | 'face' };
   rowClass: string;
   cellClass: string;
 }) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [asking, setAsking] = useState<'enrol' | 'remove' | null>(null);
+  const [enrolToken, setEnrolToken] = useState<string | null>(null);
   const enrolled = status?.enrolled ?? false;
-  // The API refuses a face confirmation here; say so before the camera opens, not after.
-  const needsPassword = confirmation.method !== 'password';
 
   const remove = useMutation({
-    mutationFn: () =>
-      removeFaceUnlock('cash-visibility', confirmation.confirmationToken),
+    mutationFn: (token: string) => removeFaceUnlock('cash-visibility', token),
     onSuccess: (next) => {
       queryClient.setQueryData(FACE_UNLOCK_QUERY, next);
       toast.success('Face unlock removed.');
@@ -98,9 +207,7 @@ export function FaceUnlockRow({
       <td className={cellClass}>
         <div className="font-medium text-gray-900">Face unlock</div>
         <div className="text-xs text-gray-500">
-          {needsPassword
-            ? 'Unlock this screen with your password to change it.'
-            : 'Open this screen with your face instead of your password.'}
+          Confirm secured settings with your face instead of a password.
         </div>
       </td>
       <td className={`${cellClass} text-gray-600`}>Security</td>
@@ -109,8 +216,8 @@ export function FaceUnlockRow({
           <SecondaryButton
             type="button"
             size="sm"
-            disabled={needsPassword || !status}
-            onClick={() => setOpen(true)}
+            disabled={!status}
+            onClick={() => setAsking('enrol')}
           >
             {enrolled ? 'Update' : 'Set up'}
           </SecondaryButton>
@@ -118,17 +225,30 @@ export function FaceUnlockRow({
             <SecondaryButton
               type="button"
               size="sm"
-              disabled={needsPassword || remove.isPending}
-              onClick={() => remove.mutate()}
+              disabled={remove.isPending}
+              onClick={() => setAsking('remove')}
             >
               Remove
             </SecondaryButton>
           )}
         </div>
-        {open && (
+        {asking && (
+          <ConfirmModal
+            faceEnrolled={enrolled}
+            passwordOnly
+            onClose={() => setAsking(null)}
+            onConfirmed={(confirmation) => {
+              if (asking === 'remove')
+                remove.mutate(confirmation.confirmationToken);
+              else setEnrolToken(confirmation.confirmationToken);
+              setAsking(null);
+            }}
+          />
+        )}
+        {enrolToken && (
           <FaceEnrolModal
-            confirmationToken={confirmation.confirmationToken}
-            onClose={() => setOpen(false)}
+            confirmationToken={enrolToken}
+            onClose={() => setEnrolToken(null)}
           />
         )}
       </td>

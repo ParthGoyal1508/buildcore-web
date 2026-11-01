@@ -1,32 +1,19 @@
 'use client';
 
-import { LockClosedIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import {
-  confirmPassword,
-  getFaceUnlock,
-  PASSWORD_CONFIRMATION_REQUIRED,
-  PASSWORD_INCORRECT,
-  type PasswordConfirmation,
-} from '@/app/lib/api/auth';
-import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { getFaceUnlock } from '@/app/lib/api/auth';
+import { errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompany } from '@/app/lib/api/company-selection';
 import { getCashVisibility, setCashVisibility } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
 import { MESSAGES, SETTINGS_PERMISSIONS } from '@/app/lib/constants';
-import { clockTime } from '@/app/lib/format';
-import { Button, TextButton } from '@/app/ui/button';
 import QueryError from '@/app/ui/query-error';
+import { compactSelectClass, FormError } from '@/app/ui/settings/form-fields';
 import {
-  compactSelectClass,
-  FormError,
-  TextField,
-} from '@/app/ui/settings/form-fields';
-import {
+  ConfirmModal,
   FACE_UNLOCK_QUERY,
-  FaceGate,
   FaceUnlockRow,
 } from '@/app/ui/settings/face-unlock';
 import { TABLE } from '@/app/ui/table';
@@ -41,14 +28,11 @@ import { toast } from '@/app/ui/toast';
  * and refused for everyone until it is turned off; nothing is deleted). Every other row is a
  * decoy: it works, and is remembered on this device, but changes nothing else.
  *
- * Still Super Admin only (`CROSS_COMPANY_ACCESS`) and behind the Super Admin's own password
- * (2026-10-14): nothing — not even the switch's state — is fetched until the password is
- * verified, the confirmation lasts ten minutes in this component's state alone, and the API
- * refuses a change without it. Since 054 a registered face can stand in for the password (the
- * "Face unlock" row registers it; the password stays as the fallback).
+ * Still Super Admin only (`CROSS_COMPANY_ACCESS`). The screen opens without a prompt (the client,
+ * 2026-11-01): the check comes when the Slate theme is flipped — the face if one is registered,
+ * else the settings password the server generates, which is not the sign-in password and has no
+ * screen to set it. The API refuses the change without that confirmation.
  */
-
-type Confirmation = PasswordConfirmation & { method: 'password' | 'face' };
 
 type Decoy =
   | {
@@ -234,10 +218,8 @@ function Switch({
 export default function AppSettings() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [usePassword, setUsePassword] = useState(false);
-  // Lazily, not in an effect: the table renders only after the password, so always in a browser.
+  // The Slate value waiting on the face or password, while the prompt is open.
+  const [pending, setPending] = useState<boolean | null>(null);
   const [decoys, setDecoys] = useState<DecoyValues>(() =>
     typeof window === 'undefined' ? {} : loadDecoys(),
   );
@@ -252,70 +234,28 @@ export default function AppSettings() {
   const company = useSelectedCompany();
   const companyLabel = company?.name ?? 'your company';
 
-  // Drop the confirmation when it expires, so the table hides itself on time.
-  useEffect(() => {
-    if (!confirmation) return;
-    const remaining = Date.parse(confirmation.expiresAt) - Date.now();
-    const timer = window.setTimeout(
-      () => setConfirmation(null),
-      Math.max(remaining, 0),
-    );
-    return () => window.clearTimeout(timer);
-  }, [confirmation]);
-
-  // Asked before the unlock: it says only whether to open the camera or the password field.
   const face = useQuery({
     queryKey: FACE_UNLOCK_QUERY,
     queryFn: () => getFaceUnlock('cash-visibility'),
     enabled: isSuperAdmin,
   });
-  const faceGate = face.data?.enrolled === true && !usePassword;
 
   const current = useQuery({
     queryKey: ['cash-visibility'],
     queryFn: () => getCashVisibility(),
-    enabled: isSuperAdmin && confirmation !== null,
-  });
-
-  const confirm = useMutation({
-    mutationFn: () => confirmPassword(password, 'cash-visibility'),
-    onSuccess: (result) => {
-      setPassword('');
-      setError(null);
-      setConfirmation({ ...result, method: 'password' });
-    },
-    onError: (err) => {
-      setPassword('');
-      setError(
-        err instanceof ApiError && err.code === PASSWORD_INCORRECT
-          ? 'That password is not correct.'
-          : err instanceof ApiError
-            ? err.message
-            : MESSAGES.saveFailed,
-      );
-    },
+    enabled: isSuperAdmin,
   });
 
   const save = useMutation({
-    mutationFn: (hide: boolean) =>
-      setCashVisibility(hide, confirmation?.confirmationToken ?? ''),
+    mutationFn: ({ hide, token }: { hide: boolean; token: string }) =>
+      setCashVisibility(hide, token),
     onSuccess: (next) => {
       queryClient.setQueryData(['cash-visibility'], next);
       toast.success('Settings saved.');
       // Every open screen holds figures shaped under the old setting, the cash policy included.
       void queryClient.invalidateQueries();
     },
-    onError: (err) => {
-      if (
-        err instanceof ApiError &&
-        err.code === PASSWORD_CONFIRMATION_REQUIRED
-      ) {
-        setConfirmation(null);
-        setError("Your confirmation has expired. Confirm it's you again.");
-        return;
-      }
-      setError(errorMessage(err, MESSAGES.saveFailed));
-    },
+    onError: (err) => setError(errorMessage(err, MESSAGES.saveFailed)),
   });
 
   const setDecoy = (key: string, value: boolean | string) => {
@@ -331,81 +271,6 @@ export default function AppSettings() {
 
   if (!isSuperAdmin) return null;
 
-  if (!confirmation) {
-    return (
-      <section className="max-w-xl rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
-            <LockClosedIcon className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-gray-900">
-              Confirm it&apos;s you
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              {faceGate
-                ? 'Look at the camera to change app settings.'
-                : 'Enter your password to change app settings.'}{' '}
-              The confirmation lasts ten minutes and ends when you leave this
-              screen.
-            </p>
-          </div>
-        </div>
-        {faceGate ? (
-          <FaceGate
-            onConfirmed={(result) => {
-              setError(null);
-              setConfirmation({ ...result, method: 'face' });
-            }}
-          />
-        ) : (
-          <form
-            className="mt-4 flex flex-col gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!password) return;
-              setError(null);
-              confirm.mutate();
-            }}
-          >
-            <FormError message={error} />
-            <TextField
-              id="app-settings-password"
-              label="Your password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-            <div>
-              <Button
-                type="submit"
-                intent="read"
-                disabled={confirm.isPending || password.length === 0}
-                className="gap-2"
-              >
-                <ShieldCheckIcon className="h-5 w-5" aria-hidden="true" />
-                {confirm.isPending ? 'Checking…' : 'Confirm password'}
-              </Button>
-            </div>
-          </form>
-        )}
-        {face.data?.enrolled && (
-          <TextButton
-            className="mt-3"
-            onClick={() => {
-              setError(null);
-              setUsePassword((v) => !v);
-            }}
-          >
-            {faceGate ? 'Use password instead' : 'Use face unlock instead'}
-          </TextButton>
-        )}
-      </section>
-    );
-  }
-
   // Nothing is offered until the real setting has loaded: a failed load must not show a working
   // switch one click from a state nobody read (036 C13).
   if (current.isError) {
@@ -420,7 +285,7 @@ export default function AppSettings() {
     );
   }
 
-  const busy = current.isPending || save.isPending;
+  const busy = current.isPending || save.isPending || face.isPending;
   const slate = current.data?.hideCashTransactions ?? false;
 
   const decoyRow = (d: Decoy) => {
@@ -491,7 +356,7 @@ export default function AppSettings() {
                   disabled={busy || !current.data}
                   onChange={(next) => {
                     setError(null);
-                    save.mutate(next);
+                    setPending(next);
                   }}
                 />
               </td>
@@ -499,17 +364,26 @@ export default function AppSettings() {
             {DECOYS.slice(SLATE_AFTER).map(decoyRow)}
             <FaceUnlockRow
               status={face.data}
-              confirmation={confirmation}
               rowClass={TABLE.row}
               cellClass={TABLE.td}
             />
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-gray-500">
-        Settings for {companyLabel}. Unlocked until{' '}
-        {clockTime(confirmation.expiresAt)}.
-      </p>
+      <p className="text-xs text-gray-500">Settings for {companyLabel}.</p>
+      {pending !== null && (
+        <ConfirmModal
+          faceEnrolled={face.data?.enrolled === true}
+          onClose={() => setPending(null)}
+          onConfirmed={(confirmation) => {
+            save.mutate({
+              hide: pending,
+              token: confirmation.confirmationToken,
+            });
+            setPending(null);
+          }}
+        />
+      )}
     </section>
   );
 }
