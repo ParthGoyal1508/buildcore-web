@@ -102,26 +102,29 @@ function PhotoDialog({
 /**
  * "Photo" in a table cell, opening the image in a dialog. Says "Deleted" where the row reports no
  * photo held — the retention sweep removed it — so an empty cell is never mistaken for a fault.
+ * `missing` replaces that wording where "no photo" has more than one cause (the daily register).
  */
 export function EvidencePhoto({
   available,
   title,
   queryKey,
   load,
+  missing = {
+    label: 'Deleted',
+    title: 'Deleted under the photo retention policy',
+  },
 }: {
   available: boolean;
   title: string;
   queryKey: readonly unknown[];
   load: () => Promise<Blob>;
+  missing?: { label: string; title: string };
 }) {
   const [open, setOpen] = useState(false);
   if (!available) {
     return (
-      <span
-        className="text-xs text-gray-500"
-        title="Deleted under the photo retention policy"
-      >
-        Deleted
+      <span className="text-xs text-gray-500" title={missing.title}>
+        {missing.label}
       </span>
     );
   }

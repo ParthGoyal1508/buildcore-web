@@ -529,6 +529,15 @@ export const dailyAttendanceRowSchema = z.object({
   remarks: z.string().nullable(),
   hasException: z.boolean(),
   /**
+   * The punches behind In and Out and whether each still has its photo (057). No photo means the
+   * punch was entered by hand or imported, or its photo passed the retention period (14 days).
+   * Optional for the same staged-rollout reason as `pendingCorrection` below.
+   */
+  inPunchId: z.string().nullable().optional().default(null),
+  inHasPhoto: z.boolean().optional().default(false),
+  outPunchId: z.string().nullable().optional().default(null),
+  outHasPhoto: z.boolean().optional().default(false),
+  /**
    * A correction asked for on this day and not yet applied (016 FR-009c).
    *
    * **Optional, unlike `status` above, and for the opposite reason.** `status` is required
@@ -663,6 +672,12 @@ const flaggedPunchSchema = z.object({
   faceMatchDistance: nullableDecimal.optional().default(null),
   photoRef: z.string().nullable().optional().default(null),
 });
+
+/** The photo any punch was taken with, for the daily register (057); 404 once deleted. */
+export async function getPunchPhoto(punchId: string): Promise<Blob> {
+  const { blob } = await authFetchFile(`/hr/attendance/punches/${punchId}/photo`);
+  return blob;
+}
 
 /** The photo a flagged punch was taken with (057); 404 once the retention sweep deleted it. */
 export async function getExceptionPhoto(punchId: string): Promise<Blob> {
