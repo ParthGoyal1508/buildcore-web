@@ -468,10 +468,8 @@ export default function PunchClock() {
           it. Three parts, in the order they are useful: what to do, that nothing was recorded and
           who can fix that, and — only after three in a row — to stop and find a supervisor.
 
-          No offer to show the photo (T020). A face refusal keeps none: an unattributed biometric
-          held against a named employee is worse than the record it replaces. The line saying so is
-          shown on a face refusal only, so it reads as a fact about this product rather than as an
-          apology for a missing feature. */}
+          On a face refusal, one line says what happens to the photo: since 057 it is kept for 30
+          days for HR to review, then deleted. */}
       {refusal && (
         <div
           role="alert"

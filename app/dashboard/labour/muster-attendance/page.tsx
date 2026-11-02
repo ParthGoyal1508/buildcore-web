@@ -17,11 +17,14 @@ import {
   downloadLabourAttendanceSheet,
   getLabourDayRules,
   getMusterDaily,
+  getLabourRefusalPhoto,
+  getLabourRefusals,
   getMusterMonthly,
   getMyLabourSites,
   getPunchCorrections,
   setLabourDayRules,
   type LabourDayRules,
+  type LabourRefusal,
   type MusterDay,
   type MusterDailyRow,
   type MusterFilter,
@@ -32,10 +35,16 @@ import { getCurrentUser } from '@/app/lib/api/users';
 import {
   LABOUR_DAY_FLAG_LABELS,
   LABOUR_DAY_STATUS_LABELS,
+  LABOUR_REFUSAL_REASON_LABELS,
   ROUTES,
 } from '@/app/lib/constants';
 import { saveBlob } from '@/app/lib/download-file';
 import { urlEnum, urlString, useUrlState } from '@/app/lib/use-url-state';
+import {
+  distanceLabel,
+  EvidencePhoto,
+  MapLink,
+} from '@/app/ui/attendance/evidence';
 import { Button } from '@/app/ui/button';
 import PageHeader from '@/app/ui/page-header';
 import QueryError from '@/app/ui/query-error';
@@ -114,7 +123,7 @@ function MusterAttendanceBody() {
   // worker keeps them and a supervisor can send the exact view as a link.
   const [state, setState] = useUrlState(
     {
-      view: urlEnum(['daily', 'monthly'] as const, 'daily'),
+      view: urlEnum(['daily', 'monthly', 'refused'] as const, 'daily'),
       site: urlString(),
       date: urlString(todayIso()),
       month: urlString(todayIso().slice(0, 7)),
@@ -128,7 +137,8 @@ function MusterAttendanceBody() {
   const date = state.date;
   const month = state.month;
   const filter = state.show;
-  const setView = (v: 'daily' | 'monthly') => setState({ view: v });
+  const setView = (v: 'daily' | 'monthly' | 'refused') =>
+    setState({ view: v });
   const setFilter = (f: MusterFilter | '') => setState({ show: f });
   const [correcting, setCorrecting] = useState<{
     row: { workerId: string; fullName: string; labourCode: string };
@@ -199,7 +209,7 @@ function MusterAttendanceBody() {
       <FormError message={error} />
 
       <div role="tablist" aria-label="View" className="flex gap-2">
-        {(['daily', 'monthly'] as const).map((v) => (
+        {(['daily', 'monthly', 'refused'] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -213,7 +223,7 @@ function MusterAttendanceBody() {
                 : 'border-gray-300 bg-white text-gray-700',
             )}
           >
-            {v === 'daily' ? 'Daily' : 'Monthly'}
+            {v === 'daily' ? 'Daily' : v === 'monthly' ? 'Monthly' : 'Refused'}
           </button>
         ))}
       </div>
@@ -234,7 +244,7 @@ function MusterAttendanceBody() {
               </option>
             ))}
         </SelectField>
-        {view === 'daily' ? (
+        {view === 'refused' ? null : view === 'daily' ? (
           <>
             <TextField
               id="ma-date"
@@ -283,6 +293,11 @@ function MusterAttendanceBody() {
         <p className="rounded-md bg-gray-100 px-3 py-3 text-sm text-gray-700">
           No sites are assigned to you yet. Ask the HR office to assign your site.
         </p>
+      ) : view === 'refused' ? (
+        <RefusedView
+          siteId={siteId || (multiSite ? '' : (sites.data?.[0]?.id ?? ''))}
+          search={state.q}
+        />
       ) : view === 'daily' ? (
         <DailyView
           siteId={siteId}
@@ -1098,3 +1113,106 @@ function DayRulesModal({
     </Modal>
   );
 }
+
+/**
+ * Refused labour punches at a site over the last 30 days (057) — the HR side of the list the
+ * supervisor sees on the punch screen, with the evidence: distance from the site, a map link, and
+ * the photo while it is held (refusal photos are deleted after 30 days, which is why the window is
+ * 30). One site at a time, because that is how the refusal log is kept and secured.
+ */
+function RefusedView({ siteId, search }: { siteId: string; search: string }) {
+  const refusals = useQuery({
+    queryKey: ['labour', 'refusals', siteId, 30],
+    queryFn: () => getLabourRefusals(siteId, 30),
+    enabled: Boolean(siteId),
+  });
+
+  if (!siteId) {
+    return (
+      <p className="rounded-md bg-gray-100 px-3 py-3 text-sm text-gray-700">
+        Choose a site to see its refused punches.
+      </p>
+    );
+  }
+
+  const term = search.trim().toLowerCase();
+  const rows = (refusals.data ?? []).filter(
+    (r) =>
+      !term ||
+      (r.fullName ?? '').toLowerCase().includes(term) ||
+      (r.labourCode ?? '').toLowerCase().includes(term),
+  );
+
+  const columns: Column<LabourRefusal>[] = [
+    {
+      key: 'at',
+      header: 'When',
+      render: (r) => dateTimeLabel(r.at),
+    },
+    {
+      key: 'worker',
+      header: 'Worker',
+      render: (r) => (
+        <span>
+          {r.fullName ?? 'Labour'}
+          <span className="block text-xs text-gray-500">{r.labourCode}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Punch',
+      render: (r) => (r.type === 'in' ? 'In' : 'Out'),
+    },
+    {
+      key: 'reason',
+      header: 'Reason',
+      render: (r) => LABOUR_REFUSAL_REASON_LABELS[r.reason] ?? r.reason,
+    },
+    {
+      key: 'distance',
+      header: 'From site',
+      render: (r) => distanceLabel(r.distanceMetres),
+    },
+    {
+      key: 'accuracy',
+      header: 'GPS accuracy',
+      hideOnCard: true,
+      render: (r) => distanceLabel(r.accuracyMetres),
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (r) => <MapLink latitude={r.latitude} longitude={r.longitude} />,
+    },
+    {
+      key: 'photo',
+      header: 'Photo',
+      render: (r) => (
+        <EvidencePhoto
+          available={r.hasPhoto}
+          title={`${r.fullName ?? 'Labour'} · ${dateTimeLabel(r.at)}`}
+          queryKey={['labour', 'refusalPhoto', r.id]}
+          load={() => getLabourRefusalPhoto(r.id)}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <ResponsiveList
+      columns={columns}
+      rows={rows}
+      rowKey={(r) => r.id}
+      isLoading={refusals.isPending}
+      error={refusals.error}
+      onRetry={refusals.refetch}
+      emptyMessage={
+        term
+          ? 'Nobody matches this search.'
+          : 'No refused punches at this site in the last 30 days.'
+      }
+    />
+  );
+}
+

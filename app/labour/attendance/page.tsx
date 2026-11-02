@@ -16,6 +16,7 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   addSitePhoto,
   blobToBase64,
+  getLabourRefusalPhoto,
   getLabourRefusals,
   getLabourToday,
   getMyLabourSites,
@@ -34,6 +35,11 @@ import {
 } from '@/app/lib/constants';
 import { resolvePosition } from '@/app/lib/location';
 import { refusalMeasurementText } from '@/app/lib/punch-refusal';
+import {
+  distanceLabel,
+  EvidencePhoto,
+  MapLink,
+} from '@/app/ui/attendance/evidence';
 import CameraCapture from '@/app/ui/my/camera-capture';
 import {
   DevicePermissionsPanel,
@@ -448,10 +454,23 @@ export default function LabourAttendancePage() {
               </summary>
               <ul className="mt-2 space-y-1 text-gray-600">
                 {refusals.data.map((r) => (
-                  <li key={r.id}>
-                    {timeOf(r.at)} · {r.fullName ?? 'Labour'}{' '}
-                    {r.labourCode ? `(${r.labourCode})` : ''} · punch {r.type} ·{' '}
-                    {LABOUR_REFUSAL_REASON_LABELS[r.reason] ?? r.reason}
+                  <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      {timeOf(r.at)} · {r.fullName ?? 'Labour'}{' '}
+                      {r.labourCode ? `(${r.labourCode})` : ''} · punch {r.type} ·{' '}
+                      {LABOUR_REFUSAL_REASON_LABELS[r.reason] ?? r.reason}
+                      {/* 057: how far from the site, where the outcome turned on it. */}
+                      {r.reason === 'outside_geofence' && r.distanceMetres !== null
+                        ? ` · ${distanceLabel(r.distanceMetres)} from site`
+                        : ''}
+                    </span>
+                    <MapLink latitude={r.latitude} longitude={r.longitude} />
+                    <EvidencePhoto
+                      available={r.hasPhoto}
+                      title={`${r.fullName ?? 'Labour'} · ${timeOf(r.at)}`}
+                      queryKey={['labour', 'refusalPhoto', r.id]}
+                      load={() => getLabourRefusalPhoto(r.id)}
+                    />
                   </li>
                 ))}
               </ul>

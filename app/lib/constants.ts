@@ -1956,13 +1956,14 @@ export const MESSAGES = {
   punchRefusedRepeatedly:
     'That is three attempts in a row. Stop trying for now and tell your supervisor what the screen said — they can record the day for you.',
   /**
-   * Shown where a refused attempt would otherwise look like a missing feature (FR-012, T020).
+   * Said under a face refusal (FR-012, T020), so the worker knows what happens to the picture.
    *
-   * There is no photo to show. A face refusal stores none, because keeping an unattributed
-   * biometric against a named employee is worse than the record it replaces — so the screen must
-   * not offer to show one, and must not read as though the photo were merely unavailable.
+   * Since 057 a refused attempt's photo is kept for 30 days so HR can see who was in front of the
+   * camera, then deleted. The worker is told plainly, because a face photo of them is being kept
+   * after it failed to match — which is exactly the thing a person is entitled to know.
    */
-  punchRefusedNoPhoto: 'The photo from a refused attempt is not kept.',
+  punchRefusedNoPhoto:
+    'The photo from this attempt is kept for 30 days so HR can review it, then deleted.',
   notEnrolled: 'Enrol your face before punching in.',
   enrolmentConsent:
     'I consent to my facial data being captured and stored for attendance verification.',

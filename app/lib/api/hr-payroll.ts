@@ -641,9 +641,10 @@ export async function getAttendanceExceptions() {
  * `PunchRecord`, and listing all of it here would mean this schema had to be revised
  * every time an unrelated column was added to a table this screen does not own.
  *
- * `latitude` and `longitude` are deliberately absent even though they arrive: they come
- * over the wire as **strings** (Postgres `Decimal`), and nothing on this screen plots a
- * point. Declaring them as numbers is the mistake this comment exists to prevent.
+ * Since 057 the reviewer sees the evidence: where the punch was taken, how far from the
+ * site, and the photo. `latitude`/`longitude`/the distances arrive as **strings**
+ * (Postgres `Decimal`) and go through `nullableDecimal`; `photoRef` is read only for
+ * whether a photo is still held — the image itself comes from `getExceptionPhoto`.
  */
 const flaggedPunchSchema = z.object({
   id: z.string(),
@@ -656,7 +657,20 @@ const flaggedPunchSchema = z.object({
   exceptionResolution: z.string().nullable(),
   resolvedByUserId: z.string().nullable(),
   resolvedAt: z.string().nullable(),
+  latitude: nullableDecimal.optional().default(null),
+  longitude: nullableDecimal.optional().default(null),
+  geofenceDistanceMeters: nullableDecimal.optional().default(null),
+  faceMatchDistance: nullableDecimal.optional().default(null),
+  photoRef: z.string().nullable().optional().default(null),
 });
+
+/** The photo a flagged punch was taken with (057); 404 once the retention sweep deleted it. */
+export async function getExceptionPhoto(punchId: string): Promise<Blob> {
+  const { blob } = await authFetchFile(
+    `/workspace-admin/attendance-exceptions/${punchId}/photo`,
+  );
+  return blob;
+}
 
 /**
  * One flagged punch with the state of its approval.
@@ -797,8 +811,8 @@ export const punchRefusalRowSchema = z.object({
     'face_mismatch',
     'no_face_detected',
   ]),
-  /** How far outside the fence, in metres — the real distance, unadjusted. Null where the
-   * refusal was not about distance. */
+  /** Distance from the site's centre, in metres — the real distance, unadjusted. Null where
+   * the fix was too vague to measure from. */
   distanceMeters: nullableDecimal,
   /** What the device claimed to know, in metres. Null where the browser reported none. */
   accuracyMeters: z.number().nullable(),
@@ -807,8 +821,18 @@ export const punchRefusalRowSchema = z.object({
    * days later. */
   capturedAt: isoDate,
   createdAt: isoDate,
+  // 057: where the attempt was made, and whether its photo is still held.
+  latitude: nullableDecimal.optional().default(null),
+  longitude: nullableDecimal.optional().default(null),
+  hasPhoto: z.boolean().optional().default(false),
 });
 export type PunchRefusalRow = z.infer<typeof punchRefusalRowSchema>;
+
+/** The photo of one refused staff attempt (057); 404 once the retention sweep deleted it. */
+export async function getPunchRefusalPhoto(id: string): Promise<Blob> {
+  const { blob } = await authFetchFile(`/hr/attendance/refusals/${id}/photo`);
+  return blob;
+}
 
 /**
  * The company's punch refusal log, filterable (020 FR-013c).

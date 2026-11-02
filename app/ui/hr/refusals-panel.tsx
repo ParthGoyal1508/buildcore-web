@@ -4,11 +4,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
+  getPunchRefusalPhoto,
   getPunchRefusals,
   type PunchRefusalRow,
 } from '@/app/lib/api/hr-payroll';
 import { LABOUR_REFUSAL_REASON_LABELS } from '@/app/lib/constants';
 import { dateTimeLabel } from '@/app/lib/format';
+import {
+  distanceLabel,
+  EvidencePhoto,
+  MapLink,
+} from '@/app/ui/attendance/evidence';
 import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import { SelectField, TextField } from '@/app/ui/settings/form-fields';
@@ -35,8 +41,10 @@ const metresLabel = (value: number | null) =>
  *
  * A **log, not a queue**: nothing here can be resolved or promoted into attendance, because a
  * refused punch was never recorded. A wrongly refused day is fixed by a manual attendance
- * correction, which goes through its own review. While the hard block is off (the default),
- * these are punches that were accepted and *would* have been refused.
+ * correction, which goes through its own review.
+ *
+ * Since 057 each row carries where the attempt was made (a map link) and, for 30 days, the photo —
+ * the face in front of the camera is what settles "was it really them".
  */
 export default function RefusalsPanel() {
   const employees = useEmployeeNames();
@@ -83,9 +91,17 @@ export default function RefusalsPanel() {
     },
     {
       key: 'distance',
-      header: 'Outside fence by',
+      // From the site's centre — the fence it was judged against includes the radius.
+      header: 'From site',
       numeric: true,
-      render: (row) => metresLabel(row.distanceMeters),
+      render: (row) => distanceLabel(row.distanceMeters),
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (row) => (
+        <MapLink latitude={row.latitude} longitude={row.longitude} />
+      ),
     },
     {
       key: 'accuracy',
@@ -101,15 +117,28 @@ export default function RefusalsPanel() {
       render: (row) =>
         row.faceMatchDistance === null ? '—' : row.faceMatchDistance.toFixed(2),
     },
+    {
+      key: 'photo',
+      header: 'Photo',
+      render: (row) => (
+        <EvidencePhoto
+          available={row.hasPhoto}
+          title={`${employees.label(row.employeeId)} · ${dateTimeLabel(row.capturedAt)}`}
+          queryKey={['hr', 'punchRefusalPhoto', row.id]}
+          load={() => getPunchRefusalPhoto(row.id)}
+        />
+      ),
+    },
   ];
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-gray-600">
-        Punches that were refused — or, while the hard refusal is off, were
-        accepted and would have been. A log, not a queue: a refused punch was
-        never recorded, so a wrongly refused day is fixed with a manual
-        attendance correction on the daily register.
+        Punches that were refused because the face or the location did not
+        check out, with where each attempt was made and its photo (photos are
+        deleted after 30 days). A log, not a queue: a refused punch was never
+        recorded, so a wrongly refused day is fixed with a manual attendance
+        correction on the daily register.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

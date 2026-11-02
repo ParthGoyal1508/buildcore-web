@@ -1027,8 +1027,23 @@ const labourRefusalSchema = z.object({
   type: z.enum(['in', 'out']),
   reason: z.string(),
   at: z.string(),
+  // 057: the evidence, for the supervisor and for HR reviewing the site.
+  latitude: z.number().nullable().optional().default(null),
+  longitude: z.number().nullable().optional().default(null),
+  distanceMetres: z.number().nullable().optional().default(null),
+  accuracyMetres: z.number().nullable().optional().default(null),
+  faceMatchDistance: z.number().nullable().optional().default(null),
+  hasPhoto: z.boolean().optional().default(false),
 });
 export type LabourRefusal = z.infer<typeof labourRefusalSchema>;
+
+/** The photo of one refused labour attempt (057); 404 once the retention sweep deleted it. */
+export async function getLabourRefusalPhoto(id: string): Promise<Blob> {
+  const { blob } = await authFetchFile(
+    `/labour/attendance/refusals/${id}/photo`,
+  );
+  return blob;
+}
 
 export async function getLabourRefusals(
   siteId: string,
