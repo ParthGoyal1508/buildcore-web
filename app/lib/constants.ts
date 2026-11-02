@@ -1926,9 +1926,16 @@ export const MESSAGES = {
   punchRefusedLocation:
     'You are too far from your site for this punch to count. Walk to the site and punch again there.',
   punchRefusedUnlocatable:
-    'Your phone could not work out where you are precisely enough. Step into the open, away from walls and roofs, wait a few seconds and punch again.',
+    'Your phone could not work out where you are precisely enough. Check that Location (GPS) is on, step into the open away from walls and roofs, wait a few seconds and punch again.',
   punchRefusedFace:
     'This photo did not match your enrolled face. Take it again in better light, looking straight at the camera.',
+  /** 057: what to do, after a location refusal's measured sentence replaces the generic one. */
+  punchRefusedLocationAction: 'Walk to the site and punch again there.',
+  punchRefusedUnlocatableAction:
+    'Check that Location (GPS) is on, step into the open away from walls and roofs, wait a few seconds and punch again.',
+  /** 057: a face refusal where no face was found at all — fixed by framing, unlike a mismatch. */
+  punchRefusedNoFace:
+    'No face could be seen in the photo. Take it again in good light, with your face filling the frame.',
   /**
    * Said once, under the message, for every refusal.
    *
@@ -3325,7 +3332,7 @@ export const LABOUR_PUNCH_MESSAGES = {
   LABOUR_PUNCH_REFUSED_LOCATION:
     'You are too far from this site for attendance to be marked. Move to the site and try again.',
   LABOUR_PUNCH_REFUSED_UNLOCATABLE:
-    'Your phone could not work out where you are accurately enough. Step outside or somewhere with a clearer view of the sky, then try again.',
+    'Your phone could not work out where you are accurately enough. Check that Location (GPS) is on, step outside or somewhere with a clearer view of the sky, then try again.',
   LABOUR_ALREADY_PUNCHED: 'Already marked — refresh the list to see the latest.',
   LABOUR_NOT_PUNCHED_IN: 'Punch this labour in before punching them out.',
   LABOUR_FACE_NOT_ENROLLED:
@@ -3397,6 +3404,13 @@ export const LABOUR_REFUSAL_REASON_LABELS: Record<string, string> = {
 };
 
 export const LABOUR_ATTENDANCE_COPY = {
+  /** 057: what to do, after a location refusal's measured sentence replaces the generic one. */
+  locationAction: 'Move to the site and try again.',
+  unlocatableAction:
+    'Check that Location (GPS) is on, step outside or somewhere with a clearer view of the sky, then try again.',
+  /** 057: a face refusal where no face was found — fixed by framing, unlike a mismatch. */
+  noFaceSeen:
+    'No face could be seen in this photo, so attendance was not marked. Retake it in good light with the face filling the frame.',
   needsConnection:
     'You are offline. Attendance needs a connection to check the face, so connect and try again.',
   noSites:
@@ -5526,4 +5540,88 @@ export const AGREED_RATE_COPY = {
     daily: 'Its rate changes daily — set it on Daily rates instead.',
   },
   empty: 'No agreed rates yet. They are set by a vendor’s first purchase of an item, or imported here.',
+} as const;
+
+/**
+ * Camera and location permission copy (057): the first-open prompt, the status chips on the punch
+ * screens, and the steps shown when a permission has been blocked.
+ *
+ * Steps are per platform because the route to the switch differs completely — an installed Android
+ * app keeps its permissions under App info, Chrome keeps them behind the address bar, and an iPhone
+ * keeps them in the Settings app. One generic "allow it in your browser settings" sent people to the
+ * wrong place on every one of them.
+ */
+export const DEVICE_PERMISSION_COPY = {
+  onboardingTitle: 'Allow camera and location',
+  onboardingBody:
+    'Attendance is marked with a photo taken here and your location at the moment you punch. Allow both now so marking attendance later is one tap.',
+  onboardingAllow: 'Allow camera and location',
+  onboardingLater: 'Not now',
+  allGranted: 'Camera and location are allowed. You are ready to mark attendance.',
+  chipLocation: 'Location',
+  chipCamera: 'Camera',
+  stateGranted: 'Allowed',
+  stateDenied: 'Blocked',
+  statePrompt: 'Not yet allowed',
+  allowButton: 'Allow camera and location',
+  needBoth:
+    'Attendance needs both the camera and your location. Allow them to continue.',
+  locationBlockedTitle: 'Location is blocked for this app',
+  cameraBlockedTitle: 'Camera is blocked for this app',
+  locationOffTitle: 'Your phone’s location is switched off',
+  afterSteps: 'Then come back here and tap Try again.',
+  tryAgain: 'Try again',
+  steps: {
+    location: {
+      'android-app': [
+        'Press and hold the app icon on your home screen, then tap App info (ⓘ).',
+        'Open Permissions → Location.',
+        'Choose “Allow only while using the app” and switch on “Use precise location”.',
+      ],
+      'android-browser': [
+        'Tap the icon to the left of the web address (🔒 or ⚙).',
+        'Tap Permissions → Location and choose Allow.',
+        'If Location is not listed, open Chrome ⋮ → Settings → Site settings → Location, and remove this site from Blocked.',
+      ],
+      'ios-app': [
+        'Open the Settings app → Privacy & Security → Location Services and make sure it is on.',
+        'Scroll to Safari Websites and choose “While Using the App”, with Precise Location on.',
+        'Close this app completely and open it again.',
+      ],
+      'ios-browser': [
+        'Tap “aA” in the address bar → Website Settings → Location → Allow.',
+        'If that is greyed out: Settings app → Privacy & Security → Location Services → Safari Websites → “While Using the App”.',
+      ],
+      desktop: [
+        'Click the icon to the left of the web address.',
+        'Set Location to Allow and reload the page.',
+      ],
+    },
+    camera: {
+      'android-app': [
+        'Press and hold the app icon on your home screen, then tap App info (ⓘ).',
+        'Open Permissions → Camera and choose “Allow only while using the app”.',
+      ],
+      'android-browser': [
+        'Tap the icon to the left of the web address (🔒 or ⚙).',
+        'Tap Permissions → Camera and choose Allow.',
+      ],
+      'ios-app': [
+        'Open the Settings app → Safari → Camera and choose Allow (or Ask).',
+        'Close this app completely and open it again.',
+      ],
+      'ios-browser': [
+        'Tap “aA” in the address bar → Website Settings → Camera → Allow.',
+      ],
+      desktop: [
+        'Click the icon to the left of the web address.',
+        'Set Camera to Allow and reload the page.',
+      ],
+    },
+    locationOff: [
+      'Swipe down from the top of the screen and switch on Location (GPS).',
+      'On Android, also check Settings → Location → Location services → Google Location Accuracy is on.',
+      'Step outside or near a window and wait a few seconds for the location to settle.',
+    ],
+  },
 } as const;

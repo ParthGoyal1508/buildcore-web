@@ -17,6 +17,7 @@ import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
 import { MobileNavShell } from '@/app/ui/mobile-nav';
 import { MY_SECTIONS } from '@/app/ui/my/sections';
+import { PermissionsOnboarding } from '@/app/ui/permissions/device-permissions';
 import SectionTabs from '@/app/ui/section-tabs';
 import { TextButton } from '@/app/ui/button';
 
@@ -153,6 +154,8 @@ export default function MyWorkspaceLayout({
         <MobileNavShell>
           <div className="flex min-h-screen flex-col bg-gray-50 md:fixed md:inset-0 md:h-screen md:overflow-clip md:bg-transparent">
             <ShellHeader />
+            {/* 057: anyone with an employee record punches here — ask for camera and location once. */}
+            {employee && <PermissionsOnboarding />}
             <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
               {/* Desktop only. The same component `/dashboard` mounts, so a dual-role user
             keeps every module they can reach instead of being stranded in this one. */}
