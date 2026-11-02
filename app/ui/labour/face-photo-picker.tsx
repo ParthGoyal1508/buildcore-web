@@ -1,99 +1,83 @@
 'use client';
 
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useState } from 'react';
 
-import {
-  LABOUR_ATTENDANCE_COPY,
-  LABOUR_ENROLMENT_PHOTOS,
-} from '@/app/lib/constants';
-import CameraCapture from '@/app/ui/my/camera-capture';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
+import { LABOUR_ATTENDANCE_COPY } from '@/app/lib/constants';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
-import { IconButton } from '@/app/ui/button';
 
 /**
- * Takes the 3–5 face photos a labour is registered with (031): a camera, thumbnails that can be
- * removed one at a time, and a counter. The camera closes itself at the fifth photo.
+ * A labour's face, for registration or a retake (031; guided since 057).
+ *
+ * One liveness capture — the labour looks straight twice, then turns their head to each side as
+ * the screen asks — in place of 3–5 separate photos. It proves a live person stood there, so a
+ * labour cannot be registered from somebody's photo and then punched in by it every day; and the
+ * slight turns give the template the angles a punch is taken at.
  */
 export default function FacePhotoPicker({
-  photos,
+  capture,
   onChange,
   error,
 }: {
-  photos: Blob[];
-  onChange: (photos: Blob[]) => void;
+  capture: LivenessCaptureResult | null;
+  onChange: (capture: LivenessCaptureResult | null) => void;
   error?: string;
 }) {
   const [cameraOpen, setCameraOpen] = useState(false);
 
-  // Object URLs for the thumbnails, revoked when the photos change or this unmounts.
-  const thumbnails = useMemo(
-    () => photos.map((p) => URL.createObjectURL(p)),
-    [photos],
+  // The straight frame, previewed; revoked when the capture changes or this unmounts.
+  const preview = useMemo(
+    () => (capture ? URL.createObjectURL(capture.frames[0]) : null),
+    [capture],
   );
   useEffect(
-    () => () => thumbnails.forEach((url) => URL.revokeObjectURL(url)),
-    [thumbnails],
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
   );
 
   return (
     <section aria-labelledby="face-photos" className="space-y-2">
-      <div className="flex items-baseline justify-between">
-        <h2 id="face-photos" className="text-sm font-medium text-gray-700">
-          Face photos
-        </h2>
-        <span className="text-xs text-gray-500">
-          {photos.length} of {LABOUR_ENROLMENT_PHOTOS.max} · at least{' '}
-          {LABOUR_ENROLMENT_PHOTOS.min}
-        </span>
-      </div>
+      <h2 id="face-photos" className="text-sm font-medium text-gray-700">
+        Face
+      </h2>
       <p className="text-xs text-gray-500">{LABOUR_ATTENDANCE_COPY.registerHelp}</p>
 
-      {photos.length > 0 && (
-        <ul className="grid grid-cols-5 gap-2">
-          {thumbnails.map((url, i) => (
-            <li key={url} className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
-              <img
-                src={url}
-                alt={`Face photo ${i + 1}`}
-                className="aspect-square w-full rounded-md object-cover"
-              />
-              <IconButton
-                size="xs"
-                tone="overlay"
-                label={`Remove photo ${i + 1}`}
-                className="absolute -right-1 -top-1"
-                onClick={() => onChange(photos.filter((_, j) => j !== i))}
-              >
-                <XMarkIcon className="w-4" aria-hidden="true" />
-              </IconButton>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {cameraOpen ? (
-        <CameraCapture
-          captureLabel={`Take photo ${photos.length + 1}`}
-          disabled={photos.length >= LABOUR_ENROLMENT_PHOTOS.max}
+      {capture && preview ? (
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
+          <img
+            src={preview}
+            alt="Captured face"
+            className="h-20 w-20 rounded-md object-cover"
+          />
+          <div className="space-y-2">
+            <p className="text-sm text-gray-700">Face captured.</p>
+            <SecondaryButton type="button" onClick={() => onChange(null)}>
+              Retake
+            </SecondaryButton>
+          </div>
+        </div>
+      ) : cameraOpen ? (
+        <LivenessCapture
+          flow="labour-enrolment"
+          subject="other"
           onCancel={() => setCameraOpen(false)}
-          onCapture={(blob) => {
-            const next = [...photos, blob];
-            onChange(next);
-            if (next.length >= LABOUR_ENROLMENT_PHOTOS.max) setCameraOpen(false);
+          onCapture={(result) => {
+            setCameraOpen(false);
+            onChange(result);
           }}
         />
       ) : (
-        photos.length < LABOUR_ENROLMENT_PHOTOS.max && (
-          <SecondaryButton
-            type="button"
-            className="w-full justify-center"
-            onClick={() => setCameraOpen(true)}
-          >
-            {photos.length === 0 ? 'Open camera' : 'Take another photo'}
-          </SecondaryButton>
-        )
+        <SecondaryButton
+          type="button"
+          className="w-full justify-center"
+          onClick={() => setCameraOpen(true)}
+        >
+          Open camera
+        </SecondaryButton>
       )}
       {error && (
         <p className="text-xs text-red-600" role="alert">

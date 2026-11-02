@@ -1933,6 +1933,9 @@ export const MESSAGES = {
   punchRefusedLocationAction: 'Walk to the site and punch again there.',
   punchRefusedUnlocatableAction:
     'Check that Location (GPS) is on, step into the open away from walls and roofs, wait a few seconds and punch again.',
+  /** 057: a capture that is not a live person, when the reason is not one the screen words itself. */
+  punchRefusedLiveness:
+    'This could not be confirmed as a live person, so the punch was not recorded. Follow the prompts on screen and try again.',
   /** 057: a face refusal where no face was found at all — fixed by framing, unlike a mismatch. */
   punchRefusedNoFace:
     'No face could be seen in the photo. Take it again in good light, with your face filling the frame.',
@@ -2728,6 +2731,8 @@ export const PUNCH_REFUSAL_CODES = [
   'PUNCH_REFUSED_LOCATION',
   'PUNCH_REFUSED_UNLOCATABLE',
   'PUNCH_REFUSED_FACE',
+  // 057: the capture was not a live person — a photo held up, or the head did not turn as asked.
+  'PUNCH_REFUSED_LIVENESS',
 ] as const;
 
 export type PunchRefusalCode = (typeof PUNCH_REFUSAL_CODES)[number];
@@ -3334,6 +3339,9 @@ export const LABOUR_PUNCH_MESSAGES = {
     'You are too far from this site for attendance to be marked. Move to the site and try again.',
   LABOUR_PUNCH_REFUSED_UNLOCATABLE:
     'Your phone could not work out where you are accurately enough. Check that Location (GPS) is on, step outside or somewhere with a clearer view of the sky, then try again.',
+  // 057. The specific check is worded by `livenessRefusalMessage`; this is its fallback.
+  LABOUR_PUNCH_REFUSED_LIVENESS:
+    'This could not be confirmed as a live person, so attendance was not marked. Follow the prompts on screen and try again.',
   LABOUR_ALREADY_PUNCHED: 'Already marked — refresh the list to see the latest.',
   LABOUR_NOT_PUNCHED_IN: 'Punch this labour in before punching them out.',
   LABOUR_FACE_NOT_ENROLLED:
@@ -3400,6 +3408,7 @@ export const LABOUR_DAY_FLAG_LABELS: Record<string, string> = {
 export const LABOUR_REFUSAL_REASON_LABELS: Record<string, string> = {
   face_mismatch: 'Face did not match',
   no_face_detected: 'No face in photo',
+  liveness_failed: 'Not a live person',
   outside_geofence: 'Outside the site',
   unlocatable: 'Location not accurate',
 };
@@ -3421,7 +3430,7 @@ export const LABOUR_ATTENDANCE_COPY = {
   flaggedLocation:
     'Marked — but your location could not be confirmed inside the site, so the HR office will see it flagged.',
   registerHelp:
-    'Take 3 to 5 clear photos of the face: straight on, in good light, nothing covering the face. A slight turn left and right in two of them helps matching later.',
+    'The camera takes the face straight on, then turned slightly to each side — ask the labour to follow the prompts. Good light, nothing covering the face.',
   groupPhotoHint:
     'For reference only — it does not mark anyone in or out. Punch each labour separately.',
   groupPhotoSaved: 'Group photo saved for reference. Nobody was marked by it.',
@@ -5625,4 +5634,51 @@ export const DEVICE_PERMISSION_COPY = {
       'Step outside or near a window and wait a few seconds for the location to settle.',
     ],
   },
+} as const;
+
+/**
+ * Liveness capture (057): the guided head-turn every face photo now follows.
+ *
+ * Frame sizes: the straight frame is the one stored and matched, so it keeps detail (800 px); the
+ * turn frames only have to show which way the head moved and look like a live face to the
+ * anti-spoof check, which reads an 80 px crop — 480 px is plenty, and keeps a punch near 110 KB.
+ * Full frames rather than face crops: that check looks at 2.7× and 4× the face box for a screen's
+ * edge or a print's texture, and a tight crop would cut away exactly that.
+ */
+export const LIVENESS_FRAME = {
+  straightMaxDimension: 800,
+  turnMaxDimension: 480,
+  jpegQuality: 0.8,
+  /** Seconds of countdown before each frame: time to settle, then to turn. */
+  straightSeconds: 2,
+  turnSeconds: 2,
+} as const;
+
+export const LIVENESS_COPY = {
+  start: 'Start',
+  starting: 'Preparing…',
+  retry: 'Try again',
+  intro: {
+    self: 'Fit your face inside the oval. You will be asked to look straight, then turn your head slowly to each side.',
+    other:
+      'Fit their face inside the oval. Ask them to look straight, then to turn their head slowly to each side when the screen says.',
+  },
+  straight: {
+    self: 'Look straight at the camera',
+    other: 'Ask them to look straight at the camera',
+  },
+  /** `arrow` is the side of the screen the head moves toward in the preview. */
+  turn: {
+    self: (side: 'left' | 'right', arrow: string) =>
+      `Turn your head slowly to your ${side} ${arrow}`,
+    other: (side: 'left' | 'right', arrow: string) =>
+      `Ask them to turn their head to THEIR ${side} (${arrow} on your screen)`,
+  },
+  holdStill: 'Hold still…',
+  done: 'Captured. Checking…',
+  challengeFailed:
+    'Could not start the capture. Check your connection and try again.',
+  /** A punch saved offline before 057 carries one photo and no liveness capture. */
+  queuedPunchRetired:
+    'A punch saved on this phone while it was offline could not be sent: attendance now needs a live head-turn check, which a saved photo cannot pass. Ask your supervisor to correct that day.',
 } as const;

@@ -10,7 +10,6 @@ import { Suspense, useState } from 'react';
 import { ApiError } from '@/app/lib/api/client';
 import { getCurrentUser } from '@/app/lib/api/users';
 import {
-  blobToBase64,
   createWorker,
   getMyLabourSites,
   type LabourGender,
@@ -18,7 +17,6 @@ import {
 } from '@/app/lib/api/labour';
 import {
   LABOUR_ATTENDANCE_COPY,
-  LABOUR_ENROLMENT_PHOTOS,
   LABOUR_GENDER_LABELS,
   LABOUR_GENDERS,
   LABOUR_PUNCH_MESSAGES,
@@ -40,6 +38,7 @@ import {
   TextField,
 } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
 
 /** Ten digits, optionally after +91 / 0 — the same rule the API applies. */
 const PHONE_PATTERN = /^(?:\+?91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}$/;
@@ -97,7 +96,7 @@ function RegisterLabourForm() {
   const [gender, setGender] = useState<LabourGender | ''>('');
   const [fatherName, setFatherName] = useState('');
   const [phone, setPhone] = useState('');
-  const [photos, setPhotos] = useState<Blob[]>([]);
+  const [capture, setCapture] = useState<LivenessCaptureResult | null>(null);
   const [details, setDetails] =
     useState<WorkerDetailsValue>(EMPTY_WORKER_DETAILS);
   const [showDetails, setShowDetails] = useState(false);
@@ -120,10 +119,7 @@ function RegisterLabourForm() {
       phone.trim() && !PHONE_PATTERN.test(phone.trim())
         ? 'A mobile number is 10 digits, optionally starting with +91.'
         : undefined,
-    photos:
-      photos.length < LABOUR_ENROLMENT_PHOTOS.min
-        ? `Take at least ${LABOUR_ENROLMENT_PHOTOS.min} photos.`
-        : undefined,
+    photos: !capture ? 'Capture the face.' : undefined,
     ...detailErrors,
   };
   const valid = Object.values(errors).every((e) => !e);
@@ -153,8 +149,7 @@ function RegisterLabourForm() {
         ...(canSetRate && details.rateOverride.trim()
           ? { rateOverride: Number(details.rateOverride.trim()) }
           : {}),
-        photos: await Promise.all(photos.map((p) => blobToBase64(p))),
-      }),
+      }, capture),
     onSuccess: (worker) => {
       setRegistered(worker);
       void queryClient.invalidateQueries({ queryKey: ['labour', 'today'] });
@@ -166,7 +161,7 @@ function RegisterLabourForm() {
     setGender('');
     setFatherName('');
     setPhone('');
-    setPhotos([]);
+    setCapture(null);
     setDetails(EMPTY_WORKER_DETAILS);
     setShowDetails(false);
     setTouched(false);
@@ -361,8 +356,8 @@ function RegisterLabourForm() {
       </div>
 
       <FacePhotoPicker
-        photos={photos}
-        onChange={setPhotos}
+        capture={capture}
+        onChange={setCapture}
         error={touched ? errors.photos : undefined}
       />
 

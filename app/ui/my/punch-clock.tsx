@@ -12,11 +12,12 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
 import { DEV_FALLBACK_POSITION, MESSAGES } from '@/app/lib/constants';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
 import { isPunchRefusal, punchRefusalMessage } from '@/app/lib/punch-refusal';
 import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
-import CameraCapture from '@/app/ui/my/camera-capture';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
 import {
   DevicePermissionsPanel,
   PermissionSteps,
@@ -213,10 +214,10 @@ export default function PunchClock() {
   const punch = useMutation({
     mutationFn: async ({
       type,
-      photo,
+      capture,
     }: {
       type: 'in' | 'out';
-      photo: Blob;
+      capture: LivenessCaptureResult;
     }) => {
       const capturedAt = new Date().toISOString();
 
@@ -259,7 +260,7 @@ export default function PunchClock() {
       }
       usedFallbackRef.current = usedFallback;
 
-      const input = { type, photo, capturedAt, ...coords };
+      const input = { type, capture, capturedAt, ...coords };
       setPhase('submitting');
 
       /**
@@ -533,11 +534,14 @@ export default function PunchClock() {
           above already show what happened, and the only control that could appear
           here is one the server would refuse. */}
       {dayIsComplete || !isOnline ? null : pendingType ? (
-        <CameraCapture
-          captureLabel={`Confirm punch ${pendingType}`}
+        // 057: a guided head-turn capture, not a single photo — a picture held up to the camera
+        // cannot turn its head. The challenge is fetched as the capture starts.
+        <LivenessCapture
+          flow="staff-punch"
+          subject="self"
           disabled={punch.isPending}
           onCancel={() => setPendingType(null)}
-          onCapture={(photo) => punch.mutate({ type: pendingType, photo })}
+          onCapture={(capture) => punch.mutate({ type: pendingType, capture })}
         />
       ) : (
         <Button

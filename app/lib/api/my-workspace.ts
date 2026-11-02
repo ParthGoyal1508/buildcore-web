@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { approvalStateSchemaForModules } from '@/app/lib/api/approvals';
 import type { StoredFile } from '@/app/lib/api/client';
 import { authFetch, authFetchFile } from '@/app/lib/session';
+import {
+  captureForm,
+  type LivenessCaptureResult,
+} from '@/app/lib/api/liveness';
 
 /**
  * The `/my/*` client (contracts/my-workspace-ui.md).
@@ -247,16 +251,15 @@ export async function getEnrolmentStatus(): Promise<FaceEnrolmentStatus> {
   return faceEnrolmentStatusSchema.parse(await authFetch('/my/face-enrol'));
 }
 
+/** Enrols from a liveness capture (057): two frames facing the camera, then both head turns. */
 export async function enrol(input: {
-  photos: Blob[];
+  capture: LivenessCaptureResult;
   consentMethod: 'signed_paper' | 'digital' | 'verbal';
 }): Promise<FaceEnrolmentStatus> {
-  const photos = await Promise.all(input.photos.map(blobToBase64));
   return faceEnrolmentStatusSchema.parse(
     await authFetch('/my/face-enrol', {
       method: 'POST',
-      body: JSON.stringify({
-        photos,
+      body: captureForm(input.capture, {
         consentMethod: input.consentMethod,
         consentAcknowledged: true,
       }),
@@ -284,13 +287,12 @@ export async function requestReEnrolment(reason: string): Promise<void> {
 }
 
 export async function completeReEnrolment(input: {
-  photos: Blob[];
+  capture: LivenessCaptureResult;
 }): Promise<FaceEnrolmentStatus> {
-  const photos = await Promise.all(input.photos.map(blobToBase64));
   return faceEnrolmentStatusSchema.parse(
     await authFetch('/my/face-enrol/re-enrolment-complete', {
       method: 'POST',
-      body: JSON.stringify({ photos, consentAcknowledged: true }),
+      body: captureForm(input.capture, { consentAcknowledged: true }),
     }),
   );
 }
@@ -299,7 +301,8 @@ export async function completeReEnrolment(input: {
 
 export interface PunchInput {
   type: 'in' | 'out';
-  photo: Blob;
+  /** The liveness capture (057), sent as multipart frames with its challenge. */
+  capture: LivenessCaptureResult;
   latitude: number;
   longitude: number;
   /**
@@ -325,9 +328,8 @@ export async function submitPunch(input: PunchInput): Promise<PunchResult> {
   return punchResultSchema.parse(
     await authFetch('/my/punch', {
       method: 'POST',
-      body: JSON.stringify({
+      body: captureForm(input.capture, {
         type: input.type,
-        photo: await blobToBase64(input.photo),
         latitude: input.latitude,
         longitude: input.longitude,
         // `accuracyMeters` — American and singular, which is the backend's spelling
@@ -598,6 +600,7 @@ export const PUNCH_REFUSAL_REASONS = [
   'unlocatable',
   'face_mismatch',
   'no_face_detected',
+  'liveness_failed',
 ] as const;
 
 export type PunchRefusalReason = (typeof PUNCH_REFUSAL_REASONS)[number];

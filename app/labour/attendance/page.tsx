@@ -34,7 +34,12 @@ import {
   ROUTES,
 } from '@/app/lib/constants';
 import { resolvePosition } from '@/app/lib/location';
-import { refusalMeasurementText } from '@/app/lib/punch-refusal';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
+import {
+  livenessRefusalMessage,
+  refusalMeasurementText,
+} from '@/app/lib/punch-refusal';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
 import {
   distanceLabel,
   EvidencePhoto,
@@ -112,6 +117,14 @@ const MEASURED_KIND = {
   LABOUR_PUNCH_REFUSED_FACE: 'face',
 } as const;
 
+/** 057: a refusal for a capture that was not a live person, worded by which check failed. */
+function livenessMessageOf(error: ApiError): string | null {
+  return error.code === 'LABOUR_PUNCH_REFUSED_LIVENESS'
+    ? (livenessRefusalMessage(error.details, 'other') ??
+        LABOUR_PUNCH_MESSAGES.LABOUR_PUNCH_REFUSED_LIVENESS)
+    : null;
+}
+
 /**
  * The user-facing sentence for a failed punch, by the API's code — never the server's prose. A
  * refusal leads with what was measured (057): the distance from the site, the phone's accuracy, or
@@ -119,6 +132,8 @@ const MEASURED_KIND = {
  */
 function punchErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    const liveness = livenessMessageOf(error);
+    if (liveness) return liveness;
     const code = error.code as keyof typeof LABOUR_PUNCH_MESSAGES | undefined;
     if (code && code in MEASURED_KIND) {
       const kind = MEASURED_KIND[code as keyof typeof MEASURED_KIND];
@@ -606,7 +621,7 @@ function PunchDialog({
     useState<PermissionProblem | null>(null);
 
   const punch = useMutation({
-    mutationFn: async (photo: Blob) => {
+    mutationFn: async (capture: LivenessCaptureResult) => {
       setPhase('locating');
       let coords: { latitude: number; longitude: number; accuracy?: number };
       try {
@@ -618,17 +633,19 @@ function PunchDialog({
         coords = DEV_FALLBACK_POSITION;
       }
       setPhase('matching');
-      return punchLabour({
-        siteId,
-        workerId: target.worker.workerId,
-        type: target.type,
-        photo: await blobToBase64(photo),
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        ...(typeof coords.accuracy === 'number'
-          ? { accuracyMeters: Math.round(coords.accuracy * 100) / 100 }
-          : {}),
-      });
+      return punchLabour(
+        {
+          siteId,
+          workerId: target.worker.workerId,
+          type: target.type,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          ...(typeof coords.accuracy === 'number'
+            ? { accuracyMeters: Math.round(coords.accuracy * 100) / 100 }
+            : {}),
+        },
+        capture,
+      );
     },
     onSuccess: onDone,
     onError: (e) => {
@@ -676,14 +693,18 @@ function PunchDialog({
         )}
 
         {phase === 'camera' ? (
-          <CameraCapture
-            captureLabel={error ? 'Retake photo' : 'Take photo'}
+          // 057: a guided head-turn the supervisor talks the labour through; the challenge is bound
+          // to this labour, so it cannot be spent punching someone else.
+          <LivenessCapture
+            flow="labour-punch"
+            workerId={target.worker.workerId}
+            subject="other"
             disabled={punch.isPending}
             onCancel={onClose}
-            onCapture={(blob) => {
+            onCapture={(capture) => {
               setError(null);
               setPermissionProblem(null);
-              punch.mutate(blob);
+              punch.mutate(capture);
             }}
           />
         ) : (

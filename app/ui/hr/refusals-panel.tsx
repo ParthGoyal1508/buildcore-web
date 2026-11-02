@@ -27,6 +27,7 @@ const REASONS = [
   'unlocatable',
   'face_mismatch',
   'no_face_detected',
+  'liveness_failed',
 ] as const;
 
 const metresLabel = (value: number | null) =>

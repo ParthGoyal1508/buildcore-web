@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { SerwistProvider } from '@serwist/next/react';
 import { useQuery } from '@tanstack/react-query';
-import { getMyEmployee, submitPunch } from '@/app/lib/api/my-workspace';
+import { getMyEmployee } from '@/app/lib/api/my-workspace';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, ROUTES } from '@/app/lib/constants';
+import { LIVENESS_COPY, MESSAGES, ROUTES } from '@/app/lib/constants';
 import { drainQueue, getQueuedCount } from '@/app/lib/offline-queue';
 import { hasModuleAccess } from '@/app/lib/permissions';
 import AccessDenied from '@/app/ui/access-denied';
@@ -87,19 +87,12 @@ export default function MyWorkspaceLayout({
     };
 
     const onOnline = async () => {
-      const result = await drainQueue((entry) =>
-        submitPunch({
-          type: entry.type,
-          photo: entry.photo,
-          latitude: entry.latitude,
-          longitude: entry.longitude,
-          // The accuracy from when the worker punched, not from now. Undefined for
-          // an entry queued before this field existed, which the backend treats as
-          // "no accuracy reported" — today's behaviour, unchanged.
-          accuracyMeters: entry.accuracyMeters,
-          capturedAt: entry.capturedAt,
-        }),
-      );
+      // 057: a punch saved offline (only possible before 2026-10-03) holds one photo and no
+      // liveness capture, which the server now refuses. Each is surfaced once with that reason and
+      // removed, rather than sent to fail with a message about missing photos.
+      const result = await drainQueue(async () => {
+        throw new Error(LIVENESS_COPY.queuedPunchRetired);
+      });
       if (!active) return;
 
       // A rejected punch is surfaced once rather than dropped silently — the

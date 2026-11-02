@@ -810,6 +810,7 @@ export const punchRefusalRowSchema = z.object({
     'unlocatable',
     'face_mismatch',
     'no_face_detected',
+    'liveness_failed',
   ]),
   /** Distance from the site's centre, in metres — the real distance, unadjusted. Null where
    * the fix was too vague to measure from. */

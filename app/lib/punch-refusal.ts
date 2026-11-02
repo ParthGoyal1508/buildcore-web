@@ -24,7 +24,36 @@ const MESSAGE_BY_CODE = {
   PUNCH_REFUSED_LOCATION: MESSAGES.punchRefusedLocation,
   PUNCH_REFUSED_UNLOCATABLE: MESSAGES.punchRefusedUnlocatable,
   PUNCH_REFUSED_FACE: MESSAGES.punchRefusedFace,
+  PUNCH_REFUSED_LIVENESS: MESSAGES.punchRefusedLiveness,
 } as const satisfies Record<PunchRefusalCode, string>;
+
+/**
+ * Which liveness check failed (057), worded for who is in front of the camera. Read from the 422's
+ * `detail.liveness` — `{ kind, step }` — so the person is told the true reason: a head that did
+ * not turn the way asked is what a held-up photo looks like, and saying so is the point.
+ */
+export function livenessRefusalMessage(
+  details: Record<string, unknown> | undefined,
+  subject: 'self' | 'other',
+): string | null {
+  const raw = (details?.detail as Record<string, unknown> | undefined)?.liveness;
+  if (!raw || typeof raw !== 'object') return null;
+  const { kind, step } = raw as { kind?: string; step?: string };
+  const side = step === 'left' || step === 'right' ? step : null;
+  const head = subject === 'self' ? 'your head' : 'their head';
+  switch (kind) {
+    case 'did_not_turn':
+      return `The head did not turn${side ? ` to the ${side}` : ''} when asked, so this could not be confirmed as a live person — a photo held up to the camera looks exactly like this. Turn ${head} slowly when the screen says, then try again.`;
+    case 'no_face':
+      return `The face left the frame${side ? ` while turning ${side}` : ''}. Turn ${head} slowly, keeping the face inside the oval, then try again.`;
+    case 'different_person':
+      return 'The face changed between the photos, so this could not be confirmed as one live person. Keep the same face in the frame for the whole capture, then try again.';
+    case 'spoof':
+      return 'These photos look like a picture of a screen or a printout rather than a live face. The person must face the camera themselves, in good light — then try again.';
+    default:
+      return null;
+  }
+}
 
 /**
  * Whether a code is one this client knows how to explain.
@@ -130,6 +159,9 @@ export function punchRefusalMessage(
   ) {
     return MESSAGES.punchRefusedNoFace;
   }
+  if (code === 'PUNCH_REFUSED_LIVENESS') {
+    return livenessRefusalMessage(details, 'self') ?? MESSAGE_BY_CODE[code];
+  }
   // The measured sentence replaces the generic one rather than leading it — "you were 850 m away"
   // followed by "you are too far" says the same thing twice — and only the action follows.
   if (code === 'PUNCH_REFUSED_LOCATION') {
@@ -158,6 +190,7 @@ const CODE_BY_REASON = {
   unlocatable: 'PUNCH_REFUSED_UNLOCATABLE',
   face_mismatch: 'PUNCH_REFUSED_FACE',
   no_face_detected: 'PUNCH_REFUSED_FACE',
+  liveness_failed: 'PUNCH_REFUSED_LIVENESS',
 } as const satisfies Record<PunchRefusalReason, PunchRefusalCode>;
 
 /** What a past refusal is called in a list the worker reads. */
