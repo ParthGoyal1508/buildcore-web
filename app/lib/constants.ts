@@ -5675,6 +5675,21 @@ export const LIVENESS_COPY = {
       `Ask them to turn their head to THEIR ${side} (${arrow} on your screen)`,
   },
   holdStill: 'Hold still…',
+  /** Live hints from the on-device face check (057), worded for whoever holds the phone. */
+  hint: {
+    noFace: 'Bring the face into the oval',
+    closer: 'Move the camera a little closer to the face',
+    centre: 'Move the face to the middle of the oval',
+    keepInOval: 'Keep the face inside the oval',
+    turnMore: (arrow: string) => `Turn a little further ${arrow}`,
+  },
+  /** Seconds the check waits for a face before saying so, and for a turn before sending anyway. */
+  straightTimeoutSeconds: 12,
+  turnTimeoutSeconds: 8,
+  noFaceFound:
+    'No face was found in the oval. Make sure the face is well lit, uncovered and fills the oval, then try again.',
+  faceTooSmall:
+    'The face is too far from the camera. Move closer so the face fills the oval, then try again.',
   done: 'Captured. Checking…',
   challengeFailed:
     'Could not start the capture. Check your connection and try again.',

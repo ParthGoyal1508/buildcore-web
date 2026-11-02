@@ -16,6 +16,7 @@ import {
   MESSAGES,
   type CameraFacing,
 } from '@/app/lib/constants';
+import { loadFaceCheck, type FaceCheck } from '@/app/lib/face-check';
 import { Button } from '@/app/ui/button';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
 
@@ -23,7 +24,15 @@ type CameraState = 'starting' | 'ready' | 'denied' | 'unavailable';
 type Phase =
   | { kind: 'idle' }
   | { kind: 'preparing' }
-  | { kind: 'step'; index: number; steps: LivenessStep[]; secondsLeft: number }
+  | {
+      kind: 'step';
+      index: number;
+      steps: LivenessStep[];
+      /** The countdown, when the on-device check is unavailable. */
+      secondsLeft: number | null;
+      /** The on-device check's live hint, when it is running. */
+      hint: string | null;
+    }
   | { kind: 'done' };
 
 function readStoredFacing(fallback: CameraFacing): CameraFacing {
@@ -36,6 +45,17 @@ function readStoredFacing(fallback: CameraFacing): CameraFacing {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * How far a head must turn before the on-device check takes the frame: the server's own minimum
+ * (0.12) plus a margin, so a frame the phone accepts is one the server will too.
+ */
+const TURN_TO_CAPTURE = 0.15;
+/** A face narrower than this share of the frame is too far away to match well. */
+const MIN_FACE_SIZE = 0.12;
+/** Consecutive good readings before the straight frame is taken — the face has settled. */
+const STEADY_READINGS = 4;
+const READ_EVERY_MS = 120;
 
 /** One video frame, scaled to `maxDimension` on its longest edge, as a JPEG — unmirrored. */
 async function grabFrame(
@@ -100,6 +120,8 @@ export default function LivenessCapture({
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
+  /** The front camera is previewed mirrored, so the person's left is the screen's left. */
+  const mirrored = facing === 'user';
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +195,12 @@ export default function LivenessCapture({
     });
   }, []);
 
+  // 057, option 6: the on-device check starts loading with the camera, so it is usually ready by
+  // the time Start is pressed. If it never loads, the countdown takes over.
+  useEffect(() => {
+    void loadFaceCheck().catch(() => undefined);
+  }, []);
+
   const run = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -186,19 +214,96 @@ export default function LivenessCapture({
       setPhase({ kind: 'idle' });
       return;
     }
+    // Waited for briefly, not indefinitely: on a slow connection the countdown is better than a
+    // capture that has not started.
+    let check: FaceCheck | null = await Promise.race([
+      loadFaceCheck().catch(() => null),
+      wait(8000).then(() => null),
+    ]);
     const { steps } = challenge;
     const frames: Blob[] = [];
+    const straightYaws: number[] = [];
     try {
       for (let index = 0; index < steps.length; index += 1) {
         const step = steps[index];
-        const seconds =
-          step === 'straight'
-            ? LIVENESS_FRAME.straightSeconds
-            : LIVENESS_FRAME.turnSeconds;
-        for (let left = seconds; left > 0; left -= 1) {
-          if (cancelledRef.current) return;
-          setPhase({ kind: 'step', index, steps, secondsLeft: left });
-          await wait(1000);
+        if (!check) {
+          const seconds =
+            step === 'straight'
+              ? LIVENESS_FRAME.straightSeconds
+              : LIVENESS_FRAME.turnSeconds;
+          for (let left = seconds; left > 0; left -= 1) {
+            if (cancelledRef.current) return;
+            setPhase({ kind: 'step', index, steps, secondsLeft: left, hint: null });
+            await wait(1000);
+          }
+        } else {
+          // Guided: take the frame when the face is settled in the oval (straight), or the moment
+          // the head has turned far enough the asked way (a turn) — measured as the server does.
+          const baseline =
+            straightYaws.length > 0
+              ? straightYaws.reduce((a, b) => a + b, 0) / straightYaws.length
+              : 0;
+          const sign = step === 'left' ? 1 : -1;
+          const onScreenLeft = mirrored ? step === 'left' : step === 'right';
+          const deadline =
+            Date.now() +
+            (step === 'straight'
+              ? COPY.straightTimeoutSeconds
+              : COPY.turnTimeoutSeconds) *
+              1000;
+          let steady: number[] = [];
+          for (;;) {
+            if (cancelledRef.current) return;
+            let reading;
+            try {
+              reading = check.read(video);
+            } catch (failure) {
+              // The check is advisory: if it fails mid-capture, the countdown finishes the job.
+              console.warn('On-device face check failed; using the countdown.', failure);
+              check = null;
+              break;
+            }
+            let hint: string;
+            let ready = false;
+            if (step === 'straight') {
+              if (!reading.found) hint = COPY.hint.noFace;
+              else if (reading.size < MIN_FACE_SIZE) hint = COPY.hint.closer;
+              else if (!reading.centred) hint = COPY.hint.centre;
+              else hint = COPY.holdStill;
+              steady =
+                reading.found && reading.size >= MIN_FACE_SIZE && reading.centred
+                  ? [...steady, reading.yaw]
+                  : [];
+              ready = steady.length >= STEADY_READINGS;
+            } else if (!reading.found) {
+              hint = COPY.hint.keepInOval;
+            } else {
+              ready = (reading.yaw - baseline) * sign >= TURN_TO_CAPTURE;
+              hint = COPY.hint.turnMore(onScreenLeft ? '←' : '→');
+            }
+            setPhase({ kind: 'step', index, steps, secondsLeft: null, hint: ready ? null : hint });
+            if (ready) break;
+            if (Date.now() > deadline) {
+              if (step === 'straight') {
+                // Nothing worth judging: say why here, upload nothing, keep the challenge unspent.
+                setError(reading.found ? COPY.faceTooSmall : COPY.noFaceFound);
+                setPhase({ kind: 'idle' });
+                return;
+              }
+              // A head that never turns is sent anyway: the server refuses it with its reason and
+              // logs the attempt — with its photo — which is how HR sees a held-up picture.
+              break;
+            }
+            await wait(READ_EVERY_MS);
+          }
+          if (step === 'straight') straightYaws.push(...steady);
+          if (!check) {
+            for (let left = LIVENESS_FRAME.turnSeconds; left > 0; left -= 1) {
+              if (cancelledRef.current) return;
+              setPhase({ kind: 'step', index, steps, secondsLeft: left, hint: null });
+              await wait(1000);
+            }
+          }
         }
         if (cancelledRef.current) return;
         frames.push(
@@ -217,7 +322,7 @@ export default function LivenessCapture({
     }
     setPhase({ kind: 'done' });
     onCapture({ challengeId: challenge.challengeId, frames });
-  }, [flow, workerId, onCapture]);
+  }, [flow, workerId, onCapture, mirrored]);
 
   if (camera === 'denied' || camera === 'unavailable') {
     return (
@@ -236,7 +341,6 @@ export default function LivenessCapture({
     );
   }
 
-  const mirrored = facing === 'user';
   const prompt = (() => {
     if (phase.kind !== 'step') return null;
     const step = phase.steps[phase.index];
@@ -265,9 +369,13 @@ export default function LivenessCapture({
         {phase.kind === 'step' && (
           <div className="absolute inset-x-0 bottom-0 bg-black/60 px-3 py-2 text-center text-white">
             <p className="text-base font-semibold">{prompt}</p>
-            <p className="text-3xl font-bold tabular-nums">
-              {phase.secondsLeft}
-            </p>
+            {phase.secondsLeft !== null ? (
+              <p className="text-3xl font-bold tabular-nums">
+                {phase.secondsLeft}
+              </p>
+            ) : (
+              phase.hint && <p className="text-sm text-amber-200">{phase.hint}</p>
+            )}
           </div>
         )}
       </div>
@@ -278,7 +386,9 @@ export default function LivenessCapture({
           : phase.kind === 'preparing'
             ? COPY.starting
             : phase.kind === 'step'
-              ? `${prompt} — ${phase.secondsLeft}`
+              ? [prompt, phase.secondsLeft ?? phase.hint]
+                  .filter((part) => part !== null)
+                  .join(' — ')
               : phase.kind === 'done'
                 ? COPY.done
                 : COPY.intro[subject]}
