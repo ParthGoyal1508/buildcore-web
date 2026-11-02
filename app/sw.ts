@@ -5,7 +5,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from '@serwist/next/worker';
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from 'serwist';
-import { NetworkOnly, Serwist } from 'serwist';
+import { CacheFirst, ExpirationPlugin, NetworkOnly, Serwist } from 'serwist';
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -96,6 +96,20 @@ const runtimeCaching: RuntimeCaching[] = [
       url.pathname !== OFFLINE_AREA &&
       !url.pathname.startsWith(`${OFFLINE_AREA}/`),
     handler: new NetworkOnly(),
+  },
+  /**
+   * The on-device face check's runtime and model (057): ~5 MB compressed, fetched the first time a
+   * face is captured and then never again — cache-first, kept a year. Their URLs never change for
+   * a given package version, and a new version gets new bytes under the same path only on an app
+   * release, which replaces this worker and its caches with it.
+   */
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith('/mediapipe/'),
+    handler: new CacheFirst({
+      cacheName: 'face-check',
+      plugins: [new ExpirationPlugin({ maxEntries: 8, maxAgeSeconds: 365 * 24 * 60 * 60 })],
+    }),
   },
   ...defaultCache,
 ];

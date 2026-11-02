@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { blobToBase64 } from '@/app/lib/api/my-workspace';
 import { isIosSafari, openBlobInTab, saveBlob } from '@/app/lib/download-file';
 import { IconButton, SecondaryButton, TextButton } from '@/app/ui/button';
 
@@ -236,6 +237,27 @@ function useNamedPdfUrl(blob: Blob, name: string, enabled: boolean) {
 }
 
 /**
+ * An image's data URL, read once per blob (057). Not an object URL made in a `useMemo` and revoked
+ * in an effect's cleanup: React re-runs effects in development, which revoked the URL the memo
+ * still held and broke the image on the second open.
+ */
+function useImageUrl(blob: Blob, enabled: boolean) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    void blobToBase64(blob).then((dataUrl) => {
+      if (!cancelled) setUrl(dataUrl);
+    });
+    return () => {
+      cancelled = true;
+      setUrl(null);
+    };
+  }, [blob, enabled]);
+  return url;
+}
+
+/**
  * The document itself — an iframe for a PDF, an `<img>` for an image. The object URL lives exactly as
  * long as the blob it was made from is on screen, and is released when either changes or the viewer
  * closes. A PDF is served under `name` (see `useNamedPdfUrl`), which is what the browser's own PDF
@@ -253,22 +275,13 @@ function FileFrame({
   className: string;
 }) {
   const shown = useMemo(() => renderable(file), [file]);
-  const imageUrl = useMemo(
-    () => (shown.isImage ? URL.createObjectURL(shown.blob) : null),
-    [shown],
-  );
-  useEffect(
-    () => () => {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    },
-    [imageUrl],
-  );
+  const imageUrl = useImageUrl(shown.blob, shown.isImage);
   const pdfUrl = useNamedPdfUrl(shown.blob, name, !shown.isImage);
 
   if (imageUrl) {
     return (
       <div className={`overflow-auto ${className}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- a blob URL, which next/image cannot optimise */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- a data URL, which next/image cannot optimise */}
         <img src={imageUrl} alt={title} className="mx-auto max-w-full" />
       </div>
     );

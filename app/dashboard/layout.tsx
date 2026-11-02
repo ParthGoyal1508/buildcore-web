@@ -6,6 +6,7 @@ import { MobileNavShell } from '@/app/ui/mobile-nav';
 import { PageLoadingOverlay } from '@/app/ui/page-skeleton';
 import ShellGate from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
+import { SupervisorPermissionsOnboarding } from '@/app/ui/permissions/device-permissions';
 
 /**
  * The dashboard shell: sidebar beside a content column; on a phone, the content alone above the
@@ -69,6 +70,7 @@ export default function DashboardLayout({
             <ShellHeader>
               <DashboardSearch />
             </ShellHeader>
+            <SupervisorPermissionsOnboarding />
             <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
               {/* Desktop only (2026-10-15). On a phone this was a grid of unlabelled module icons
             stacked above every page; the modules now sit, by name, behind Menu in the bottom

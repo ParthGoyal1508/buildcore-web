@@ -13,16 +13,11 @@ import {
   type PasswordConfirmation,
   removeFaceUnlock,
 } from '@/app/lib/api/auth';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
 import { ApiError, errorMessage } from '@/app/lib/api/client';
-import { ENROLMENT_PHOTO_RANGE, MESSAGES } from '@/app/lib/constants';
-import { fileToBase64 } from '@/app/lib/files';
-import {
-  Button,
-  IconButton,
-  SecondaryButton,
-  TextButton,
-} from '@/app/ui/button';
-import CameraCapture from '@/app/ui/my/camera-capture';
+import { MESSAGES } from '@/app/lib/constants';
+import { Button, SecondaryButton, TextButton } from '@/app/ui/button';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
 import { FormError, TextField } from '@/app/ui/settings/form-fields';
 import Modal from '@/app/ui/settings/modal';
 import { toast } from '@/app/ui/toast';
@@ -30,7 +25,10 @@ import { toast } from '@/app/ui/toast';
 /**
  * Face unlock for App Settings (054, 2026-11-01): the client asked for the face in place of the
  * password, with the password kept as the fallback. The match runs on the server — this only
- * takes the picture — and returns the same confirmation the password does.
+ * takes the pictures — and returns the same confirmation the password does.
+ *
+ * Both registering and confirming are the guided head-turn capture attendance uses (057), so a
+ * photo of the owner held up to the camera is refused.
  *
  * The password is the settings password the server generates (`settings-password:rotate`), not
  * the sign-in password, and nothing here can show or change it.
@@ -138,39 +136,51 @@ export function ConfirmModal({
   );
 }
 
-/** The camera, in place of the password prompt. */
+/** The camera, in place of the password prompt: a guided head-turn capture (057). */
 export function FaceGate({
   onConfirmed,
 }: {
   onConfirmed: (confirmation: PasswordConfirmation) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  // A capture spends its challenge, so a refused one is retried with a fresh capture: remounted.
+  const [attempt, setAttempt] = useState(0);
   const confirm = useMutation({
-    mutationFn: async (photo: Blob) =>
-      confirmFace(await fileToBase64(photo), 'cash-visibility'),
+    mutationFn: (capture: LivenessCaptureResult) =>
+      confirmFace(capture, 'cash-visibility'),
     onSuccess: (result) => {
       setError(null);
       onConfirmed(result);
     },
-    onError: (err) =>
+    onError: (err) => {
+      setAttempt((n) => n + 1);
       setError(
-        err instanceof ApiError && err.code === FACE_NOT_RECOGNISED
+        err instanceof ApiError &&
+          (err.code === FACE_NOT_RECOGNISED || err.code === 'LIVENESS_FAILED')
           ? err.message
           : errorMessage(err, MESSAGES.saveFailed),
-      ),
+      );
+    },
   });
 
   return (
     <div className="mt-4 flex flex-col gap-3">
       <FormError message={error} />
-      <CameraCapture
-        captureLabel={confirm.isPending ? 'Checking…' : 'Unlock with face'}
-        disabled={confirm.isPending}
-        onCapture={(blob) => {
-          setError(null);
-          confirm.mutate(blob);
-        }}
-      />
+      {confirm.isPending ? (
+        <p className="text-sm text-gray-600" role="status">
+          Checking…
+        </p>
+      ) : (
+        <LivenessCapture
+          key={attempt}
+          flow="unlock-confirm"
+          subject="self"
+          onCapture={(capture) => {
+            setError(null);
+            confirm.mutate(capture);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -264,100 +274,52 @@ function FaceEnrolModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [shots, setShots] = useState<{ blob: Blob; url: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const full = shots.length >= ENROLMENT_PHOTO_RANGE.max;
+  const [attempt, setAttempt] = useState(0);
 
+  // Saved as soon as the capture completes: the guided capture is the whole of registering, so
+  // there is no set of pictures left to review.
   const save = useMutation({
-    mutationFn: async () =>
-      enrolFaceUnlock(
-        await Promise.all(shots.map((s) => fileToBase64(s.blob))),
-        'cash-visibility',
-        confirmationToken,
-      ),
+    mutationFn: (capture: LivenessCaptureResult) =>
+      enrolFaceUnlock(capture, 'cash-visibility', confirmationToken),
     onSuccess: (next) => {
       queryClient.setQueryData(FACE_UNLOCK_QUERY, next);
       toast.success('Face unlock is set up.');
       onClose();
     },
-    onError: (err) => setError(errorMessage(err, MESSAGES.saveFailed)),
+    onError: (err) => {
+      setAttempt((n) => n + 1);
+      setError(errorMessage(err, MESSAGES.saveFailed));
+    },
   });
 
   return (
     <Modal
       title="Set up face unlock"
       onClose={onClose}
-      isDirty={shots.length > 0}
       pending={save.isPending}
-      footer={
-        <>
-          <SecondaryButton type="button" onClick={onClose}>
-            Cancel
-          </SecondaryButton>
-          <Button
-            type="button"
-            disabled={
-              shots.length < ENROLMENT_PHOTO_RANGE.min || save.isPending
-            }
-            onClick={() => {
-              setError(null);
-              save.mutate();
-            }}
-          >
-            {save.isPending ? 'Saving…' : 'Save'}
-          </Button>
-        </>
-      }
     >
       <div className="flex flex-col gap-3">
         <p className="text-sm text-gray-600">
-          Look at the camera in good light and take {ENROLMENT_PHOTO_RANGE.min}{' '}
-          to {ENROLMENT_PHOTO_RANGE.max} pictures, turning your head slightly
-          between them.
+          Look at the camera in good light, press Start, and turn your head
+          slightly when the screen asks.
         </p>
         <FormError message={error} />
-        <CameraCapture
-          captureLabel={
-            full
-              ? `Maximum ${ENROLMENT_PHOTO_RANGE.max} pictures taken`
-              : `Take picture ${shots.length + 1}`
-          }
-          disabled={full || save.isPending}
-          onCapture={(blob) =>
-            setShots((current) =>
-              current.length >= ENROLMENT_PHOTO_RANGE.max
-                ? current
-                : [...current, { blob, url: URL.createObjectURL(blob) }],
-            )
-          }
-        />
-        {shots.length > 0 && (
-          <ul className="flex flex-wrap gap-2">
-            {shots.map((shot, index) => (
-              <li key={shot.url} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={shot.url}
-                  alt={`Picture ${index + 1}`}
-                  className="h-16 w-16 rounded-md object-cover"
-                />
-                <IconButton
-                  size="xs"
-                  tone="overlay"
-                  label={`Remove picture ${index + 1}`}
-                  className="absolute -right-1 -top-1"
-                  onClick={() => {
-                    URL.revokeObjectURL(shot.url);
-                    setShots((current) =>
-                      current.filter((s) => s.url !== shot.url),
-                    );
-                  }}
-                >
-                  ×
-                </IconButton>
-              </li>
-            ))}
-          </ul>
+        {save.isPending ? (
+          <p className="text-sm text-gray-600" role="status">
+            Saving…
+          </p>
+        ) : (
+          <LivenessCapture
+            key={attempt}
+            flow="unlock-enrolment"
+            subject="self"
+            onCancel={onClose}
+            onCapture={(capture) => {
+              setError(null);
+              save.mutate(capture);
+            }}
+          />
         )}
       </div>
     </Modal>

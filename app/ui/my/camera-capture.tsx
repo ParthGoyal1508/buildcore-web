@@ -91,7 +91,13 @@ export default function CameraCapture({
           // constraint throws OverconstrainedError on a device that has no camera
           // facing that way, which would strand the user on an error screen. As a
           // preference, the browser picks the closest match instead.
-          video: { facingMode: facing },
+          // 057: a size asked for, not left to the browser — most hand back 640×480 when asked
+          // for nothing, which leaves a face or a document across the room few pixels to work with.
+          video: {
+            facingMode: facing,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
         });
         // The effect may have been torn down while the permission prompt was open;
         // adopting the stream now would leave the camera light on with nothing
@@ -209,7 +215,8 @@ export default function CameraCapture({
   }
 
   return (
-    <div className="space-y-3">
+    // Capped at 480 px (057): full width of a laptop screen is a preview nobody frames with.
+    <div className="mx-auto w-full max-w-[480px] space-y-3">
       <div className="overflow-hidden rounded-lg bg-black">
         <video
           ref={videoRef}

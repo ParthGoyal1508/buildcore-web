@@ -16,6 +16,7 @@ import { ApiError } from '@/app/lib/api/client';
 import {
   addSitePhoto,
   blobToBase64,
+  getLabourRefusalPhoto,
   getLabourRefusals,
   getLabourToday,
   getMyLabourSites,
@@ -33,7 +34,23 @@ import {
   ROUTES,
 } from '@/app/lib/constants';
 import { resolvePosition } from '@/app/lib/location';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
+import {
+  livenessRefusalMessage,
+  refusalMeasurementText,
+} from '@/app/lib/punch-refusal';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
+import {
+  distanceLabel,
+  EvidencePhoto,
+  MapLink,
+} from '@/app/ui/attendance/evidence';
 import CameraCapture from '@/app/ui/my/camera-capture';
+import {
+  DevicePermissionsPanel,
+  PermissionSteps,
+  type PermissionProblem,
+} from '@/app/ui/permissions/device-permissions';
 import PageHeader from '@/app/ui/page-header';
 import { FormError, SelectField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
@@ -93,15 +110,69 @@ function dayText(day: { status: string; hours: number | null; overtimeHours: num
   return `${hours}${label}${ot}`;
 }
 
-/** The user-facing sentence for a failed punch, by the API's code — never the server's prose. */
+/** Which measured clause, if any, a labour refusal code takes (057). */
+const MEASURED_KIND = {
+  LABOUR_PUNCH_REFUSED_LOCATION: 'location',
+  LABOUR_PUNCH_REFUSED_UNLOCATABLE: 'unlocatable',
+  LABOUR_PUNCH_REFUSED_FACE: 'face',
+} as const;
+
+/** 057: a refusal for a capture that was not a live person, worded by which check failed. */
+function livenessMessageOf(error: ApiError): string | null {
+  return error.code === 'LABOUR_PUNCH_REFUSED_LIVENESS'
+    ? (livenessRefusalMessage(error.details, 'other') ??
+        LABOUR_PUNCH_MESSAGES.LABOUR_PUNCH_REFUSED_LIVENESS)
+    : null;
+}
+
+/**
+ * The user-facing sentence for a failed punch, by the API's code — never the server's prose. A
+ * refusal leads with what was measured (057): the distance from the site, the phone's accuracy, or
+ * that no face was found at all.
+ */
 function punchErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    const liveness = livenessMessageOf(error);
+    if (liveness) return liveness;
     const code = error.code as keyof typeof LABOUR_PUNCH_MESSAGES | undefined;
+    if (code && code in MEASURED_KIND) {
+      const kind = MEASURED_KIND[code as keyof typeof MEASURED_KIND];
+      if (kind === 'face' && error.details?.reason === 'no_face_detected') {
+        return LABOUR_ATTENDANCE_COPY.noFaceSeen;
+      }
+      // The measured sentence replaces the generic one; only the action follows it.
+      const measured =
+        kind === 'face' ? '' : refusalMeasurementText(kind, error.details);
+      if (measured) {
+        return `${measured} ${
+          kind === 'location'
+            ? LABOUR_ATTENDANCE_COPY.locationAction
+            : LABOUR_ATTENDANCE_COPY.unlocatableAction
+        }`;
+      }
+      return LABOUR_PUNCH_MESSAGES[code];
+    }
     if (code && code in LABOUR_PUNCH_MESSAGES) return LABOUR_PUNCH_MESSAGES[code];
     if (error.status === 0) return LABOUR_ATTENDANCE_COPY.needsConnection;
   }
   if (error instanceof Error && error.message) return error.message;
   return MESSAGES.saveFailed;
+}
+
+/** A failure the supervisor fixes in the phone's settings rather than by moving or retaking (057). */
+function permissionProblemOf(error: unknown): PermissionProblem | null {
+  if (error instanceof ApiError) {
+    return error.code === 'LABOUR_PUNCH_REFUSED_UNLOCATABLE' ? 'location-off' : null;
+  }
+  if (!(error instanceof Error)) return null;
+  if (error.message === MESSAGES.locationDenied) return 'location-blocked';
+  if (
+    error.message === MESSAGES.locationTimedOut ||
+    error.message === MESSAGES.locationUnavailable
+  ) {
+    return 'location-off';
+  }
+  return null;
 }
 
 /**
@@ -241,6 +312,9 @@ export default function LabourAttendancePage() {
           ) : null
         }
       />
+
+      {/* 057: camera and location status before the first labour is picked. */}
+      {siteId && online && <DevicePermissionsPanel />}
 
       {!online && (
         <p
@@ -395,10 +469,23 @@ export default function LabourAttendancePage() {
               </summary>
               <ul className="mt-2 space-y-1 text-gray-600">
                 {refusals.data.map((r) => (
-                  <li key={r.id}>
-                    {timeOf(r.at)} · {r.fullName ?? 'Labour'}{' '}
-                    {r.labourCode ? `(${r.labourCode})` : ''} · punch {r.type} ·{' '}
-                    {LABOUR_REFUSAL_REASON_LABELS[r.reason] ?? r.reason}
+                  <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      {timeOf(r.at)} · {r.fullName ?? 'Labour'}{' '}
+                      {r.labourCode ? `(${r.labourCode})` : ''} · punch {r.type} ·{' '}
+                      {LABOUR_REFUSAL_REASON_LABELS[r.reason] ?? r.reason}
+                      {/* 057: how far from the site, where the outcome turned on it. */}
+                      {r.reason === 'outside_geofence' && r.distanceMetres !== null
+                        ? ` · ${distanceLabel(r.distanceMetres)} from site`
+                        : ''}
+                    </span>
+                    <MapLink latitude={r.latitude} longitude={r.longitude} />
+                    <EvidencePhoto
+                      available={r.hasPhoto}
+                      title={`${r.fullName ?? 'Labour'} · ${timeOf(r.at)}`}
+                      queryKey={['labour', 'refusalPhoto', r.id]}
+                      load={() => getLabourRefusalPhoto(r.id)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -530,9 +617,11 @@ function PunchDialog({
     'camera',
   );
   const [error, setError] = useState<string | null>(null);
+  const [permissionProblem, setPermissionProblem] =
+    useState<PermissionProblem | null>(null);
 
   const punch = useMutation({
-    mutationFn: async (photo: Blob) => {
+    mutationFn: async (capture: LivenessCaptureResult) => {
       setPhase('locating');
       let coords: { latitude: number; longitude: number; accuracy?: number };
       try {
@@ -544,21 +633,24 @@ function PunchDialog({
         coords = DEV_FALLBACK_POSITION;
       }
       setPhase('matching');
-      return punchLabour({
-        siteId,
-        workerId: target.worker.workerId,
-        type: target.type,
-        photo: await blobToBase64(photo),
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        ...(typeof coords.accuracy === 'number'
-          ? { accuracyMeters: Math.round(coords.accuracy * 100) / 100 }
-          : {}),
-      });
+      return punchLabour(
+        {
+          siteId,
+          workerId: target.worker.workerId,
+          type: target.type,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          ...(typeof coords.accuracy === 'number'
+            ? { accuracyMeters: Math.round(coords.accuracy * 100) / 100 }
+            : {}),
+        },
+        capture,
+      );
     },
     onSuccess: onDone,
     onError: (e) => {
       setError(punchErrorMessage(e));
+      setPermissionProblem(permissionProblemOf(e));
       setPhase('camera');
     },
   });
@@ -594,14 +686,25 @@ function PunchDialog({
           </p>
         )}
 
+        {permissionProblem && (
+          <div className="mb-3">
+            <PermissionSteps problem={permissionProblem} />
+          </div>
+        )}
+
         {phase === 'camera' ? (
-          <CameraCapture
-            captureLabel={error ? 'Retake photo' : 'Take photo'}
+          // 057: a guided head-turn the supervisor talks the labour through; the challenge is bound
+          // to this labour, so it cannot be spent punching someone else.
+          <LivenessCapture
+            flow="labour-punch"
+            workerId={target.worker.workerId}
+            subject="other"
             disabled={punch.isPending}
             onCancel={onClose}
-            onCapture={(blob) => {
+            onCapture={(capture) => {
               setError(null);
-              punch.mutate(blob);
+              setPermissionProblem(null);
+              punch.mutate(capture);
             }}
           />
         ) : (

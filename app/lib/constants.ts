@@ -517,9 +517,6 @@ export type CameraFacing = 'user' | 'environment';
 export const CAMERA_FACING_STORAGE_KEY = 'tirupati.my.cameraFacing';
 export const DEFAULT_CAMERA_FACING: CameraFacing = 'user';
 
-/** Photos required to enrol, mirroring the backend's configured bounds. */
-export const ENROLMENT_PHOTO_RANGE = { min: 3, max: 5 } as const;
-
 /**
  * Capture ceiling applied before a photo is uploaded.
  *
@@ -1926,9 +1923,19 @@ export const MESSAGES = {
   punchRefusedLocation:
     'You are too far from your site for this punch to count. Walk to the site and punch again there.',
   punchRefusedUnlocatable:
-    'Your phone could not work out where you are precisely enough. Step into the open, away from walls and roofs, wait a few seconds and punch again.',
+    'Your phone could not work out where you are precisely enough. Check that Location (GPS) is on, step into the open away from walls and roofs, wait a few seconds and punch again.',
   punchRefusedFace:
     'This photo did not match your enrolled face. Take it again in better light, looking straight at the camera.',
+  /** 057: what to do, after a location refusal's measured sentence replaces the generic one. */
+  punchRefusedLocationAction: 'Walk to the site and punch again there.',
+  punchRefusedUnlocatableAction:
+    'Check that Location (GPS) is on, step into the open away from walls and roofs, wait a few seconds and punch again.',
+  /** 057: a capture that is not a live person, when the reason is not one the screen words itself. */
+  punchRefusedLiveness:
+    'This could not be confirmed as a live person, so the punch was not recorded. Follow the prompts on screen and try again.',
+  /** 057: a face refusal where no face was found at all — fixed by framing, unlike a mismatch. */
+  punchRefusedNoFace:
+    'No face could be seen in the photo. Take it again in good light, with your face filling the frame.',
   /**
    * Said once, under the message, for every refusal.
    *
@@ -1949,13 +1956,14 @@ export const MESSAGES = {
   punchRefusedRepeatedly:
     'That is three attempts in a row. Stop trying for now and tell your supervisor what the screen said — they can record the day for you.',
   /**
-   * Shown where a refused attempt would otherwise look like a missing feature (FR-012, T020).
+   * Said under a face refusal (FR-012, T020), so the worker knows what happens to the picture.
    *
-   * There is no photo to show. A face refusal stores none, because keeping an unattributed
-   * biometric against a named employee is worse than the record it replaces — so the screen must
-   * not offer to show one, and must not read as though the photo were merely unavailable.
+   * Since 057 a refused attempt's photo is kept for 30 days so HR can see who was in front of the
+   * camera, then deleted. The worker is told plainly, because a face photo of them is being kept
+   * after it failed to match — which is exactly the thing a person is entitled to know.
    */
-  punchRefusedNoPhoto: 'The photo from a refused attempt is not kept.',
+  punchRefusedNoPhoto:
+    'The photo from this attempt is kept for 30 days so HR can review it, then deleted.',
   notEnrolled: 'Enrol your face before punching in.',
   enrolmentConsent:
     'I consent to my facial data being captured and stored for attendance verification.',
@@ -2720,6 +2728,8 @@ export const PUNCH_REFUSAL_CODES = [
   'PUNCH_REFUSED_LOCATION',
   'PUNCH_REFUSED_UNLOCATABLE',
   'PUNCH_REFUSED_FACE',
+  // 057: the capture was not a live person — a photo held up, or the head did not turn as asked.
+  'PUNCH_REFUSED_LIVENESS',
 ] as const;
 
 export type PunchRefusalCode = (typeof PUNCH_REFUSAL_CODES)[number];
@@ -3325,7 +3335,10 @@ export const LABOUR_PUNCH_MESSAGES = {
   LABOUR_PUNCH_REFUSED_LOCATION:
     'You are too far from this site for attendance to be marked. Move to the site and try again.',
   LABOUR_PUNCH_REFUSED_UNLOCATABLE:
-    'Your phone could not work out where you are accurately enough. Step outside or somewhere with a clearer view of the sky, then try again.',
+    'Your phone could not work out where you are accurately enough. Check that Location (GPS) is on, step outside or somewhere with a clearer view of the sky, then try again.',
+  // 057. The specific check is worded by `livenessRefusalMessage`; this is its fallback.
+  LABOUR_PUNCH_REFUSED_LIVENESS:
+    'This could not be confirmed as a live person, so attendance was not marked. Follow the prompts on screen and try again.',
   LABOUR_ALREADY_PUNCHED: 'Already marked — refresh the list to see the latest.',
   LABOUR_NOT_PUNCHED_IN: 'Punch this labour in before punching them out.',
   LABOUR_FACE_NOT_ENROLLED:
@@ -3392,11 +3405,19 @@ export const LABOUR_DAY_FLAG_LABELS: Record<string, string> = {
 export const LABOUR_REFUSAL_REASON_LABELS: Record<string, string> = {
   face_mismatch: 'Face did not match',
   no_face_detected: 'No face in photo',
+  liveness_failed: 'Not a live person',
   outside_geofence: 'Outside the site',
   unlocatable: 'Location not accurate',
 };
 
 export const LABOUR_ATTENDANCE_COPY = {
+  /** 057: what to do, after a location refusal's measured sentence replaces the generic one. */
+  locationAction: 'Move to the site and try again.',
+  unlocatableAction:
+    'Check that Location (GPS) is on, step outside or somewhere with a clearer view of the sky, then try again.',
+  /** 057: a face refusal where no face was found — fixed by framing, unlike a mismatch. */
+  noFaceSeen:
+    'No face could be seen in this photo, so attendance was not marked. Retake it in good light with the face filling the frame.',
   needsConnection:
     'You are offline. Attendance needs a connection to check the face, so connect and try again.',
   noSites:
@@ -3406,7 +3427,7 @@ export const LABOUR_ATTENDANCE_COPY = {
   flaggedLocation:
     'Marked — but your location could not be confirmed inside the site, so the HR office will see it flagged.',
   registerHelp:
-    'Take 3 to 5 clear photos of the face: straight on, in good light, nothing covering the face. A slight turn left and right in two of them helps matching later.',
+    'The camera takes the face straight on, then turned slightly to each side — ask the labour to follow the prompts. Good light, nothing covering the face.',
   groupPhotoHint:
     'For reference only — it does not mark anyone in or out. Punch each labour separately.',
   groupPhotoSaved: 'Group photo saved for reference. Nobody was marked by it.',
@@ -5526,4 +5547,150 @@ export const AGREED_RATE_COPY = {
     daily: 'Its rate changes daily — set it on Daily rates instead.',
   },
   empty: 'No agreed rates yet. They are set by a vendor’s first purchase of an item, or imported here.',
+} as const;
+
+/**
+ * Camera and location permission copy (057): the first-open prompt, the status chips on the punch
+ * screens, and the steps shown when a permission has been blocked.
+ *
+ * Steps are per platform because the route to the switch differs completely — an installed Android
+ * app keeps its permissions under App info, Chrome keeps them behind the address bar, and an iPhone
+ * keeps them in the Settings app. One generic "allow it in your browser settings" sent people to the
+ * wrong place on every one of them.
+ */
+export const DEVICE_PERMISSION_COPY = {
+  onboardingTitle: 'Allow camera and location',
+  onboardingBody:
+    'Attendance is marked with a photo taken here and your location at the moment you punch. Allow both now so marking attendance later is one tap.',
+  onboardingAllow: 'Allow camera and location',
+  onboardingLater: 'Not now',
+  allGranted: 'Camera and location are allowed. You are ready to mark attendance.',
+  chipLocation: 'Location',
+  chipCamera: 'Camera',
+  stateGranted: 'Allowed',
+  stateDenied: 'Blocked',
+  statePrompt: 'Not yet allowed',
+  allowButton: 'Allow camera and location',
+  needBoth:
+    'Attendance needs both the camera and your location. Allow them to continue.',
+  locationBlockedTitle: 'Location is blocked for this app',
+  cameraBlockedTitle: 'Camera is blocked for this app',
+  locationOffTitle: 'Your phone’s location is switched off',
+  afterSteps: 'Then come back here and tap Try again.',
+  tryAgain: 'Try again',
+  steps: {
+    location: {
+      'android-app': [
+        'Press and hold the app icon on your home screen, then tap App info (ⓘ).',
+        'Open Permissions → Location.',
+        'Choose “Allow only while using the app” and switch on “Use precise location”.',
+      ],
+      'android-browser': [
+        'Tap the icon to the left of the web address (🔒 or ⚙).',
+        'Tap Permissions → Location and choose Allow.',
+        'If Location is not listed, open Chrome ⋮ → Settings → Site settings → Location, and remove this site from Blocked.',
+      ],
+      'ios-app': [
+        'Open the Settings app → Privacy & Security → Location Services and make sure it is on.',
+        'Scroll to Safari Websites and choose “While Using the App”, with Precise Location on.',
+        'Close this app completely and open it again.',
+      ],
+      'ios-browser': [
+        'Tap “aA” in the address bar → Website Settings → Location → Allow.',
+        'If that is greyed out: Settings app → Privacy & Security → Location Services → Safari Websites → “While Using the App”.',
+      ],
+      desktop: [
+        'Click the icon to the left of the web address.',
+        'Set Location to Allow and reload the page.',
+      ],
+    },
+    camera: {
+      'android-app': [
+        'Press and hold the app icon on your home screen, then tap App info (ⓘ).',
+        'Open Permissions → Camera and choose “Allow only while using the app”.',
+      ],
+      'android-browser': [
+        'Tap the icon to the left of the web address (🔒 or ⚙).',
+        'Tap Permissions → Camera and choose Allow.',
+      ],
+      'ios-app': [
+        'Open the Settings app → Safari → Camera and choose Allow (or Ask).',
+        'Close this app completely and open it again.',
+      ],
+      'ios-browser': [
+        'Tap “aA” in the address bar → Website Settings → Camera → Allow.',
+      ],
+      desktop: [
+        'Click the icon to the left of the web address.',
+        'Set Camera to Allow and reload the page.',
+      ],
+    },
+    locationOff: [
+      'Swipe down from the top of the screen and switch on Location (GPS).',
+      'On Android, also check Settings → Location → Location services → Google Location Accuracy is on.',
+      'Step outside or near a window and wait a few seconds for the location to settle.',
+    ],
+  },
+} as const;
+
+/**
+ * Liveness capture (057): the guided head-turn every face photo now follows.
+ *
+ * Frame sizes: the straight frame is the one stored and matched, so it keeps detail (800 px); the
+ * turn frames only have to show which way the head moved and look like a live face to the
+ * anti-spoof check, which reads an 80 px crop — 480 px is plenty, and keeps a punch near 110 KB.
+ * Full frames rather than face crops: that check looks at 2.7× and 4× the face box for a screen's
+ * edge or a print's texture, and a tight crop would cut away exactly that.
+ */
+export const LIVENESS_FRAME = {
+  straightMaxDimension: 800,
+  turnMaxDimension: 480,
+  jpegQuality: 0.8,
+  /** Seconds of countdown before each frame: time to settle, then to turn. */
+  straightSeconds: 2,
+  turnSeconds: 2,
+} as const;
+
+export const LIVENESS_COPY = {
+  start: 'Start',
+  starting: 'Preparing…',
+  retry: 'Try again',
+  intro: {
+    self: 'Fit your face inside the oval. You will be asked to look straight, then turn your head slowly to each side.',
+    other:
+      'Fit their face inside the oval. Ask them to look straight, then to turn their head slowly to each side when the screen says.',
+  },
+  straight: {
+    self: 'Look straight at the camera',
+    other: 'Ask them to look straight at the camera',
+  },
+  /** `arrow` is the side of the screen the head moves toward in the preview. */
+  turn: {
+    self: (side: 'left' | 'right', arrow: string) =>
+      `Turn your head slowly to your ${side} ${arrow}`,
+    other: (side: 'left' | 'right', arrow: string) =>
+      `Ask them to turn their head to THEIR ${side} (${arrow} on your screen)`,
+  },
+  holdStill: 'Hold still…',
+  /** Live hints from the on-device face check (057), worded for whoever holds the phone. */
+  hint: {
+    noFace: 'Bring the face into the oval',
+    closer: 'Move the camera a little closer to the face',
+    centre: 'Move the face to the middle of the oval',
+    keepInOval: 'Keep the face inside the oval',
+    turnMore: (arrow: string) => `Turn a little further ${arrow}`,
+  },
+  /** Seconds the check waits for a face before saying so, and for a turn before sending anyway. */
+  straightTimeoutSeconds: 12,
+  turnTimeoutSeconds: 8,
+  noFaceFound:
+    'No face was found in the oval. Make sure the face is well lit, uncovered and fills the oval, then try again.',
+  faceTooSmall:
+    'The face is too far from the camera. Move closer so the face fills the oval, then try again.',
+  done: 'Captured. Checking…',
+  challengeFailed:
+    'Could not start the capture. Check your connection and try again.',
+  /** A punch saved offline before 057 carries one photo and no liveness capture. */
+  queuedPunchRetired:
+    'A punch saved on this phone while it was offline could not be sent: attendance now needs a live head-turn check, which a saved photo cannot pass. Ask your supervisor to correct that day.',
 } as const;

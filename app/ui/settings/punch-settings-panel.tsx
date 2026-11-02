@@ -18,6 +18,13 @@ import { toast } from '@/app/ui/toast';
 const MAX_ACCURACY_METRES = 10_000;
 
 /**
+ * Hidden since 057 (2026-11-02): the client chose to refuse every failing punch, and a migration
+ * switched every company on. The toggle, its mutation and the API behind it are kept so a company
+ * can be offered "record as an exception" again by flipping this to `true` — no other change.
+ */
+const SHOW_ENFORCEMENT_TOGGLE = false;
+
+/**
  * Face-punch settings for one company (020 FR-012b / FR-013, surfaced 042).
  *
  * Two decisions, saved separately because they are separate acts: how bad a GPS fix may be
@@ -36,7 +43,7 @@ export default function PunchSettingsPanel({ company }: { company: Company }) {
       ? ''
       : String(company.punchAccuracyMaxMetres),
   );
-  const [enforced, setEnforced] = useState(company.punchBlockEnforced ?? false);
+  const [enforced, setEnforced] = useState(company.punchBlockEnforced ?? true);
   const [accuracyError, setAccuracyError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,37 +136,39 @@ export default function PunchSettingsPanel({ company }: { company: Company }) {
         </div>
       </section>
 
-      <section className="space-y-3 border-t border-gray-200 pt-5">
-        <div>
-          <h3 className="text-sm font-medium text-gray-900">
-            Refuse failing punches
-          </h3>
-          <p className="mt-1 text-sm text-gray-600">
-            While off — the default — a punch that fails location or face
-            validation is recorded as an exception for an admin, and the
-            would-be refusal is logged so the rate can be measured. While on,
-            the punch is refused and nothing is written to attendance at all.
-            The refusals log under HR → Attendance keeps the same shape either
-            way, so before and after are directly comparable.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
-            checked={enforced}
-            onChange={(event) => setEnforced(event.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-accent-500"
-          />
-          Refuse a punch that fails location or face validation
-        </label>
-        <Button
-          type="button"
-          loading={saveEnforcement.isPending}
-          onClick={() => saveEnforcement.mutate()}
-        >
-          Save
-        </Button>
-      </section>
+      {SHOW_ENFORCEMENT_TOGGLE && (
+        <section className="space-y-3 border-t border-gray-200 pt-5">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900">
+              Refuse failing punches
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              While off, a punch that fails location or face
+              validation is recorded as an exception for an admin, and the
+              would-be refusal is logged so the rate can be measured. While on,
+              the punch is refused and nothing is written to attendance at all.
+              The refusals log under HR → Attendance keeps the same shape either
+              way, so before and after are directly comparable.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-800">
+            <input
+              type="checkbox"
+              checked={enforced}
+              onChange={(event) => setEnforced(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-accent-500"
+            />
+            Refuse a punch that fails location or face validation
+          </label>
+          <Button
+            type="button"
+            loading={saveEnforcement.isPending}
+            onClick={() => saveEnforcement.mutate()}
+          >
+            Save
+          </Button>
+        </section>
+      )}
     </div>
   );
 }

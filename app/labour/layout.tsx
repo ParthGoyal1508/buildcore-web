@@ -12,6 +12,7 @@ import SideNav from '@/app/ui/dashboard/sidenav';
 import LabourNav from '@/app/ui/labour/labour-nav';
 import { FullPageLoader } from '@/app/ui/shell-gate';
 import ShellHeader from '@/app/ui/shell-header';
+import { PermissionsOnboarding } from '@/app/ui/permissions/device-permissions';
 
 /**
  * The field shell for labour attendance and registration (031; formerly the muster capture shell).
@@ -62,6 +63,8 @@ export default function LabourFieldLayout({
   return (
     <div className="flex min-h-screen flex-col bg-gray-50 md:h-screen md:overflow-hidden md:bg-transparent">
       <ShellHeader />
+      {/* 057: supervisors mark labour attendance here — ask for camera and location once. */}
+      <PermissionsOnboarding />
       <div className="flex min-h-0 min-w-0 flex-grow flex-col md:flex-row md:overflow-hidden">
         {/* Desktop only, and the same component `/dashboard` mounts, so a supervisor
             who is also an admin keeps every module they can reach. */}

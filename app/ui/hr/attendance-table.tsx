@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import {
   getDailyAttendance,
+  getPunchPhoto,
   listSites,
   markAttendance,
   type DailyAttendanceRow,
@@ -18,6 +19,7 @@ import {
   hrLabel,
 } from '@/app/lib/constants';
 import { timeLabel, todayIso } from '@/app/lib/format';
+import { EvidencePhoto } from '@/app/ui/attendance/evidence';
 import { Button, IconButton } from '@/app/ui/button';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import Modal from '@/app/ui/settings/modal';
@@ -31,6 +33,35 @@ import {
 import ToneBadge from '@/app/ui/status-badge';
 
 const ATTENDANCE_PAGE_SIZE = 50;
+
+/**
+ * The photo a punch was taken with (057). `—` with no punch; "NA" for a punch without one — entered
+ * by hand, imported, or older than the 14 days punch photos are kept.
+ */
+function PunchPhotoCell({
+  punchId,
+  hasPhoto,
+  title,
+}: {
+  punchId: string | null;
+  hasPhoto: boolean;
+  title: string;
+}) {
+  if (!punchId) return <span className="text-gray-500">—</span>;
+  return (
+    <EvidencePhoto
+      available={hasPhoto}
+      title={title}
+      queryKey={['hr', 'attendance', 'punchPhoto', punchId]}
+      load={() => getPunchPhoto(punchId)}
+      missing={{
+        label: 'NA',
+        title:
+          'No photo: punch photos are kept for 14 days, and a time entered by hand or imported has none',
+      }}
+    />
+  );
+}
 
 /** Shifts the selected date by whole days, for the arrow controls. */
 function shiftDate(iso: string, days: number): string {
@@ -244,7 +275,31 @@ export default function AttendanceTable() {
     { key: 'code', header: 'Code', sticky: true, render: (row) => row.employeeCode },
     { key: 'name', header: 'Employee', render: (row) => row.name },
     { key: 'in', header: 'In', render: (row) => timeLabel(row.inTime) },
+    {
+      key: 'inPhoto',
+      header: 'In photo',
+      sortable: false,
+      render: (row) => (
+        <PunchPhotoCell
+          punchId={row.inPunchId}
+          hasPhoto={row.inHasPhoto}
+          title={`${row.name} · in ${timeLabel(row.inTime)} · ${date}`}
+        />
+      ),
+    },
     { key: 'out', header: 'Out', render: (row) => timeLabel(row.outTime) },
+    {
+      key: 'outPhoto',
+      header: 'Out photo',
+      sortable: false,
+      render: (row) => (
+        <PunchPhotoCell
+          punchId={row.outPunchId}
+          hasPhoto={row.outHasPhoto}
+          title={`${row.name} · out ${timeLabel(row.outTime)} · ${date}`}
+        />
+      ),
+    },
     {
       key: 'status',
       header: 'Status',
