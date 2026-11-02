@@ -13,7 +13,10 @@ export type LivenessFlow =
   | 'staff-punch'
   | 'labour-punch'
   | 'staff-enrolment'
-  | 'labour-enrolment';
+  | 'labour-enrolment'
+  // App Settings face unlock (054): registering the face, and using it in place of the password.
+  | 'unlock-enrolment'
+  | 'unlock-confirm';
 
 const challengeSchema = z.object({
   challengeId: z.string(),

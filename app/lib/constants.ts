@@ -517,9 +517,6 @@ export type CameraFacing = 'user' | 'environment';
 export const CAMERA_FACING_STORAGE_KEY = 'tirupati.my.cameraFacing';
 export const DEFAULT_CAMERA_FACING: CameraFacing = 'user';
 
-/** Photos required to enrol, mirroring the backend's configured bounds. */
-export const ENROLMENT_PHOTO_RANGE = { min: 3, max: 5 } as const;
-
 /**
  * Capture ceiling applied before a photo is uploaded.
  *
