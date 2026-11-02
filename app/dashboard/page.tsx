@@ -12,7 +12,11 @@ import { widgetHref } from '@/app/ui/dashboard/widget-links';
 import WidgetRenderer from '@/app/ui/dashboard/widget-renderer';
 import WelcomeBanner from '@/app/ui/dashboard/welcome-banner';
 import type { Metric } from '@/app/ui/dashboard/metric-tile';
-import { SummaryBanner, widgetMetric } from '@/app/ui/dashboard/widget-metrics';
+import {
+  MoneyPanels,
+  SummaryBanner,
+  widgetMetric,
+} from '@/app/ui/dashboard/widget-metrics';
 import { CompanyMark } from '@/app/ui/company-logo';
 import { LoadingText } from '@/app/ui/spinner';
 import PageHeader from '@/app/ui/page-header';
@@ -96,6 +100,9 @@ export default function DashboardPage() {
             }
             metrics={tiles}
           />
+
+          {/* 054: money in from clients, money held, money still to pay out. */}
+          <MoneyPanels widgets={section(widgets.data, 'money')} />
 
           {/* The four cards in an even two-by-two (2026-10-15): what happened today beside
               what needs a decision, then leave beside alerts — the client: "we can fix this

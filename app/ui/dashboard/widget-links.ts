@@ -30,6 +30,14 @@ export const WIDGET_LINKS: Record<string, string> = {
   'billed-amount': ROUTES.projectsPortfolio,
   'received-amount': ROUTES.projectsPortfolio,
   'receivable-amount': ROUTES.projectsPortfolio,
+  // 054: the Held and Outgoing panels. Subcontractor bills live per project, so those go to
+  // the portfolio; the plant card and the total span screens behind different permissions,
+  // so they link nowhere rather than into a refusal.
+  'held-by-clients': ROUTES.projectsPortfolio,
+  'held-from-subcontractors': ROUTES.projectsPortfolio,
+  'payable-material': ROUTES.inventoryPayments,
+  'payable-subcontractors': ROUTES.projectsPortfolio,
+  'payable-labour': ROUTES.labourPaymentSheets,
   'employees-on-muster': ROUTES.hrAttendance,
   'alerts-reminders': ROUTES.reminders,
   'today-attendance': ROUTES.hrAttendance,
