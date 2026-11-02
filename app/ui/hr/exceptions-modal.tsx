@@ -132,6 +132,7 @@ export default function ExceptionsModal({ onClose }: { onClose: () => void }) {
     {
       key: 'photo',
       header: 'Photo',
+      sortable: false,
       render: (row) => (
         <EvidencePhoto
           available={row.punch.photoRef !== null}

@@ -100,6 +100,8 @@ export default function RefusalsPanel() {
     {
       key: 'location',
       header: 'Location',
+      // Nothing to order by.
+      sortable: false,
       render: (row) => (
         <MapLink latitude={row.latitude} longitude={row.longitude} />
       ),
@@ -121,6 +123,8 @@ export default function RefusalsPanel() {
     {
       key: 'photo',
       header: 'Photo',
+      // Nothing to order by.
+      sortable: false,
       render: (row) => (
         <EvidencePhoto
           available={row.hasPhoto}

@@ -2,9 +2,10 @@
 
 import { CameraIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
+import { blobToBase64 } from '@/app/lib/api/my-workspace';
 import { TextButton } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 
@@ -61,22 +62,17 @@ function PhotoDialog({
 }) {
   const photo = useQuery({
     queryKey,
-    queryFn: load,
+    // A data URL, not an object URL — the reason `company-logo.tsx` gives: an object URL must be
+    // revoked by an effect, and React re-running that effect in development revoked the URL a
+    // photo already in the cache was showing, so it opened once and was broken the second time.
+    // A data URL has no lifecycle to get wrong; a refusal photo is ~40 KB.
+    queryFn: async () => blobToBase64(await load()),
     staleTime: 10 * 60_000,
     // A 404 is the retention sweep, not a blip — asking again will not bring the photo back.
     retry: (count, error) =>
       !(error instanceof ApiError && error.status === 404) && count < 2,
   });
-  const url = useMemo(
-    () => (photo.data ? URL.createObjectURL(photo.data) : null),
-    [photo.data],
-  );
-  useEffect(
-    () => () => {
-      if (url) URL.revokeObjectURL(url);
-    },
-    [url],
-  );
+  const url = photo.data ?? null;
   const gone = photo.error instanceof ApiError && photo.error.status === 404;
 
   return (

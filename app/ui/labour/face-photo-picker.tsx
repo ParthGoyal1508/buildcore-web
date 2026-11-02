@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
+import { blobToBase64 } from '@/app/lib/api/my-workspace';
 import { LABOUR_ATTENDANCE_COPY } from '@/app/lib/constants';
 import LivenessCapture from '@/app/ui/attendance/liveness-capture';
 import { SecondaryButton } from '@/app/ui/settings/form-fields';
@@ -26,17 +28,14 @@ export default function FacePhotoPicker({
 }) {
   const [cameraOpen, setCameraOpen] = useState(false);
 
-  // The straight frame, previewed; revoked when the capture changes or this unmounts.
-  const preview = useMemo(
-    () => (capture ? URL.createObjectURL(capture.frames[0]) : null),
-    [capture],
-  );
-  useEffect(
-    () => () => {
-      if (preview) URL.revokeObjectURL(preview);
-    },
-    [preview],
-  );
+  // The straight frame, previewed as a data URL — no object URL to revoke, so nothing for React's
+  // re-run effects to revoke while it is on screen (see `evidence.tsx`).
+  const { data: preview } = useQuery({
+    queryKey: ['labour', 'facePreview', capture?.challengeId],
+    queryFn: () => blobToBase64((capture as LivenessCaptureResult).frames[0]),
+    enabled: capture !== null,
+    staleTime: Infinity,
+  });
 
   return (
     <section aria-labelledby="face-photos" className="space-y-2">
