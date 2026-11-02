@@ -55,14 +55,17 @@ export const EQUIPMENT_DOCUMENT_ACCEPT =
  */
 export default function DocumentModal({
   equipmentId,
+  companyId,
   onClose,
 }: {
   equipmentId: string;
+  /** The machine's company: only its document types may be attached. */
+  companyId: string;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const docTypes = usePlantDocTypes();
+  const docTypes = usePlantDocTypes(companyId);
 
   const [docTypeId, setDocTypeId] = useState('');
   const [file, setFile] = useState<PreparedFile | null>(null);

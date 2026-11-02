@@ -30,6 +30,7 @@ export const companySchema = z.object({
   phone: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
+  corporateAddress: z.string().nullable().optional(),
   pfEstablishmentCode: z.string().nullable(),
   esicCode: z.string().nullable(),
   professionalTaxRegNumber: z.string().nullable(),

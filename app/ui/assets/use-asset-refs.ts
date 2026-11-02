@@ -79,11 +79,13 @@ export function useAllAssetCategories() {
   });
 }
 
-export function useAssetDocTypes() {
-  const companyId = useAssetsCompanyId();
+/** `forCompany`: the asset's own company, as `usePlantDocTypes` — see there. */
+export function useAssetDocTypes(forCompany?: string) {
+  const selected = useAssetsCompanyId();
+  const companyId = forCompany ?? selected;
   return useQuery({
     queryKey: ['assets', 'doc-types', companyId],
-    queryFn: () => getAssetDocTypes(),
+    queryFn: () => getAssetDocTypes(forCompany),
     select: (rows) => rows.filter((row) => row.active),
   });
 }

@@ -63,6 +63,7 @@ const schema = z.object({
   phone: optionalText,
   email: optionalText.refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Not a valid email'),
   website: optionalText,
+  corporateAddress: optionalText,
   pfEstablishmentCode: optionalText,
   esicCode: optionalText,
   professionalTaxRegNumber: optionalText,
@@ -117,6 +118,7 @@ const FIELD_TAB: Record<string, TabId> = {
   phone: 'address',
   email: 'address',
   website: 'address',
+  corporateAddress: 'address',
   pfEstablishmentCode: 'statutory',
   esicCode: 'statutory',
   professionalTaxRegNumber: 'statutory',
@@ -182,6 +184,7 @@ export default function CompanyModal({
       phone: company?.phone ?? '',
       email: company?.email ?? '',
       website: company?.website ?? '',
+      corporateAddress: company?.corporateAddress ?? '',
       pfEstablishmentCode: company?.pfEstablishmentCode ?? '',
       esicCode: company?.esicCode ?? '',
       professionalTaxRegNumber: company?.professionalTaxRegNumber ?? '',
@@ -413,13 +416,15 @@ export default function CompanyModal({
         </div>
 
         <div className={tab === 'address' ? 'space-y-4' : 'hidden'}>
-          <TextField id="address" label="Address" error={err('address')} {...register('address')} />
+          <TextField id="address" label="Registered office address" error={err('address')} {...register('address')} />
           <TextField id="city" label="City" error={err('city')} {...register('city')} />
           <TextField id="state" label="State" error={err('state')} {...register('state')} />
           <TextField id="pinCode" label="PIN code" error={err('pinCode')} {...register('pinCode')} />
           <TextField id="phone" label="Phone" hint="Printed at the head of work orders and purchase orders" error={err('phone')} {...register('phone')} />
           <TextField id="email" label="Email" error={err('email')} {...register('email')} />
-          <TextField id="website" label="Website" error={err('website')} {...register('website')} />
+          <TextField id="website" label="Website" hint="e.g. https://parthrealcon.com" error={err('website')} {...register('website')} />
+          {/* 055: printed under the registered office at the head of every generated PDF. */}
+          <TextField id="corporateAddress" label="Corporate office address" hint="Printed under the registered office on POs, work orders and other documents. Leave blank if it is the same office." error={err('corporateAddress')} {...register('corporateAddress')} />
         </div>
 
         <div className={tab === 'statutory' ? 'space-y-4' : 'hidden'}>

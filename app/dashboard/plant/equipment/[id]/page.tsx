@@ -516,8 +516,12 @@ export default function EquipmentDetailPage() {
         />
       </section>
 
-      {showUpload && (
-        <DocumentModal equipmentId={id} onClose={() => setShowUpload(false)} />
+      {showUpload && data && (
+        <DocumentModal
+          equipmentId={id}
+          companyId={data.companyId}
+          onClose={() => setShowUpload(false)}
+        />
       )}
 
       <EquipmentHistoryPanel equipmentId={id} />
