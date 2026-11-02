@@ -465,6 +465,7 @@ export default function AssetDetailPage() {
       {showDocument && (
         <AssetDocumentModal
           assetId={assetId}
+          companyId={row.companyId}
           onClose={() => setShowDocument(false)}
         />
       )}

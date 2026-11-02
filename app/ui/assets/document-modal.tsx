@@ -38,14 +38,17 @@ import { useAssetDocTypes } from './use-asset-refs';
  */
 export default function AssetDocumentModal({
   assetId,
+  companyId,
   onClose,
 }: {
   assetId: string;
+  /** The asset's company: only its document types may be attached. */
+  companyId: string;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const docTypes = useAssetDocTypes();
+  const docTypes = useAssetDocTypes(companyId);
 
   const [docTypeId, setDocTypeId] = useState('');
   const [file, setFile] = useState<PreparedFile | null>(null);

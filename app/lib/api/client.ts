@@ -189,8 +189,10 @@ async function send<T>(
   defaultTimeout = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
   const { timeoutMs, ...rest } = init ?? {};
+  // A multipart body (057, photo frames) is an upload whatever its size on paper.
   const large =
-    typeof rest.body === 'string' && rest.body.length > LARGE_BODY_CHARS;
+    (typeof rest.body === 'string' && rest.body.length > LARGE_BODY_CHARS) ||
+    isFormData(rest.body);
   const signal = deadlineSignal(
     rest.signal,
     timeoutMs ?? (large ? UPLOAD_TIMEOUT_MS : defaultTimeout),
@@ -224,11 +226,20 @@ async function send<T>(
   }
 }
 
+/** `FormData`, where the runtime has it (not during server rendering of a client module). */
+function isFormData(body: unknown): body is FormData {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+
 export async function apiFetch<T>(path: string, init?: ApiInit): Promise<T> {
   return send(
     path,
     init,
-    { 'Content-Type': 'application/json', ...init?.headers },
+    // A `FormData` body gets no Content-Type from us: the browser writes `multipart/form-data`
+    // with the boundary it chose, and a header set here would replace it with one that has none.
+    isFormData(init?.body)
+      ? { ...init?.headers }
+      : { 'Content-Type': 'application/json', ...init?.headers },
     async (res) => {
       const text = await res.text();
       return text ? JSON.parse(text) : (undefined as T);

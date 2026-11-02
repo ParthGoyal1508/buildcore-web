@@ -60,11 +60,18 @@ export function usePlantCategories() {
 }
 
 /** Active document types only, for the same reason. */
-export function usePlantDocTypes() {
-  const companyId = usePlantCompanyId();
+/**
+ * `forCompany`: the company whose types to list — the machine's own when attaching a document to
+ * one. Without it a Super Admin viewing all companies got every company's types, the same name
+ * twice, and picking the other company's was refused ("Document type … does not exist in this
+ * company").
+ */
+export function usePlantDocTypes(forCompany?: string) {
+  const selected = usePlantCompanyId();
+  const companyId = forCompany ?? selected;
   return useQuery({
     queryKey: ['plant', 'doc-types', companyId],
-    queryFn: () => getEquipmentDocTypes(),
+    queryFn: () => getEquipmentDocTypes(forCompany),
     select: (rows) => rows.filter((row) => row.active),
   });
 }

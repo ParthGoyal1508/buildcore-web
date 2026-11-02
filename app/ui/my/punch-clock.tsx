@@ -12,11 +12,17 @@ import {
 } from '@/app/lib/api/my-workspace';
 import { getEnrolmentStatus } from '@/app/lib/api/my-workspace';
 import { DEV_FALLBACK_POSITION, MESSAGES } from '@/app/lib/constants';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
 import { isPunchRefusal, punchRefusalMessage } from '@/app/lib/punch-refusal';
 import { resolvePosition, assertAccurate } from '@/app/lib/location';
 import { Button } from '@/app/ui/button';
 import { FormError } from '@/app/ui/settings/form-fields';
-import CameraCapture from '@/app/ui/my/camera-capture';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
+import {
+  DevicePermissionsPanel,
+  PermissionSteps,
+  type PermissionProblem,
+} from '@/app/ui/permissions/device-permissions';
 import { clockTime, longDateLabel } from '@/app/lib/format';
 
 /** HTTP 423 — the backend's status for a write into a closed payroll period. */
@@ -88,6 +94,12 @@ export default function PunchClock() {
    */
   const [refusal, setRefusal] = useState<string | null>(null);
   const [refusalsInARow, setRefusalsInARow] = useState(0);
+  /** The refusal's code, kept beside its sentence: the sentence now carries measured numbers (057),
+   * so it can no longer be compared against a fixed message to tell which refusal it was. */
+  const [refusalCode, setRefusalCode] = useState<string | null>(null);
+  /** A location or camera permission problem to explain step by step (057). */
+  const [permissionProblem, setPermissionProblem] =
+    useState<PermissionProblem | null>(null);
   // Which step of the capture -> locate -> submit sequence is running. Locating can
   // take many seconds (and on a device that cannot get a fix, the better part of
   // half a minute before it gives up), during which the screen previously showed
@@ -202,10 +214,10 @@ export default function PunchClock() {
   const punch = useMutation({
     mutationFn: async ({
       type,
-      photo,
+      capture,
     }: {
       type: 'in' | 'out';
-      photo: Blob;
+      capture: LivenessCaptureResult;
     }) => {
       const capturedAt = new Date().toISOString();
 
@@ -248,7 +260,7 @@ export default function PunchClock() {
       }
       usedFallbackRef.current = usedFallback;
 
-      const input = { type, photo, capturedAt, ...coords };
+      const input = { type, capture, capturedAt, ...coords };
       setPhase('submitting');
 
       /**
@@ -329,10 +341,27 @@ export default function PunchClock() {
        * reason the backend sends a code at all.
        */
       if (err instanceof ApiError && isPunchRefusal(err.code)) {
-        setRefusal(punchRefusalMessage(err.code, err.message));
+        setRefusalCode(err.code);
+        setRefusal(punchRefusalMessage(err.code, err.message, err.details));
+        // A fix too vague to place the worker is usually the phone's location service, not the
+        // worker's position — the same steps as a location that could not be read at all.
+        if (err.code === 'PUNCH_REFUSED_UNLOCATABLE') {
+          setPermissionProblem('location-off');
+        }
         setRefusalsInARow((count) => count + 1);
         queryClient.invalidateQueries({ queryKey: ['my', 'punch-refusals'] });
         return;
+      }
+      // The phone would not give a location at all (057): say how to fix that on this device rather
+      // than only that it failed.
+      if (err instanceof Error && err.message === MESSAGES.locationDenied) {
+        setPermissionProblem('location-blocked');
+      } else if (
+        err instanceof Error &&
+        (err.message === MESSAGES.locationTimedOut ||
+          err.message === MESSAGES.locationUnavailable)
+      ) {
+        setPermissionProblem('location-off');
       }
       // 409 is the day's own state refusing the punch (backend FR-008) — already
       // punched in, already punched out, nothing to punch out from. The server's
@@ -348,6 +377,8 @@ export default function PunchClock() {
     // does not: it is the count of attempts, and resetting it here would mean the escalation could
     // never be reached, since every attempt starts by clearing what the last one said.
     setRefusal(null);
+    setRefusalCode(null);
+    setPermissionProblem(null);
     setPendingType(type);
   }
 
@@ -419,7 +450,18 @@ export default function PunchClock() {
         </p>
       )}
 
+      {/* 057: camera and location status, and one button asking for both. Renders nothing once
+          both are allowed. */}
+      {!dayIsComplete && <DevicePermissionsPanel />}
+
       <FormError message={error} />
+
+      {permissionProblem && (
+        <PermissionSteps
+          problem={permissionProblem}
+          onRetry={() => startPunch(nextType)}
+        />
+      )}
 
       {/* The refusal (020 FR-013, T018–T020).
           Amber rather than red, and separate from `FormError`: nothing is broken and nothing
@@ -427,10 +469,8 @@ export default function PunchClock() {
           it. Three parts, in the order they are useful: what to do, that nothing was recorded and
           who can fix that, and — only after three in a row — to stop and find a supervisor.
 
-          No offer to show the photo (T020). A face refusal keeps none: an unattributed biometric
-          held against a named employee is worse than the record it replaces. The line saying so is
-          shown on a face refusal only, so it reads as a fact about this product rather than as an
-          apology for a missing feature. */}
+          On a face refusal, one line says what happens to the photo: since 057 it is kept for 30
+          days for HR to review, then deleted. */}
       {refusal && (
         <div
           role="alert"
@@ -438,7 +478,7 @@ export default function PunchClock() {
         >
           <p className="font-medium">{refusal}</p>
           <p className="text-amber-800">{MESSAGES.punchRefusedRecovery}</p>
-          {refusal === MESSAGES.punchRefusedFace && (
+          {refusalCode === 'PUNCH_REFUSED_FACE' && (
             <p className="text-amber-700">{MESSAGES.punchRefusedNoPhoto}</p>
           )}
           {refusalsInARow >= REFUSALS_BEFORE_ESCALATING && (
@@ -494,11 +534,14 @@ export default function PunchClock() {
           above already show what happened, and the only control that could appear
           here is one the server would refuse. */}
       {dayIsComplete || !isOnline ? null : pendingType ? (
-        <CameraCapture
-          captureLabel={`Confirm punch ${pendingType}`}
+        // 057: a guided head-turn capture, not a single photo — a picture held up to the camera
+        // cannot turn its head. The challenge is fetched as the capture starts.
+        <LivenessCapture
+          flow="staff-punch"
+          subject="self"
           disabled={punch.isPending}
           onCancel={() => setPendingType(null)}
-          onCapture={(photo) => punch.mutate({ type: pendingType, photo })}
+          onCapture={(capture) => punch.mutate({ type: pendingType, capture })}
         />
       ) : (
         <Button

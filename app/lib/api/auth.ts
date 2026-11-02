@@ -10,6 +10,7 @@ import {
   purgeRuntimeCaches,
 } from "@/app/lib/session";
 import { MESSAGES, formatLockoutMessage } from "@/app/lib/constants";
+import { captureForm, type LivenessCaptureResult } from "@/app/lib/api/liveness";
 import { clearLocalUserData } from "@/app/lib/local-data";
 import { announceSessionChange } from "@/app/lib/session-tab";
 
@@ -106,9 +107,12 @@ export type PasswordConfirmation = z.infer<typeof passwordConfirmationSchema>;
 /** The refusal codes `confirmPassword` and the act it unlocks can answer with. */
 export const PASSWORD_INCORRECT = "PASSWORD_INCORRECT";
 export const PASSWORD_CONFIRMATION_REQUIRED = "PASSWORD_CONFIRMATION_REQUIRED";
+export const CONFIRMATION_NOT_SET_UP = "CONFIRMATION_NOT_SET_UP";
 
 /**
- * Re-enters the signed-in user's own password before a sensitive act (2026-10-14).
+ * Checks a purpose's password before a sensitive act (2026-10-14). Since 054 that is the
+ * purpose's own password, generated on the server — not the signed-in user's — and a purpose with
+ * none generated yet is refused as `CONFIRMATION_NOT_SET_UP`.
  *
  * Returns a short-lived confirmation (ten minutes) for that one purpose, which the act's own
  * request then carries. Held in component state only — never stored — so it ends with the
@@ -150,37 +154,36 @@ export async function getFaceUnlock(
 }
 
 /**
- * One camera frame in place of the password: the server matches it against the registered face
- * and returns the same ten-minute confirmation `confirmPassword` does. A mismatch is a 403 coded
- * `FACE_NOT_RECOGNISED`.
+ * A live face in place of the password: a head-turn capture on an `unlock-confirm` challenge
+ * (057), matched against the registered face, returning the same ten-minute confirmation
+ * `confirmPassword` does. A mismatch is a 403 coded `FACE_NOT_RECOGNISED`; a capture that is not
+ * a live person (a photo held up to the camera) a 422 coded `LIVENESS_FAILED`.
  */
 export async function confirmFace(
-  photo: string,
+  capture: LivenessCaptureResult,
   purpose: "cash-visibility",
 ): Promise<PasswordConfirmation> {
   return passwordConfirmationSchema.parse(
     await authFetch<unknown>("/auth/face-unlock/confirm", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ photo, purpose }),
+      body: captureForm(capture, { purpose }),
     }),
   );
 }
 
 /** Registers or replaces the face. Needs a confirmation made with the *password*, not a face. */
 export async function enrolFaceUnlock(
-  photos: string[],
+  capture: LivenessCaptureResult,
   purpose: "cash-visibility",
   confirmationToken: string,
 ): Promise<FaceUnlockStatus> {
   return faceUnlockStatusSchema.parse(
     await authFetch<unknown>("/auth/face-unlock", {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Confirmation-Token": confirmationToken,
-      },
-      body: JSON.stringify({ photos, purpose }),
+      headers: { "X-Confirmation-Token": confirmationToken },
+      // A guided capture on an `unlock-enrolment` challenge (057): two frames facing the camera,
+      // then both head turns.
+      body: captureForm(capture, { purpose }),
     }),
   );
 }

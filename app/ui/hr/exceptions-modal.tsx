@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { ApprovalDecisionAction } from '@/app/lib/api/approvals';
 import {
+  getExceptionPhoto,
   getPendingAttendanceExceptions,
   resolveAttendanceException,
   type AttendanceExceptionRow,
@@ -13,6 +14,11 @@ import { dateTimeLabel } from '@/app/lib/format';
 import ActionReview from '@/app/ui/approvals/action-review';
 import DecisionHistory from '@/app/ui/approvals/decision-history';
 import LastAction from '@/app/ui/approvals/last-action';
+import {
+  distanceLabel,
+  EvidencePhoto,
+  MapLink,
+} from '@/app/ui/attendance/evidence';
 import DataTable, { StatusBadge, type Column } from '@/app/ui/hr/data-table';
 import { useEmployeeNames } from '@/app/ui/hr/use-employee-names';
 import Modal from '@/app/ui/settings/modal';
@@ -107,6 +113,33 @@ export default function ExceptionsModal({ onClose }: { onClose: () => void }) {
       header: 'Geofence',
       render: (row) => (
         <StatusBadge status={row.punch.geofenceResult ?? undefined} />
+      ),
+    },
+    {
+      // 057: the evidence the badges summarise — how far from the site, and where.
+      key: 'location',
+      header: 'From site',
+      render: (row) => (
+        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+          {distanceLabel(row.punch.geofenceDistanceMeters)}
+          <MapLink
+            latitude={row.punch.latitude}
+            longitude={row.punch.longitude}
+          />
+        </span>
+      ),
+    },
+    {
+      key: 'photo',
+      header: 'Photo',
+      sortable: false,
+      render: (row) => (
+        <EvidencePhoto
+          available={row.punch.photoRef !== null}
+          title={`${employees.label(row.punch.employeeId)} · ${dateTimeLabel(row.punch.capturedAt)}`}
+          queryKey={['hr', 'exceptionPhoto', row.punch.id]}
+          load={() => getExceptionPhoto(row.punch.id)}
+        />
       ),
     },
     {

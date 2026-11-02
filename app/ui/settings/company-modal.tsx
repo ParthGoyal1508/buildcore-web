@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ApiError, errorMessage } from '@/app/lib/api/client';
@@ -15,6 +15,7 @@ import {
   uploadCompanyLogo,
 } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
+import { blobToBase64 } from '@/app/lib/api/my-workspace';
 import { MESSAGES } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import FileUpload, { type PreparedFile } from '@/app/ui/file-upload';
@@ -63,6 +64,7 @@ const schema = z.object({
   phone: optionalText,
   email: optionalText.refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Not a valid email'),
   website: optionalText,
+  corporateAddress: optionalText,
   pfEstablishmentCode: optionalText,
   esicCode: optionalText,
   professionalTaxRegNumber: optionalText,
@@ -117,6 +119,7 @@ const FIELD_TAB: Record<string, TabId> = {
   phone: 'address',
   email: 'address',
   website: 'address',
+  corporateAddress: 'address',
   pfEstablishmentCode: 'statutory',
   esicCode: 'statutory',
   professionalTaxRegNumber: 'statutory',
@@ -182,6 +185,7 @@ export default function CompanyModal({
       phone: company?.phone ?? '',
       email: company?.email ?? '',
       website: company?.website ?? '',
+      corporateAddress: company?.corporateAddress ?? '',
       pfEstablishmentCode: company?.pfEstablishmentCode ?? '',
       esicCode: company?.esicCode ?? '',
       professionalTaxRegNumber: company?.professionalTaxRegNumber ?? '',
@@ -413,13 +417,15 @@ export default function CompanyModal({
         </div>
 
         <div className={tab === 'address' ? 'space-y-4' : 'hidden'}>
-          <TextField id="address" label="Address" error={err('address')} {...register('address')} />
+          <TextField id="address" label="Registered office address" error={err('address')} {...register('address')} />
           <TextField id="city" label="City" error={err('city')} {...register('city')} />
           <TextField id="state" label="State" error={err('state')} {...register('state')} />
           <TextField id="pinCode" label="PIN code" error={err('pinCode')} {...register('pinCode')} />
           <TextField id="phone" label="Phone" hint="Printed at the head of work orders and purchase orders" error={err('phone')} {...register('phone')} />
           <TextField id="email" label="Email" error={err('email')} {...register('email')} />
-          <TextField id="website" label="Website" error={err('website')} {...register('website')} />
+          <TextField id="website" label="Website" hint="e.g. https://parthrealcon.com" error={err('website')} {...register('website')} />
+          {/* 055: printed under the registered office at the head of every generated PDF. */}
+          <TextField id="corporateAddress" label="Corporate office address" hint="Printed under the registered office on POs, work orders and other documents. Leave blank if it is the same office." error={err('corporateAddress')} {...register('corporateAddress')} />
         </div>
 
         <div className={tab === 'statutory' ? 'space-y-4' : 'hidden'}>
@@ -493,19 +499,14 @@ function LetterheadUpload({ companyId }: { companyId: string }) {
   const queryClient = useQueryClient();
   const current = useQuery({
     queryKey: ['companies', companyId, 'letterhead'],
-    queryFn: () => getCompanyLetterhead(companyId),
+    // Held as a data URL, not an object URL: nothing to revoke, so React's re-run effects in
+    // development cannot revoke it from under the preview (057; see `company-logo.tsx`).
+    queryFn: async () => {
+      const blob = await getCompanyLetterhead(companyId);
+      return blob ? blobToBase64(blob) : null;
+    },
   });
-
-  // The preview's object URL — derived from the blob, released when it changes or the
-  // control goes away.
-  const previewUrl = useMemo(
-    () => (current.data ? URL.createObjectURL(current.data) : null),
-    [current.data],
-  );
-  useEffect(() => {
-    if (!previewUrl) return;
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [previewUrl]);
+  const previewUrl = current.data ?? null;
 
   return (
     <div className="space-y-2">
@@ -521,7 +522,7 @@ function LetterheadUpload({ companyId }: { companyId: string }) {
           {errorMessage(current.error, 'The letterhead could not be loaded.')}
         </p>
       ) : previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a local object URL, not an asset.
+        // eslint-disable-next-line @next/next/no-img-element -- a local data URL, not an asset.
         <img
           src={previewUrl}
           alt="The letterhead every letter currently prints on"

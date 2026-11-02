@@ -69,7 +69,11 @@ export default function EquipmentModal({
   const queryClient = useQueryClient();
   const companyId = usePlantCompanyId();
   const categories = usePlantCategories();
-  const docTypes = usePlantDocTypes();
+  // The machine's own company's types: matched by name below, and both companies have a
+  // "POLLUTION CERTIFICATE" — the other company's would be refused at upload.
+  const docTypes = usePlantDocTypes(
+    equipment?.companyId ?? companyId ?? undefined,
+  );
   // Set once a new machine is saved (2026-10-15). If a paper's file then fails to upload, the
   // form stays open, and saving again must update that machine rather than register a second.
   const [savedId, setSavedId] = useState<string | null>(null);

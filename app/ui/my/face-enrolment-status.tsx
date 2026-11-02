@@ -11,22 +11,23 @@ import {
   requestReEnrolment,
   type FaceEnrolmentStatus,
 } from '@/app/lib/api/my-workspace';
-import { ENROLMENT_PHOTO_RANGE, MESSAGES } from '@/app/lib/constants';
-import { Button, IconButton } from '@/app/ui/button';
+import { MESSAGES } from '@/app/lib/constants';
+import { Button } from '@/app/ui/button';
 import {
   CheckboxField,
   FormError,
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
-import CameraCapture from '@/app/ui/my/camera-capture';
+import LivenessCapture from '@/app/ui/attendance/liveness-capture';
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
 import { LoadingText } from '@/app/ui/spinner';
 import { dateLabel } from '@/app/lib/format';
 
-/** A captured shot plus the object URL its thumbnail is rendered from. */
-interface Shot {
-  blob: Blob;
-  url: string;
+/** A completed liveness capture (057), plus the object URL its straight frame is previewed from. */
+interface Capture {
+  result: LivenessCaptureResult;
+  previewUrl: string;
 }
 
 const STATUS_LABEL: Record<FaceEnrolmentStatus['status'], string> = {
@@ -51,7 +52,7 @@ const STATUS_CLASS: Record<FaceEnrolmentStatus['status'], string> = {
 export default function FaceEnrolmentStatusPanel() {
   const queryClient = useQueryClient();
 
-  const [shots, setShots] = useState<Shot[]>([]);
+  const [capture, setCapture] = useState<Capture | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [consentAcknowledged, setConsentAcknowledged] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -64,11 +65,16 @@ export default function FaceEnrolmentStatusPanel() {
   });
 
   function resetCapture() {
-    shots.forEach((shot) => URL.revokeObjectURL(shot.url));
-    setShots([]);
+    if (capture) URL.revokeObjectURL(capture.previewUrl);
+    setCapture(null);
     setConsentAcknowledged(false);
     setIsCapturing(false);
     setFormError(null);
+  }
+
+  function discardCapture() {
+    if (capture) URL.revokeObjectURL(capture.previewUrl);
+    setCapture(null);
   }
 
   const afterChange = () => {
@@ -83,15 +89,26 @@ export default function FaceEnrolmentStatusPanel() {
     mutationFn: () =>
       // Consent is always given digitally here — the checkbox below is the record
       // of it, so there is no method left to choose.
-      enrol({ photos: shots.map((s) => s.blob), consentMethod: 'digital' }),
+      enrol({
+        capture: (capture as Capture).result,
+        consentMethod: 'digital',
+      }),
     onSuccess: afterChange,
-    onError: (error) => setFormError(asMessage(error)),
+    // A refused capture is spent (its challenge is single-use), so it is cleared for a retake.
+    onError: (error) => {
+      setFormError(asMessage(error));
+      discardCapture();
+    },
   });
 
   const submitReEnrolment = useMutation({
-    mutationFn: () => completeReEnrolment({ photos: shots.map((s) => s.blob) }),
+    mutationFn: () =>
+      completeReEnrolment({ capture: (capture as Capture).result }),
     onSuccess: afterChange,
-    onError: (error) => setFormError(asMessage(error)),
+    onError: (error) => {
+      setFormError(asMessage(error));
+      discardCapture();
+    },
   });
 
   const submitRequest = useMutation({
@@ -123,7 +140,7 @@ export default function FaceEnrolmentStatusPanel() {
   const reEnrolment = data.reEnrolment;
   const unlockActive = reEnrolment?.unlockActive === true;
   const isEnrolled = data.status === 'enrolled';
-  const hasEnoughShots = shots.length >= ENROLMENT_PHOTO_RANGE.min;
+  const hasEnoughShots = capture !== null;
 
   // A first enrolment needs consent recorded; a re-enrolment re-acknowledges it but
   // does not re-collect the method, because consent was given once and this is a
@@ -131,68 +148,45 @@ export default function FaceEnrolmentStatusPanel() {
   const canSubmitFirstEnrolment = hasEnoughShots && consentAcknowledged;
   const canSubmitReEnrolment = hasEnoughShots && consentAcknowledged;
 
+  // 057: one guided capture — look straight twice, then turn to each side as the screen asks —
+  // in place of 3–5 separate photos. It proves a live person enrolled, and its slight turns give the
+  // template the angles a punch is actually taken at.
   const captureSession = (
     <div className="space-y-4">
-      {isCapturing ? (
-        <CameraCapture
-          // At the cap the button is disabled, so labelling it with the next
-          // photo number advertises an action that can never happen — say why it
-          // is unavailable instead.
-          captureLabel={
-            shots.length >= ENROLMENT_PHOTO_RANGE.max
-              ? `Maximum ${ENROLMENT_PHOTO_RANGE.max} photos captured`
-              : `Capture photo ${shots.length + 1}`
-          }
-          disabled={shots.length >= ENROLMENT_PHOTO_RANGE.max}
+      {capture ? (
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- an object URL */}
+          <img
+            src={capture.previewUrl}
+            alt="Your captured face"
+            className="h-20 w-20 rounded-md object-cover"
+          />
+          <div className="space-y-2">
+            <p className="text-sm text-gray-700">Face captured.</p>
+            <SecondaryButton type="button" onClick={discardCapture}>
+              Retake
+            </SecondaryButton>
+          </div>
+        </div>
+      ) : isCapturing ? (
+        <LivenessCapture
+          flow="staff-enrolment"
+          subject="self"
           onCancel={() => setIsCapturing(false)}
-          onCapture={(blob) =>
-            setShots((current) =>
-              current.length >= ENROLMENT_PHOTO_RANGE.max
-                ? current
-                : [...current, { blob, url: URL.createObjectURL(blob) }],
-            )
-          }
+          onCapture={(result) => {
+            setFormError(null);
+            setIsCapturing(false);
+            setCapture({
+              result,
+              previewUrl: URL.createObjectURL(result.frames[0]),
+            });
+          }}
         />
       ) : (
         <Button type="button" onClick={() => setIsCapturing(true)}>
-          {shots.length === 0 ? 'Start capture' : 'Capture another'}
+          Start capture
         </Button>
       )}
-
-      <div>
-        <p className="text-sm text-gray-700">
-          {shots.length} of {ENROLMENT_PHOTO_RANGE.max} captured — at least{' '}
-          {ENROLMENT_PHOTO_RANGE.min} needed.
-        </p>
-        {shots.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {shots.map((shot, index) => (
-              <li key={shot.url} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={shot.url}
-                  alt={`Captured photo ${index + 1}`}
-                  className="h-20 w-20 rounded-md object-cover"
-                />
-                <IconButton
-                  size="xs"
-                  tone="overlay"
-                  label={`Remove photo ${index + 1}`}
-                  className="absolute -right-1 -top-1"
-                  onClick={() => {
-                    URL.revokeObjectURL(shot.url);
-                    setShots((current) =>
-                      current.filter((s) => s.url !== shot.url),
-                    );
-                  }}
-                >
-                  ×
-                </IconButton>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 

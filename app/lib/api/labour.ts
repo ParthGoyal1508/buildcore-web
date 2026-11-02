@@ -13,6 +13,10 @@ import {
 } from '@/app/lib/constants';
 import { authFetch, authFetchFile } from '@/app/lib/session';
 import { amountHidden, hideableDecimal } from './cash-hiding';
+import {
+  captureForm,
+  type LivenessCaptureResult,
+} from '@/app/lib/api/liveness';
 
 /**
  * Every `/labour/*` and `/settings/skill-categories` call to `buildcore-api`
@@ -296,8 +300,6 @@ export interface WorkerInput {
   fatherName?: string;
   phone?: string;
   siteId: string;
-  /** 3–5 face photos, sent with the registration so nobody is registered without a face. */
-  photos?: string[];
   dateOfBirth?: string;
   skillCategoryId?: string;
   engagementType?: 'direct' | 'contractor';
@@ -307,10 +309,18 @@ export interface WorkerInput {
   rateOverride?: number;
 }
 
-export async function createWorker(input: WorkerInput): Promise<Worker> {
+/**
+ * Registers a labour. With a face capture (057) the request is multipart — the fields and the
+ * liveness frames together, so nobody is registered without a face; without one (the office
+ * registering someone to photograph later) it stays JSON.
+ */
+export async function createWorker(
+  input: WorkerInput,
+  capture?: LivenessCaptureResult | null,
+): Promise<Worker> {
   const data = await authFetch<unknown>('/labour/workers', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: capture ? captureForm(capture, { ...input }) : JSON.stringify(input),
   });
   return workerSchema.parse(data);
 }
@@ -381,14 +391,14 @@ export async function deactivateWorker(
   return workerSchema.parse(data);
 }
 
+/** Takes or replaces a labour's face from a liveness capture (057). */
 export async function enrolWorkerFace(
   id: string,
-  photos: Blob[],
+  capture: LivenessCaptureResult,
 ): Promise<{ faceEnrolled: boolean }> {
-  const encoded = await Promise.all(photos.map((p) => blobToBase64(p)));
   const data = await authFetch<unknown>(
     `/labour/workers/${id}/face-enrolment`,
-    { method: 'POST', body: JSON.stringify({ photos: encoded }) },
+    { method: 'POST', body: captureForm(capture, {}) },
   );
   return z.object({ faceEnrolled: z.boolean() }).parse(data);
 }
@@ -992,7 +1002,6 @@ export interface LabourPunchInput {
   siteId: string;
   workerId: string;
   type: 'in' | 'out';
-  photo: string;
   latitude: number;
   longitude: number;
   accuracyMeters?: number;
@@ -1009,12 +1018,14 @@ const labourPunchResultSchema = z.object({
 });
 export type LabourPunchResult = z.infer<typeof labourPunchResultSchema>;
 
+/** A labour punch with its liveness capture (057), as multipart frames beside the fields. */
 export async function punchLabour(
   input: LabourPunchInput,
+  capture: LivenessCaptureResult,
 ): Promise<LabourPunchResult> {
   const data = await authFetch<unknown>('/labour/attendance/punch', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: captureForm(capture, { ...input }),
   });
   return labourPunchResultSchema.parse(data);
 }
@@ -1027,8 +1038,23 @@ const labourRefusalSchema = z.object({
   type: z.enum(['in', 'out']),
   reason: z.string(),
   at: z.string(),
+  // 057: the evidence, for the supervisor and for HR reviewing the site.
+  latitude: z.number().nullable().optional().default(null),
+  longitude: z.number().nullable().optional().default(null),
+  distanceMetres: z.number().nullable().optional().default(null),
+  accuracyMetres: z.number().nullable().optional().default(null),
+  faceMatchDistance: z.number().nullable().optional().default(null),
+  hasPhoto: z.boolean().optional().default(false),
 });
 export type LabourRefusal = z.infer<typeof labourRefusalSchema>;
+
+/** The photo of one refused labour attempt (057); 404 once the retention sweep deleted it. */
+export async function getLabourRefusalPhoto(id: string): Promise<Blob> {
+  const { blob } = await authFetchFile(
+    `/labour/attendance/refusals/${id}/photo`,
+  );
+  return blob;
+}
 
 export async function getLabourRefusals(
   siteId: string,

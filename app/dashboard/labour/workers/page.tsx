@@ -9,6 +9,8 @@ import {
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
+import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
+
 import { ApiError, errorMessage } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
@@ -19,7 +21,6 @@ import {
   type Worker,
 } from '@/app/lib/api/labour';
 import {
-  LABOUR_ENROLMENT_PHOTOS,
   LABOUR_GENDER_LABELS,
   ROUTES,
 } from '@/app/lib/constants';
@@ -353,8 +354,8 @@ export default function WorkersPage() {
   );
 }
 
-/** Takes (or replaces) a labour's 3–5 face photos — for anyone registered before 031, or whose
- * face has changed enough that matching keeps refusing them. */
+/** Takes (or replaces) a labour's face with a liveness capture (057) — for anyone registered before
+ * 031, or whose face has changed enough that matching keeps refusing them. */
 function FacePhotosForm({
   worker,
   onClose,
@@ -364,25 +365,29 @@ function FacePhotosForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [photos, setPhotos] = useState<Blob[]>([]);
+  const [capture, setCapture] = useState<LivenessCaptureResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({
-    mutationFn: () => enrolWorkerFace(worker.id, photos),
+    mutationFn: () => enrolWorkerFace(worker.id, capture as LivenessCaptureResult),
     onSuccess: onSaved,
-    onError: (e) =>
+    onError: (e) => {
+      // 400 (no face) and 422 (not a live person) carry a sentence written for the person holding
+      // the phone. Either way the capture's challenge is spent, so it is cleared for a retake.
       setError(
-        e instanceof ApiError && e.status === 400
+        e instanceof ApiError && (e.status === 400 || e.status === 422)
           ? e.message
           : 'Could not save the photos.',
-      ),
+      );
+      setCapture(null);
+    },
   });
 
   return (
     <Modal
       title={`Face photos — ${worker.fullName}`}
       onClose={onClose}
-      isDirty={photos.length > 0}
+      isDirty={capture !== null}
       pending={save.isPending}
       // O15: buttons passed straight to the footer, so a phone stacks them full width.
       footer={
@@ -395,7 +400,7 @@ function FacePhotosForm({
               setError(null);
               save.mutate();
             }}
-            disabled={photos.length < LABOUR_ENROLMENT_PHOTOS.min}
+            disabled={!capture}
             loading={save.isPending}
           >
             Save photos
@@ -410,7 +415,7 @@ function FacePhotosForm({
             These replace the photos taken before.
           </p>
         )}
-        <FacePhotoPicker photos={photos} onChange={setPhotos} />
+        <FacePhotoPicker capture={capture} onChange={setCapture} />
       </div>
     </Modal>
   );
