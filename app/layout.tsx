@@ -10,19 +10,20 @@ import { ToastHost } from "@/app/ui/toast";
 import CompanyChangedBanner from "@/app/ui/company-changed-banner";
 import SessionTabSync from "@/app/ui/session-tab-sync";
 import TopLoader from "@/app/ui/top-loader";
+import { APP_NAME } from "@/app/lib/config";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Tirupati Groups",
-    default: "Tirupati Groups",
+    template: `%s | ${APP_NAME}`,
+    default: APP_NAME,
   },
   description:
     "Tirupati Groups — construction workforce, assets, and project management.",
   manifest: "/manifest.webmanifest",
-  applicationName: "Tirupati Groups",
+  applicationName: APP_NAME,
   appleWebApp: {
     capable: true,
-    title: "Tirupati Groups",
+    title: APP_NAME,
     statusBarStyle: "default",
   },
   icons: [

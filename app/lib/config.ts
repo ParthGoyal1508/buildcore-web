@@ -19,3 +19,12 @@
  * server-side `API_ORIGIN`, which never reaches the browser.
  */
 export const API_URL = '/bff';
+
+/**
+ * The installed app's name. The develop deployment (dev.tirupatigroups.in) says so in
+ * its name, so a phone with both installed can tell them apart. Vercel sets
+ * `VERCEL_GIT_COMMIT_REF` at build time to the branch being deployed.
+ */
+const IS_DEVELOP = process.env.VERCEL_GIT_COMMIT_REF === 'develop';
+export const APP_NAME = IS_DEVELOP ? 'Tirupati Groups (dev)' : 'Tirupati Groups';
+export const APP_SHORT_NAME = IS_DEVELOP ? 'Tirupati (dev)' : 'Tirupati';
