@@ -11,11 +11,15 @@ import {
 import { LOCATION_ASSIGNMENT } from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
+import AssignmentPlaces, {
+  NO_PLACES,
+  placesChosen,
+  type ChosenPlaces,
+} from '@/app/ui/hr/assignment-places';
 import {
   CheckboxField,
   FormError,
   SecondaryButton,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 
@@ -41,7 +45,7 @@ export default function BulkLocationAssignment({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [siteId, setSiteId] = useState('');
+  const [places, setPlaces] = useState<ChosenPlaces>(NO_PLACES);
   const [isMobile, setIsMobile] = useState(false);
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [reason, setReason] = useState('');
@@ -62,7 +66,7 @@ export default function BulkLocationAssignment({
       assignLocationToMany(
         employees.map((employee) => employee.id),
         {
-          siteId: isMobile ? undefined : siteId,
+          ...(isMobile ? {} : places),
           isMobile,
           effectiveFrom,
           reason: reason.trim() || undefined,
@@ -94,7 +98,7 @@ export default function BulkLocationAssignment({
       setError(LOCATION_ASSIGNMENT.bulkNobodySelected);
       return;
     }
-    if (!isMobile && !siteId) {
+    if (!isMobile && placesChosen(places) === 0) {
       setError(LOCATION_ASSIGNMENT.siteRequired);
       return;
     }
@@ -146,20 +150,13 @@ export default function BulkLocationAssignment({
           </p>
         ) : (
           <>
-            <SelectField
-              id="bulk-assignment-site"
-              label={LOCATION_ASSIGNMENT.siteLabel}
-              value={siteId}
+            <AssignmentPlaces
+              id="bulk-assignment-places"
+              sites={sites ?? []}
+              value={places}
+              onChange={setPlaces}
               disabled={isMobile}
-              onChange={(event) => setSiteId(event.target.value)}
-            >
-              <option value="">{LOCATION_ASSIGNMENT.sitePlaceholder}</option>
-              {(sites ?? []).map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name}
-                </option>
-              ))}
-            </SelectField>
+            />
 
             <CheckboxField
               id="bulk-assignment-mobile"

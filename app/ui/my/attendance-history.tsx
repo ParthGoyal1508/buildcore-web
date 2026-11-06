@@ -222,6 +222,17 @@ export default function AttendanceHistory() {
     { key: 'in', header: 'In', render: (day) => timeOnly(day.inTime) },
     { key: 'out', header: 'Out', render: (day) => timeOnly(day.outTime) },
     {
+      // 058: an employee who works at several sites sees which one each day counted at.
+      key: 'site',
+      header: 'Site',
+      render: (day) => {
+        const sites = [day.punchInSite?.name, day.punchOutSite?.name].filter(
+          (name): name is string => Boolean(name),
+        );
+        return sites.length === 0 ? '—' : [...new Set(sites)].join(' → ');
+      },
+    },
+    {
       key: 'ot',
       header: 'OT',
       render: (day) => (day.otHours != null ? day.otHours : '—'),

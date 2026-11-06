@@ -3069,6 +3069,14 @@ export const HR_MESSAGES = {
     'Shown to the approvers, and kept in the modifications trail if the correction is approved.',
 
   // The modification trail's filters (016 FR-012d)
+  /** 058: which of the employee's sites the corrected punches were made at. */
+  correctionSiteLabel: 'Site',
+  correctionSiteHint:
+    'One of the sites this employee is assigned to on this day. Leave it blank if you do not know.',
+  correctionSiteNone: 'Not recorded',
+  registerPostedAt: 'Posted at',
+  registerPunchedAt: 'Punched at',
+  registerPunchedAtHint: 'Only people who punched in or out at this site.',
   modificationEmployeeFilter: 'Employee',
   modificationAllEmployees: 'All employees',
   modificationActorFilter: 'Changed by',
@@ -4141,9 +4149,24 @@ export const LOCATION_ASSIGNMENT = {
   reason: 'Why',
   reasonRequiredForMobile:
     'A mobility exemption needs a reason — a year from now, nobody can tell whether it was considered or merely convenient.',
-  siteRequired: 'Choose a site, or mark the employee mobile.',
+  siteRequired: 'Choose at least one site or project, or mark the employee mobile.',
   siteLabel: 'Site',
   sitePlaceholder: 'Select a site',
+  /** 058: an assignment covers several sites and whole projects. */
+  placesLabel: 'Sites and projects',
+  placesHint:
+    'Punches are accepted inside any chosen site, and recorded against the site they were made at. A project covers all of its active sites, including ones added later.',
+  projectsGroup: 'Whole projects',
+  sitesGroup: 'Individual sites',
+  projectOption: (name: string, sites: number) =>
+    `${name} — all ${sites} site${sites === 1 ? '' : 's'}`,
+  noPlaces: 'No sites yet.',
+  chosenCount: (count: number) =>
+    count === 0 ? 'Nothing chosen' : `${count} chosen`,
+  projectWithoutActiveSite:
+    'Saved. The project has no active site yet, so this employee’s punches will be refused until one is added.',
+  /** How an assignment reads in its history: its places, or that it is mobile. */
+  placesOf: (names: string[]) => names.join(', '),
   cancel: 'Cancel',
   close: 'Close',
   bulkCount: (count: number) =>

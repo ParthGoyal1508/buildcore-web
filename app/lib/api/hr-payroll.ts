@@ -506,6 +506,9 @@ export async function uploadEmployeeDocument(
 // Attendance administration (US3)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** A site a punch was made at (058). */
+export const punchSiteSchema = z.object({ id: z.string(), name: z.string() });
+
 export const dailyAttendanceRowSchema = z.object({
   employeeId: z.string(),
   employeeCode: z.string(),
@@ -538,6 +541,12 @@ export const dailyAttendanceRowSchema = z.object({
   outPunchId: z.string().nullable().optional().default(null),
   outHasPhoto: z.boolean().optional().default(false),
   /**
+   * Where each punch was made (058). Null for a mobile employee, a hand-entered punch with no site,
+   * or a punch from before 058 whose site was not certain. Optional for a staged rollout.
+   */
+  punchInSite: punchSiteSchema.nullable().optional().default(null),
+  punchOutSite: punchSiteSchema.nullable().optional().default(null),
+  /**
    * A correction asked for on this day and not yet applied (016 FR-009c).
    *
    * **Optional, unlike `status` above, and for the opposite reason.** `status` is required
@@ -563,9 +572,19 @@ const dailyAttendanceSchema = z.union([
   z.object({ rows: z.array(dailyAttendanceRowSchema) }),
 ]);
 
-export async function getDailyAttendance(date: string, siteId?: string) {
+/**
+ * `siteId` narrows to employees posted at that site (their home site), punched or not. `punchSiteId`
+ * (058) narrows to employees with a punch made **at** that site — "who punched at site X".
+ */
+export async function getDailyAttendance(
+  date: string,
+  siteId?: string,
+  punchSiteId?: string,
+) {
   const parsed = dailyAttendanceSchema.parse(
-    await authFetch<unknown>(`/hr/attendance${qs({ date, siteId })}`),
+    await authFetch<unknown>(
+      `/hr/attendance${qs({ date, siteId, punchSiteId })}`,
+    ),
   );
   return Array.isArray(parsed) ? parsed : parsed.rows;
 }
@@ -577,6 +596,8 @@ export interface MarkAttendanceInput {
   outTime?: string;
   statusOverride?: (typeof ATTENDANCE_STATUS_OVERRIDES)[number];
   remarks?: string;
+  /** The site the punches are recorded against (058); one of the employee's sites that day. */
+  siteId?: string;
 }
 
 /**
@@ -929,6 +950,17 @@ export const attendanceDaySchema = z.object({
   dayOfWeek: z.number(),
   inTime: z.string().nullable(),
   outTime: z.string().nullable(),
+  /** Where the punch-in and punch-out were made (058); optional for a staged rollout. */
+  punchInSite: z
+    .object({ id: z.string(), name: z.string() })
+    .nullable()
+    .optional()
+    .default(null),
+  punchOutSite: z
+    .object({ id: z.string(), name: z.string() })
+    .nullable()
+    .optional()
+    .default(null),
   otHours: z.number().nullable(),
   status: z.enum(['present', 'absent', 'on_leave', 'weekly_off', 'holiday']),
 });
@@ -2206,7 +2238,13 @@ export async function decideReEnrolment(
 // Reference data owned by other modules
 // ─────────────────────────────────────────────────────────────────────────────
 
-const siteOptionSchema = z.object({ id: z.string(), name: z.string() });
+const siteOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** The site's project (058), so an assignment can offer "every site of a project". */
+  projectId: z.string().nullable().optional().default(null),
+  projectName: z.string().nullable().optional().default(null),
+});
 
 /**
  * Sites, for the pickers on the employee form and the attendance filters.
@@ -2421,11 +2459,19 @@ async function fileToBase64(file: File): Promise<string> {
 // Where an employee may punch (020 FR-007 – FR-011 — `bugs.md` items 2, 15)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** One place an assignment covers (058): a site, or a whole project's active sites. */
+export const assignmentTargetSchema = z.object({
+  siteId: z.string().nullable(),
+  projectId: z.string().nullable(),
+  name: z.string(),
+});
+export type AssignmentTarget = z.infer<typeof assignmentTargetSchema>;
+
 export const locationAssignmentSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
-  /** Null on a mobility exemption: there is no fence, which is the point of one. */
-  siteId: z.string().nullable(),
+  /** Empty on a mobility exemption: there is no fence, which is the point of one. */
+  targets: z.array(assignmentTargetSchema).default([]),
   isMobile: z.boolean(),
   effectiveFrom: isoDate,
   reason: z.string().nullable(),
@@ -2454,8 +2500,12 @@ export async function getLocationAssignments(employeeId: string) {
 }
 
 export interface AssignLocationInput {
-  /** Required unless `isMobile` — an assignment naming no site and claiming no exemption validates nothing. */
-  siteId?: string;
+  /**
+   * Sites and projects the employee may punch at (058) — at least one unless `isMobile`. A project
+   * covers every active site of it, including sites added later.
+   */
+  siteIds?: string[];
+  projectIds?: string[];
   isMobile?: boolean;
   /** `YYYY-MM-DD`. Resolution keys on the punch's own day, so this is never "now". */
   effectiveFrom: string;
@@ -2473,12 +2523,14 @@ export async function assignLocation(
   employeeId: string,
   input: AssignLocationInput,
 ) {
-  return locationAssignmentSchema.parse(
-    await authFetch<unknown>(
-      `/hr/employees/${employeeId}/location-assignments`,
-      { method: 'PUT', body: JSON.stringify(input) },
-    ),
-  );
+  return locationAssignmentSchema
+    .extend({ warnings: z.array(z.string()).default([]) })
+    .parse(
+      await authFetch<unknown>(
+        `/hr/employees/${employeeId}/location-assignments`,
+        { method: 'PUT', body: JSON.stringify(input) },
+      ),
+    );
 }
 
 /** One employee's outcome in a bulk assignment. */
