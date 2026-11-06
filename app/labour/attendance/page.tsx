@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { ApiError } from '@/app/lib/api/client';
+import { getCurrentUser, isSuperAdmin } from '@/app/lib/api/users';
 import {
   addSitePhoto,
   blobToBase64,
@@ -226,10 +227,16 @@ export default function LabourAttendancePage() {
     refetchInterval: 60_000,
   });
 
+  // 058: the list of refused punches is Super Admin only (the server answers anyone else 403).
+  // A supervisor still sees why a punch was refused at the moment it happens.
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
   const refusals = useQuery({
     queryKey: ['labour', 'refusals', siteId],
     queryFn: () => getLabourRefusals(siteId, 1),
-    enabled: !!siteId,
+    enabled: !!siteId && isSuperAdmin(me),
   });
 
   const counts = useMemo(() => {

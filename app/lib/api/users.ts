@@ -104,6 +104,14 @@ export function hasWrite(user: CurrentUser | undefined, permission: string): boo
 }
 
 /**
+ * Whether the caller is a Super Admin — which is the `CROSS_COMPANY_ACCESS` permission, as on the
+ * backend, never the role's renameable name. Holding an all-companies role (058) is **not** this.
+ */
+export function isSuperAdmin(user: CurrentUser | undefined): boolean {
+  return user?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false;
+}
+
+/**
  * The authoritative answer to "who is signed in right now" — resolved from
  * the session itself on every call, never from a URL or cached copy that
  * could outlive the session that produced it.

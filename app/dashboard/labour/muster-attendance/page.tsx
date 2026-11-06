@@ -31,7 +31,7 @@ import {
   type MusterMonthRow,
   type PunchFact,
 } from '@/app/lib/api/labour';
-import { getCurrentUser } from '@/app/lib/api/users';
+import { getCurrentUser, isSuperAdmin } from '@/app/lib/api/users';
 import {
   LABOUR_DAY_FLAG_LABELS,
   LABOUR_DAY_STATUS_LABELS,
@@ -132,7 +132,7 @@ function MusterAttendanceBody() {
     },
     { debounce: ['q'] },
   );
-  const view = state.view;
+  const requestedView = state.view;
   const siteId = state.site;
   const date = state.date;
   const month = state.month;
@@ -151,6 +151,14 @@ function MusterAttendanceBody() {
   const permissions = user.data?.permissions ?? [];
   const canCorrect = permissions.includes('LABOUR_PUNCH_CORRECT');
   const canSetRules = permissions.includes('LABOUR_APPROVE');
+  // 058: refused punches are Super Admin only. A shared link to the Refused view opens the daily
+  // view for anyone else rather than an empty or forbidden list.
+  const superAdmin = isSuperAdmin(user.data);
+  const views = superAdmin
+    ? (['daily', 'monthly', 'refused'] as const)
+    : (['daily', 'monthly'] as const);
+  const view =
+    requestedView === 'refused' && !superAdmin ? 'daily' : requestedView;
 
   const sites = useQuery({ queryKey: ['labour', 'my-sites'], queryFn: getMyLabourSites });
   const rules = useQuery({
@@ -209,7 +217,7 @@ function MusterAttendanceBody() {
       <FormError message={error} />
 
       <div role="tablist" aria-label="View" className="flex gap-2">
-        {(['daily', 'monthly', 'refused'] as const).map((v) => (
+        {views.map((v) => (
           <button
             key={v}
             type="button"
