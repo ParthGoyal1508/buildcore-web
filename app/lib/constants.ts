@@ -4124,6 +4124,18 @@ export const FUEL_EXCEPTIONS = {
     `${count} machines in ${category} breached together. That is usually a benchmark that needs correcting rather than ${count} separate recoveries — check the category's benchmark before raising any.`,
 } as const;
 
+/** 058: the "Works in all companies" role setting. */
+export const ROLE_ALL_COMPANIES = {
+  label: 'Works in all companies',
+  description:
+    'Holders can switch between every company of the group and work in one at a time, with only this role’s modules. It does not make them a Super Admin: no group dashboard, App Settings or other companies’ setup. Only a Super Admin can set this, or give the role to someone.',
+  readOnly:
+    'This role works in all companies. Only a Super Admin can change that, or give the role to someone.',
+  // Not "All companies": the Company column already uses that for a role every company shares.
+  badge: 'Works in all companies',
+  assignBlocked: 'Only a Super Admin can give this role.',
+} as const;
+
 export const LOCATION_ASSIGNMENT = {
   heading: 'Where this employee punches',
   noAssignment:

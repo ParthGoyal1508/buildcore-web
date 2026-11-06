@@ -27,6 +27,12 @@ const currentUserSchema = z.object({
   /** Where this user lands after signing in, from their roles (029 FR-021). Optional so this
    * client can deploy ahead of the API; absent means the first module they can open. */
   homeModule: z.string().nullable().optional(),
+  /**
+   * 058. `companyId` is the company the session works in; for an all-companies user that is the
+   * one they chose, and `homeCompanyId` is the account's own. Optional for a staged rollout.
+   */
+  homeCompanyId: z.string().nullable().optional(),
+  multiCompany: z.boolean().optional().default(false),
   /** An administrator chose the current password and it must be replaced (029 FR-016). */
   mustChangePassword: z.boolean().optional(),
   /**

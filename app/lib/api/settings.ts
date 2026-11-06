@@ -298,6 +298,8 @@ export const roleSchema = z.object({
   isDefault: z.boolean().default(false),
   /** Where holders land after signing in — a module key (029 FR-020). Null: their first module. */
   homeModule: z.string().nullable().default(null),
+  /** "Works in all companies" (058): holders switch company, without Super Admin's powers. */
+  allCompanies: z.boolean().default(false),
   assignedUserCount: z.number(),
   /** Active accounts holding the role in the caller's company (036 C11). Optional: a server
    * predating it still parses, and the screens then say nothing rather than "0 holders". */
@@ -351,6 +353,8 @@ export async function createRole(input: {
   permissions: string[];
   grants?: RoleGrant[];
   homeModule?: string | null;
+  /** Super Admin only (058); the server refuses anyone else. */
+  allCompanies?: boolean;
 }): Promise<Role> {
   return roleSchema.parse(
     await authFetch('/settings/roles', {
@@ -367,6 +371,7 @@ export async function updateRole(
     permissions?: string[];
     grants?: RoleGrant[];
     homeModule?: string | null;
+    allCompanies?: boolean;
   },
 ): Promise<Role> {
   return roleSchema.parse(

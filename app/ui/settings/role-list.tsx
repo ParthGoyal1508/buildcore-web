@@ -6,7 +6,11 @@ import { ApiError } from '@/app/lib/api/client';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import { Role, deleteRole, listRoles } from '@/app/lib/api/settings';
 import { getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES, permissionLabel } from '@/app/lib/constants';
+import {
+  MESSAGES,
+  permissionLabel,
+  ROLE_ALL_COMPANIES,
+} from '@/app/lib/constants';
 import { Button } from '@/app/ui/button';
 import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
@@ -59,6 +63,11 @@ export default function RoleList() {
           {r.isDefault && (
             <span className="ml-2 inline-flex rounded-full bg-accent-50 px-2 py-0.5 text-xs text-accent-800">
               Default for new accounts
+            </span>
+          )}
+          {r.allCompanies && (
+            <span className="ml-2 inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-800">
+              {ROLE_ALL_COMPANIES.badge}
             </span>
           )}
         </>

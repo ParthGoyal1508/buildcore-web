@@ -27,8 +27,15 @@ import {
   listUsersPage,
   updateUser,
 } from '@/app/lib/api/settings';
-import { CurrentUser, getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
+import {
+  CurrentUser,
+  getCurrentUser,
+  isSuperAdmin,
+} from '@/app/lib/api/users';
+import {
+  MESSAGES,
+  ROLE_ALL_COMPANIES,
+} from '@/app/lib/constants';
 import { formatLastLogin } from '@/app/lib/settings-utils';
 import {
   urlEnum,
@@ -184,18 +191,28 @@ function UserModal({
                 // leaves a held role alone), unavailable to add (036 C10 — refused up front, not
                 // after Save).
                 const grantable = held || mayAssignRole(me, role);
+                // 058: a role that works in all companies is the directors' to give **or take
+                // away**, so it is locked either way for anyone else.
+                const lockedAllCompanies =
+                  role.allCompanies && !isSuperAdmin(me);
                 return (
                   <CheckboxField
                     key={role.id}
                     id={`user-role-${role.id}`}
-                    label={role.name}
+                    label={
+                      role.allCompanies
+                        ? `${role.name} · ${ROLE_ALL_COMPANIES.badge}`
+                        : role.name
+                    }
                     description={
-                      grantable
-                        ? undefined
-                        : 'Grants more than your own role, so you cannot assign it.'
+                      lockedAllCompanies
+                        ? ROLE_ALL_COMPANIES.assignBlocked
+                        : grantable
+                          ? undefined
+                          : 'Grants more than your own role, so you cannot assign it.'
                     }
                     checked={roleIds.includes(role.id)}
-                    disabled={isSelf || !grantable}
+                    disabled={isSelf || !grantable || lockedAllCompanies}
                     onChange={(event) =>
                       toggleRole(role.id, event.target.checked)
                     }
