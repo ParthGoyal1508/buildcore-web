@@ -2192,6 +2192,11 @@ export const PERMISSIONS = [
    * hold it; site roles keep MAINTENANCE to raise and correct cards.
    */
   'MAINTENANCE_PAY',
+  /**
+   * 058: the site supervisor's slice of Labour — register labour and mark attendance at their
+   * sites, nothing else. `DAILY_WORKER_REGISTRY` ("Labour management") is everything else.
+   */
+  'LABOUR_ATTENDANCE',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -2200,6 +2205,9 @@ const PERMISSION_LABELS: Record<string, string> = {
   INVENTORY_SITE_ENTRY: 'Inventory Site Delivery Entry',
   HR_LETTERS: 'HR Letters',
   MAINTENANCE_PAY: 'Maintenance Payments',
+  // 058: the labour split, named for what each one lets somebody do.
+  DAILY_WORKER_REGISTRY: 'Labour Management',
+  LABOUR_ATTENDANCE: 'Labour Registration & Attendance',
 };
 
 /** Human-readable label for a permission value, for checkbox lists and summaries. */
@@ -2570,9 +2578,9 @@ export const NAV_MODULES = [
     href: ROUTES.labour,
     guardPrefix: ROUTES.labour,
     guardsSubtree: true,
-    // Any-of: the registry permission opens the module; report sub-routes
-    // additionally require REPORTS, gated in the labour layout (spec FR-002).
-    permissions: ['DAILY_WORKER_REGISTRY'],
+    // Any-of: labour management or (058) the site supervisor's registration & attendance opens
+    // the module; report sub-routes additionally require REPORTS, gated in the labour layout.
+    permissions: ['DAILY_WORKER_REGISTRY', 'LABOUR_ATTENDANCE'],
   },
   {
     id: 'recruitment',

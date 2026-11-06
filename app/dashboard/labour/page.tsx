@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 
-import { getCurrentUser } from '@/app/lib/api/users';
+import { canManageLabour, getCurrentUser } from '@/app/lib/api/users';
 import { useCashPolicy } from '@/app/lib/cash-entry';
 import { ROUTES } from '@/app/lib/constants';
 import PageHeader from '@/app/ui/page-header';
@@ -89,13 +89,21 @@ export default function LabourIndexPage() {
   const user = useQuery({ queryKey: ['currentUser'], queryFn: getCurrentUser });
   const canManage = user.data?.permissions.includes('LABOUR_APPROVE') ?? false;
   const { hidden: cashHidden } = useCashPolicy();
+  // 058: a site supervisor registers labour and marks attendance — those two tiles and no others.
+  const tiles = canManageLabour(user.data)
+    ? tilesFor(canManage, cashHidden)
+    : tilesFor(false, cashHidden).filter((tile) =>
+        (
+          [ROUTES.labourAttendance, ROUTES.labourWorkers] as string[]
+        ).includes(tile.href),
+      );
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Labour"
         description="Face attendance on site, site rates, and labour payment sheets."
       />
-      <TileGrid tiles={tilesFor(canManage, cashHidden)} />
+      <TileGrid tiles={tiles} />
     </div>
   );
 }

@@ -118,6 +118,22 @@ export function isSuperAdmin(user: CurrentUser | undefined): boolean {
 }
 
 /**
+ * 058: Labour is split. A site supervisor (`LABOUR_ATTENDANCE`) registers labour and marks
+ * attendance at their sites; labour management (`DAILY_WORKER_REGISTRY`) is everything else.
+ */
+export function canMarkLabour(user: CurrentUser | undefined): boolean {
+  return (
+    user?.permissions.some(
+      (p) => p === 'DAILY_WORKER_REGISTRY' || p === 'LABOUR_ATTENDANCE',
+    ) ?? false
+  );
+}
+
+export function canManageLabour(user: CurrentUser | undefined): boolean {
+  return user?.permissions.includes('DAILY_WORKER_REGISTRY') ?? false;
+}
+
+/**
  * The authoritative answer to "who is signed in right now" — resolved from
  * the session itself on every call, never from a URL or cached copy that
  * could outlive the session that produced it.

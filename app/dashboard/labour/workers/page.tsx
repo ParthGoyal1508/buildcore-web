@@ -12,6 +12,7 @@ import { Suspense, useState } from 'react';
 import type { LivenessCaptureResult } from '@/app/lib/api/liveness';
 
 import { ApiError, errorMessage } from '@/app/lib/api/client';
+import { canManageLabour, getCurrentUser } from '@/app/lib/api/users';
 import { useSelectedCompanyId } from '@/app/lib/api/company-selection';
 import {
   deactivateWorker,
@@ -91,6 +92,13 @@ function WorkersPageBody() {
   // 052: editing a worker's details, and moving them to another site.
   const [editing, setEditing] = useState<Worker | null>(null);
   const [transferring, setTransferring] = useState<Worker | null>(null);
+  // 058: a site supervisor registers labour and adds their photos; editing, transferring,
+  // deactivating and NOCs are the Operations Manager's (labour management).
+  const { data: me } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  const manages = canManageLabour(me);
 
   const sites = useQuery({
     queryKey: ['labour', 'my-sites'],
@@ -239,9 +247,11 @@ function WorkersPageBody() {
         emptyMessage="No labour matches these filters."
         actions={(w) => (
           <>
-            <RowAction onClick={() => setEditing(w)}>Edit</RowAction>
+            {manages && (
+              <RowAction onClick={() => setEditing(w)}>Edit</RowAction>
+            )}
             {/* A transfer needs a second site the caller works at. */}
-            {w.status === 'active' && (sites.data?.length ?? 0) > 1 && (
+            {manages && w.status === 'active' && (sites.data?.length ?? 0) > 1 && (
               <RowAction onClick={() => setTransferring(w)}>Transfer</RowAction>
             )}
             {w.status === 'active' && (
@@ -249,13 +259,15 @@ function WorkersPageBody() {
                 {w.faceEnrolled ? 'Retake photos' : 'Add photos'}
               </RowAction>
             )}
-            <RowAction
-              intent="read"
-              onClick={() => setNocFor({ id: w.id, name: w.fullName })}
-            >
-              NOC
-            </RowAction>
-            {w.status === 'active' && (
+            {manages && (
+              <RowAction
+                intent="read"
+                onClick={() => setNocFor({ id: w.id, name: w.fullName })}
+              >
+                NOC
+              </RowAction>
+            )}
+            {manages && w.status === 'active' && (
               <RowAction onClick={() => setDeactivating(w)}>
                 Deactivate
               </RowAction>

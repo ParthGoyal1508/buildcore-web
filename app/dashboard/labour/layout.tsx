@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 
-import { getCurrentUser } from '@/app/lib/api/users';
+import { canManageLabour, getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import WorkspaceLoadError from '@/app/ui/workspace-load-error';
@@ -48,6 +48,16 @@ export default function LabourLayout({
   }
 
   const canSeeReports = user.permissions.includes('REPORTS');
+  // 058: a site supervisor holding only "Labour registration & attendance" has the Labour list
+  // (to register) and nothing else here; Attendance is the field screen outside /dashboard.
+  const supervisorOnly = !canManageLabour(user);
+  const supervisorMayOpen =
+    pathname === ROUTES.labour || pathname.startsWith(ROUTES.labourWorkers);
+  if (supervisorOnly && !supervisorMayOpen) {
+    return (
+      <AccessDenied detail="This part of Labour is for the Operations Manager. As a site supervisor you register labour and mark attendance." />
+    );
+  }
 
   if (needsReports && !canSeeReports) {
     return (
@@ -60,6 +70,7 @@ export default function LabourLayout({
       <LabourNav
         canSeeReports={canSeeReports}
         canManage={user.permissions.includes('LABOUR_APPROVE')}
+        canManageLabour={!supervisorOnly}
         stripHidden={isModuleIndex}
       />
       {/*
