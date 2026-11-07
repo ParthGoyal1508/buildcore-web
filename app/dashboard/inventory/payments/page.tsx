@@ -54,6 +54,7 @@ import Pager from '@/app/ui/inventory/pager';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * Vendor payments (009), on the 036 kit (M5, M10, M12): filters in the URL, the vendor searched on
@@ -61,6 +62,7 @@ import { confirmDialog } from '@/app/ui/dialogs';
  * payment as the primary action, and a per-row pending Delete.
  */
 function PaymentsList() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -303,7 +305,7 @@ function PaymentsList() {
         onRetry={() => void list.refetch()}
         serverPaged
         emptyMessage={MESSAGES.paymentsEmpty}
-        actions={(row) => (
+        actions={canDelete ? (row) => (
           <RowAction
             onClick={async () => {
               if (
@@ -322,7 +324,7 @@ function PaymentsList() {
           >
             Delete
           </RowAction>
-        )}
+        ) : undefined}
       />
 
       <Pager

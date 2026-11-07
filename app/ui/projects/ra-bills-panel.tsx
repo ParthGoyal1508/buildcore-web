@@ -66,6 +66,7 @@ import {
   useNocStatuses,
   type NocFilter,
 } from '@/app/ui/nocs/noc-status';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const TABS = ['award', 'bills', 'retention', 'settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -930,6 +931,7 @@ function BillsTab({
   onCaptureAward: () => void;
   onError: (message: string | null) => void;
 }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   /** Which bills are expanded. A set, because reading two side by side is how they get compared. */
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
@@ -1118,7 +1120,7 @@ function BillsTab({
                     {/* The way out of a bill raised twice for the same date (2026-10-08). Draft
                       only, and the server refuses anything else — a submitted bill is a claim
                       somebody is reading. Confirmed because it cannot be undone. */}
-                    {bill.status === 'draft' && !isLocked && (
+                    {bill.status === 'draft' && !isLocked && canDelete && (
                       <SecondaryButton
                         type="button"
                         loading={discard.isPending && discard.variables === bill.id}

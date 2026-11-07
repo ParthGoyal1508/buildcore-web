@@ -38,6 +38,7 @@ import PageHeader from '@/app/ui/page-header';
 import { LoadingText } from '@/app/ui/spinner';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { dateLabel } from '@/app/lib/format';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 type Tab = 'documents' | 'allocations' | 'stock';
 
@@ -50,6 +51,7 @@ type Tab = 'documents' | 'allocations' | 'stock';
  * not exist.
  */
 export default function AssetDetailPage() {
+  const canDelete = useCanDelete();
   const params = useParams<{ id: string }>();
   const assetId = params.id;
   const queryClient = useQueryClient();
@@ -299,30 +301,32 @@ export default function AssetDetailPage() {
           <SecondaryButton type="button" onClick={() => setShowDocument(true)}>
             Attach a document
           </SecondaryButton>
-          <SecondaryButton
-            type="button"
-            onClick={async () => {
-              if (
-                await confirmDialog({
-                  title: 'Delete this asset?',
-                  message:
-                    'The asset leaves the register, with its history. This cannot be undone.',
-                  confirmLabel: 'Delete asset',
-                  tone: 'danger',
-                  typeToConfirm: 'DELETE',
-                })
-              )
-                remove.mutate();
-            }}
-            disabled={remove.isPending}
-            title={
-              openAllocation
-                ? 'Return it first — its custody record has to close against a real asset.'
-                : undefined
-            }
-          >
-            Retire
-          </SecondaryButton>
+          {canDelete && (
+            <SecondaryButton
+              type="button"
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Delete this asset?',
+                    message:
+                      'The asset leaves the register, with its history. This cannot be undone.',
+                    confirmLabel: 'Delete asset',
+                    tone: 'danger',
+                    typeToConfirm: 'DELETE',
+                  })
+                )
+                  remove.mutate();
+              }}
+              disabled={remove.isPending}
+              title={
+                openAllocation
+                  ? 'Return it first — its custody record has to close against a real asset.'
+                  : undefined
+              }
+            >
+              Retire
+            </SecondaryButton>
+          )}
         </div>
       </div>
 

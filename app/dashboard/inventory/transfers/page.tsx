@@ -42,6 +42,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * 036 M3, M5, M12 (2026-10-17):
@@ -53,6 +54,7 @@ import { useToast } from '@/app/ui/toast';
  * - A short receipt shows its reason under the quantity.
  */
 function TransfersPageBody() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -377,19 +379,21 @@ function TransfersPageBody() {
                 Mark {inventoryLabel(next).toLowerCase()}
               </RowAction>
             ))}
-            <RowAction
-              onClick={() => void remove(row)}
-              // A received transfer is at the other store now; the backend refuses
-              // to unwind it, and the control says so rather than finding out.
-              disabled={row.status === 'received' || busy.has(row.id)}
-              title={
-                row.status === 'received'
-                  ? 'A received transfer can no longer be deleted.'
-                  : undefined
-              }
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={() => void remove(row)}
+                // A received transfer is at the other store now; the backend refuses
+                // to unwind it, and the control says so rather than finding out.
+                disabled={row.status === 'received' || busy.has(row.id)}
+                title={
+                  row.status === 'received'
+                    ? 'A received transfer can no longer be deleted.'
+                    : undefined
+                }
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
         )}
       />

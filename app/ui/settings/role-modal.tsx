@@ -17,6 +17,7 @@ import {
   PERMISSIONS,
   ROLE_LEVELS,
   permissionLabel,
+  ROLE_ALL_COMPANIES,
 } from '@/app/lib/constants';
 import { getCurrentUser } from '@/app/lib/api/users';
 import {
@@ -56,8 +57,12 @@ import {
 const NAV_PERMISSIONS = PERMISSIONS.filter((permission) =>
   NAV_GOVERNING_PERMISSIONS.has(permission),
 );
+// Export and delete are not offered (client, 2026-11-07): whoever can view a list may download
+// it, and deleting a record is Super Admin only, so neither checkbox would control anything.
+const NOT_OFFERED: ReadonlySet<string> = new Set(['DATA_EXPORT', 'DATA_DELETE']);
 const NON_NAV_PERMISSIONS = PERMISSIONS.filter(
-  (permission) => !NAV_GOVERNING_PERMISSIONS.has(permission),
+  (permission) =>
+    !NAV_GOVERNING_PERMISSIONS.has(permission) && !NOT_OFFERED.has(permission),
 );
 
 
@@ -214,6 +219,8 @@ export default function RoleModal({
   );
   /** Where holders land after signing in (029 FR-020); '' is "their first module". */
   const [homeModule, setHomeModule] = useState(role?.homeModule ?? '');
+  // 058: Super Admin only — the server refuses anyone else.
+  const [allCompanies, setAllCompanies] = useState(role?.allCompanies ?? false);
   const [nameError, setNameError] = useState<string | undefined>();
   const [serverError, setServerError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -243,6 +250,7 @@ export default function RoleModal({
   const isDirty =
     name !== (role?.name ?? '') ||
     homeModule !== (role?.homeModule ?? '') ||
+    allCompanies !== (role?.allCompanies ?? false) ||
     selected.length !== initialSelected.length ||
     selected.some((p) => !initialSelected.includes(p)) ||
     writable.size !== initialWrite.length ||
@@ -256,12 +264,18 @@ export default function RoleModal({
             permissions: selected,
             grants: grantsFor(selected, writable),
             homeModule: homeModule || null,
+            // Sent only by a Super Admin, and only when changed: anyone else editing a role that
+            // has it must not trip the server's Super-Admin-only check.
+            ...(crossCompany && allCompanies !== role.allCompanies
+              ? { allCompanies }
+              : {}),
           })
         : createRole({
             name: name.trim(),
             permissions: selected,
             grants: grantsFor(selected, writable),
             homeModule: homeModule || null,
+            ...(crossCompany && allCompanies ? { allCompanies } : {}),
           }),
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
@@ -367,6 +381,22 @@ export default function RoleModal({
             </option>
           ))}
         </SelectField>
+
+        {crossCompany ? (
+          <CheckboxField
+            id="role-all-companies"
+            label={ROLE_ALL_COMPANIES.label}
+            description={ROLE_ALL_COMPANIES.description}
+            checked={allCompanies}
+            onChange={(event) => setAllCompanies(event.target.checked)}
+          />
+        ) : (
+          role?.allCompanies && (
+            <p className="text-xs text-gray-600">
+              {ROLE_ALL_COMPANIES.readOnly}
+            </p>
+          )
+        )}
 
         {/* 019 FR-021. Said once, above both groups: the choice is per area and it is about
             changing records, not about a permission model. */}

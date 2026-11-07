@@ -47,6 +47,7 @@ import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
 import { useToast } from '@/app/ui/toast';
 import PageHeader from '@/app/ui/page-header';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 interface Breakup {
   notes: Record<string, number>;
@@ -177,6 +178,7 @@ function fixLinkFor(e: unknown): { href: string; label: string } | null {
 }
 
 export default function PaymentSheetDetailPage() {
+  const canDelete = useCanDelete();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -398,13 +400,15 @@ export default function PaymentSheetDetailPage() {
             >
               Regenerate
             </SecondaryButton>
-            <SecondaryButton
-              onClick={askDelete}
-              loading={remove.isPending}
-              disabled={busy}
-            >
-              Delete
-            </SecondaryButton>
+            {canDelete && (
+              <SecondaryButton
+                onClick={askDelete}
+                loading={remove.isPending}
+                disabled={busy}
+              >
+                Delete
+              </SecondaryButton>
+            )}
           </>
         )}
         {s.status === 'approved' && canApprove && (

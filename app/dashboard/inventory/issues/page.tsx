@@ -48,6 +48,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * 036 M5, M12 (2026-10-17):
@@ -66,6 +67,7 @@ function compositeLabel(row: Issue): string {
 }
 
 function IssuesPageBody() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -443,12 +445,14 @@ function IssuesPageBody() {
             {(row.returnedQuantity ?? 0) < row.quantity && (
               <RowAction onClick={() => setReturning(row)}>Return</RowAction>
             )}
-            <RowAction
-              onClick={() => void remove(row)}
-              loading={deleting.has(row.id)}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={() => void remove(row)}
+                loading={deleting.has(row.id)}
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
         )}
       />

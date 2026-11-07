@@ -32,8 +32,10 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 export default function ServiceSchedulesPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   // 036 K15: the filter is a server-searched picker; the chosen machine is named from its record.
 
@@ -201,22 +203,24 @@ export default function ServiceSchedulesPage() {
             >
               Edit
             </RowAction>
-            <RowAction
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this service schedule?',
-                    message: 'Delete this service schedule?',
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                ) {
-                  remove.mutate(row.id);
-                }
-              }}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this service schedule?',
+                      message: 'Delete this service schedule?',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  ) {
+                    remove.mutate(row.id);
+                  }
+                }}
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

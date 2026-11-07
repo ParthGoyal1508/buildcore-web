@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { getCurrentUser, hasWrite } from '@/app/lib/api/users';
+import { getCurrentUser, hasWrite, isSuperAdmin } from '@/app/lib/api/users';
 import AttendanceImportPanel from '@/app/ui/hr/attendance-import-panel';
 import AttendanceTable from '@/app/ui/hr/attendance-table';
 import ExceptionsModal from '@/app/ui/hr/exceptions-modal';
@@ -18,9 +18,9 @@ const TABS = [
   { id: 'daily', label: 'Daily register' },
   { id: 'holidays', label: 'Holidays' },
   { id: 'late', label: 'Late coming' },
-  // ATTENDANCE **write** only — filtered below. The server's rule (020 FR-013c): the log carries
-  // where a named person physically was and how well their face matched, a narrower audience
-  // than "can read attendance".
+  // Super Admin only — filtered below (058, the client's decision of 2026-11-06). The log carries
+  // where a named person physically was and how well their face matched; the server refuses
+  // everyone else with SUPER_ADMIN_REQUIRED, so the tab is not offered to them.
   { id: 'refusals', label: 'Refusals' },
   { id: 'import', label: 'Bulk import' },
 ] as const;
@@ -45,7 +45,7 @@ export default function AttendanceWorkspace() {
     queryFn: getCurrentUser,
   });
   const tabs = TABS.filter(
-    (entry) => entry.id !== 'refusals' || hasWrite(user, 'ATTENDANCE'),
+    (entry) => entry.id !== 'refusals' || isSuperAdmin(user),
   );
 
   return (

@@ -27,6 +27,12 @@ const currentUserSchema = z.object({
   /** Where this user lands after signing in, from their roles (029 FR-021). Optional so this
    * client can deploy ahead of the API; absent means the first module they can open. */
   homeModule: z.string().nullable().optional(),
+  /**
+   * 058. `companyId` is the company the session works in; for an all-companies user that is the
+   * one they chose, and `homeCompanyId` is the account's own. Optional for a staged rollout.
+   */
+  homeCompanyId: z.string().nullable().optional(),
+  multiCompany: z.boolean().optional().default(false),
   /** An administrator chose the current password and it must be replaced (029 FR-016). */
   mustChangePassword: z.boolean().optional(),
   /**
@@ -101,6 +107,30 @@ export function hasWrite(user: CurrentUser | undefined, permission: string): boo
   return user.grants.some(
     (grant) => grant.permission === permission && grant.level === 'write',
   );
+}
+
+/**
+ * Whether the caller is a Super Admin — which is the `CROSS_COMPANY_ACCESS` permission, as on the
+ * backend, never the role's renameable name. Holding an all-companies role (058) is **not** this.
+ */
+export function isSuperAdmin(user: CurrentUser | undefined): boolean {
+  return user?.permissions.includes('CROSS_COMPANY_ACCESS') ?? false;
+}
+
+/**
+ * 058: Labour is split. A site supervisor (`LABOUR_ATTENDANCE`) registers labour and marks
+ * attendance at their sites; labour management (`DAILY_WORKER_REGISTRY`) is everything else.
+ */
+export function canMarkLabour(user: CurrentUser | undefined): boolean {
+  return (
+    user?.permissions.some(
+      (p) => p === 'DAILY_WORKER_REGISTRY' || p === 'LABOUR_ATTENDANCE',
+    ) ?? false
+  );
+}
+
+export function canManageLabour(user: CurrentUser | undefined): boolean {
+  return user?.permissions.includes('DAILY_WORKER_REGISTRY') ?? false;
 }
 
 /**

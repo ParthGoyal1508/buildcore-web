@@ -56,6 +56,7 @@ import RunApprovalBadge from '@/app/ui/hr/run-approval-badge';
 import TransactionReconciliation from '@/app/ui/hr/transaction-reconciliation';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const TABS = [
   { id: 'lines', label: 'Line items' },
@@ -211,6 +212,7 @@ function RunApprovalPanel({ run }: { run: PayrollRun }) {
 }
 
 export default function PayrollRunDetail({ runId }: { runId: string }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const router = useRouter();
   const toast = useToast();
@@ -559,27 +561,29 @@ export default function PayrollRunDetail({ runId }: { runId: string }) {
                   Process run
                 </Button>
               )}
-              <SecondaryButton
-                type="button"
-                loading={discard.isPending}
-                disabled={setStatus.isPending}
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Discard this draft?',
-                      message: `The ${periodLabel(run.period)} draft and its ${lines.length} line${
-                        lines.length === 1 ? '' : 's'
-                      } are deleted. Nothing has been paid or recovered from it, so nothing else changes. You can generate the period again.`,
-                      confirmLabel: 'Discard draft',
-                      tone: 'danger',
-                    })
-                  ) {
-                    discard.mutate();
-                  }
-                }}
-              >
-                Discard draft
-              </SecondaryButton>
+              {canDelete && (
+                <SecondaryButton
+                  type="button"
+                  loading={discard.isPending}
+                  disabled={setStatus.isPending}
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Discard this draft?',
+                        message: `The ${periodLabel(run.period)} draft and its ${lines.length} line${
+                          lines.length === 1 ? '' : 's'
+                        } are deleted. Nothing has been paid or recovered from it, so nothing else changes. You can generate the period again.`,
+                        confirmLabel: 'Discard draft',
+                        tone: 'danger',
+                      })
+                    ) {
+                      discard.mutate();
+                    }
+                  }}
+                >
+                  Discard draft
+                </SecondaryButton>
+              )}
             </>
           )}
           {run.status === 'processed' && (

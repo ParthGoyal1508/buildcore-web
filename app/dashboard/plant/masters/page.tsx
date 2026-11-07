@@ -31,6 +31,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { dateLabel } from '@/app/lib/format';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 type Tab = 'categories' | 'doc-types' | 'rates';
 
@@ -46,6 +47,7 @@ type Tab = 'categories' | 'doc-types' | 'rates';
  * bookmark separately.
  */
 export default function MastersPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('categories');
   const [editingCategory, setEditingCategory] =
@@ -257,31 +259,33 @@ export default function MastersPage() {
                 >
                   Edit
                 </RowAction>
-                <RowAction
-                  // Offered only when nothing references it. The backend refuses
-                  // either way; hiding the control keeps the list from advertising
-                  // an action that cannot succeed.
-                  disabled={row.equipmentCount > 0}
-                  title={
-                    row.equipmentCount > 0
-                      ? 'Machines are registered under this category. Retire it instead.'
-                      : undefined
-                  }
-                  onClick={async () => {
-                    if (
-                      await confirmDialog({
-                        title: 'Delete this category?',
-                        message: `Delete ${row.name}?`,
-                        confirmLabel: 'Delete',
-                        tone: 'danger',
-                      })
-                    ) {
-                      removeCategory.mutate(row.id);
+                {canDelete && (
+                  <RowAction
+                    // Offered only when nothing references it. The backend refuses
+                    // either way; hiding the control keeps the list from advertising
+                    // an action that cannot succeed.
+                    disabled={row.equipmentCount > 0}
+                    title={
+                      row.equipmentCount > 0
+                        ? 'Machines are registered under this category. Retire it instead.'
+                        : undefined
                     }
-                  }}
-                >
-                  Delete
-                </RowAction>
+                    onClick={async () => {
+                      if (
+                        await confirmDialog({
+                          title: 'Delete this category?',
+                          message: `Delete ${row.name}?`,
+                          confirmLabel: 'Delete',
+                          tone: 'danger',
+                        })
+                      ) {
+                        removeCategory.mutate(row.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </RowAction>
+                )}
               </>
             )}
           />
@@ -340,7 +344,7 @@ export default function MastersPage() {
             isLoading={rates.isPending}
             error={rates.isError ? MESSAGES.plantLoadFailed : undefined}
             emptyMessage="No hire rates yet. Add one before raising a hire bill."
-            actions={(row) => (
+            actions={canDelete ? (row) => (
               <RowAction
                 // Only the open-ended rate can go, and removing it reopens its
                 // predecessor. Deleting from the middle would leave a gap no bill
@@ -366,7 +370,7 @@ export default function MastersPage() {
               >
                 Delete
               </RowAction>
-            )}
+            ) : undefined}
           />
           <p className="text-xs text-gray-500">
             Rates are a timeline, not a setting. A new rate closes the one

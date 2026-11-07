@@ -32,11 +32,14 @@ import SectionTabs from '@/app/ui/section-tabs';
 export default function LabourNav({
   canSeeReports,
   canManage,
+  canManageLabour = true,
   className,
   stripHidden = false,
 }: {
   canSeeReports: boolean;
   canManage: boolean;
+  /** 058: false for a site supervisor — Attendance and Labour only. */
+  canManageLabour?: boolean;
   className?: string;
   stripHidden?: boolean;
 }) {
@@ -49,38 +52,43 @@ export default function LabourNav({
       icon: CameraIcon,
     },
     { name: 'Labour', href: ROUTES.labourWorkers, icon: UserGroupIcon },
-    ...(canManage
+    // 058: everything past registration and attendance is the Operations Manager's.
+    ...(canManageLabour
       ? [
-          { name: 'Site Rates', href: ROUTES.labourSiteRates, icon: BanknotesIcon },
-          { name: 'Supervisors', href: ROUTES.labourSupervisors, icon: UsersIcon },
-        ]
-      : []),
-    {
-      name: 'Muster Attendance',
-      href: ROUTES.labourMusterAttendance,
-      icon: TableCellsIcon,
-    },
-    {
-      name: 'Payment Sheets',
-      href: ROUTES.labourPaymentSheets,
-      icon: DocumentTextIcon,
-    },
-    {
-      name: 'Musters',
-      href: ROUTES.labourMusters,
-      icon: ClipboardDocumentCheckIcon,
-    },
-    ...(cashHidden
-      ? []
-      : [{ name: 'Advances', href: ROUTES.labourAdvances, icon: CreditCardIcon }]),
-    ...(canSeeReports
-      ? [
-          {
-            name: 'Reports',
-            href: ROUTES.labourReportsDeployment,
-            match: '/dashboard/labour/reports',
-            icon: ChartBarIcon,
-          },
+        ...(canManage
+          ? [
+              { name: 'Site Rates', href: ROUTES.labourSiteRates, icon: BanknotesIcon },
+              { name: 'Supervisors', href: ROUTES.labourSupervisors, icon: UsersIcon },
+            ]
+          : []),
+        {
+          name: 'Muster Attendance',
+          href: ROUTES.labourMusterAttendance,
+          icon: TableCellsIcon,
+        },
+        {
+          name: 'Payment Sheets',
+          href: ROUTES.labourPaymentSheets,
+          icon: DocumentTextIcon,
+        },
+        {
+          name: 'Musters',
+          href: ROUTES.labourMusters,
+          icon: ClipboardDocumentCheckIcon,
+        },
+        ...(cashHidden
+          ? []
+          : [{ name: 'Advances', href: ROUTES.labourAdvances, icon: CreditCardIcon }]),
+        ...(canSeeReports
+          ? [
+              {
+                name: 'Reports',
+                href: ROUTES.labourReportsDeployment,
+                match: '/dashboard/labour/reports',
+                icon: ChartBarIcon,
+              },
+            ]
+          : []),
         ]
       : []),
   ];

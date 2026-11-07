@@ -98,6 +98,17 @@ export const attendanceDaySchema = z.object({
   dayOfWeek: z.number(),
   inTime: z.string().nullable(),
   outTime: z.string().nullable(),
+  /** Where the punch-in and punch-out were made (058); optional for a staged rollout. */
+  punchInSite: z
+    .object({ id: z.string(), name: z.string() })
+    .nullable()
+    .optional()
+    .default(null),
+  punchOutSite: z
+    .object({ id: z.string(), name: z.string() })
+    .nullable()
+    .optional()
+    .default(null),
   otHours: z.number().nullable(),
   status: z.enum(['present', 'absent', 'on_leave', 'weekly_off', 'holiday']),
   /**

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import {
   getDailyAttendance,
+  getLocationAssignments,
   getPunchPhoto,
   listSites,
   markAttendance,
@@ -103,7 +104,37 @@ function MarkAttendanceModal({
   const [outTime, setOutTime] = useState(row.outTime ?? '');
   const [statusOverride, setStatusOverride] = useState(row.statusOverride ?? '');
   const [remarks, setRemarks] = useState(row.remarks ?? '');
+  const [siteId, setSiteId] = useState(row.punchInSite?.id ?? '');
   const [error, setError] = useState<string | null>(null);
+
+  // 058: the sites this employee may punch at on this day — the ones HR may name for these punches.
+  // The assignment in force that day (newest effective date on or before it), else their own site;
+  // a mobile employee may be put at any site.
+  const { data: assignments } = useQuery({
+    queryKey: ['hr', 'location-assignments', row.employeeId],
+    queryFn: () => getLocationAssignments(row.employeeId),
+  });
+  const { data: allSites } = useQuery({
+    queryKey: ['sites'],
+    queryFn: listSites,
+  });
+  const coveredSites = useMemo(() => {
+    const sites = allSites ?? [];
+    const inForce = (assignments ?? []).find(
+      (a) => a.effectiveFrom.slice(0, 10) <= date,
+    );
+    if (!inForce) return sites.filter((s) => s.id === row.siteId);
+    if (inForce.isMobile) return sites;
+    const siteIds = new Set(
+      inForce.targets.flatMap((t) => (t.siteId ? [t.siteId] : [])),
+    );
+    const projectIds = new Set(
+      inForce.targets.flatMap((t) => (t.projectId ? [t.projectId] : [])),
+    );
+    return sites.filter(
+      (s) => siteIds.has(s.id) || (s.projectId && projectIds.has(s.projectId)),
+    );
+  }, [assignments, allSites, date, row.siteId]);
 
   const save = useMutation({
     mutationFn: () => {
@@ -116,6 +147,7 @@ function MarkAttendanceModal({
           ? (statusOverride as MarkAttendanceInput['statusOverride'])
           : undefined,
         remarks: remarks || undefined,
+        siteId: siteId || undefined,
       };
       return markAttendance(input);
     },
@@ -182,6 +214,20 @@ function MarkAttendanceModal({
           />
         </div>
         <SelectField
+          id="mark-site"
+          label={HR_MESSAGES.correctionSiteLabel}
+          value={siteId}
+          hint={HR_MESSAGES.correctionSiteHint}
+          onChange={(event) => setSiteId(event.target.value)}
+        >
+          <option value="">{HR_MESSAGES.correctionSiteNone}</option>
+          {coveredSites.map((site) => (
+            <option key={site.id} value={site.id}>
+              {site.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField
           id="mark-status"
           label="Status override"
           value={statusOverride}
@@ -212,6 +258,8 @@ export default function AttendanceTable() {
   const today = todayIso();
   const [date, setDate] = useState(today);
   const [siteId, setSiteId] = useState('');
+  // 058: "who punched at this site", beside "who is posted at this site" above.
+  const [punchSiteId, setPunchSiteId] = useState('');
   const [editing, setEditing] = useState<DailyAttendanceRow | null>(null);
   /**
    * What the last submission did, shown until the administrator moves on.
@@ -236,8 +284,9 @@ export default function AttendanceTable() {
   const { data: sites } = useQuery({ queryKey: ['sites'], queryFn: listSites });
 
   const attendance = useQuery({
-    queryKey: ['hr', 'attendance', date, siteId],
-    queryFn: () => getDailyAttendance(date, siteId || undefined),
+    queryKey: ['hr', 'attendance', date, siteId, punchSiteId],
+    queryFn: () =>
+      getDailyAttendance(date, siteId || undefined, punchSiteId || undefined),
   });
   const { data, isLoading, isError, error } = attendance;
 
@@ -287,6 +336,11 @@ export default function AttendanceTable() {
         />
       ),
     },
+    {
+      key: 'inSite',
+      header: 'In site',
+      render: (row) => row.punchInSite?.name ?? '—',
+    },
     { key: 'out', header: 'Out', render: (row) => timeLabel(row.outTime) },
     {
       key: 'outPhoto',
@@ -299,6 +353,11 @@ export default function AttendanceTable() {
           title={`${row.name} · out ${timeLabel(row.outTime)} · ${date}`}
         />
       ),
+    },
+    {
+      key: 'outSite',
+      header: 'Out site',
+      render: (row) => row.punchOutSite?.name ?? '—',
     },
     {
       key: 'status',
@@ -389,11 +448,27 @@ export default function AttendanceTable() {
         </div>
         <SelectField
           id="attendance-site"
-          label="Site"
+          label={HR_MESSAGES.registerPostedAt}
           value={siteId}
           onChange={(event) => changeView(() => setSiteId(event.target.value))}
         >
           <option value="">All sites</option>
+          {sites?.map((site) => (
+            <option key={site.id} value={site.id}>
+              {site.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField
+          id="attendance-punch-site"
+          label={HR_MESSAGES.registerPunchedAt}
+          hint={HR_MESSAGES.registerPunchedAtHint}
+          value={punchSiteId}
+          onChange={(event) =>
+            changeView(() => setPunchSiteId(event.target.value))
+          }
+        >
+          <option value="">Any site</option>
           {sites?.map((site) => (
             <option key={site.id} value={site.id}>
               {site.name}

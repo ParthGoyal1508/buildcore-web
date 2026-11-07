@@ -19,6 +19,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { LoadingText } from '@/app/ui/spinner';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const QUERY_KEY = ['letter-kinds'];
 
@@ -30,6 +31,7 @@ const QUERY_KEY = ['letter-kinds'];
  * types.
  */
 export function LetterKindsScreen() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
@@ -139,7 +141,7 @@ export function LetterKindsScreen() {
                   delete it. Saying so beats a button that always fails. */}
               {kind.isShipped ? (
                 <span className="text-xs text-gray-500">Not editable</span>
-              ) : (
+              ) : canDelete ? (
                 <RowAction
                   type="button"
                   onClick={async () => {
@@ -157,7 +159,7 @@ export function LetterKindsScreen() {
                 >
                   Delete
                 </RowAction>
-              )}
+              ) : null}
             </div>
             {/*
               017 FR-011b. Expanded in place rather than on a screen of its own: a kind's fields are

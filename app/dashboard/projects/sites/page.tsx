@@ -27,9 +27,11 @@ import {
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /** The site master (spec US2). */
 export default function SitesPage() {
+  const canDelete = useCanDelete();
   const [search, setSearch] = useState('');
   const [projectId, setProjectId] = useState('');
   const [status, setStatus] = useState('');
@@ -190,23 +192,25 @@ export default function SitesPage() {
             {/* Not pre-disabled like the client delete: whether a site is in use
                 depends on employee postings this list has no count of, so the only
                 honest answer comes from trying. */}
-            <RowAction
-              disabled={removal.isPending}
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this site?',
-                    message: `${row.name} will be deleted. This cannot be undone.`,
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                    typeToConfirm: 'DELETE',
-                  })
-                )
-                  removal.mutate(row.id);
-              }}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                disabled={removal.isPending}
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this site?',
+                      message: `${row.name} will be deleted. This cannot be undone.`,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                      typeToConfirm: 'DELETE',
+                    })
+                  )
+                    removal.mutate(row.id);
+                }}
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

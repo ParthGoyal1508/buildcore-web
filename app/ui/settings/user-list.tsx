@@ -27,8 +27,15 @@ import {
   listUsersPage,
   updateUser,
 } from '@/app/lib/api/settings';
-import { CurrentUser, getCurrentUser } from '@/app/lib/api/users';
-import { MESSAGES } from '@/app/lib/constants';
+import {
+  CurrentUser,
+  getCurrentUser,
+  isSuperAdmin,
+} from '@/app/lib/api/users';
+import {
+  MESSAGES,
+  ROLE_ALL_COMPANIES,
+} from '@/app/lib/constants';
 import { formatLastLogin } from '@/app/lib/settings-utils';
 import {
   urlEnum,
@@ -54,6 +61,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import { toast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /** Add/Edit user — roles and status only. Accounts are never created here; that is
  * feature 010's invite flow. */
@@ -184,18 +192,28 @@ function UserModal({
                 // leaves a held role alone), unavailable to add (036 C10 — refused up front, not
                 // after Save).
                 const grantable = held || mayAssignRole(me, role);
+                // 058: a role that works in all companies is the directors' to give **or take
+                // away**, so it is locked either way for anyone else.
+                const lockedAllCompanies =
+                  role.allCompanies && !isSuperAdmin(me);
                 return (
                   <CheckboxField
                     key={role.id}
                     id={`user-role-${role.id}`}
-                    label={role.name}
+                    label={
+                      role.allCompanies
+                        ? `${role.name} · ${ROLE_ALL_COMPANIES.badge}`
+                        : role.name
+                    }
                     description={
-                      grantable
-                        ? undefined
-                        : 'Grants more than your own role, so you cannot assign it.'
+                      lockedAllCompanies
+                        ? ROLE_ALL_COMPANIES.assignBlocked
+                        : grantable
+                          ? undefined
+                          : 'Grants more than your own role, so you cannot assign it.'
                     }
                     checked={roleIds.includes(role.id)}
-                    disabled={isSelf || !grantable}
+                    disabled={isSelf || !grantable || lockedAllCompanies}
                     onChange={(event) =>
                       toggleRole(role.id, event.target.checked)
                     }
@@ -429,6 +447,7 @@ const STATUS_FILTERS = ['', 'active', 'pending', 'deactivated'] as const;
 const PAGE_SIZE = 25;
 
 export default function UserList() {
+  const canDelete = useCanDelete();
   const [editing, setEditing] = useState<UserSummary | null>(null);
   const [resetting, setResetting] = useState<UserSummary | null>(null);
   const queryClient = useQueryClient();
@@ -700,7 +719,7 @@ export default function UserList() {
               )}
               {/* Not on your own row either: the API refuses deleting your own account (036 C3,
                   OWN_ACCOUNT) — another administrator does it. */}
-              {!isSelf && (
+              {!isSelf && canDelete && (
                 <RowAction
                   type="button"
                   loading={removal.isPending && removal.variables?.id === user.id}

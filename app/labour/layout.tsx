@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
-import { getCurrentUser } from '@/app/lib/api/users';
+import { canManageLabour, canMarkLabour, getCurrentUser } from '@/app/lib/api/users';
 import { ROUTES } from '@/app/lib/constants';
 import AccessDenied from '@/app/ui/access-denied';
 import WorkspaceLoadError from '@/app/ui/workspace-load-error';
@@ -54,9 +54,9 @@ export default function LabourFieldLayout({
   if (isError || !user) {
     return <WorkspaceLoadError />;
   }
-  if (!user.permissions.includes('DAILY_WORKER_REGISTRY')) {
+  if (!canMarkLabour(user)) {
     return (
-      <AccessDenied detail="Labour attendance needs the Daily Worker Registry permission." />
+      <AccessDenied detail="Labour attendance needs the Labour Registration & Attendance or Labour Management permission." />
     );
   }
 
@@ -89,6 +89,7 @@ export default function LabourFieldLayout({
             <LabourNav
               canSeeReports={user.permissions.includes('REPORTS')}
               canManage={user.permissions.includes('LABOUR_APPROVE')}
+              canManageLabour={canManageLabour(user)}
               className="mb-6 hidden md:block"
             />
 

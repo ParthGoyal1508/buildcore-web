@@ -2192,6 +2192,11 @@ export const PERMISSIONS = [
    * hold it; site roles keep MAINTENANCE to raise and correct cards.
    */
   'MAINTENANCE_PAY',
+  /**
+   * 058: the site supervisor's slice of Labour — register labour and mark attendance at their
+   * sites, nothing else. `DAILY_WORKER_REGISTRY` ("Labour management") is everything else.
+   */
+  'LABOUR_ATTENDANCE',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -2200,6 +2205,9 @@ const PERMISSION_LABELS: Record<string, string> = {
   INVENTORY_SITE_ENTRY: 'Inventory Site Delivery Entry',
   HR_LETTERS: 'HR Letters',
   MAINTENANCE_PAY: 'Maintenance Payments',
+  // 058: the labour split, named for what each one lets somebody do.
+  DAILY_WORKER_REGISTRY: 'Labour Management',
+  LABOUR_ATTENDANCE: 'Labour Registration & Attendance',
 };
 
 /** Human-readable label for a permission value, for checkbox lists and summaries. */
@@ -2570,9 +2578,9 @@ export const NAV_MODULES = [
     href: ROUTES.labour,
     guardPrefix: ROUTES.labour,
     guardsSubtree: true,
-    // Any-of: the registry permission opens the module; report sub-routes
-    // additionally require REPORTS, gated in the labour layout (spec FR-002).
-    permissions: ['DAILY_WORKER_REGISTRY'],
+    // Any-of: labour management or (058) the site supervisor's registration & attendance opens
+    // the module; report sub-routes additionally require REPORTS, gated in the labour layout.
+    permissions: ['DAILY_WORKER_REGISTRY', 'LABOUR_ATTENDANCE'],
   },
   {
     id: 'recruitment',
@@ -3069,6 +3077,14 @@ export const HR_MESSAGES = {
     'Shown to the approvers, and kept in the modifications trail if the correction is approved.',
 
   // The modification trail's filters (016 FR-012d)
+  /** 058: which of the employee's sites the corrected punches were made at. */
+  correctionSiteLabel: 'Site',
+  correctionSiteHint:
+    'One of the sites this employee is assigned to on this day. Leave it blank if you do not know.',
+  correctionSiteNone: 'Not recorded',
+  registerPostedAt: 'Posted at',
+  registerPunchedAt: 'Punched at',
+  registerPunchedAtHint: 'Only people who punched in or out at this site.',
   modificationEmployeeFilter: 'Employee',
   modificationAllEmployees: 'All employees',
   modificationActorFilter: 'Changed by',
@@ -4116,6 +4132,18 @@ export const FUEL_EXCEPTIONS = {
     `${count} machines in ${category} breached together. That is usually a benchmark that needs correcting rather than ${count} separate recoveries — check the category's benchmark before raising any.`,
 } as const;
 
+/** 058: the "Works in all companies" role setting. */
+export const ROLE_ALL_COMPANIES = {
+  label: 'Works in all companies',
+  description:
+    'Holders can switch between every company of the group and work in one at a time, with only this role’s modules. It does not make them a Super Admin: no group dashboard, App Settings or other companies’ setup. Only a Super Admin can set this, or give the role to someone.',
+  readOnly:
+    'This role works in all companies. Only a Super Admin can change that, or give the role to someone.',
+  // Not "All companies": the Company column already uses that for a role every company shares.
+  badge: 'Works in all companies',
+  assignBlocked: 'Only a Super Admin can give this role.',
+} as const;
+
 export const LOCATION_ASSIGNMENT = {
   heading: 'Where this employee punches',
   noAssignment:
@@ -4141,9 +4169,24 @@ export const LOCATION_ASSIGNMENT = {
   reason: 'Why',
   reasonRequiredForMobile:
     'A mobility exemption needs a reason — a year from now, nobody can tell whether it was considered or merely convenient.',
-  siteRequired: 'Choose a site, or mark the employee mobile.',
+  siteRequired: 'Choose at least one site or project, or mark the employee mobile.',
   siteLabel: 'Site',
   sitePlaceholder: 'Select a site',
+  /** 058: an assignment covers several sites and whole projects. */
+  placesLabel: 'Sites and projects',
+  placesHint:
+    'Punches are accepted inside any chosen site, and recorded against the site they were made at. A project covers all of its active sites, including ones added later.',
+  projectsGroup: 'Whole projects',
+  sitesGroup: 'Individual sites',
+  projectOption: (name: string, sites: number) =>
+    `${name} — all ${sites} site${sites === 1 ? '' : 's'}`,
+  noPlaces: 'No sites yet.',
+  chosenCount: (count: number) =>
+    count === 0 ? 'Nothing chosen' : `${count} chosen`,
+  projectWithoutActiveSite:
+    'Saved. The project has no active site yet, so this employee’s punches will be refused until one is added.',
+  /** How an assignment reads in its history: its places, or that it is mobile. */
+  placesOf: (names: string[]) => names.join(', '),
   cancel: 'Cancel',
   close: 'Close',
   bulkCount: (count: number) =>

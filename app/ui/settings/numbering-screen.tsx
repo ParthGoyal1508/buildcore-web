@@ -23,6 +23,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 import StatusBadge from '@/app/ui/status-badge';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /** Same rendering as the server's `formatCode`, for the live preview while typing. */
 function counted(prefix: string, base: number, step: number, width: number) {
@@ -100,6 +101,7 @@ function SeriesCard({
   companyId: string;
   entry: NumberingEntry;
 }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const [prefix, setPrefix] = useState(entry.prefix);
   const [base, setBase] = useState(String(entry.base));
@@ -295,7 +297,7 @@ function SeriesCard({
       )}
 
       <div className="mt-auto flex flex-wrap justify-end gap-2">
-        {!entry.isDefault && (
+        {!entry.isDefault && canDelete && (
           <SecondaryButton
             type="button"
             loading={reset.isPending}

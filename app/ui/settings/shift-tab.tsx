@@ -20,6 +20,7 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 interface FormState {
   name: string;
@@ -36,6 +37,7 @@ const EMPTY: FormState = {
 };
 
 export default function ShiftTab() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<Shift | null>(null);
@@ -126,16 +128,18 @@ export default function ShiftTab() {
             <RowAction type="button" onClick={() => openEdit(shift)}>
               Edit
             </RowAction>
-            <RowAction
-              type="button"
-              onClick={() => {
-                setDeleteError(null);
-                setConfirming(shift);
-              }}
-              className="text-red-600"
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                type="button"
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirming(shift);
+                }}
+                className="text-red-600"
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

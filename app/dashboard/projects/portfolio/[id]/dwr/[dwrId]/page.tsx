@@ -26,6 +26,7 @@ import SectionGuard from '@/app/ui/projects/section-guard';
 import StatusBadge from '@/app/ui/status-badge';
 import { TABLE } from '@/app/ui/table';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * One daily work report, read-only (024 Story 2).
@@ -40,6 +41,7 @@ import { confirmDialog } from '@/app/ui/dialogs';
  * trusted: an omitted factor counts as one, so 100 × 7.5 × 0.15 with three blanks is 112.5.
  */
 export default function DwrReportPage() {
+  const canDelete = useCanDelete();
   const params = useParams<{ id: string; dwrId: string }>();
   const projectId = params.id;
   const router = useRouter();
@@ -144,25 +146,27 @@ export default function DwrReportPage() {
                 >
                   Edit
                 </Link>
-                <Button
-                  type="button"
-                  disabled={remove.isPending}
-                  onClick={async () => {
-                    if (
-                      !(await confirmDialog({
-                        title: 'Delete this daily work report?',
-                        message: 'This cannot be undone.',
-                        confirmLabel: 'Delete',
-                        tone: 'danger',
-                      }))
-                    )
-                      return;
-                    setError(null);
-                    remove.mutate();
-                  }}
-                >
-                  {remove.isPending ? 'Deleting…' : 'Delete'}
-                </Button>
+                {canDelete && (
+                  <Button
+                    type="button"
+                    disabled={remove.isPending}
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog({
+                          title: 'Delete this daily work report?',
+                          message: 'This cannot be undone.',
+                          confirmLabel: 'Delete',
+                          tone: 'danger',
+                        }))
+                      )
+                        return;
+                      setError(null);
+                      remove.mutate();
+                    }}
+                  >
+                    {remove.isPending ? 'Deleting…' : 'Delete'}
+                  </Button>
+                )}
               </>
             )}
           </div>

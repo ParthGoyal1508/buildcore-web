@@ -4,7 +4,7 @@ import { CameraIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useSyncExternalStore } from 'react';
 
-import { getCurrentUser } from '@/app/lib/api/users';
+import { canMarkLabour, getCurrentUser } from '@/app/lib/api/users';
 import { DEVICE_PERMISSION_COPY as COPY } from '@/app/lib/constants';
 import {
   detectPlatform,
@@ -263,6 +263,6 @@ export function SupervisorPermissionsOnboarding() {
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
-  if (!user?.permissions.includes('DAILY_WORKER_REGISTRY')) return null;
+  if (!canMarkLabour(user)) return null;
   return <PermissionsOnboarding />;
 }

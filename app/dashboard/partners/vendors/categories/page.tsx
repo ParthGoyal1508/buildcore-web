@@ -15,8 +15,10 @@ import DataTable, { type Column } from '@/app/ui/hr/data-table';
 import VendorCategoryModal from '@/app/ui/partners/vendor-category-modal';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 export default function VendorCategoriesPage() {
+  const canDelete = useCanDelete();
   const [editing, setEditing] = useState<VendorCategory | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -115,24 +117,26 @@ export default function VendorCategoriesPage() {
               }}>
               Edit
             </TextButton>
-            <TextButton
-              tone="danger"
-              disabled={remove.isPending}
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this category?',
-                    message: `Delete the "${row.name}" category? This cannot be undone.`,
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                ) {
-                  remove.mutate(row.id);
-                }
-              }}
-            >
-              Delete
-            </TextButton>
+            {canDelete && (
+              <TextButton
+                tone="danger"
+                disabled={remove.isPending}
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this category?',
+                      message: `Delete the "${row.name}" category? This cannot be undone.`,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  ) {
+                    remove.mutate(row.id);
+                  }
+                }}
+              >
+                Delete
+              </TextButton>
+            )}
           </>
         )}
       />

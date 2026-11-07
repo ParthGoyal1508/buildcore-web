@@ -62,6 +62,7 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import StatusBadge from '@/app/ui/status-badge';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * Purchases (009), on the 036 kit (M5, M11, M12, M9):
@@ -73,6 +74,7 @@ import { useToast } from '@/app/ui/toast';
  * - a delete refused because the stock has moved on says how much is left (422), per row.
  */
 function PurchasesList() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -419,25 +421,27 @@ function PurchasesList() {
             <div className="flex flex-wrap gap-2">
               <RowAction onClick={() => setCompleting(row)}>Complete</RowAction>
               <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
-              <RowAction
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Delete this site entry?',
-                      message:
-                        'It has moved no stock and has no bill, so nothing else changes. The site will need to record the delivery again if it was real.',
-                      confirmLabel: 'Delete',
-                      tone: 'danger',
-                    })
-                  ) {
-                    remove.mutate(row.id);
-                  }
-                }}
-                loading={remove.isPending && remove.variables === row.id}
-                disabled={remove.isPending}
-              >
-                Delete
-              </RowAction>
+              {canDelete && (
+                <RowAction
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this site entry?',
+                        message:
+                          'It has moved no stock and has no bill, so nothing else changes. The site will need to record the delivery again if it was real.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    ) {
+                      remove.mutate(row.id);
+                    }
+                  }}
+                  loading={remove.isPending && remove.variables === row.id}
+                  disabled={remove.isPending}
+                >
+                  Delete
+                </RowAction>
+              )}
             </div>
           ) : (
           <div className="flex flex-wrap gap-2">
@@ -452,24 +456,26 @@ function PurchasesList() {
                 ledger and the bill were computed from, so correcting it is delete + re-create —
                 the modal says so where a fuller edit would be looked for. */}
             <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
-            <RowAction
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this purchase?',
-                    message: MESSAGES.confirmDeletePurchase,
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                ) {
-                  remove.mutate(row.id);
-                }
-              }}
-              loading={remove.isPending && remove.variables === row.id}
-              disabled={remove.isPending}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this purchase?',
+                      message: MESSAGES.confirmDeletePurchase,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  ) {
+                    remove.mutate(row.id);
+                  }
+                }}
+                loading={remove.isPending && remove.variables === row.id}
+                disabled={remove.isPending}
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
           )
         }

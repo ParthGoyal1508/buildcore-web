@@ -33,8 +33,10 @@ import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import StatusBadge from '@/app/ui/status-badge';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 export default function RequisitionsPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -174,21 +176,23 @@ export default function RequisitionsPage() {
                 <RowAction onClick={() => submit.mutate(r.id)}>
                   Submit
                 </RowAction>
-                <RowAction
-                  onClick={async () => {
-                    if (
-                      await confirmDialog({
-                        title: 'Delete this requisition?',
-                        message: 'This cannot be undone.',
-                        confirmLabel: 'Delete',
-                        tone: 'danger',
-                      })
-                    )
-                      remove.mutate(r.id);
-                  }}
-                >
-                  Delete
-                </RowAction>
+                {canDelete && (
+                  <RowAction
+                    onClick={async () => {
+                      if (
+                        await confirmDialog({
+                          title: 'Delete this requisition?',
+                          message: 'This cannot be undone.',
+                          confirmLabel: 'Delete',
+                          tone: 'danger',
+                        })
+                      )
+                        remove.mutate(r.id);
+                    }}
+                  >
+                    Delete
+                  </RowAction>
+                )}
               </>
             )}
             {r.status === 'pending_approval' && canApprove && (

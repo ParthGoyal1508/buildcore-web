@@ -134,6 +134,22 @@ export default function AttendanceCalendar({
                       {timeLabel(day.inTime)} – {timeLabel(day.outTime)}
                     </div>
                   )}
+                  {(day.punchInSite || day.punchOutSite) && (
+                    // 058: where the day counted — the in site, and the out site when it differs.
+                    <div
+                      className="mt-0.5 truncate opacity-80"
+                      title={[day.punchInSite?.name, day.punchOutSite?.name]
+                        .filter(Boolean)
+                        .join(' → ')}
+                    >
+                      {day.punchInSite?.name ?? day.punchOutSite?.name}
+                      {day.punchInSite &&
+                      day.punchOutSite &&
+                      day.punchOutSite.id !== day.punchInSite.id
+                        ? ` → ${day.punchOutSite.name}`
+                        : ''}
+                    </div>
+                  )}
                   {day.otHours ? (
                     <div className="mt-0.5 opacity-80">OT {day.otHours}h</div>
                   ) : null}

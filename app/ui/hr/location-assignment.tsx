@@ -12,10 +12,14 @@ import {
 import { LOCATION_ASSIGNMENT, MESSAGES } from '@/app/lib/constants';
 import { dateLabel } from '@/app/lib/format';
 import { Button } from '@/app/ui/button';
+import AssignmentPlaces, {
+  NO_PLACES,
+  placesChosen,
+  type ChosenPlaces,
+} from '@/app/ui/hr/assignment-places';
 import {
   CheckboxField,
   FormError,
-  SelectField,
   TextField,
 } from '@/app/ui/settings/form-fields';
 
@@ -38,7 +42,8 @@ export default function LocationAssignmentPanel({
   employeeId: string;
 }) {
   const queryClient = useQueryClient();
-  const [siteId, setSiteId] = useState('');
+  const [places, setPlaces] = useState<ChosenPlaces>(NO_PLACES);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [reason, setReason] = useState('');
@@ -54,26 +59,32 @@ export default function LocationAssignmentPanel({
     queryFn: listSites,
   });
 
-  const siteName = (id: string | null) =>
-    id === null
+  // 058: an assignment names its places itself (sites and projects, named by the server).
+  const placesOf = (assignment: LocationAssignment) =>
+    assignment.isMobile
       ? LOCATION_ASSIGNMENT.mobile
-      : sites?.find((site) => site.id === id)?.name ?? id;
+      : LOCATION_ASSIGNMENT.placesOf(assignment.targets.map((t) => t.name));
 
   const save = useMutation({
     mutationFn: () =>
       assignLocation(employeeId, {
-        // Sent only when it means something. A site id alongside `isMobile` would be a fence the
-        // server is being told to ignore, which is a contradiction worth not sending at all.
-        siteId: isMobile ? undefined : siteId,
+        // Sent only when it means something. Places alongside `isMobile` would be fences the
+        // server is being told to ignore, which it refuses (ASSIGNMENT_MOBILE_WITH_TARGETS).
+        ...(isMobile ? {} : places),
         isMobile,
         effectiveFrom,
         reason: reason.trim() || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       void queryClient.invalidateQueries({
         queryKey: ['hr', 'location-assignments', employeeId],
       });
       setReason('');
+      setNotice(
+        saved.warnings.includes('PROJECT_HAS_NO_ACTIVE_SITE')
+          ? LOCATION_ASSIGNMENT.projectWithoutActiveSite
+          : null,
+      );
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -86,7 +97,9 @@ export default function LocationAssignmentPanel({
    * trip to be told "choose a site" is a round trip that did not need to happen.
    */
   const validationError = (): string | null => {
-    if (!isMobile && !siteId) return LOCATION_ASSIGNMENT.siteRequired;
+    if (!isMobile && placesChosen(places) === 0) {
+      return LOCATION_ASSIGNMENT.siteRequired;
+    }
     if (isMobile && reason.trim().length === 0) {
       return LOCATION_ASSIGNMENT.reasonRequiredForMobile;
     }
@@ -113,7 +126,7 @@ export default function LocationAssignmentPanel({
       ) : current ? (
         <div className="rounded-md bg-gray-50 px-3 py-2 text-sm">
           <p className="font-medium text-gray-900">
-            {LOCATION_ASSIGNMENT.current}: {siteName(current.siteId)}
+            {LOCATION_ASSIGNMENT.current}: {placesOf(current)}
           </p>
           <AssignmentDetail assignment={current} />
         </div>
@@ -136,7 +149,7 @@ export default function LocationAssignmentPanel({
                 key={assignment.id}
                 className="rounded-md border border-gray-200 px-3 py-2"
               >
-                <p className="text-gray-900">{siteName(assignment.siteId)}</p>
+                <p className="text-gray-900">{placesOf(assignment)}</p>
                 <AssignmentDetail assignment={assignment} />
               </li>
             ))}
@@ -145,21 +158,13 @@ export default function LocationAssignmentPanel({
       )}
 
       <div className="space-y-3 border-t border-gray-200 pt-4">
-        <SelectField
-          id="assignment-site"
-          label={LOCATION_ASSIGNMENT.siteLabel}
-          value={siteId}
+        <AssignmentPlaces
+          id="assignment-places"
+          sites={sites ?? []}
+          value={places}
+          onChange={setPlaces}
           disabled={isMobile}
-          hint={isMobile ? LOCATION_ASSIGNMENT.mobileScope : undefined}
-          onChange={(event) => setSiteId(event.target.value)}
-        >
-          <option value="">{LOCATION_ASSIGNMENT.sitePlaceholder}</option>
-          {(sites ?? []).map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </SelectField>
+        />
 
         <CheckboxField
           id="assignment-mobile"
@@ -189,6 +194,11 @@ export default function LocationAssignmentPanel({
         />
 
         <FormError message={error} />
+        {notice && (
+          <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {notice}
+          </p>
+        )}
 
         <Button type="button" onClick={submit} disabled={save.isPending}>
           {save.isPending ? LOCATION_ASSIGNMENT.saving : LOCATION_ASSIGNMENT.assign}
