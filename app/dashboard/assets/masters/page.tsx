@@ -31,6 +31,7 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 type Tab = 'categories' | 'doc-types' | 'grades';
 
@@ -47,6 +48,7 @@ type Tab = 'categories' | 'doc-types' | 'grades';
  * would fight it.
  */
 export default function AssetMastersPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const companyId = useAssetsCompanyId();
   const [tab, setTab] = useState<Tab>('categories');
@@ -258,7 +260,7 @@ export default function AssetMastersPage() {
                 already on the row — so the control simply is not there rather than
                 being there to fail.
               */}
-              {row.assetCount === 0 && (
+              {row.assetCount === 0 && canDelete && (
                 <RowAction
                   onClick={async () => {
                     if (
@@ -299,22 +301,24 @@ export default function AssetMastersPage() {
               >
                 Edit
               </RowAction>
-              <RowAction
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Delete this document type?',
-                      message: 'This cannot be undone.',
-                      confirmLabel: 'Delete',
-                      tone: 'danger',
-                    })
-                  )
-                    removeDocType.mutate(row.id);
-                }}
-                disabled={removeDocType.isPending}
-              >
-                Delete
-              </RowAction>
+              {canDelete && (
+                <RowAction
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this document type?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    )
+                      removeDocType.mutate(row.id);
+                  }}
+                  disabled={removeDocType.isPending}
+                >
+                  Delete
+                </RowAction>
+              )}
             </div>
           )}
         />
@@ -338,22 +342,24 @@ export default function AssetMastersPage() {
               >
                 Edit
               </RowAction>
-              <RowAction
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Delete this grade?',
-                      message: 'This cannot be undone.',
-                      confirmLabel: 'Delete',
-                      tone: 'danger',
-                    })
-                  )
-                    removeGrade.mutate(row.id);
-                }}
-                disabled={removeGrade.isPending}
-              >
-                Delete
-              </RowAction>
+              {canDelete && (
+                <RowAction
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this grade?',
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    )
+                      removeGrade.mutate(row.id);
+                  }}
+                  disabled={removeGrade.isPending}
+                >
+                  Delete
+                </RowAction>
+              )}
             </div>
           )}
         />

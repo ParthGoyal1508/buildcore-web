@@ -41,6 +41,7 @@ import { TABLE } from '@/app/ui/table';
 import { useToast } from '@/app/ui/toast';
 import { confirmDialog, promptDialog } from '@/app/ui/dialogs';
 import { boqKeys } from '@/app/lib/api/projects';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const STATUS_FILTERS = ['all', ...DWR_STATUSES] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -362,6 +363,7 @@ function ReportRow({
   readOnly: boolean;
   onAct: (kind: DwrAction, reason?: string) => void;
 }) {
+  const canDelete = useCanDelete();
   const reversed = Boolean(report.reversedAt);
 
   // 022 FR-012a. The author of a report may not approve it, so the control says why instead of
@@ -430,26 +432,28 @@ function ReportRow({
               </Button>
               {/* 025 FR-026. A draft entered against the wrong project or the wrong day had no way
                   out: the endpoint has existed since 022 and nothing called it. */}
-              <Button
-                disabled={busy}
-                loading={pendingKind === 'delete'}
-                intent="write"
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Delete this draft?',
-                      message:
-                        'Delete this draft? Nothing has moved yet, so nothing is taken back.',
-                      confirmLabel: 'Delete',
-                      tone: 'danger',
-                    })
-                  ) {
-                    onAct('delete');
-                  }
-                }}
-              >
-                Delete
-              </Button>
+              {canDelete && (
+                <Button
+                  disabled={busy}
+                  loading={pendingKind === 'delete'}
+                  intent="write"
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this draft?',
+                        message:
+                          'Delete this draft? Nothing has moved yet, so nothing is taken back.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    ) {
+                      onAct('delete');
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
             </>
           ) : null}
 

@@ -27,6 +27,7 @@ import {
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * The client master (spec US1).
@@ -37,6 +38,7 @@ import { confirmDialog } from '@/app/ui/dialogs';
  * count is a snapshot and someone else may add a project between render and click.
  */
 export default function ClientsPage() {
+  const canDelete = useCanDelete();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -168,26 +170,28 @@ export default function ClientsPage() {
             >
               Edit
             </RowAction>
-            <RowAction
-              disabled={row.projectCount > 0 || removal.isPending}
-              title={
-                row.projectCount > 0 ? MESSAGES.clientHasProjects : undefined
-              }
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this client?',
-                    message: `${row.name} will be deleted. This cannot be undone.`,
-                    confirmLabel: 'Delete client',
-                    tone: 'danger',
-                    typeToConfirm: 'DELETE',
-                  })
-                )
-                  removal.mutate(row.id);
-              }}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                disabled={row.projectCount > 0 || removal.isPending}
+                title={
+                  row.projectCount > 0 ? MESSAGES.clientHasProjects : undefined
+                }
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this client?',
+                      message: `${row.name} will be deleted. This cannot be undone.`,
+                      confirmLabel: 'Delete client',
+                      tone: 'danger',
+                      typeToConfirm: 'DELETE',
+                    })
+                  )
+                    removal.mutate(row.id);
+                }}
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

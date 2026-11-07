@@ -31,8 +31,10 @@ import {
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 export default function SparePartsPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const categories = usePlantCategories();
 
@@ -292,22 +294,24 @@ export default function SparePartsPage() {
             >
               Edit
             </RowAction>
-            <RowAction
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this spare part?',
-                    message: `Delete ${row.partNumber}?`,
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                ) {
-                  remove.mutate(row.id);
-                }
-              }}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this spare part?',
+                      message: `Delete ${row.partNumber}?`,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  ) {
+                    remove.mutate(row.id);
+                  }
+                }}
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

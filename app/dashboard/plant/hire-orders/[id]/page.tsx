@@ -23,6 +23,7 @@ import { FormError, RowAction } from '@/app/ui/settings/form-fields';
 import ResponsiveList from '@/app/ui/settings/responsive-list';
 import { LoadingText } from '@/app/ui/spinner';
 import StatusBadge from '@/app/ui/status-badge';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * One vehicle work/hire order, opened from its row (2026-10-15) — the client: "how can I open a
@@ -31,6 +32,7 @@ import StatusBadge from '@/app/ui/status-badge';
  * Edit and Delete, and the hire bills raised under it.
  */
 export default function HireOrderPage() {
+  const canDelete = useCanDelete();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -99,23 +101,25 @@ export default function HireOrderPage() {
           onError={setError}
         />
         <RowAction onClick={() => setEditing(true)}>Edit</RowAction>
-        <RowAction
-          disabled={remove.isPending}
-          onClick={async () => {
-            if (
-              await confirmDialog({
-                title: `Delete work order ${o.code}?`,
-                message:
-                  'An order a hire bill has been raised against cannot be deleted.',
-                confirmLabel: 'Delete',
-              })
-            ) {
-              remove.mutate();
-            }
-          }}
-        >
-          Delete
-        </RowAction>
+        {canDelete && (
+          <RowAction
+            disabled={remove.isPending}
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: `Delete work order ${o.code}?`,
+                  message:
+                    'An order a hire bill has been raised against cannot be deleted.',
+                  confirmLabel: 'Delete',
+                })
+              ) {
+                remove.mutate();
+              }
+            }}
+          >
+            Delete
+          </RowAction>
+        )}
       </div>
       <FormError message={error} />
 

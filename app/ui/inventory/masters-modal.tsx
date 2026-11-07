@@ -44,6 +44,7 @@ import Modal from '@/app/ui/settings/modal';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
 import CompositeItemsTab from './composite-items-tab';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const ITEM_PAGE_SIZE = 25;
 
@@ -80,6 +81,7 @@ function messageFor(error: unknown, fallback: string): string {
 }
 
 function CategoryTab() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState('');
@@ -181,7 +183,7 @@ function CategoryTab() {
         emptyMessage={
           needle ? `No category matches “${filter.trim()}”.` : MESSAGES.categoriesEmpty
         }
-        actions={(row) => (
+        actions={canDelete ? (row) => (
           <RowAction
             onClick={async () => {
               if (
@@ -205,7 +207,7 @@ function CategoryTab() {
           >
             Delete
           </RowAction>
-        )}
+        ) : undefined}
       />
     </div>
   );
@@ -218,6 +220,7 @@ const EMPTY_ITEM: ItemInput = {
 };
 
 function ItemTab() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -515,23 +518,25 @@ function ItemTab() {
             >
               {row.active ? 'Retire' : 'Restore'}
             </RowAction>
-            <RowAction
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this item?',
-                    message: 'This cannot be undone.',
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                )
-                  remove.mutate(row.id);
-              }}
-              loading={remove.isPending && remove.variables === row.id}
-              title={MESSAGES.itemInUse}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this item?',
+                      message: 'This cannot be undone.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  )
+                    remove.mutate(row.id);
+                }}
+                loading={remove.isPending && remove.variables === row.id}
+                title={MESSAGES.itemInUse}
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
         )}
       />

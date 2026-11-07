@@ -26,6 +26,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import { LoadingText } from '@/app/ui/spinner';
 import { NocStatusBadge, useNocStatuses } from './noc-status';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -51,6 +52,7 @@ export default function NocPanel({
   title?: string;
   hint?: string;
 }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const { show, viewer } = useFileViewer();
   const [adding, setAdding] = useState(false);
@@ -180,23 +182,25 @@ export default function NocPanel({
                 >
                   Download
                 </RowAction>
-                <RowAction
-                  disabled={remove.isPending}
-                  onClick={async () => {
-                    if (
-                      await confirmDialog({
-                        title: 'Remove this NOC?',
-                        message: 'The uploaded file is deleted with it.',
-                        confirmLabel: 'Remove',
-                        tone: 'danger',
-                      })
-                    ) {
-                      remove.mutate(noc.id);
-                    }
-                  }}
-                >
-                  Remove
-                </RowAction>
+                {canDelete && (
+                  <RowAction
+                    disabled={remove.isPending}
+                    onClick={async () => {
+                      if (
+                        await confirmDialog({
+                          title: 'Remove this NOC?',
+                          message: 'The uploaded file is deleted with it.',
+                          confirmLabel: 'Remove',
+                          tone: 'danger',
+                        })
+                      ) {
+                        remove.mutate(noc.id);
+                      }
+                    }}
+                  >
+                    Remove
+                  </RowAction>
+                )}
               </div>
             </li>
           ))}

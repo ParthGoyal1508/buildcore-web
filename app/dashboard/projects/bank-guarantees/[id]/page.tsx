@@ -41,6 +41,7 @@ import { TextField } from '@/app/ui/settings/form-fields';
 import { LoadingText } from '@/app/ui/spinner';
 import { useToast } from '@/app/ui/toast';
 import { useCanWrite } from '@/app/lib/write-access';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const tenderKey = (id: string) => ['projects', 'bank-guarantees', 'tender', id];
 
@@ -49,6 +50,7 @@ const tenderKey = (id: string) => ['projects', 'bank-guarantees', 'tender', id];
  * documents and its history.
  */
 export default function BankGuaranteeTenderPage() {
+  const canDelete = useCanDelete();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -108,27 +110,29 @@ export default function BankGuaranteeTenderPage() {
           canWrite ? (
             <div className="flex flex-wrap gap-2">
               <RowAction onClick={() => setEditingTender(true)}>Edit tender</RowAction>
-              <RowAction
-                disabled={row.guarantees.length > 0 || removeTender.isPending}
-                title={
-                  row.guarantees.length > 0
-                    ? 'Delete its guarantees first.'
-                    : undefined
-                }
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Delete this tender?',
-                      message: 'The tender will be deleted. This cannot be undone.',
-                      confirmLabel: 'Delete tender',
-                      tone: 'danger',
-                    })
-                  )
-                    removeTender.mutate();
-                }}
-              >
-                Delete tender
-              </RowAction>
+              {canDelete && (
+                <RowAction
+                  disabled={row.guarantees.length > 0 || removeTender.isPending}
+                  title={
+                    row.guarantees.length > 0
+                      ? 'Delete its guarantees first.'
+                      : undefined
+                  }
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Delete this tender?',
+                        message: 'The tender will be deleted. This cannot be undone.',
+                        confirmLabel: 'Delete tender',
+                        tone: 'danger',
+                      })
+                    )
+                      removeTender.mutate();
+                  }}
+                >
+                  Delete tender
+                </RowAction>
+              )}
             </div>
           ) : undefined
         }
@@ -224,6 +228,7 @@ function GuaranteeCard({
   onEdit: () => void;
   onAction: (action: BgAction) => void;
 }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const running = bg.status === 'RUNNING';
@@ -295,24 +300,26 @@ function GuaranteeCard({
         ) : (
           <RowAction onClick={() => onAction('reopen')}>Reopen</RowAction>
         )}
-        <RowAction
-          disabled={remove.isPending}
-          onClick={async () => {
-            if (
-              await confirmDialog({
-                title: 'Delete this guarantee?',
-                message:
-                  'Only for a guarantee entered by mistake. Its documents and history are deleted with it. This cannot be undone.',
-                confirmLabel: 'Delete guarantee',
-                tone: 'danger',
-                typeToConfirm: 'DELETE',
-              })
-            )
-              remove.mutate();
-          }}
-        >
-          Delete
-        </RowAction>
+        {canDelete && (
+          <RowAction
+            disabled={remove.isPending}
+            onClick={async () => {
+              if (
+                await confirmDialog({
+                  title: 'Delete this guarantee?',
+                  message:
+                    'Only for a guarantee entered by mistake. Its documents and history are deleted with it. This cannot be undone.',
+                  confirmLabel: 'Delete guarantee',
+                  tone: 'danger',
+                  typeToConfirm: 'DELETE',
+                })
+              )
+                remove.mutate();
+            }}
+          >
+            Delete
+          </RowAction>
+        )}
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">

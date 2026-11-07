@@ -34,6 +34,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { type Column } from '@/app/ui/settings/responsive-list';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * The daily logbook entries.
@@ -44,6 +45,7 @@ import { useToast } from '@/app/ui/toast';
  * corrected with a reason (K6) instead of only deleted.
  */
 export default function LogbookPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [filters, setFilters, query] = useUrlState(
@@ -218,23 +220,25 @@ export default function LogbookPage() {
             <RowAction onClick={() => setCorrecting(row)}>
               Correct readings
             </RowAction>
-            <RowAction
-              loading={remove.isPending && remove.variables === row.id}
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this logbook entry?',
-                    message: MESSAGES.plantConfirmDeleteLogbook,
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                ) {
-                  remove.mutate(row.id);
-                }
-              }}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                loading={remove.isPending && remove.variables === row.id}
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this logbook entry?',
+                      message: MESSAGES.plantConfirmDeleteLogbook,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  ) {
+                    remove.mutate(row.id);
+                  }
+                }}
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
         )}
       />

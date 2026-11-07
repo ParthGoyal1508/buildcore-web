@@ -30,6 +30,7 @@ import PageHeader from '@/app/ui/page-header';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { useToast } from '@/app/ui/toast';
 import { ProjectPicker } from '@/app/ui/plant/pickers';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /** A daily rate the form accepts: above zero (036 O13 — negative and zero rates used to pass). */
 function rateError(value: string): string | undefined {
@@ -297,6 +298,7 @@ function SkillCategoryMasters({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const canDelete = useCanDelete();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [defaultDailyRate, setDefaultDailyRate] = useState('');
@@ -395,24 +397,26 @@ function SkillCategoryMasters({
                   </span>
                 )}
               </span>
-              <RowAction
-                loading={deletingId === s.id}
-                disabled={deletingId !== null}
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      // 036 O13: this deletes a skill category, not a wage rate.
-                      title: `Delete the skill category "${s.name}"?`,
-                      message: 'This cannot be undone.',
-                      confirmLabel: 'Delete',
-                      tone: 'danger',
-                    })
-                  )
-                    remove.mutate(s.id);
-                }}
-              >
-                Delete
-              </RowAction>
+              {canDelete && (
+                <RowAction
+                  loading={deletingId === s.id}
+                  disabled={deletingId !== null}
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        // 036 O13: this deletes a skill category, not a wage rate.
+                        title: `Delete the skill category "${s.name}"?`,
+                        message: 'This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        tone: 'danger',
+                      })
+                    )
+                      remove.mutate(s.id);
+                  }}
+                >
+                  Delete
+                </RowAction>
+              )}
             </li>
           ))}
           {skills.length === 0 && (

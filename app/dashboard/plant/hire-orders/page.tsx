@@ -37,6 +37,7 @@ import {
   type NocFilter,
 } from '@/app/ui/nocs/noc-status';
 import { dateLabel } from '@/app/lib/format';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * Vehicle work/hire orders (2026-10-15), each downloadable in the client's WORK/HIRE ORDER
@@ -48,6 +49,7 @@ import { dateLabel } from '@/app/lib/format';
  * the filters and page live in the URL. (The NOC filter narrows the page shown.)
  */
 export default function HireOrdersPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = usePlantCompanyId();
@@ -199,21 +201,23 @@ export default function HireOrdersPage() {
               NOC
             </RowAction>
             <RowAction onClick={() => setEditing(row)}>Edit</RowAction>
-            <RowAction
-              loading={remove.isPending && remove.variables === row.id}
-              onClick={async () => {
-                const confirmed = await confirmDialog({
-                  title: `Delete work order ${row.code}?`,
-                  message:
-                    'An order a hire bill has been raised against cannot be deleted.',
-                  confirmLabel: 'Delete',
-                  tone: 'danger',
-                });
-                if (confirmed) remove.mutate(row.id);
-              }}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                loading={remove.isPending && remove.variables === row.id}
+                onClick={async () => {
+                  const confirmed = await confirmDialog({
+                    title: `Delete work order ${row.code}?`,
+                    message:
+                      'An order a hire bill has been raised against cannot be deleted.',
+                    confirmLabel: 'Delete',
+                    tone: 'danger',
+                  });
+                  if (confirmed) remove.mutate(row.id);
+                }}
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
         )}
       />

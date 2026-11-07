@@ -61,6 +61,7 @@ import {
 } from '@/app/ui/settings/form-fields';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import { toast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /** Add/Edit user — roles and status only. Accounts are never created here; that is
  * feature 010's invite flow. */
@@ -446,6 +447,7 @@ const STATUS_FILTERS = ['', 'active', 'pending', 'deactivated'] as const;
 const PAGE_SIZE = 25;
 
 export default function UserList() {
+  const canDelete = useCanDelete();
   const [editing, setEditing] = useState<UserSummary | null>(null);
   const [resetting, setResetting] = useState<UserSummary | null>(null);
   const queryClient = useQueryClient();
@@ -717,7 +719,7 @@ export default function UserList() {
               )}
               {/* Not on your own row either: the API refuses deleting your own account (036 C3,
                   OWN_ACCOUNT) — another administrator does it. */}
-              {!isSelf && (
+              {!isSelf && canDelete && (
                 <RowAction
                   type="button"
                   loading={removal.isPending && removal.variables?.id === user.id}

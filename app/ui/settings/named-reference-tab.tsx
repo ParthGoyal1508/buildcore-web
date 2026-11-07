@@ -14,6 +14,7 @@ import {
   SecondaryButton,
   TextField,
 } from '@/app/ui/settings/form-fields';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * Departments and Designations are the same screen with a different noun and
@@ -37,6 +38,7 @@ export default function NamedReferenceTab({
     remove: (id: string) => Promise<void>;
   };
 }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<NamedReference | null>(null);
@@ -126,16 +128,18 @@ export default function NamedReferenceTab({
             <RowAction type="button" onClick={() => openEdit(row)}>
               Edit
             </RowAction>
-            <RowAction
-              type="button"
-              onClick={() => {
-                setDeleteError(null);
-                setConfirming(row);
-              }}
-              className="text-red-600"
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                type="button"
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirming(row);
+                }}
+                className="text-red-600"
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

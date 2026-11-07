@@ -34,6 +34,7 @@ import {
 import { useToast } from '@/app/ui/toast';
 import { searchItems } from './inventory-search';
 import Pager from './pager';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const PAGE_SIZE = 25;
 
@@ -84,6 +85,7 @@ const recipeOf = (row: CompositeItem) =>
  * instead.
  */
 export default function CompositeItemsTab() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -405,23 +407,25 @@ export default function CompositeItemsTab() {
             >
               {row.active ? 'Deactivate' : 'Reactivate'}
             </RowAction>
-            <RowAction
-              onClick={async () => {
-                if (
-                  await confirmDialog({
-                    title: 'Delete this composite item?',
-                    message:
-                      'This cannot be undone. A composite that has been issued cannot be deleted; deactivate it instead.',
-                    confirmLabel: 'Delete',
-                    tone: 'danger',
-                  })
-                )
-                  remove.mutate(row.id);
-              }}
-              loading={remove.isPending && remove.variables === row.id}
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: 'Delete this composite item?',
+                      message:
+                        'This cannot be undone. A composite that has been issued cannot be deleted; deactivate it instead.',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    })
+                  )
+                    remove.mutate(row.id);
+                }}
+                loading={remove.isPending && remove.variables === row.id}
+              >
+                Delete
+              </RowAction>
+            )}
           </div>
         )}
       />

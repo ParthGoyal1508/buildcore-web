@@ -29,6 +29,7 @@ import QueryError from '@/app/ui/query-error';
 import { ListSkeleton } from '@/app/ui/skeletons';
 import { TABLE } from '@/app/ui/table-classes';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 type Open = { kind: 'add' } | { kind: 'replace'; row: OpeningStock } | { kind: 'import' } | null;
 
@@ -40,6 +41,7 @@ type Open = { kind: 'add' } | { kind: 'replace'; row: OpeningStock } | { kind: '
  * replaceable until stock of that item moves at that store; after that it is shown locked.
  */
 export default function OpeningStockPage() {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const companyId = useSelectedCompanyId();
@@ -176,23 +178,25 @@ export default function OpeningStockPage() {
                         >
                           Replace
                         </RowAction>
-                        <RowAction
-                          loading={remove.isPending && remove.variables?.id === row.id}
-                          onClick={async () => {
-                            if (
-                              await confirmDialog(
-                                OPENING_STOCK_COPY.confirmDelete(
-                                  row.itemName,
-                                  row.siteName,
-                                ),
-                              )
-                            ) {
-                              remove.mutate(row);
-                            }
-                          }}
-                        >
-                          Delete
-                        </RowAction>
+                        {canDelete && (
+                          <RowAction
+                            loading={remove.isPending && remove.variables?.id === row.id}
+                            onClick={async () => {
+                              if (
+                                await confirmDialog(
+                                  OPENING_STOCK_COPY.confirmDelete(
+                                    row.itemName,
+                                    row.siteName,
+                                  ),
+                                )
+                              ) {
+                                remove.mutate(row);
+                              }
+                            }}
+                          >
+                            Delete
+                          </RowAction>
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-gray-500" title={OPENING_STOCK_COPY.locked}>

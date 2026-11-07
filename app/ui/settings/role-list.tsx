@@ -16,8 +16,10 @@ import Modal from '@/app/ui/settings/modal';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { FormError, RowAction, SecondaryButton } from '@/app/ui/settings/form-fields';
 import RoleModal from '@/app/ui/settings/role-modal';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 export default function RoleList() {
+  const canDelete = useCanDelete();
   const [editing, setEditing] = useState<Role | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [confirming, setConfirming] = useState<Role | null>(null);
@@ -129,26 +131,28 @@ export default function RoleList() {
             >
               Edit
             </RowAction>
-            <RowAction
-              type="button"
-              // The default role cannot be deleted either (029 FR-001) — the API refuses it, and
-              // a button that only ever fails is worse than one that says why it is off.
-              disabled={role.isProtected || role.isDefault}
-              title={
-                role.isProtected
-                  ? MESSAGES.protectedRole
-                  : role.isDefault
-                    ? 'New accounts are given this role, so it cannot be deleted.'
-                    : undefined
-              }
-              onClick={() => {
-                setDeleteError(null);
-                setConfirming(role);
-              }}
-              className="text-red-600"
-            >
-              Delete
-            </RowAction>
+            {canDelete && (
+              <RowAction
+                type="button"
+                // The default role cannot be deleted either (029 FR-001) — the API refuses it, and
+                // a button that only ever fails is worse than one that says why it is off.
+                disabled={role.isProtected || role.isDefault}
+                title={
+                  role.isProtected
+                    ? MESSAGES.protectedRole
+                    : role.isDefault
+                      ? 'New accounts are given this role, so it cannot be deleted.'
+                      : undefined
+                }
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirming(role);
+                }}
+                className="text-red-600"
+              >
+                Delete
+              </RowAction>
+            )}
           </>
         )}
       />

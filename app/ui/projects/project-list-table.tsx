@@ -11,6 +11,7 @@ import { RowAction, RowActionLink } from '@/app/ui/settings/form-fields';
 import ResponsiveList, { Column } from '@/app/ui/settings/responsive-list';
 import { confirmDialog } from '@/app/ui/dialogs';
 import { dateLabel } from '@/app/lib/format';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * The portfolio list (spec FR-010, FR-014).
@@ -45,6 +46,7 @@ export default function ProjectListTable({
   /** The row being deleted, for its button's spinner; every Delete is disabled meanwhile. */
   deletingId?: string | null;
 }) {
+  const canDelete = useCanDelete();
   const isDeleting = Boolean(deletingId);
   const columns: Column<ProjectListItem>[] = [
     {
@@ -179,31 +181,33 @@ export default function ProjectListTable({
           <RowActionLink href={ROUTES.projectsEditProject(row.id)}>
             Edit
           </RowActionLink>
-          <RowAction
-            disabled={row.isLocked || isDeleting}
-            loading={deletingId === row.id}
-            title={row.isLocked ? MESSAGES.projectLocked : undefined}
-            // It deleted on the click until 2026-10-15, and a project goes with its documents, work
-            // orders and bills.
-            onClick={async () => {
-              if (
-                await confirmDialog({
-                  title: `Delete ${row.name}?`,
-                  // 036 I23: what the API actually does. It refuses (409) a project with any BOQ,
-                  // daily report, revenue entry or RA bill rather than cascading them away, and its
-                  // sites survive. The old wording described a cascade that never happens.
-                  message:
-                    'Only a project nothing has been recorded against can be deleted — one with a BOQ, daily reports, revenue or RA bills is refused. Its sites stay. This cannot be undone.',
-                  confirmLabel: 'Delete project',
-                  tone: 'danger',
-                  typeToConfirm: 'DELETE',
-                })
-              )
-                onDelete(row.id);
-            }}
-          >
-            Delete
-          </RowAction>
+          {canDelete && (
+            <RowAction
+              disabled={row.isLocked || isDeleting}
+              loading={deletingId === row.id}
+              title={row.isLocked ? MESSAGES.projectLocked : undefined}
+              // It deleted on the click until 2026-10-15, and a project goes with its documents, work
+              // orders and bills.
+              onClick={async () => {
+                if (
+                  await confirmDialog({
+                    title: `Delete ${row.name}?`,
+                    // 036 I23: what the API actually does. It refuses (409) a project with any BOQ,
+                    // daily report, revenue entry or RA bill rather than cascading them away, and its
+                    // sites survive. The old wording described a cascade that never happens.
+                    message:
+                      'Only a project nothing has been recorded against can be deleted — one with a BOQ, daily reports, revenue or RA bills is refused. Its sites stay. This cannot be undone.',
+                    confirmLabel: 'Delete project',
+                    tone: 'danger',
+                    typeToConfirm: 'DELETE',
+                  })
+                )
+                  onDelete(row.id);
+              }}
+            >
+              Delete
+            </RowAction>
+          )}
         </>
       )}
     />

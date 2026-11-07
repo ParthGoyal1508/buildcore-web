@@ -57,8 +57,12 @@ import {
 const NAV_PERMISSIONS = PERMISSIONS.filter((permission) =>
   NAV_GOVERNING_PERMISSIONS.has(permission),
 );
+// Export and delete are not offered (client, 2026-11-07): whoever can view a list may download
+// it, and deleting a record is Super Admin only, so neither checkbox would control anything.
+const NOT_OFFERED: ReadonlySet<string> = new Set(['DATA_EXPORT', 'DATA_DELETE']);
 const NON_NAV_PERMISSIONS = PERMISSIONS.filter(
-  (permission) => !NAV_GOVERNING_PERMISSIONS.has(permission),
+  (permission) =>
+    !NAV_GOVERNING_PERMISSIONS.has(permission) && !NOT_OFFERED.has(permission),
 );
 
 

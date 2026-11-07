@@ -22,6 +22,7 @@ import { SecondaryButton } from '@/app/ui/settings/form-fields';
 import { confirmDialog } from '@/app/ui/dialogs';
 import QueryError from '@/app/ui/query-error';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 /**
  * What has been paid against one bill (028 FR-021).
@@ -204,6 +205,7 @@ function Payments({
   onError: (message: string | null) => void;
   onChanged: () => void;
 }) {
+  const canDelete = useCanDelete();
   const [adviceBusy, setAdviceBusy] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const canWrite = useCanWrite();
@@ -296,26 +298,28 @@ function Payments({
                   </SecondaryButton>
                 ))}
               </span>
-              <Button
-                type="button"
-                intent="write"
-                loading={remove.isPending && remove.variables === payment.id}
-                disabled={remove.isPending}
-                onClick={async () => {
-                  if (
-                    await confirmDialog({
-                      title: 'Remove this payment?',
-                      message: SETTLEMENT_COPY.removeConfirm,
-                      confirmLabel: 'Remove',
-                      tone: 'danger',
-                    })
-                  ) {
-                    remove.mutate(payment.id);
-                  }
-                }}
-              >
-                {SETTLEMENT_COPY.remove}
-              </Button>
+              {canDelete && (
+                <Button
+                  type="button"
+                  intent="write"
+                  loading={remove.isPending && remove.variables === payment.id}
+                  disabled={remove.isPending}
+                  onClick={async () => {
+                    if (
+                      await confirmDialog({
+                        title: 'Remove this payment?',
+                        message: SETTLEMENT_COPY.removeConfirm,
+                        confirmLabel: 'Remove',
+                        tone: 'danger',
+                      })
+                    ) {
+                      remove.mutate(payment.id);
+                    }
+                  }}
+                >
+                  {SETTLEMENT_COPY.remove}
+                </Button>
+              )}
             </li>
           ))}
         </ul>

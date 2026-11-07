@@ -28,6 +28,7 @@ import {
 import Modal from '@/app/ui/settings/modal';
 import { TABLE } from '@/app/ui/table';
 import { useToast } from '@/app/ui/toast';
+import { useCanDelete } from '@/app/lib/can-delete';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -51,6 +52,7 @@ export default function ClientBillReceipts({
   isDraft: boolean;
   isLocked: boolean;
 }) {
+  const canDelete = useCanDelete();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [recording, setRecording] = useState(false);
@@ -185,23 +187,25 @@ export default function ClientBillReceipts({
                   </td>
                   {!isLocked && (
                     <td className={TABLE.td}>
-                      <RowAction
-                        onClick={async () => {
-                          if (
-                            await confirmDialog({
-                              title: CLIENT_HOLDINGS_COPY.removeTitle,
-                              message: CLIENT_HOLDINGS_COPY.removeMessage(
-                                rupees(receipt.settles),
-                              ),
-                              confirmLabel: 'Remove',
-                              tone: 'danger',
-                            })
-                          )
-                            remove.mutate(receipt.id);
-                        }}
-                      >
-                        Remove
-                      </RowAction>
+                      {canDelete && (
+                        <RowAction
+                          onClick={async () => {
+                            if (
+                              await confirmDialog({
+                                title: CLIENT_HOLDINGS_COPY.removeTitle,
+                                message: CLIENT_HOLDINGS_COPY.removeMessage(
+                                  rupees(receipt.settles),
+                                ),
+                                confirmLabel: 'Remove',
+                                tone: 'danger',
+                              })
+                            )
+                              remove.mutate(receipt.id);
+                          }}
+                        >
+                          Remove
+                        </RowAction>
+                      )}
                     </td>
                   )}
                 </tr>
